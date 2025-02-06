@@ -1,15 +1,15 @@
 [package]
 name = "bundler"
-version = "0.1.0"
-edition = "2021"
+version = { workspace = true }
+edition = { workspace = true }
 
 [dependencies]
-tauri-bundler = "2.2.1"
-tauri-utils = "2.1.1"
-serde_json = "1.0.135"
-log = "0.4.22"
-env_logger = "0.11.6"
-clap = { version = "4.5.27", features = ["derive"] }
+tauri-bundler = { workspace = true }
+tauri-utils = { workspace = true }
+serde_json = { workspace = true }
+log = { workspace = true }
+env_logger = { workspace = true }
+clap = { workspace = true, features = ["derive"] }
 
 [[bin]]
 name = "bundle-nomos-node"

@@ -1,15 +1,15 @@
 [package]
 name = "nomos-da-messages"
-version = "0.1.0"
-edition = "2021"
+edition = { workspace = true }
+version = { workspace = true }
 
 [dependencies]
-nomos-core = { path = "../../../nomos-core/chain-defs" }
-kzgrs-backend = { path = "../../kzgrs-backend" }
-serde = { version = "1.0.215", features = ["derive"] }
-futures = "0.3.31"
-tokio = "1"
+nomos-core = { workspace = true }
+kzgrs-backend = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+futures = { workspace = true }
+tokio = { workspace = true }
 
 [dev-dependencies]
-tokio = { version = "1", features = ["macros"] }
-kzgrs-backend = { path = "../../kzgrs-backend", features = ["testutils"] }
+tokio = { workspace = true, features = ["macros"] }
+kzgrs-backend = { workspace = true, features = ["testutils"] }

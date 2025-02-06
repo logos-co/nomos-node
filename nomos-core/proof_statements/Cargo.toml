@@ -1,10 +1,10 @@
 [package]
 name = "nomos_proof_statements"
-version = "0.1.0"
-edition = "2021"
+version = { workspace = true }
+edition = { workspace = true }
 
 [dependencies]
-cl = { path = "../cl" }
-serde = { version = "1.0", features = ["derive"] }
-crypto-bigint = { version = "0.5.5", features = ["serde"] }
-sha2 = "0.10"
+cl = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+crypto-bigint = { workspace = true, features = ["serde"] }
+sha2 = { workspace = true }

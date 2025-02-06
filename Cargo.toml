@@ -110,6 +110,7 @@ indexmap = { version = "1.9" }
 const-hex = { version = "1" }
 risc0-zkvm = { version = "1.1" }
 tracing = { version = "0.1" }
+rocksdb = { version = "0.22" }
 anyhow = { version = "1.0" }
 rand = { version = "0.8" }
 rand_core = { version = "0.6.0" }
@@ -155,7 +156,7 @@ opentelemetry = { version = "0.25" }
 opentelemetry-otlp = { version = "0.25" }
 opentelemetry_sdk = { version = "0.25" }
 tracing-appender = { version = "0.2" }
-tracing-loki = { version = "0.25" }
+tracing-loki = { version = "0.2.5" }
 tracing-opentelemetry = { version = "0.26" }
 tracing-gelf = { version = "0.7" }
 chrono = { version = "0.4" }
@@ -198,3 +199,5 @@ ed25519-dalek = { version = "2" }
 tauri-bundler = { version = "2.2.1" }
 tauri-utils = { version = "2.1.1" }
 env_logger = { version = "0.11.6" }
+crypto-bigint = { version = "0.5.5" }
+risc0-build = { version = "1.0" }

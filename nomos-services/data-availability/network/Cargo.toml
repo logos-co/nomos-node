@@ -1,21 +1,21 @@
 [package]
 name = "nomos-da-network-service"
-version = "0.1.0"
-edition = "2021"
+version = { workspace = true }
+edition = { workspace = true }
 
 [dependencies]
-async-trait = "0.1"
-futures = "0.3"
-kzgrs-backend = { path = "../../../nomos-da/kzgrs-backend" }
-overwatch-rs = { git = "https://github.com/logos-co/Overwatch", rev = "f5f7ea0" }
-nomos-core = { path = "../../../nomos-core/chain-defs" }
-nomos-libp2p = { path = "../../../nomos-libp2p" }
-nomos-da-network-core = { path = "../../../nomos-da/network/core" }
-nomos-tracing = { path = "../../../nomos-tracing" }
-subnetworks-assignations = { path = "../../../nomos-da/network/subnetworks-assignations" }
-libp2p = { version = "0.53", features = ["ed25519"] }
-serde = { version = "1.0", features = ["derive"] }
-tokio = { version = "1", features = ["macros", "sync"] }
-tokio-stream = "0.1"
-tracing = "0.1"
-log = "0.4.22"
+async-trait = { workspace = true }
+futures = { workspace = true }
+kzgrs-backend = { workspace = true }
+overwatch-rs = { workspace = true, rev = "f5f7ea0" }
+nomos-core = { workspace = true }
+nomos-libp2p = { workspace = true }
+nomos-da-network-core = { workspace = true }
+nomos-tracing = { workspace = true }
+subnetworks-assignations = { workspace = true }
+libp2p = { workspace = true, features = ["ed25519"] }
+serde = { workspace = true, features = ["derive"] }
+tokio = { workspace = true, features = ["macros", "sync"] }
+tokio-stream = { workspace = true }
+tracing = { workspace = true }
+log = { workspace = true }

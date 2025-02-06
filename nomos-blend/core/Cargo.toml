@@ -1,23 +1,22 @@
 [package]
 name = "nomos-blend"
-version = "0.1.0"
-edition = "2021"
+version = { workspace = true }
+edition = { workspace = true }
 
 [dependencies]
-blake2 = "0.10"
-cached = "0.53"
-tokio = { version = "1", features = ["time", "sync", "macros"] }
-tokio-stream = "0.1"
-tracing = "0.1"
-rand = "0.8"
-serde = { version = "1.0", features = ["derive"] }
-nomos-blend-message = { path = "../message" }
-futures = "0.3"
-multiaddr = "0.18"
-x25519-dalek = { version = "2", features = ["getrandom", "static_secrets"] }
-fixed = { version = "1", features = ["serde-str"] }
-
+blake2 = { workspace = true }
+cached = { workspace = true }
+tokio = { workspace = true, features = ["time", "sync", "macros"] }
+tokio-stream = { workspace = true }
+tracing = { workspace = true }
+rand = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+nomos-blend-message = { workspace = true }
+futures = { workspace = true }
+multiaddr = { workspace = true }
+x25519-dalek = { workspace = true, features = ["getrandom", "static_secrets"] }
+fixed = { workspace = true, features = ["serde-str"] }
 
 [dev-dependencies]
-tokio = { version = "1", features = ["rt-multi-thread", "time"] }
-rand_chacha = "0.3"
+tokio = { workspace = true, features = ["rt-multi-thread", "time"] }
+rand_chacha = { workspace = true }

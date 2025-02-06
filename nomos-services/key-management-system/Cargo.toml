@@ -1,23 +1,23 @@
 [package]
 name = "key-management-system"
-version = "0.1.0"
-edition = "2021"
+version = { workspace = true }
+edition = { workspace = true }
 
 [dependencies]
-overwatch-rs = { git = "https://github.com/logos-co/Overwatch", rev = "4160cdd" }
-tokio = { version = "1", features = ["macros"] }
-bytes = "1"
-futures = "0.3"
-async-trait = "0.1"
-log = "0.4.22"
-thiserror = "2"
-zeroize = { version = "1", features = ["zeroize_derive"] }
-ed25519-dalek = { version = "2", features = ["serde", "zeroize"] }
-serde = { version = "1", features = ["derive"] }
+overwatch-rs = { workspace = true, rev = "4160cdd" }
+tokio = { workspace = true, features = ["macros"] }
+bytes = { workspace = true }
+futures = { workspace = true }
+async-trait = { workspace = true }
+log = { workspace = true }
+thiserror = { workspace = true }
+zeroize = { workspace = true, features = ["zeroize_derive"] }
+ed25519-dalek = { workspace = true, features = ["serde", "zeroize"] }
+serde = { workspace = true, features = ["derive"] }
 
 [dev-dependencies]
-ed25519-dalek = { version = "2", features = ["rand_core"] }
-rand = "0.8"
+ed25519-dalek = { workspace = true, features = ["rand_core"] }
+rand = { workspace = true }
 
 [features]
 default = ["preload"]

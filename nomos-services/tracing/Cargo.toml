@@ -1,23 +1,23 @@
 [package]
 name = "nomos-tracing-service"
-version = "0.1.0"
-edition = "2021"
+version = { workspace = true }
+edition = { workspace = true }
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-async-trait = "0.1"
-futures = "0.3"
-nomos-tracing = { path = "../../nomos-tracing" }
-opentelemetry = { version = "0.25" }
-opentelemetry-otlp = "0.25"
-opentelemetry_sdk = { version = "0.25", features = ["rt-tokio"] }
+async-trait = { workspace = true }
+futures = { workspace = true }
+nomos-tracing = { workspace = true }
+opentelemetry = { workspace = true }
+opentelemetry-otlp = { workspace = true }
+opentelemetry_sdk = { workspace = true, features = ["rt-tokio"] }
 overwatch-rs = { git = "https://github.com/logos-co/Overwatch", rev = "f5f7ea0" }
-serde = { version = "1.0", features = ["derive"] }
-tokio = { version = "1", features = ["time"] }
-tracing = "0.1"
-tracing-appender = "0.2"
-tracing-loki = "0.2.5"
-tracing-opentelemetry = "0.26"
-tracing-subscriber = { version = "0.3", features = ["json", "registry"] }
-tracing-gelf = "0.7"
+serde = { workspace = true, features = ["derive"] }
+tokio = { workspace = true, features = ["time"] }
+tracing = { workspace = true }
+tracing-appender = { workspace = true }
+tracing-loki = { workspace = true }
+tracing-opentelemetry = { workspace = true }
+tracing-subscriber = { workspace = true, features = ["json", "registry"] }
+tracing-gelf = { workspace = true }

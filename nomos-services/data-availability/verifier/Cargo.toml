@@ -1,29 +1,29 @@
 [package]
 name = "nomos-da-verifier"
-version = "0.1.0"
-edition = "2021"
+version = { workspace = true }
+edition = { workspace = true }
 
 [dependencies]
-async-trait = "0.1"
-blst = { version = "0.3.11", features = ["serde-secret"] }
-bytes = "1.2"
-futures = "0.3"
-hex = "0.4.3"
-kzgrs-backend = { path = "../../../nomos-da/kzgrs-backend" }
-libp2p = { version = "0.54", features = ["ed25519"] }
-nomos-core = { path = "../../../nomos-core/chain-defs" }
-nomos-da-storage = { path = "../../../nomos-da/storage" }
-nomos-da-network-core = { path = "../../../nomos-da/network/core" }
-nomos-da-network-service = { path = "../../../nomos-services/data-availability/network" }
-nomos-storage = { path = "../../../nomos-services/storage" }
-nomos-tracing = { path = "../../../nomos-tracing" }
-overwatch-rs = { git = "https://github.com/logos-co/Overwatch", rev = "f5f7ea0" }
-overwatch-derive = { git = "https://github.com/logos-co/Overwatch", rev = "f5f7ea0" }
-serde = { version = "1.0", features = ["derive"] }
-subnetworks-assignations = { path = "../../../nomos-da/network/subnetworks-assignations" }
-tokio = { version = "1", features = ["sync", "macros"] }
-tokio-stream = "0.1.15"
-tracing = { version = "0.1", features = ["attributes"] }
+async-trait = { workspace = true }
+blst = { workspace = true, features = ["serde-secret"] }
+bytes = { workspace = true }
+futures = { workspace = true }
+hex = { workspace = true }
+kzgrs-backend = { workspace = true }
+libp2p = { workspace = true, features = ["ed25519"] }
+nomos-core = { workspace = true }
+nomos-da-storage = { workspace = true }
+nomos-da-network-core = { workspace = true }
+nomos-da-network-service = { workspace = true }
+nomos-storage = { workspace = true }
+nomos-tracing = { workspace = true }
+overwatch-rs = { workspace = true, rev = "f5f7ea0" }
+overwatch-derive = { workspace = true, rev = "f5f7ea0" }
+serde = { workspace = true, features = ["derive"] }
+subnetworks-assignations = { workspace = true }
+tokio = { workspace = true, features = ["sync", "macros"] }
+tokio-stream = { workspace = true }
+tracing = { workspace = true, features = ["attributes"] }
 
 [features]
 rocksdb-backend = ["nomos-storage/rocksdb-backend"]

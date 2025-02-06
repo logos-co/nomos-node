@@ -1,28 +1,28 @@
 [package]
 name = "nomos-blend-network"
-version = "0.1.0"
-edition = "2021"
+version = { workspace = true }
+edition = { workspace = true }
 
 [dependencies]
-cached = "0.53.1"
-futures = "0.3.30"
-futures-timer = "3.0.3"
-libp2p = "0.55"
-tracing = "0.1"
-nomos-blend = { path = "../core" }
-nomos-blend-message = { path = "../message" }
-sha2 = "0.10"
-rand = "0.8"
-opentelemetry = "0.27.1"
-tokio = { version = "1", features = ["time"], optional = true }
-tokio-stream = { version = "0.1", optional = true }
+cached = { workspace = true }
+futures = { workspace = true }
+futures-timer = { workspace = true }
+libp2p = { workspace = true }
+tracing = { workspace = true }
+nomos-blend = { workspace = true }
+nomos-blend-message = { workspace = true }
+sha2 = { workspace = true }
+rand = { workspace = true }
+opentelemetry = { workspace = true }
+tokio = { workspace = true, features = ["time"], optional = true }
+tokio-stream = { workspace = true, optional = true }
 
 [dev-dependencies]
-tokio = { version = "1", features = ["macros", "rt-multi-thread", "time"] }
-tokio-stream = "0.1"
-libp2p = { version = "0.55", features = ["ed25519", "tokio", "quic"] }
-tracing-subscriber = "0.3.18"
-fixed = "1"
+tokio = { workspace = true, features = ["macros", "rt-multi-thread", "time"] }
+tokio-stream = { workspace = true }
+libp2p = { workspace = true, features = ["ed25519", "tokio", "quic"] }
+tracing-subscriber = { workspace = true }
+fixed = { workspace = true }
 
 [features]
 default = ["tokio"]

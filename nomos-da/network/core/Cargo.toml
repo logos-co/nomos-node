@@ -1,32 +1,40 @@
 [package]
 name = "nomos-da-network-core"
-version = "0.1.0"
-edition = "2021"
+edition = { workspace = true }
+version = { workspace = true }
 
 [dependencies]
-libp2p = { version = "0.53", features = ["macros", "tokio", "quic"] }
-libp2p-stream = "0.1.0-alpha"
-futures = "0.3"
-tracing = "0.1"
-indexmap = "2.2"
-subnetworks-assignations = { path = "../subnetworks-assignations" }
-nomos-da-messages = { path = "../messages" }
-nomos-core = { path = "../../../nomos-core/chain-defs" }
-kzgrs-backend = { path = "../../kzgrs-backend" }
-tracing-subscriber = "0.3.18"
-void = "1.0.2"
-either = "1.13.0"
-log = "0.4"
-serde = "1.0"
-rand = "0.8"
-rand_chacha = "0.3"
-tokio = { version = "1" }
-tokio-stream = "0.1"
-thiserror = "1.0"
+libp2p = { workspace = true, features = ["macros", "tokio", "quic"] }
+libp2p-stream = { workspace = true }
+futures = { workspace = true }
+tracing = { workspace = true }
+indexmap = { workspace = true }
+subnetworks-assignations = { workspace = true }
+nomos-da-messages = { workspace = true }
+nomos-core = { workspace = true }
+kzgrs-backend = { workspace = true }
+tracing-subscriber = { workspace = true }
+void = { workspace = true }
+either = { workspace = true }
+log = { workspace = true }
+serde = { workspace = true }
+rand = { workspace = true }
+rand_chacha = { workspace = true }
+tokio = { workspace = true }
+tokio-stream = { workspace = true }
+thiserror = { workspace = true }
 
 [dev-dependencies]
-tokio = { version = "1", features = ["macros", "rt-multi-thread", "time"] }
-libp2p = { version = "0.53", features = ["ed25519", "ping", "macros", "quic", "tcp", "yamux", "noise"] }
-tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-kzgrs-backend = { path = "../../kzgrs-backend", features = ["testutils"] }
-blake2 = "0.10"
+tokio = { workspace = true, features = ["macros", "rt-multi-thread", "time"] }
+libp2p = { workspace = true, features = [
+    "ed25519",
+    "ping",
+    "macros",
+    "quic",
+    "tcp",
+    "yamux",
+    "noise",
+] }
+tracing-subscriber = { workspace = true, features = ["env-filter"] }
+kzgrs-backend = { workspace = true, features = ["testutils"] }
+blake2 = { workspace = true }

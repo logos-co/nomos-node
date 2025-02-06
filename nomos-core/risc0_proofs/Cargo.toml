@@ -1,11 +1,10 @@
 [package]
 name = "nomos_risc0_proofs"
-version = "0.1.0"
-edition = "2021"
-
-[build-dependencies]
-risc0-build = { version = "1.0" }
+version = { workspace = true }
+edition = { workspace = true }
 
 [package.metadata.risc0]
 methods = ["bundle_balance", "covenant_nop", "ptx", "proof_of_leadership"]
 
+[build-dependencies]
+risc0-build = { workspace = true }
