@@ -25,7 +25,7 @@ pub trait Transaction {
 
 pub trait TxSelect {
     type Tx: Transaction;
-    type Settings: Clone;
+    type Settings: Clone + Send;
     fn new(settings: Self::Settings) -> Self;
 
     fn select_tx_from<'i, I: Iterator<Item = Self::Tx> + 'i>(

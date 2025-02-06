@@ -7,8 +7,6 @@ pub mod storage;
 mod time;
 
 use crate::relays::CryptarchiaConsensusRelays;
-use crate::storage::adapters::StorageAdapter;
-use crate::storage::StorageAdapter as StorageAdapterTrait;
 use core::fmt::Debug;
 use cryptarchia_engine::Slot;
 use futures::StreamExt;
@@ -435,7 +433,6 @@ where
             ..
         } = self.service_state.settings_reader.get_updated_settings();
 
-        let security_param = config.consensus_config.security_param as u64;
         let genesis_id = HeaderId::from([0; 32]);
         let mut cryptarchia = Cryptarchia {
             consensus: <cryptarchia_engine::Cryptarchia<_>>::from_genesis(
@@ -476,7 +473,6 @@ where
                             block,
                             &relays,
                             &mut self.block_subscription_sender,
-                            &security_param
                         )
                         .await;
 
@@ -740,7 +736,6 @@ where
             TxS,
         >,
         block_broadcaster: &mut broadcast::Sender<Block<ClPool::Item, DaPool::Item>>,
-        security_param: &u64,
     ) -> Cryptarchia {
         tracing::debug!("received proposal {:?}", block);
 
@@ -791,10 +786,6 @@ where
                     tracing::error!("Could not send block to storage: {e}");
                 }
 
-                // set as latest savable state
-                Self::try_save_security_block(&cryptarchia.consensus, relays.storage_adapter())
-                    .await;
-
                 if let Err(e) = block_broadcaster.send(block) {
                     tracing::error!("Could not notify block to services {e}");
                 }
@@ -810,20 +801,6 @@ where
         }
 
         cryptarchia
-    }
-
-    /// Try to save the block for a given security parameter (k)
-    /// Try to fetch the block that is `security_param` blocks behind the given block.
-    /// If the block is found it will send its header id to the storage.
-    async fn try_save_security_block(
-        consensus: &cryptarchia_engine::Cryptarchia<HeaderId>,
-        storage_adapter: &StorageAdapter<Storage, TxS::Tx, BS::BlobId>,
-    ) {
-        if let Some(header_id) = consensus.get_security_block_header_id() {
-            storage_adapter
-                .save_header_as_security_block(&header_id)
-                .await;
-        }
     }
 
     #[allow(clippy::too_many_arguments)]
