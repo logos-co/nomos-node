@@ -72,16 +72,4 @@ where
     async fn get_block(&self, key: &HeaderId) -> Option<Self::Block> {
         self.get_value(key).await
     }
-
-    async fn get_security_block_header(&self) -> Option<HeaderId> {
-        self.get_value(&SECURITY_BLOCK_KEY).await
-    }
-
-    async fn save_header_as_security_block(&self, header_id: &HeaderId) {
-        let security_block_msg = <StorageMsg<_>>::new_store_message(SECURITY_BLOCK_KEY, header_id);
-
-        if let Err((e, _msg)) = self.storage_relay.send(security_block_msg).await {
-            tracing::error!("Could not send security block id to storage: {e}");
-        }
-    }
 }
