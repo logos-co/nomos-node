@@ -26,6 +26,7 @@ mod tests {
     use serde::{Deserialize, Serialize};
     use std::env::temp_dir;
     use std::path::PathBuf;
+    use tracing;
 
     #[derive(Debug, Clone, Default, Serialize, Deserialize)]
     struct MyState {
