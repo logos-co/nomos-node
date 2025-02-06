@@ -791,12 +791,8 @@ where
                 }
 
                 // set as latest savable state
-                Self::try_save_security_block(
-                    block.clone(),
-                    security_param,
-                    relays.storage_adapter(),
-                )
-                .await;
+                Self::try_save_security_block(&cryptarchia.consensus, relays.storage_adapter())
+                    .await;
 
                 if let Err(e) = block_broadcaster.send(block) {
                     tracing::error!("Could not notify block to services {e}");
@@ -816,18 +812,16 @@ where
     }
 
     /// Try to save the block for a given security parameter (k)
-    /// This will try to fetch the block that is `security_param` blocks behind the given block.
-    /// If the block is found it will send the block id to the storage
+    /// Try to fetch the block that is `security_param` blocks behind the given block.
+    /// If the block is found it will send its header id to the storage.
     async fn try_save_security_block(
-        current_block: Block<TxS::Tx, BS::BlobId>,
-        security_param: &u64,
+        consensus: &cryptarchia_engine::Cryptarchia<HeaderId>,
         storage_adapter: &StorageAdapter<Storage, TxS::Tx, BS::BlobId>,
     ) {
-        if let Some(security_block) = storage_adapter
-            .get_block_for_security_param(current_block, security_param)
-            .await
-        {
-            storage_adapter.save_security_block(security_block).await;
+        if let Some(header_id) = consensus.get_security_block_header_id() {
+            storage_adapter
+                .save_header_as_security_block(&header_id)
+                .await;
         }
     }
 

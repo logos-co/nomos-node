@@ -13,6 +13,8 @@ use serde::Serialize;
 // Internal
 use crate::storage::StorageAdapter as StorageAdapterTrait;
 
+const SECURITY_BLOCK_KEY: &str = "security_block_header_id";
+
 pub struct StorageAdapter<Storage, Tx, BlobCertificate>
 where
     Storage: StorageBackend + Send + Sync,
@@ -71,24 +73,12 @@ where
         self.get_value(key).await
     }
 
-    async fn get_block_for_security_param(
-        &self,
-        current_block: Self::Block,
-        security_param: &u64,
-    ) -> Option<Self::Block> {
-        let mut current_block = current_block;
-        // TODO: This implies fetching from DB `security_param` times. We should optimize this.
-        for _ in 0..*security_param {
-            let parent_block_header = current_block.header().parent();
-            let parent_block = self.get_block(&parent_block_header).await?;
-            current_block = parent_block;
-        }
-        Some(current_block)
+    async fn get_security_block_header(&self) -> Option<HeaderId> {
+        self.get_value(&SECURITY_BLOCK_KEY).await
     }
 
-    async fn save_security_block(&self, block: Self::Block) {
-        let security_block_msg =
-            <StorageMsg<_>>::new_store_message("security_block_header_id", block.header().id());
+    async fn save_header_as_security_block(&self, header_id: &HeaderId) {
+        let security_block_msg = <StorageMsg<_>>::new_store_message(SECURITY_BLOCK_KEY, header_id);
 
         if let Err((e, _msg)) = self.storage_relay.send(security_block_msg).await {
             tracing::error!("Could not send security block id to storage: {e}");
