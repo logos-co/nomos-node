@@ -14,7 +14,7 @@ nomos-da-sampling = { workspace = true }
 nomos-mempool = { workspace = true, features = ["libp2p"] }
 nomos-tracing = { workspace = true }
 kzgrs-backend = { workspace = true }
-overwatch-rs = { workspace = true, rev = "f5f7ea0" }
+overwatch-rs = { git = "https://github.com/logos-co/Overwatch", rev = "f5f7ea0" }
 rand = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 subnetworks-assignations = { workspace = true }

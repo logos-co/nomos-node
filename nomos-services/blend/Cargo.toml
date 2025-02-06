@@ -13,7 +13,7 @@ nomos-core = { workspace = true }
 nomos-blend-network = { workspace = true, features = ["tokio"] }
 nomos-blend-message = { workspace = true }
 nomos-network = { workspace = true }
-overwatch-rs = { workspace = true, rev = "f5f7ea0" }
+overwatch-rs = { git = "https://github.com/logos-co/Overwatch", rev = "f5f7ea0" }
 rand = { workspace = true }
 rand_chacha = { workspace = true }
 serde = { workspace = true, features = ["derive"] }

@@ -4,8 +4,8 @@ version = { workspace = true }
 edition = { workspace = true }
 
 [dependencies]
-overwatch-rs = { workspace = true, rev = "1b83775" }
-overwatch-derive = { workspace = true, rev = "1b83775" }
+overwatch-rs = { git = "https://github.com/logos-co/Overwatch", rev = "1b83775" }
+overwatch-derive = { git = "https://github.com/logos-co/Overwatch", rev = "1b83775" }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 thiserror = { workspace = true }

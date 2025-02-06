@@ -4,7 +4,7 @@ version = { workspace = true }
 edition = { workspace = true }
 
 [dependencies]
-overwatch-rs = { workspace = true, rev = "4160cdd" }
+overwatch-rs = { git = "https://github.com/logos-co/Overwatch", rev = "4160cdd" }
 tokio = { workspace = true, features = ["macros"] }
 bytes = { workspace = true }
 futures = { workspace = true }

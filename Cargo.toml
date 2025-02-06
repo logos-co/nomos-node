@@ -52,152 +52,150 @@ version = "0.1.0"
 
 [workspace.dependencies]
 # Local dependencies
-nomos-core = { path = "nomos-core/chain-defs" }
-cl = { path = "nomos-core/cl" }
-full-replication = { path = "nomos-da/full-replication" }
-kzgrs = { path = "nomos-da/kzgrs" }
-kzgrs-backend = { path = "nomos-da/kzgrs-backend" }
-nomos-da-storage = { path = "nomos-da/storage" }
-nomos-da-network-core = { path = "nomos-da/network/core" }
-nomos-da-messages = { path = "nomos-da/network/messages" }
-subnetworks-assignations = { path = "nomos-da/network/subnetworks-assignations" }
-nomos-libp2p = { path = "nomos-libp2p" }
-nomos-api = { path = "nomos-services/api" }
-nomos-tracing-service = { path = "nomos-services/tracing" }
-nomos-network = { path = "nomos-services/network" }
-nomos-storage = { path = "nomos-services/storage" }
-cryptarchia-consensus = { path = "nomos-services/cryptarchia-consensus" }
-nomos-mempool = { path = "nomos-services/mempool" }
-nomos-system-sig = { path = "nomos-services/system-sig" }
-nomos-da-indexer = { path = "nomos-services/data-availability/indexer" }
-nomos-da-network-service = { path = "nomos-services/data-availability/network" }
-nomos-da-sampling = { path = "nomos-services/data-availability/sampling" }
-nomos-da-verifier = { path = "nomos-services/data-availability/verifier" }
-nomos-da-dispersal = { path = "nomos-services/data-availability/dispersal" }
-nomos-da-tests = { path = "nomos-services/data-availability/tests" }
-nomos-blend-service = { path = "nomos-services/blend" }
-utils = { path = "nomos-services/utils" }
-nomos-blend = { path = "nomos-blend/core" }
-nomos-blend-message = { path = "nomos-blend/message" }
-nomos-blend-network = { path = "nomos-blend/network" }
-nomos-tracing = { path = "nomos-tracing" }
-nomos-cli = { path = "nomos-cli" }
-nomos-utils = { path = "nomos-utils" }
-nomos-node = { path = "nodes/nomos-node" }
-nomos-executor = { path = "nodes/nomos-executor" }
-carnot-engine = { path = "consensus/carnot-engine" }
-cryptarchia-engine = { path = "consensus/cryptarchia-engine" }
-nomos-ledger = { path = "ledger/nomos-ledger" }
-cfgsync = { path = "testnet/cfgsync" }
-tests = { path = "tests" }
-executor-http-client = { path = "clients/executor-http-client" }
-key-management-system = { path = "nomos-services/key-management-system" }
-bundler = { path = "nomos-bundler" }
-nomos_proof_statements = { path = "nomos-core/proof_statements" }
-nomos_risc0_proofs = { path = "nomos-core/risc0_proofs" }
+nomos-core = { path = "nomos-core/chain-defs", default-features = false }
+cl = { path = "nomos-core/cl", default-features = false }
+full-replication = { path = "nomos-da/full-replication", default-features = false }
+kzgrs = { path = "nomos-da/kzgrs", default-features = false }
+kzgrs-backend = { path = "nomos-da/kzgrs-backend", default-features = false }
+nomos-da-storage = { path = "nomos-da/storage", default-features = false }
+nomos-da-network-core = { path = "nomos-da/network/core", default-features = false }
+nomos-da-messages = { path = "nomos-da/network/messages", default-features = false }
+subnetworks-assignations = { path = "nomos-da/network/subnetworks-assignations", default-features = false }
+nomos-libp2p = { path = "nomos-libp2p", default-features = false }
+nomos-api = { path = "nomos-services/api", default-features = false }
+nomos-tracing-service = { path = "nomos-services/tracing", default-features = false }
+nomos-network = { path = "nomos-services/network", default-features = false }
+nomos-storage = { path = "nomos-services/storage", default-features = false }
+cryptarchia-consensus = { path = "nomos-services/cryptarchia-consensus", default-features = false }
+nomos-mempool = { path = "nomos-services/mempool", default-features = false }
+nomos-system-sig = { path = "nomos-services/system-sig", default-features = false }
+nomos-da-indexer = { path = "nomos-services/data-availability/indexer", default-features = false }
+nomos-da-network-service = { path = "nomos-services/data-availability/network", default-features = false }
+nomos-da-sampling = { path = "nomos-services/data-availability/sampling", default-features = false }
+nomos-da-verifier = { path = "nomos-services/data-availability/verifier", default-features = false }
+nomos-da-dispersal = { path = "nomos-services/data-availability/dispersal", default-features = false }
+nomos-da-tests = { path = "nomos-services/data-availability/tests", default-features = false }
+nomos-blend-service = { path = "nomos-services/blend", default-features = false }
+utils = { path = "nomos-services/utils", default-features = false }
+nomos-blend = { path = "nomos-blend/core", default-features = false }
+nomos-blend-message = { path = "nomos-blend/message", default-features = false }
+nomos-blend-network = { path = "nomos-blend/network", default-features = false }
+nomos-tracing = { path = "nomos-tracing", default-features = false }
+nomos-cli = { path = "nomos-cli", default-features = false }
+nomos-utils = { path = "nomos-utils", default-features = false }
+nomos-node = { path = "nodes/nomos-node", default-features = false }
+nomos-executor = { path = "nodes/nomos-executor", default-features = false }
+carnot-engine = { path = "consensus/carnot-engine", default-features = false }
+cryptarchia-engine = { path = "consensus/cryptarchia-engine", default-features = false }
+nomos-ledger = { path = "ledger/nomos-ledger", default-features = false }
+cfgsync = { path = "testnet/cfgsync", default-features = false }
+tests = { path = "tests", default-features = false }
+executor-http-client = { path = "clients/executor-http-client", default-features = false }
+key-management-system = { path = "nomos-services/key-management-system", default-features = false }
+bundler = { path = "nomos-bundler", default-features = false }
+nomos_proof_statements = { path = "nomos-core/proof_statements", default-features = false }
+nomos_risc0_proofs = { path = "nomos-core/risc0_proofs", default-features = false }
 
 # External dependencies
-async-trait = { version = "0.1" }
-blake2 = { version = "0.10" }
-bytes = { version = "1.3" }
-futures = { version = "0.3" }
-raptorq = { version = "1.7" }
-serde = { version = "1.0" }
-thiserror = { version = "1.0" }
-bincode = { version = "1.3" }
-once_cell = { version = "1.0" }
-indexmap = { version = "1.9" }
-const-hex = { version = "1" }
-risc0-zkvm = { version = "1.1" }
-tracing = { version = "0.1" }
-rocksdb = { version = "0.22" }
-anyhow = { version = "1.0" }
-rand = { version = "0.8" }
-rand_core = { version = "0.6.0" }
-hex = { version = "0.4.3" }
-sha2 = { version = "0.10" }
-utoipa = { version = "4.0" }
-serde_json = { version = "1.0" }
-ark-ec = { version = "0.4.2" }
-ark-bls12-381 = { version = "0.4.0" }
-ark-bls12-381-ext = { version = "0.4.1" }
-ark-ff = { version = "0.4.2" }
-ark-poly = { version = "0.4.2" }
-ark-poly-commit = { version = "0.4.0" }
-ark-serialize = { version = "0.4" }
-blst = { version = "0.3.11" }
-derive_more = { version = "0.99" }
-num-bigint = { version = "0.4.4" }
-num-traits = { version = "0.2.18" }
-rayon = { version = "1.10" }
-divan = { version = "0.1" }
-bitvec = { version = "1.0.1" }
-itertools = { version = "0.12" }
-sha3 = { version = "0.10" }
-tokio = { version = "1" }
-libp2p = { version = "0.53" }
-libp2p-stream = { version = "0.1.0-alpha" }
-tracing-subscriber = { version = "0.3.18" }
-void = { version = "1.0.2" }
-either = { version = "1.13.0" }
-log = { version = "0.4" }
-rand_chacha = { version = "0.3" }
-tokio-stream = { version = "0.1" }
-libp2p-identity = { version = "0.2" }
-multiaddr = { version = "0.18" }
-overwatch-rs = { git = "https://github.com/logos-co/Overwatch" }
-overwatch-derive = { git = "https://github.com/logos-co/Overwatch" }
-axum = { version = "0.6" }
-hyper = { version = "0.14" }
-tower-http = { version = "0.4" }
-utoipa-swagger-ui = { version = "4.0" }
-reqwest = { version = "0.11" }
-opentelemetry = { version = "0.25" }
-opentelemetry-otlp = { version = "0.25" }
-opentelemetry_sdk = { version = "0.25" }
-tracing-appender = { version = "0.2" }
-tracing-loki = { version = "0.2.5" }
-tracing-opentelemetry = { version = "0.26" }
-tracing-gelf = { version = "0.7" }
-chrono = { version = "0.4" }
-humantime-serde = { version = "1" }
-sscanf = { version = "0.4" }
-sled = { version = "0.34" }
-parking_lot = { version = "0.12" }
-tempfile = { version = "3" }
-tokio-util = { version = "0.7" }
-tracing-futures = { version = "0.2" }
-bls-signatures = { version = "0.14" }
-serde_with = { version = "3.0.0" }
-time = { version = "0.3" }
-linked-hash-map = { version = "0.5.6" }
-async-ctrlc = { version = "1.2" }
-x25519-dalek = { version = "2" }
-cached = { version = "0.53" }
-fixed = { version = "1" }
-sphinx-packet = { version = "0.2" }
-futures-timer = { version = "3.0.3" }
-opentelemetry-http = { version = "0.26" }
-opentelemetry-semantic-conventions = { version = "0.26" }
-url = { version = "2" }
-clap = { version = "4" }
-http = { version = "0.2.9" }
-serde_yaml = { version = "0.9" }
-color-eyre = { version = "0.6.0" }
-uuid = { version = "1.10" }
-digest = { version = "0.10" }
-integer-encoding = { version = "3" }
-fraction = { version = "0.13" }
-proptest = { version = "1.2.0" }
-proptest-state-machine = { version = "0.1.0" }
-rpds = { version = "1" }
-secp256k1 = { version = "0.26" }
-ntest = { version = "0.9.0" }
-criterion = { version = "0.5" }
-zeroize = { version = "1" }
-ed25519-dalek = { version = "2" }
-tauri-bundler = { version = "2.2.1" }
-tauri-utils = { version = "2.1.1" }
-env_logger = { version = "0.11.6" }
-crypto-bigint = { version = "0.5.5" }
-risc0-build = { version = "1.0" }
+async-trait = { version = "0.1", default-features = false }
+blake2 = { version = "0.10", default-features = false }
+bytes = { version = "1.3", default-features = false }
+futures = { version = "0.3", default-features = false }
+raptorq = { version = "1.7", default-features = false }
+serde = { version = "1.0", default-features = false }
+thiserror = { version = "1.0", default-features = false }
+bincode = { version = "1.3", default-features = false }
+once_cell = { version = "1.0", default-features = false }
+indexmap = { version = "1.9", default-features = false }
+const-hex = { version = "1", default-features = false }
+risc0-zkvm = { version = "1.1", default-features = false }
+tracing = { version = "0.1", default-features = false }
+rocksdb = { version = "0.22", default-features = false }
+anyhow = { version = "1.0", default-features = false }
+rand = { version = "0.8", default-features = false }
+rand_core = { version = "0.6.0", default-features = false }
+hex = { version = "0.4.3", default-features = false }
+sha2 = { version = "0.10", default-features = false }
+utoipa = { version = "4.0", default-features = false }
+serde_json = { version = "1.0", default-features = false }
+ark-ec = { version = "0.4.2", default-features = false }
+ark-bls12-381 = { version = "0.4.0", default-features = false }
+ark-bls12-381-ext = { version = "0.4.1", default-features = false }
+ark-ff = { version = "0.4.2", default-features = false }
+ark-poly = { version = "0.4.2", default-features = false }
+ark-poly-commit = { version = "0.4.0", default-features = false }
+ark-serialize = { version = "0.4", default-features = false }
+blst = { version = "0.3.11", default-features = false }
+derive_more = { version = "0.99", default-features = false }
+num-bigint = { version = "0.4.4", default-features = false }
+num-traits = { version = "0.2.18", default-features = false }
+rayon = { version = "1.10", default-features = false }
+divan = { version = "0.1", default-features = false }
+bitvec = { version = "1.0.1", default-features = false }
+itertools = { version = "0.12", default-features = false }
+sha3 = { version = "0.10", default-features = false }
+tokio = { version = "1", default-features = false }
+libp2p = { version = "0.53", default-features = false }
+libp2p-stream = { version = "0.1.0-alpha", default-features = false }
+tracing-subscriber = { version = "0.3.18", default-features = false }
+void = { version = "1.0.2", default-features = false }
+either = { version = "1.13.0", default-features = false }
+log = { version = "0.4", default-features = false }
+rand_chacha = { version = "0.3", default-features = false }
+tokio-stream = { version = "0.1", default-features = false }
+libp2p-identity = { version = "0.2", default-features = false }
+multiaddr = { version = "0.18", default-features = false }
+axum = { version = "0.6", default-features = false }
+hyper = { version = "0.14", default-features = false }
+tower-http = { version = "0.4", default-features = false }
+utoipa-swagger-ui = { version = "4.0", default-features = false }
+reqwest = { version = "0.11", default-features = false }
+opentelemetry = { version = "0.25", default-features = false }
+opentelemetry-otlp = { version = "0.25", default-features = false }
+opentelemetry_sdk = { version = "0.25", default-features = false }
+tracing-appender = { version = "0.2", default-features = false }
+tracing-loki = { version = "0.2.5", default-features = false }
+tracing-opentelemetry = { version = "0.26", default-features = false }
+tracing-gelf = { version = "0.7", default-features = false }
+chrono = { version = "0.4", default-features = false }
+humantime-serde = { version = "1", default-features = false }
+sscanf = { version = "0.4", default-features = false }
+sled = { version = "0.34", default-features = false }
+parking_lot = { version = "0.12", default-features = false }
+tempfile = { version = "3", default-features = false }
+tokio-util = { version = "0.7", default-features = false }
+tracing-futures = { version = "0.2", default-features = false }
+bls-signatures = { version = "0.14", default-features = false }
+serde_with = { version = "3.0.0", default-features = false }
+time = { version = "0.3", default-features = false }
+linked-hash-map = { version = "0.5.6", default-features = false }
+async-ctrlc = { version = "1.2", default-features = false }
+x25519-dalek = { version = "2", default-features = false }
+cached = { version = "0.53", default-features = false }
+fixed = { version = "1", default-features = false }
+sphinx-packet = { version = "0.2", default-features = false }
+futures-timer = { version = "3.0.3", default-features = false }
+opentelemetry-http = { version = "0.26", default-features = false }
+opentelemetry-semantic-conventions = { version = "0.26", default-features = false }
+url = { version = "2", default-features = false }
+clap = { version = "4", default-features = false }
+http = { version = "0.2.9", default-features = false }
+serde_yaml = { version = "0.9", default-features = false }
+color-eyre = { version = "0.6.0", default-features = false }
+uuid = { version = "1.10", default-features = false }
+digest = { version = "0.10", default-features = false }
+integer-encoding = { version = "3", default-features = false }
+fraction = { version = "0.13", default-features = false }
+proptest = { version = "1.2.0", default-features = false }
+proptest-state-machine = { version = "0.1.0", default-features = false }
+rpds = { version = "1", default-features = false }
+secp256k1 = { version = "0.26", default-features = false }
+ntest = { version = "0.9.0", default-features = false }
+criterion = { version = "0.5", default-features = false }
+zeroize = { version = "1", default-features = false }
+ed25519-dalek = { version = "2", default-features = false }
+tauri-bundler = { version = "2.2.1", default-features = false }
+tauri-utils = { version = "2.1.1", default-features = false }
+env_logger = { version = "0.11.6", default-features = false }
+crypto-bigint = { version = "0.5.5", default-features = false }
+risc0-build = { version = "1.0", default-features = false }

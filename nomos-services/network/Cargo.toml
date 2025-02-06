@@ -8,7 +8,7 @@ async-trait = { workspace = true }
 bytes = { workspace = true }
 chrono = { workspace = true, optional = true }
 humantime-serde = { workspace = true, optional = true }
-overwatch-rs = { workspace = true, rev = "f5f7ea0" }
+overwatch-rs = { git = "https://github.com/logos-co/Overwatch", rev = "f5f7ea0" }
 multiaddr = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 sscanf = { workspace = true, optional = true }

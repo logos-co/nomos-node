@@ -15,7 +15,7 @@ nomos-da-sampling = { workspace = true }
 nomos-core = { workspace = true }
 full-replication = { workspace = true }
 kzgrs-backend = { workspace = true }
-overwatch-rs = { workspace = true, rev = "f5f7ea0" }
+overwatch-rs = { git = "https://github.com/logos-co/Overwatch", rev = "f5f7ea0" }
 rand = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 thiserror = { workspace = true }
@@ -28,7 +28,7 @@ serde_json = { workspace = true, optional = true }
 
 [dev-dependencies]
 nomos-tracing-service = { workspace = true }
-overwatch-derive = { workspace = true, rev = "f5f7ea0" }
+overwatch-derive = { git = "https://github.com/logos-co/Overwatch", rev = "f5f7ea0" }
 tokio = { workspace = true, features = ["full"] }
 blake2 = { workspace = true }
 

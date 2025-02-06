@@ -16,8 +16,8 @@ nomos-storage = { workspace = true }
 nomos-mempool = { workspace = true }
 nomos-tracing = { workspace = true }
 cryptarchia-consensus = { workspace = true }
-overwatch-rs = { workspace = true, rev = "f5f7ea0" }
-overwatch-derive = { workspace = true, rev = "f5f7ea0" }
+overwatch-rs = { git = "https://github.com/logos-co/Overwatch", rev = "f5f7ea0" }
+overwatch-derive = { git = "https://github.com/logos-co/Overwatch", rev = "f5f7ea0" }
 serde = { workspace = true, features = ["derive"] }
 rand = { workspace = true }
 tracing = { workspace = true }

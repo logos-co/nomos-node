@@ -13,7 +13,6 @@ bytes = { workspace = true }
 carnot-engine = { workspace = true, features = ["serde"] }
 cryptarchia-engine = { workspace = true, features = ["serde"] }
 nomos-ledger = { workspace = true, features = ["serde"] }
-nomos_risc0_proofs = { workspace = true }
 nomos_proof_statements = { workspace = true }
 cl = { workspace = true }
 futures = { workspace = true }
