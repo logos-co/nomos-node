@@ -14,7 +14,7 @@ use serde::Serialize;
 
 #[async_trait::async_trait]
 pub trait BlendAdapter {
-    type Settings: Clone + 'static;
+    type Settings: Clone + Send + 'static;
     type Backend: BlendBackend + 'static;
     type Network: NetworkAdapter + 'static;
     type Tx: Serialize + DeserializeOwned + Clone + Eq + Hash + 'static;

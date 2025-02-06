@@ -12,7 +12,7 @@ pub trait Blob {
 
 pub trait BlobSelect {
     type BlobId: info::DispersedBlobInfo;
-    type Settings: Clone;
+    type Settings: Clone + Send;
 
     fn new(settings: Self::Settings) -> Self;
     fn select_blob_from<'i, I: Iterator<Item = Self::BlobId> + 'i>(
