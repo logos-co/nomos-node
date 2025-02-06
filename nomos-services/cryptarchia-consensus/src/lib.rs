@@ -5,11 +5,8 @@ pub mod network;
 mod relays;
 pub mod storage;
 
-use crate::storage::adapters::StorageAdapter;
-use crate::storage::StorageAdapter as StorageAdapterTrait;
+use crate::relays::CryptarchiaConsensusRelays;
 use core::fmt::Debug;
-use std::{collections::BTreeSet, hash::Hash, marker::PhantomData, path::PathBuf};
-
 use cryptarchia_engine::Slot;
 use futures::StreamExt;
 pub use leadership::LeaderConfig;
@@ -46,12 +43,11 @@ use serde_with::serde_as;
 use services_utils::overwatch::{
     lifecycle, recovery::backends::FileBackendSettings, JsonFileBackend, RecoveryOperator,
 };
+use std::{collections::BTreeSet, hash::Hash, marker::PhantomData, path::PathBuf};
 use thiserror::Error;
 use tokio::sync::{broadcast, oneshot, oneshot::Sender};
 use tracing::{error, instrument, span, Level};
 use tracing_futures::Instrument;
-
-use crate::relays::CryptarchiaConsensusRelays;
 
 type MempoolRelay<Payload, Item, Key> = OutboundRelay<MempoolMsg<HeaderId, Payload, Item, Key>>;
 type SamplingRelay<BlobId> = OutboundRelay<DaSamplingServiceMsg<BlobId>>;
@@ -909,10 +905,6 @@ where
                     tracing::error!("Could not send block to storage: {e}");
                 }
 
-                // set as latest savable state
-                Self::try_save_security_block(&cryptarchia.consensus, relays.storage_adapter())
-                    .await;
-
                 if let Err(e) = block_broadcaster.send(block) {
                     tracing::error!("Could not notify block to services {e}");
                 }
@@ -930,20 +922,6 @@ where
         }
 
         cryptarchia
-    }
-
-    /// Try to save the block for a given security parameter (k)
-    /// Try to fetch the block that is `security_param` blocks behind the given block.
-    /// If the block is found it will send its header id to the storage.
-    async fn try_save_security_block(
-        consensus: &cryptarchia_engine::Cryptarchia<HeaderId>,
-        storage_adapter: &StorageAdapter<Storage, TxS::Tx, BS::BlobId>,
-    ) {
-        if let Some(header_id) = consensus.get_security_block_header_id() {
-            storage_adapter
-                .save_header_as_security_block(&header_id)
-                .await;
-        }
     }
 
     #[expect(clippy::allow_attributes_without_reason)]
