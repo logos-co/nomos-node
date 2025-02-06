@@ -75,9 +75,6 @@ jobs:
       - uses: actions-rs/toolchain@v1
         name: Install Rust toolchain
         with:
-          profile: minimal
-          toolchain: stable
-          override: true
           target: ${{ matrix.platform.target_triple }}
 
       - name: Install dependencies

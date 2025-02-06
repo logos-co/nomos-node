@@ -22,9 +22,6 @@ jobs:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
       - uses: actions-rs/toolchain@v1
         with:
-          profile: minimal
-          toolchain: stable
-          override: true
           components: llvm-tools-preview
       - uses: cargo-bins/cargo-binstall@main
         env:

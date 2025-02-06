@@ -25,10 +25,6 @@ jobs:
         with:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
       - uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: stable
-          override: true
       - uses: cargo-bins/cargo-binstall@main
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -39,7 +35,7 @@ jobs:
       - uses: actions-rs/cargo@v1
         with:
           command: check
-          args: --all --no-default-features --features ${{ matrix.feature }}
+          args: --all --all-targets --no-default-features --features ${{ matrix.feature }}
 
   test:
     name: Test Suite
@@ -72,10 +68,6 @@ jobs:
       - name: Setup Rust toolchain (Other OSes)
         if: matrix.os != 'windows-latest'
         uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: stable
-          override: true
       # Setup build environment (Windows)
       - name: Setup build environment (Windows)
         if: matrix.os == 'windows-latest'
@@ -141,11 +133,6 @@ jobs:
         with:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
       - uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: stable
-          override: true
-          components: rustfmt, clippy
       - uses: cargo-bins/cargo-binstall@main
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -157,7 +144,7 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: fmt
-          args: --all -- --check
+          args: --all --check
 
       - name: Run cargo clippy
         uses: actions-rs/cargo@v1
