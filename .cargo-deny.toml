@@ -1,0 +1,33 @@
+# Config file reference can be found at https://embarkstudios.github.io/cargo-deny/checks/cfg.html.
+
+[graph]
+all-features = true
+exclude-dev = true
+no-default-features = true
+
+[advisories]
+yanked = "deny"
+
+[bans]
+allow-wildcard-paths = false
+multiple-versions = "allow"
+
+[licenses]
+allow = [
+    "MIT",
+    "Apache-2.0",
+    "Unicode-3.0",
+    "MPL-2.0",
+    "BSD-3-Clause",
+    "ISC",
+    "BSD-2-Clause",
+    "Zlib",
+    "Apache-2.0 WITH LLVM-exception",
+]
+private = { ignore = false }
+unused-allowed-license = "deny"
+
+[sources]
+allow-git = ["https://github.com/logos-co/Overwatch"]
+unknown-git = "deny"
+unknown-registry = "deny"
