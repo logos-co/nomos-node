@@ -24,7 +24,6 @@ jobs:
       - uses: arduino/setup-protoc@v3
         with:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
-      - uses: actions-rs/toolchain@v1
       - uses: cargo-bins/cargo-binstall@main
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -64,10 +63,6 @@ jobs:
           toolchain: stable-msvc
           target: x86_64-pc-windows-msvc
           override: true
-      # Setup Rust toolchain for other OSes
-      - name: Setup Rust toolchain (Other OSes)
-        if: matrix.os != 'windows-latest'
-        uses: actions-rs/toolchain@v1
       # Setup build environment (Windows)
       - name: Setup build environment (Windows)
         if: matrix.os == 'windows-latest'
@@ -132,7 +127,6 @@ jobs:
       - uses: arduino/setup-protoc@v3
         with:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
-      - uses: actions-rs/toolchain@v1
       - uses: cargo-bins/cargo-binstall@main
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
