@@ -9,8 +9,11 @@ use nomos_storage::{StorageMsg, StorageService};
 use overwatch_rs::services::relay::OutboundRelay;
 use overwatch_rs::services::ServiceData;
 use serde::de::DeserializeOwned;
+use serde::Serialize;
 // Internal
 use crate::storage::StorageAdapter as StorageAdapterTrait;
+
+const SECURITY_BLOCK_KEY: &str = "security_block_header_id";
 
 pub struct StorageAdapter<Storage, Tx, BlobCertificate>
 where
@@ -19,6 +22,30 @@ where
     pub storage_relay: OutboundRelay<<StorageService<Storage> as ServiceData>::Message>,
     _tx: PhantomData<Tx>,
     _blob_certificate: PhantomData<BlobCertificate>,
+}
+
+impl<Storage, Tx, BlobCertificate> StorageAdapter<Storage, Tx, BlobCertificate>
+where
+    Storage: StorageBackend + Send + Sync,
+{
+    /// Sends a store message to the storage service to retrieve a value by its key
+    ///
+    /// # Arguments
+    ///
+    /// * `key` - The key to retrieve the value for
+    ///
+    /// # Returns
+    ///
+    /// The value for the given key. If no value is found, returns None.
+    pub async fn get_value<Key, Value>(&self, key: &Key) -> Option<Value>
+    where
+        Key: Serialize + Send + Sync,
+        Value: DeserializeOwned,
+    {
+        let (msg, receiver) = <StorageMsg<Storage>>::new_load_message(key);
+        self.storage_relay.send(msg).await.unwrap();
+        receiver.recv().await.unwrap()
+    }
 }
 
 #[async_trait::async_trait]
@@ -42,30 +69,16 @@ where
         }
     }
 
-    async fn get_block(&self, header_id: HeaderId) -> Option<Self::Block> {
-        let (msg, receiver) = <StorageMsg<Storage>>::new_load_message(header_id);
-        self.storage_relay.send(msg).await.unwrap();
-        receiver.recv().await.unwrap()
+    async fn get_block(&self, key: &HeaderId) -> Option<Self::Block> {
+        self.get_value(key).await
     }
 
-    async fn get_block_for_security_param(
-        &self,
-        current_block: Self::Block,
-        security_param: &u64,
-    ) -> Option<Self::Block> {
-        let mut current_block = current_block;
-        // TODO: This implies fetching from DB `security_param` times. We should optimize this.
-        for _ in 0..*security_param {
-            let parent_block_header = current_block.header().parent();
-            let parent_block = self.get_block(parent_block_header).await?;
-            current_block = parent_block;
-        }
-        Some(current_block)
+    async fn get_security_block_header(&self) -> Option<HeaderId> {
+        self.get_value(&SECURITY_BLOCK_KEY).await
     }
 
-    async fn save_security_block(&self, block: Self::Block) {
-        let security_block_msg =
-            <StorageMsg<_>>::new_store_message("security_block_header_id", block.header().id());
+    async fn save_header_as_security_block(&self, header_id: &HeaderId) {
+        let security_block_msg = <StorageMsg<_>>::new_store_message(SECURITY_BLOCK_KEY, header_id);
 
         if let Err((e, _msg)) = self.storage_relay.send(security_block_msg).await {
             tracing::error!("Could not send security block id to storage: {e}");

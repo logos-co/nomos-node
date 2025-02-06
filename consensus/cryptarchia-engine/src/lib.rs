@@ -217,6 +217,20 @@ where
         }
         cmax
     }
+
+    pub fn get_security_block_header_id(&self) -> Option<Id> {
+        (0..self.config.security_param).try_fold(self.tip(), |header, _| {
+            self.branches.get(&header).and_then(|branch| {
+                let parent = branch.parent;
+                if header == parent {
+                    // If the header is the genesis block, we arrived at the end of the chain
+                    None
+                } else {
+                    Some(parent)
+                }
+            })
+        })
+    }
 }
 
 #[cfg(test)]
@@ -350,6 +364,30 @@ pub mod tests {
         assert!(
             branches.get(&id_100).is_none(),
             "id_100 should not be related to this branch"
+        );
+    }
+
+    #[test]
+    fn test_get_security_block() {
+        let mut engine = Cryptarchia::from_genesis([0; 32], config());
+        let mut parent_header = engine.genesis();
+
+        assert!(engine.get_security_block_header_id().is_none());
+
+        let headers_size = 10;
+        let headers: Vec<_> = (0..headers_size).map(|i| hash(&i)).collect();
+        for (slot, header) in headers.iter().enumerate() {
+            let current_header = *header;
+            engine = engine
+                .receive_block(current_header, parent_header, (slot as u64).into())
+                .unwrap();
+            parent_header = current_header;
+        }
+
+        let security_header_position = (headers_size - engine.config.security_param - 1) as usize;
+        assert_eq!(
+            engine.get_security_block_header_id().unwrap(),
+            headers[security_header_position]
         );
     }
 }
