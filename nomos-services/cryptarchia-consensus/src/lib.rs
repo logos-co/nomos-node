@@ -456,7 +456,7 @@ where
 
         let blend_adapter = BlendAdapter::new(blend_adapter_settings, blend_relay).await;
         let storage_adapter =
-            StorageAdapter::<Storage, ClPool::Item, DaPool::Item>::new(storage_relay.clone()).await;
+            StorageAdapter::<Storage, ClPool::Item, DaPool::Item>::new(storage_relay).await;
 
         let mut lifecycle_stream = self.service_state.lifecycle_handle.message_stream();
 
