@@ -11,6 +11,7 @@ pub enum Command {
     /// Send data to the executor for encoding and dispersal.
     Disseminate(executor::Disseminate),
     Retrieve(validator::Retrieve),
+    Reconstruct(validator::Reconstruct),
 }
 
 impl Command {
@@ -18,6 +19,7 @@ impl Command {
         match self {
             Command::Disseminate(cmd) => cmd.run(),
             Command::Retrieve(cmd) => cmd.run(),
+            Command::Reconstruct(cmd) => cmd.run(),
         }?;
         Ok(())
     }

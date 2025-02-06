@@ -1,4 +1,5 @@
 // std
+use std::path::PathBuf;
 use std::sync::mpsc::Sender;
 use std::{error::Error, ops::Range};
 // crates
@@ -6,6 +7,7 @@ use clap::Args;
 use reqwest::{Client, Url};
 use serde::{de::DeserializeOwned, Serialize};
 // internal
+use kzgrs_backend::reconstruction::reconstruct_without_missing_data;
 use kzgrs_backend::{common::blob::DaBlob, dispersal::Index};
 use nomos_core::da::blob::metadata;
 use nomos_node::api::{handlers::GetRangeReq, paths};
@@ -29,11 +31,30 @@ pub struct Retrieve {
     pub addr: Url,
 }
 
+#[allow(clippy::type_complexity)]
+fn parse_app_blobs(val: &str) -> Result<Vec<(Index, Vec<Vec<u8>>)>, String> {
+    let val: String = val.chars().filter(|&c| c != ' ' && c != '\n').collect();
+    serde_json::from_str(&val).map_err(|e| e.to_string())
+}
+
+#[derive(Args, Debug)]
+pub struct Reconstruct {
+    /// Blobs to use for reconstruction. Half of the blobs per index is expected.
+    #[clap(
+        short,
+        long,
+        help = "JSON array of blobs [[[index0], [[blob0],[blob1]...]]...]",
+        value_name = "APP_BLOBS",
+        value_parser(parse_app_blobs)
+    )]
+    pub app_blobs: Option<std::vec::Vec<(Index, Vec<Vec<u8>>)>>,
+    /// File with blobs.
+    #[clap(short, long)]
+    pub file: Option<PathBuf>,
+}
+
 impl Retrieve {
     pub fn run(self) -> Result<(), Box<dyn std::error::Error>> {
-        tracing::subscriber::set_global_default(tracing_subscriber::FmtSubscriber::new())
-            .expect("setting tracing default failed");
-
         let app_id: [u8; 32] = hex::decode(&self.app_id)?
             .try_into()
             .map_err(|_| "Invalid app_id")?;
@@ -114,4 +135,32 @@ where
         .json::<Vec<(Metadata::Index, Vec<Vec<u8>>)>>()
         .await
         .unwrap())
+}
+
+impl Reconstruct {
+    pub fn run(self) -> Result<(), Box<dyn std::error::Error>> {
+        let app_blobs: Vec<(Index, Vec<Vec<u8>>)> = if let Some(blobs) = self.app_blobs {
+            blobs
+        } else {
+            let file_path = self.file.as_ref().unwrap();
+            let json_string = String::from_utf8(std::fs::read(file_path)?)?;
+            parse_app_blobs(&json_string)?
+        };
+
+        let mut da_blobs = vec![];
+
+        for (index, blobs) in app_blobs.iter() {
+            tracing::info!("Index {:?} has {:} blobs", (index), blobs.len());
+            for blob in blobs.iter() {
+                let da_blob = wire::deserialize::<DaBlob>(blob).unwrap();
+                da_blobs.push(da_blob);
+                tracing::info!("Index {:?}; Blob: {blob:?}", index.to_u64());
+            }
+        }
+
+        let reconstructed_data = reconstruct_without_missing_data(&da_blobs);
+        tracing::info!("Reconstructed data {:?}", reconstructed_data);
+
+        Ok(())
+    }
 }
