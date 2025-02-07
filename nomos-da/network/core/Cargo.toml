@@ -2,6 +2,7 @@
 name = "nomos-da-network-core"
 version = "0.1.0"
 edition = "2021"
+license = { workspace = true }
 
 [dependencies]
 libp2p = { version = "0.53", features = ["macros", "tokio", "quic"] }

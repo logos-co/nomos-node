@@ -2,6 +2,7 @@
 name = "cfgsync"
 version = "0.1.0"
 edition = "2021"
+license = { workspace = true }
 
 [dependencies]
 axum = { version = "0.6" }

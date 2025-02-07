@@ -45,3 +45,7 @@ members = [
 ]
 exclude = ["proof_of_leadership/risc0/risc0_proofs", "nomos-core/risc0_proofs"]
 resolver = "2"
+
+[workspace.package]
+edition = "2021"
+license = "MIT or APACHE-2.0"

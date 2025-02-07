@@ -2,6 +2,7 @@
 name = "subnetworks-assignations"
 version = "0.1.0"
 edition = "2021"
+license = { workspace = true }
 
 [dependencies]
 libp2p-identity = { version = "0.2", features = ["peerid", "serde"] }

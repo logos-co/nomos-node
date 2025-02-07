@@ -5,6 +5,7 @@ edition = "2021"
 authors = [
     "Daniel Sanchez Quiros <danielsq@status.im>"
 ]
+license = { workspace = true }
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 

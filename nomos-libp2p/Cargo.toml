@@ -2,6 +2,7 @@
 name = "nomos-libp2p"
 version = "0.1.0"
 edition = "2021"
+license = { workspace = true }
 
 [dependencies]
 multiaddr = "0.18"
