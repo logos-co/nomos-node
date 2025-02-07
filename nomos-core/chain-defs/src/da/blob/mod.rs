@@ -20,7 +20,7 @@ pub trait Share {
 
 pub trait BlobSelect {
     type BlobId: info::DispersedBlobInfo;
-    type Settings: Clone + Send;
+    type Settings: Clone;
 
     fn new(settings: Self::Settings) -> Self;
     fn select_blob_from<'i, I: Iterator<Item = Self::BlobId> + 'i>(
