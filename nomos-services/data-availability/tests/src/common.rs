@@ -299,6 +299,7 @@ pub fn new_node(
                                 topic: String::from(nomos_node::CONSENSUS_TOPIC),
                             },
                     },
+                recovery_file: PathBuf::from("./recovery/cryptarchia.json"),
             },
             verifier: DaVerifierServiceSettings {
                 verifier_settings,

@@ -2,8 +2,11 @@ pub mod blend;
 mod leadership;
 mod messages;
 pub mod network;
+pub mod storage;
 mod time;
 
+use crate::storage::adapters::StorageAdapter;
+use crate::storage::StorageAdapter as StorageAdapterTrait;
 use core::fmt::Debug;
 use cryptarchia_engine::Slot;
 use futures::StreamExt;
@@ -29,17 +32,16 @@ use nomos_network::NetworkService;
 use nomos_storage::{backends::StorageBackend, StorageMsg, StorageService};
 use overwatch_rs::services::life_cycle::LifecycleMessage;
 use overwatch_rs::services::relay::{OutboundRelay, Relay, RelayMessage};
-use overwatch_rs::services::{
-    handle::ServiceStateHandle,
-    state::{NoOperator, NoState},
-    ServiceCore, ServiceData, ServiceId,
-};
+use overwatch_rs::services::state::ServiceState;
+use overwatch_rs::services::{handle::ServiceStateHandle, ServiceCore, ServiceData, ServiceId};
 use overwatch_rs::DynError;
 use rand::{RngCore, SeedableRng};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_with::serde_as;
 use std::collections::BTreeSet;
 use std::hash::Hash;
+use std::marker::PhantomData;
+use std::path::PathBuf;
 use thiserror::Error;
 pub use time::Config as TimeConfig;
 use tokio::sync::oneshot::Sender;
@@ -47,6 +49,8 @@ use tokio::sync::{broadcast, oneshot};
 use tokio_stream::wrappers::IntervalStream;
 use tracing::{error, instrument, span, Level};
 use tracing_futures::Instrument;
+use utils::overwatch::recovery::backends::FileBackendSettings;
+use utils::overwatch::{JsonFileBackend, RecoveryOperator};
 
 type MempoolRelay<Payload, Item, Key> = OutboundRelay<MempoolMsg<HeaderId, Payload, Item, Key>>;
 type SamplingRelay<BlobId> = OutboundRelay<DaSamplingServiceMsg<BlobId>>;
@@ -130,6 +134,15 @@ pub struct CryptarchiaSettings<Ts, Bs, NetworkAdapterSettings, BlendAdapterSetti
     pub leader_config: LeaderConfig,
     pub network_adapter_settings: NetworkAdapterSettings,
     pub blend_adapter_settings: BlendAdapterSettings,
+    pub recovery_file: PathBuf,
+}
+
+impl<Ts, Bs, NetworkAdapterSettings, BlendAdapterSettings> FileBackendSettings
+    for CryptarchiaSettings<Ts, Bs, NetworkAdapterSettings, BlendAdapterSettings>
+{
+    fn recovery_file(&self) -> &PathBuf {
+        &self.recovery_file
+    }
 }
 
 pub struct CryptarchiaConsensus<
@@ -148,7 +161,9 @@ pub struct CryptarchiaConsensus<
     SamplingStorage,
 > where
     A: NetworkAdapter,
+    A::Settings: Send,
     BlendAdapter: blend::BlendAdapter,
+    BlendAdapter::Settings: Send,
     ClPoolAdapter: MempoolAdapter<Payload = ClPool::Item, Key = ClPool::Key>,
     ClPool: MemPool<BlockId = HeaderId>,
     DaPool: MemPool<BlockId = HeaderId>,
@@ -160,7 +175,9 @@ pub struct CryptarchiaConsensus<
     DaPool::Key: Debug + 'static,
     A::Backend: 'static,
     TxS: TxSelect<Tx = ClPool::Item>,
+    TxS::Settings: Send,
     BS: BlobSelect<BlobId = DaPool::Item>,
+    BS::Settings: Send,
     Storage: StorageBackend + Send + Sync + 'static,
     SamplingRng: SeedableRng + RngCore,
     SamplingBackend: DaSamplingServiceBackend<SamplingRng, BlobId = DaPool::Key> + Send,
@@ -226,7 +243,9 @@ impl<
     >
 where
     A: NetworkAdapter,
+    A::Settings: Send,
     BlendAdapter: blend::BlendAdapter,
+    BlendAdapter::Settings: Send,
     ClPool: MemPool<BlockId = HeaderId>,
     ClPool::Item: Clone + Eq + Hash + Debug,
     ClPool::Key: Debug,
@@ -237,7 +256,9 @@ where
     DaPoolAdapter: MempoolAdapter<Key = DaPool::Key>,
     DaPoolAdapter::Payload: DispersedBlobInfo + Into<DaPool::Item> + Debug,
     TxS: TxSelect<Tx = ClPool::Item>,
+    TxS::Settings: Send,
     BS: BlobSelect<BlobId = DaPool::Item>,
+    BS::Settings: Send,
     Storage: StorageBackend + Send + Sync + 'static,
     SamplingRng: SeedableRng + RngCore,
     SamplingBackend: DaSamplingServiceBackend<SamplingRng, BlobId = DaPool::Key> + Send,
@@ -250,8 +271,9 @@ where
     const SERVICE_ID: ServiceId = CRYPTARCHIA_ID;
     type Settings =
         CryptarchiaSettings<TxS::Settings, BS::Settings, A::Settings, BlendAdapter::Settings>;
-    type State = NoState<Self::Settings>;
-    type StateOperator = NoOperator<Self::State>;
+    type State =
+        CryptarchiaConsensusState<TxS::Settings, BS::Settings, A::Settings, BlendAdapter::Settings>;
+    type StateOperator = RecoveryOperator<JsonFileBackend<Self::State, Self::Settings>>;
     type Message = ConsensusMsg<Block<ClPool::Item, DaPool::Item>>;
 }
 
@@ -346,7 +368,7 @@ where
 {
     fn init(
         service_state: ServiceStateHandle<Self>,
-        _init_state: Self::State,
+        _initial_state: Self::State,
     ) -> Result<Self, overwatch_rs::DynError> {
         let network_relay = service_state.overwatch_handle.relay();
         let blend_relay = service_state.overwatch_handle.relay();
@@ -414,6 +436,7 @@ where
             leader_config,
             network_adapter_settings,
             blend_adapter_settings,
+            ..
         } = self.service_state.settings_reader.get_updated_settings();
 
         let genesis_id = HeaderId::from([0; 32]);
@@ -440,6 +463,8 @@ where
         let mut slot_timer = IntervalStream::new(timer.slot_interval());
 
         let blend_adapter = BlendAdapter::new(blend_adapter_settings, blend_relay).await;
+        let storage_adapter =
+            StorageAdapter::<Storage, ClPool::Item, DaPool::Item>::new(storage_relay).await;
 
         let mut lifecycle_stream = self.service_state.lifecycle_handle.message_stream();
 
@@ -452,13 +477,21 @@ where
                             cryptarchia,
                             &mut leader,
                             block,
-                            storage_relay.clone(),
+                            &storage_adapter,
                             cl_mempool_relay.clone(),
                             da_mempool_relay.clone(),
                             sampling_relay.clone(),
-                            &mut self.block_subscription_sender
+                            &mut self.block_subscription_sender,
                         )
                         .await;
+
+                        self.service_state.state_updater.update({
+                            Self::State::new(
+                                Some(cryptarchia.tip()),
+                                cryptarchia.consensus.get_security_block_header_id()
+                            )
+                        });
+
                         tracing::info!(counter.consensus_processed_blocks = 1);
                     }
 
@@ -510,6 +543,42 @@ where
     }
 }
 
+#[derive(Clone, Serialize, Deserialize)]
+pub struct CryptarchiaConsensusState<TxS, BxS, NetworkAdapterSettings, BlendAdapterSettings> {
+    tip: Option<HeaderId>,
+    security_block: Option<HeaderId>,
+    _txs: PhantomData<TxS>,
+    _bxs: PhantomData<BxS>,
+    _network_adapter_settings: PhantomData<NetworkAdapterSettings>,
+    _blend_adapter_settings: PhantomData<BlendAdapterSettings>,
+}
+
+impl<TxS, BxS, NetworkAdapterSettings, BlendAdapterSettings>
+    CryptarchiaConsensusState<TxS, BxS, NetworkAdapterSettings, BlendAdapterSettings>
+{
+    pub fn new(tip: Option<HeaderId>, security_block: Option<HeaderId>) -> Self {
+        Self {
+            tip,
+            security_block,
+            _txs: Default::default(),
+            _bxs: Default::default(),
+            _network_adapter_settings: Default::default(),
+            _blend_adapter_settings: Default::default(),
+        }
+    }
+}
+
+impl<TxS, BxS, NetworkAdapterSettings, BlendAdapterSettings> ServiceState
+    for CryptarchiaConsensusState<TxS, BxS, NetworkAdapterSettings, BlendAdapterSettings>
+{
+    type Settings = CryptarchiaSettings<TxS, BxS, NetworkAdapterSettings, BlendAdapterSettings>;
+    type Error = Error;
+
+    fn from_settings(_settings: &Self::Settings) -> Result<Self, Self::Error> {
+        Ok(Self::new(None, None))
+    }
+}
+
 impl<
         A,
         BlendAdapter,
@@ -542,7 +611,9 @@ impl<
     >
 where
     A: NetworkAdapter + Clone + Send + Sync + 'static,
+    A::Settings: Send,
     BlendAdapter: blend::BlendAdapter + Clone + Send + Sync + 'static,
+    BlendAdapter::Settings: Send,
     ClPool: MemPool<BlockId = HeaderId> + Send + Sync + 'static,
     ClPool::Settings: Send + Sync + 'static,
     ClPool::Item: Transaction<Hash = ClPool::Key>
@@ -569,7 +640,9 @@ where
     DaPool: MemPool<BlockId = HeaderId, Key = SamplingBackend::BlobId> + Send + Sync + 'static,
     DaPool::Settings: Send + Sync + 'static,
     TxS: TxSelect<Tx = ClPool::Item> + Clone + Send + Sync + 'static,
+    TxS::Settings: Send,
     BS: BlobSelect<BlobId = DaPool::Item> + Clone + Send + Sync + 'static,
+    BS::Settings: Send,
     ClPool::Key: Debug + Send + Sync,
     ClPoolAdapter:
         MempoolAdapter<Payload = ClPool::Item, Key = ClPool::Key> + Send + Sync + 'static,
@@ -659,7 +732,7 @@ where
         level = "debug",
         skip(
             cryptarchia,
-            storage_relay,
+            storage_adapter,
             cl_mempool_relay,
             da_mempool_relay,
             sampling_relay,
@@ -670,7 +743,7 @@ where
         mut cryptarchia: Cryptarchia,
         leader: &mut leadership::Leader,
         block: Block<ClPool::Item, DaPool::Item>,
-        storage_relay: OutboundRelay<StorageMsg<Storage>>,
+        storage_adapter: &StorageAdapter<Storage, ClPool::Item, DaPool::Item>,
         cl_mempool_relay: OutboundRelay<
             MempoolMsg<HeaderId, ClPool::Item, ClPool::Item, ClPool::Key>,
         >,
@@ -725,7 +798,7 @@ where
 
                 // store block
                 let msg = <StorageMsg<_>>::new_store_message(header.id(), block.clone());
-                if let Err((e, _msg)) = storage_relay.send(msg).await {
+                if let Err((e, _msg)) = storage_adapter.storage_relay.send(msg).await {
                     tracing::error!("Could not send block to storage: {e}");
                 }
 

@@ -4,10 +4,13 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-overwatch-rs = { git = "https://github.com/logos-co/Overwatch", rev = "1b83775" }
-overwatch-derive = { git = "https://github.com/logos-co/Overwatch", rev = "1b83775" }
+overwatch-rs = { git = "https://github.com/logos-co/Overwatch", rev = "f5f7ea0" }
+overwatch-derive = { git = "https://github.com/logos-co/Overwatch", rev = "f5f7ea0" }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0.133"
 thiserror = "1"
 log = "0.4.22"
 async-trait = "0.1.83"
+
+[dev-dependencies]
+tracing = "0.1"
