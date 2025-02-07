@@ -7,6 +7,8 @@ pub mod storage;
 mod time;
 
 use crate::relays::CryptarchiaConsensusRelays;
+use crate::storage::adapters::StorageAdapter;
+use crate::storage::StorageAdapter as _;
 use core::fmt::Debug;
 use cryptarchia_engine::Slot;
 use futures::StreamExt;
@@ -209,6 +211,7 @@ pub struct CryptarchiaConsensus<
     >,
     block_subscription_sender: broadcast::Sender<Block<ClPool::Item, DaPool::Item>>,
     storage_relay: Relay<StorageService<Storage>>,
+    initial_state: <Self as ServiceData>::State,
 }
 
 impl<
@@ -375,7 +378,7 @@ where
 {
     fn init(
         service_state: ServiceStateHandle<Self>,
-        _initial_state: Self::State,
+        initial_state: Self::State,
     ) -> Result<Self, overwatch_rs::DynError> {
         let network_relay = service_state.overwatch_handle.relay();
         let blend_relay = service_state.overwatch_handle.relay();
@@ -394,6 +397,7 @@ where
             block_subscription_sender,
             storage_relay,
             sampling_relay,
+            initial_state,
         })
     }
 
@@ -444,6 +448,31 @@ where
                 config.clone(),
             ),
         };
+        let mut leader = leadership::Leader::new(genesis_id, leader_config, config);
+
+        if self.initial_state.should_recover() {
+            if !self.initial_state.can_recover() {
+                return Err(DynError::from(
+                    "Security block is missing from recovery state.",
+                ));
+            }
+
+            let CryptarchiaConsensusState {
+                tip,
+                security_block,
+                ..
+            } = self.initial_state;
+
+            cryptarchia = Self::restore_from_recovery(
+                cryptarchia,
+                tip.unwrap(),
+                security_block.unwrap(),
+                &mut leader,
+                &relays,
+                &mut self.block_subscription_sender,
+            )
+            .await;
+        }
 
         let network_adapter =
             NetAdapter::new(network_adapter_settings, relays.network_relay().clone()).await;
@@ -451,7 +480,6 @@ where
         let blob_selector = BS::new(blob_selector_settings);
 
         let mut incoming_blocks = network_adapter.blocks_stream().await?;
-        let mut leader = leadership::Leader::new(genesis_id, leader_config, config);
         let timer = time::Timer::new(time);
 
         let mut slot_timer = IntervalStream::new(timer.slot_interval());
@@ -553,6 +581,14 @@ impl<TxS, BxS, NetworkAdapterSettings, BlendAdapterSettings>
             _network_adapter_settings: Default::default(),
             _blend_adapter_settings: Default::default(),
         }
+    }
+
+    pub fn should_recover(&self) -> bool {
+        self.tip.is_some()
+    }
+
+    pub fn can_recover(&self) -> bool {
+        self.should_recover() && self.security_block.is_some()
     }
 }
 
@@ -885,6 +921,64 @@ where
             transactions = transactions,
             blobs = blobs
         );
+    }
+
+    async fn get_blocks_from_tip(
+        tip: HeaderId,
+        security_block_header: HeaderId,
+        storage_adapter: &StorageAdapter<Storage, TxS::Tx, BS::BlobId>,
+    ) -> Vec<Block<ClPool::Item, DaPool::Item>> {
+        let blocks_from_tip = futures::stream::unfold(tip, |header_id| async move {
+            if header_id == security_block_header {
+                None
+            } else {
+                let block = storage_adapter
+                    .get_block(&header_id)
+                    .await
+                    .unwrap_or_else(|| {
+                        panic!("Could not retrieve block {tip} from storage during recovery")
+                    });
+                let parent_header_id = block.header().parent();
+                Some((block, parent_header_id))
+            }
+        });
+
+        blocks_from_tip.collect::<Vec<_>>().await
+    }
+
+    /// Restore the cryptarchia state from the
+    async fn restore_from_recovery(
+        mut cryptarchia: Cryptarchia,
+        tip: HeaderId,
+        security_block_header: HeaderId,
+        leader: &mut leadership::Leader,
+        relays: &CryptarchiaConsensusRelays<
+            BlendAdapter,
+            BS,
+            ClPool,
+            ClPoolAdapter,
+            DaPool,
+            DaPoolAdapter,
+            A,
+            SamplingBackend,
+            SamplingRng,
+            Storage,
+            TxS,
+        >,
+        block_broadcaster: &mut broadcast::Sender<Block<ClPool::Item, DaPool::Item>>,
+    ) -> Cryptarchia {
+        let blocks_to_tip =
+            Self::get_blocks_from_tip(tip, security_block_header, relays.storage_adapter())
+                .await
+                .into_iter()
+                .rev();
+
+        for block in blocks_to_tip {
+            cryptarchia =
+                Self::process_block(cryptarchia, leader, block, relays, block_broadcaster).await
+        }
+
+        cryptarchia
     }
 }
 
