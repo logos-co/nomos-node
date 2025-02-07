@@ -161,7 +161,9 @@ pub struct CryptarchiaConsensus<
     SamplingStorage,
 > where
     A: NetworkAdapter,
+    A::Settings: Send,
     BlendAdapter: blend::BlendAdapter,
+    BlendAdapter::Settings: Send,
     ClPoolAdapter: MempoolAdapter<Payload = ClPool::Item, Key = ClPool::Key>,
     ClPool: MemPool<BlockId = HeaderId>,
     DaPool: MemPool<BlockId = HeaderId>,
@@ -173,7 +175,9 @@ pub struct CryptarchiaConsensus<
     DaPool::Key: Debug + 'static,
     A::Backend: 'static,
     TxS: TxSelect<Tx = ClPool::Item>,
+    TxS::Settings: Send,
     BS: BlobSelect<BlobId = DaPool::Item>,
+    BS::Settings: Send,
     Storage: StorageBackend + Send + Sync + 'static,
     SamplingRng: SeedableRng + RngCore,
     SamplingBackend: DaSamplingServiceBackend<SamplingRng, BlobId = DaPool::Key> + Send,
@@ -239,7 +243,9 @@ impl<
     >
 where
     A: NetworkAdapter,
+    A::Settings: Send,
     BlendAdapter: blend::BlendAdapter,
+    BlendAdapter::Settings: Send,
     ClPool: MemPool<BlockId = HeaderId>,
     ClPool::Item: Clone + Eq + Hash + Debug,
     ClPool::Key: Debug,
@@ -250,7 +256,9 @@ where
     DaPoolAdapter: MempoolAdapter<Key = DaPool::Key>,
     DaPoolAdapter::Payload: DispersedBlobInfo + Into<DaPool::Item> + Debug,
     TxS: TxSelect<Tx = ClPool::Item>,
+    TxS::Settings: Send,
     BS: BlobSelect<BlobId = DaPool::Item>,
+    BS::Settings: Send,
     Storage: StorageBackend + Send + Sync + 'static,
     SamplingRng: SeedableRng + RngCore,
     SamplingBackend: DaSamplingServiceBackend<SamplingRng, BlobId = DaPool::Key> + Send,
@@ -603,7 +611,9 @@ impl<
     >
 where
     A: NetworkAdapter + Clone + Send + Sync + 'static,
+    A::Settings: Send,
     BlendAdapter: blend::BlendAdapter + Clone + Send + Sync + 'static,
+    BlendAdapter::Settings: Send,
     ClPool: MemPool<BlockId = HeaderId> + Send + Sync + 'static,
     ClPool::Settings: Send + Sync + 'static,
     ClPool::Item: Transaction<Hash = ClPool::Key>
@@ -630,7 +640,9 @@ where
     DaPool: MemPool<BlockId = HeaderId, Key = SamplingBackend::BlobId> + Send + Sync + 'static,
     DaPool::Settings: Send + Sync + 'static,
     TxS: TxSelect<Tx = ClPool::Item> + Clone + Send + Sync + 'static,
+    TxS::Settings: Send,
     BS: BlobSelect<BlobId = DaPool::Item> + Clone + Send + Sync + 'static,
+    BS::Settings: Send,
     ClPool::Key: Debug + Send + Sync,
     ClPoolAdapter:
         MempoolAdapter<Payload = ClPool::Item, Key = ClPool::Key> + Send + Sync + 'static,
