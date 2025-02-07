@@ -18,7 +18,7 @@ type BoxedStream<T> = Box<dyn Stream<Item = T> + Send + Sync + Unpin>;
 #[async_trait::async_trait]
 pub trait NetworkAdapter {
     type Backend: NetworkBackend + 'static;
-    type Settings: Clone + Send + 'static;
+    type Settings: Clone + 'static;
     type Tx: Serialize + DeserializeOwned + Clone + Eq + Hash + 'static;
     type BlobCertificate: Serialize + DeserializeOwned + Clone + Eq + Hash + 'static;
     async fn new(
