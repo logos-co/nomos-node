@@ -6,6 +6,14 @@ exclude-dev = true
 no-default-features = true
 
 [advisories]
+ignore = [
+  { id = "RUSTSEC-2021-0139", reason = "`ansi_term` is unmaintained; consider using an alternative. Use `cargo tree -p ansi_term -i` for more info." },
+  { id = "RUSTSEC-2024-0388", reason = "`derivative` is unmaintained; consider using an alternative. Use `cargo tree -p derivative -i` for more info." },
+  { id = "RUSTSEC-2020-0095", reason = "`difference` is unmaintained; consider using an alternative. Use `cargo tree -p difference -i` for more info." },
+  { id = "RUSTSEC-2024-0384", reason = "`instant` is unmaintained; consider using an alternative. Use `cargo tree -p instant -i` for more info." },
+  { id = "RUSTSEC-2024-0370", reason = "`proc-macro-error` is unmaintained; consider using an alternative. Use `cargo tree -p proc-macro-error -i` for more info." },
+  { id = "RUSTSEC-2023-0071", reason = "Marvin Attack: potential key recovery through timing sidechannels" },
+]
 yanked = "deny"
 
 [bans]
@@ -23,11 +31,27 @@ allow = [
     "BSD-2-Clause",
     "Zlib",
     "Apache-2.0 WITH LLVM-exception",
+    "CC0-1.0",
+    "BlueOak-1.0.0",
+    "BSL-1.0",
+    "NCSA",
+    "OpenSSL"
 ]
 private = { ignore = false }
 unused-allowed-license = "deny"
 
+[[licenses.clarify]]
+name = "ring"
+expression = "MIT AND ISC AND OpenSSL"
+license-files = [
+    { path = "LICENSE", hash = 0xbd0eed23 }
+]
+
 [sources]
-allow-git = ["https://github.com/logos-co/Overwatch"]
 unknown-git = "deny"
 unknown-registry = "deny"
+
+[sources.allow-org]
+github = [
+    "logos-co",
+]
