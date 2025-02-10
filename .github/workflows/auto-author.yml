@@ -1,5 +1,4 @@
-# .github/workflows/auto-author-assign.yml
-name: Auto Author Assign
+name: Auto Author Assign and Check Rust and Cargo Installation
 
 on:
   pull_request_target:
@@ -12,4 +11,32 @@ jobs:
   assign-author:
     runs-on: ubuntu-latest
     steps:
-      - uses: toshimaru/auto-author-assign@v1.6.2
+      - name: Check if rustup is installed
+        id: check_rustup
+        run: |
+          if command -v rustup &> /dev/null; then
+            echo "rustup is installed."
+            echo "rustup_version=$(rustup --version)" >> $GITHUB_ENV
+          else
+            echo "rustup is not installed."
+            exit 1
+          fi
+
+      - name: Check if cargo is installed
+        id: check_cargo
+        run: |
+          if command -v cargo &> /dev/null; then
+            echo "cargo is installed."
+            echo "cargo_version=$(cargo --version)" >> $GITHUB_ENV
+          else
+            echo "cargo is not installed."
+            exit 1
+          fi
+
+      - name: Display rustup and cargo versions
+        run: |
+          echo "rustup version: ${{ env.rustup_version }}"
+          echo "cargo version: ${{ env.cargo_version }}"
+
+      - name: Auto Author Assign
+        uses: toshimaru/auto-author-assign@v1.6.2
