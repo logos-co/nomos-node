@@ -108,32 +108,34 @@ impl<
     >
 where
     BlendAdapter: blend::BlendAdapter<Network: BlendNetworkAdapter>,
-    BS: BlobSelect<BlobId = DaPool::Item> + Clone,
+    BS: BlobSelect<BlobId = DaPool::Item>,
     ClPool: RecoverableMempool<BlockId = HeaderId>,
     ClPool::RecoveryState: Serialize + for<'de> Deserialize<'de>,
-    ClPool::BlockId: Debug,
     ClPool::Item: Debug + DeserializeOwned + Eq + Hash + Clone + Send + Sync + 'static,
-    ClPool::Key: Debug + 'static,
+    ClPool::Key: 'static,
     ClPool::Settings: Clone,
     ClPoolAdapter: MempoolAdapter<Payload = ClPool::Item, Key = ClPool::Key>,
     DaPool: RecoverableMempool<BlockId = HeaderId>,
-    DaPool::RecoveryState: Serialize + for<'de> Deserialize<'de>,
     DaPool::BlockId: Debug,
     DaPool::Item: Debug + DeserializeOwned + Eq + Hash + Clone + Send + Sync + 'static,
     DaPool::Key: Debug + 'static,
+    //
+    DaPool::RecoveryState: Serialize + for<'de> Deserialize<'de>,
+    //
     DaPool::Settings: Clone,
     DaPoolAdapter: MempoolAdapter<Key = DaPool::Key>,
     DaPoolAdapter::Payload: DispersedBlobInfo + Into<DaPool::Item> + Debug,
+    //
+    DaVerifierBackend: nomos_da_verifier::backend::VerifierBackend + Send + Sync + 'static,
+    DaVerifierBackend::Settings: Clone,
+    //
     NetworkAdapter: network::NetworkAdapter,
     Storage: StorageBackend + Send + Sync + 'static,
     SamplingRng: SeedableRng + RngCore,
     SamplingBackend: DaSamplingServiceBackend<SamplingRng, BlobId = DaPool::Key> + Send,
     SamplingBackend::Settings: Clone,
     SamplingBackend::Blob: Debug,
-    SamplingBackend::BlobId: Debug,
-    TxS: TxSelect<Tx = ClPool::Item> + Clone + Send + Sync,
-    DaVerifierBackend: nomos_da_verifier::backend::VerifierBackend + Send + Sync + 'static,
-    DaVerifierBackend::Settings: Clone,
+    TxS: TxSelect<Tx = ClPool::Item>,
 {
     pub async fn new(
         network_relay: NetworkRelay<<NetworkAdapter as network::NetworkAdapter>::Backend>,
