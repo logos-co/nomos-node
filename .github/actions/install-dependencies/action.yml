@@ -33,6 +33,7 @@ runs:
       if: inputs.target_triple == 'i686-unknown-linux-gnu'
       shell: bash
       run: |
+        echo "Test"
         # Add i686 target
         rustup target add i686-unknown-linux-gnu
 
