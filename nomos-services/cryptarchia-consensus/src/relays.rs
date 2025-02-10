@@ -1,5 +1,14 @@
 use std::{fmt::Debug, hash::Hash};
 
+use overwatch_rs::services::relay::{OutboundRelay, Relay};
+use rand::{RngCore, SeedableRng};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
+
+use crate::{
+    blend, network,
+    storage::{adapters::StorageAdapter, StorageAdapter as StorageAdapterTrait},
+    MempoolRelay, SamplingRelay,
+};
 use nomos_blend_service::{network::NetworkAdapter as BlendNetworkAdapter, ServiceMessage};
 use nomos_core::{
     da::blob::{info::DispersedBlobInfo, BlobSelect},
@@ -14,15 +23,6 @@ use nomos_mempool::{
 };
 use nomos_network::{NetworkMsg, NetworkService};
 use nomos_storage::{backends::StorageBackend, StorageMsg, StorageService};
-use overwatch_rs::services::relay::{OutboundRelay, Relay};
-use rand::{RngCore, SeedableRng};
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
-
-use crate::{
-    blend, network,
-    storage::{adapters::StorageAdapter, StorageAdapter as StorageAdapterTrait},
-    MempoolRelay, SamplingRelay,
-};
 
 type NetworkRelay<NetworkBackend> = OutboundRelay<NetworkMsg<NetworkBackend>>;
 type BlendRelay<BlendAdapterNetworkBroadcastSettings> =
@@ -102,16 +102,14 @@ impl<
     >
 where
     BlendAdapter: blend::BlendAdapter<Network: BlendNetworkAdapter>,
-    BS: BlobSelect<BlobId = DaPool::Item> + Clone,
+    BS: BlobSelect<BlobId = DaPool::Item>,
     ClPool: RecoverableMempool<BlockId = HeaderId>,
     ClPool::RecoveryState: Serialize + for<'de> Deserialize<'de>,
-    ClPool::BlockId: Debug,
     ClPool::Item: Debug + DeserializeOwned + Eq + Hash + Clone + Send + Sync + 'static,
-    ClPool::Key: Debug + 'static,
+    ClPool::Key: 'static,
     ClPool::Settings: Clone,
     ClPoolAdapter: MempoolAdapter<Payload = ClPool::Item, Key = ClPool::Key>,
     DaPool: MemPool<BlockId = HeaderId>,
-    DaPool::BlockId: Debug,
     DaPool::Item: Debug + DeserializeOwned + Eq + Hash + Clone + Send + Sync,
     DaPool::Key: Debug,
     DaPool::Settings: Clone,
@@ -123,8 +121,7 @@ where
     SamplingBackend: DaSamplingServiceBackend<SamplingRng, BlobId = DaPool::Key> + Send,
     SamplingBackend::Settings: Clone,
     SamplingBackend::Blob: Debug,
-    SamplingBackend::BlobId: Debug,
-    TxS: TxSelect<Tx = ClPool::Item> + Clone + Send + Sync,
+    TxS: TxSelect<Tx = ClPool::Item>,
 {
     pub async fn new(
         network_relay: NetworkRelay<<NetworkAdapter as network::NetworkAdapter>::Backend>,
