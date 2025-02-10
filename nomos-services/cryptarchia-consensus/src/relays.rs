@@ -1,6 +1,6 @@
-use std::hash::Hash;
 // std
 use std::fmt::Debug;
+use std::hash::Hash;
 // Crates
 use overwatch_rs::services::relay::{OutboundRelay, Relay};
 use rand::{RngCore, SeedableRng};
@@ -102,14 +102,12 @@ impl<
     >
 where
     BlendAdapter: blend::BlendAdapter<Network: BlendNetworkAdapter>,
-    BS: BlobSelect<BlobId = DaPool::Item> + Clone,
+    BS: BlobSelect<BlobId = DaPool::Item>,
     ClPool: MemPool<BlockId = HeaderId>,
-    ClPool::BlockId: Debug,
     ClPool::Item: Debug + DeserializeOwned + Eq + Hash + Clone + Send + Sync,
     ClPool::Key: Debug,
     ClPoolAdapter: MempoolAdapter<Payload = ClPool::Item, Key = ClPool::Key>,
     DaPool: MemPool<BlockId = HeaderId>,
-    DaPool::BlockId: Debug,
     DaPool::Item: Debug + DeserializeOwned + Eq + Hash + Clone + Send + Sync,
     DaPool::Key: Debug,
     DaPoolAdapter: MempoolAdapter<Key = DaPool::Key>,
@@ -120,8 +118,7 @@ where
     SamplingBackend: DaSamplingServiceBackend<SamplingRng, BlobId = DaPool::Key> + Send,
     SamplingBackend::Settings: Clone,
     SamplingBackend::Blob: Debug,
-    SamplingBackend::BlobId: Debug,
-    TxS: TxSelect<Tx = ClPool::Item> + Clone + Send + Sync,
+    TxS: TxSelect<Tx = ClPool::Item>,
 {
     pub async fn new(
         network_relay: NetworkRelay<<NetworkAdapter as network::NetworkAdapter>::Backend>,
