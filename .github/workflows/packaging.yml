@@ -72,13 +72,8 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v3
 
-      - uses: actions-rs/toolchain@v1
+      - run: rustup target add ${{ matrix.platform.target_triple }}
         name: Install Rust toolchain
-        with:
-          profile: minimal
-          toolchain: stable
-          override: true
-          target: ${{ matrix.platform.target_triple }}
 
       - name: Install dependencies
         uses: ./.github/actions/install-dependencies
