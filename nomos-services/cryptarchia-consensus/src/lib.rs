@@ -2,11 +2,11 @@ pub mod blend;
 mod leadership;
 mod messages;
 pub mod network;
+mod relays;
 pub mod storage;
 mod time;
 
-use crate::storage::adapters::StorageAdapter;
-use crate::storage::StorageAdapter as StorageAdapterTrait;
+use crate::relays::CryptarchiaConsensusRelays;
 use core::fmt::Debug;
 use cryptarchia_engine::Slot;
 use futures::StreamExt;
@@ -427,6 +427,28 @@ where
             .await
             .expect("Relay connection with SamplingService should succeed");
 
+        let relays: CryptarchiaConsensusRelays<
+            BlendAdapter,
+            BS,
+            ClPool,
+            ClPoolAdapter,
+            DaPool,
+            DaPoolAdapter,
+            A,
+            SamplingBackend,
+            SamplingRng,
+            Storage,
+            TxS,
+        > = CryptarchiaConsensusRelays::new(
+            network_relay,
+            blend_relay,
+            cl_mempool_relay,
+            da_mempool_relay,
+            sampling_relay,
+            storage_relay,
+        )
+        .await;
+
         let CryptarchiaSettings {
             config,
             genesis_state,
@@ -452,7 +474,8 @@ where
             ),
         };
 
-        let network_adapter = A::new(network_adapter_settings, network_relay).await;
+        let network_adapter =
+            A::new(network_adapter_settings, relays.network_relay().clone()).await;
         let tx_selector = TxS::new(transaction_selector_settings);
         let blob_selector = BS::new(blob_selector_settings);
 
@@ -462,9 +485,8 @@ where
 
         let mut slot_timer = IntervalStream::new(timer.slot_interval());
 
-        let blend_adapter = BlendAdapter::new(blend_adapter_settings, blend_relay).await;
-        let storage_adapter =
-            StorageAdapter::<Storage, ClPool::Item, DaPool::Item>::new(storage_relay).await;
+        let blend_adapter =
+            BlendAdapter::new(blend_adapter_settings, relays.blend_relay().clone()).await;
 
         let mut lifecycle_stream = self.service_state.lifecycle_handle.message_stream();
 
@@ -477,11 +499,8 @@ where
                             cryptarchia,
                             &mut leader,
                             block,
-                            &storage_adapter,
-                            cl_mempool_relay.clone(),
-                            da_mempool_relay.clone(),
-                            sampling_relay.clone(),
-                            &mut self.block_subscription_sender,
+                            &relays,
+                            &mut self.block_subscription_sender
                         )
                         .await;
 
@@ -514,9 +533,7 @@ where
                                 proof,
                                 tx_selector.clone(),
                                 blob_selector.clone(),
-                                cl_mempool_relay.clone(),
-                                da_mempool_relay.clone(),
-                                sampling_relay.clone(),
+                                &relays
                             ).await;
 
                             if let Some(block) = block {
@@ -535,9 +552,9 @@ where
                     }
                 }
             }
-        // it sucks to use "Cryptarchia" when we have the Self::SERVICE_ID.
-        // Somehow it just do not let refer to the type to reference it.
-        // Probably related to too many generics.
+            // it sucks to use "Cryptarchia" when we have the Self::SERVICE_ID.
+            // Somehow it just do not let refer to the type to reference it.
+            // Probably related to too many generics.
         }.instrument(span!(Level::TRACE, CRYPTARCHIA_ID)).await;
         Ok(())
     }
@@ -728,29 +745,24 @@ where
     }
 
     #[allow(clippy::type_complexity, clippy::too_many_arguments)]
-    #[instrument(
-        level = "debug",
-        skip(
-            cryptarchia,
-            storage_adapter,
-            cl_mempool_relay,
-            da_mempool_relay,
-            sampling_relay,
-            leader
-        )
-    )]
+    #[instrument(level = "debug", skip(cryptarchia, leader, relays))]
     async fn process_block(
         mut cryptarchia: Cryptarchia,
         leader: &mut leadership::Leader,
         block: Block<ClPool::Item, DaPool::Item>,
-        storage_adapter: &StorageAdapter<Storage, ClPool::Item, DaPool::Item>,
-        cl_mempool_relay: OutboundRelay<
-            MempoolMsg<HeaderId, ClPool::Item, ClPool::Item, ClPool::Key>,
+        relays: &CryptarchiaConsensusRelays<
+            BlendAdapter,
+            BS,
+            ClPool,
+            ClPoolAdapter,
+            DaPool,
+            DaPoolAdapter,
+            A,
+            SamplingBackend,
+            SamplingRng,
+            Storage,
+            TxS,
         >,
-        da_mempool_relay: OutboundRelay<
-            MempoolMsg<HeaderId, DaPoolAdapter::Payload, DaPool::Item, DaPool::Key>,
-        >,
-        sampling_relay: SamplingRelay<DaPool::Key>,
         block_broadcaster: &mut broadcast::Sender<Block<ClPool::Item, DaPool::Item>>,
     ) -> Cryptarchia {
         tracing::debug!("received proposal {:?}", block);
@@ -759,7 +771,7 @@ where
 
         let header = block.header();
         let id = header.id();
-        let sampled_blobs = match get_sampled_blobs(sampling_relay.clone()).await {
+        let sampled_blobs = match get_sampled_blobs(relays.sampling_relay().clone()).await {
             Ok(sampled_blobs) => sampled_blobs,
             Err(error) => {
                 error!("Unable to retrieved sampled blobs: {error}");
@@ -778,27 +790,27 @@ where
 
                 // remove included content from mempool
                 mark_in_block(
-                    cl_mempool_relay,
+                    relays.cl_mempool_relay().clone(),
                     block.transactions().map(Transaction::hash),
                     id,
                 )
                 .await;
                 mark_in_block(
-                    da_mempool_relay,
+                    relays.da_mempool_relay().clone(),
                     block.blobs().map(DispersedBlobInfo::blob_id),
                     id,
                 )
                 .await;
 
                 mark_blob_in_block(
-                    sampling_relay,
+                    relays.sampling_relay().clone(),
                     block.blobs().map(DispersedBlobInfo::blob_id).collect(),
                 )
                 .await;
 
                 // store block
                 let msg = <StorageMsg<_>>::new_store_message(header.id(), block.clone());
-                if let Err((e, _msg)) = storage_adapter.storage_relay.send(msg).await {
+                if let Err((e, _msg)) = relays.storage_adapter().storage_relay.send(msg).await {
                     tracing::error!("Could not send block to storage: {e}");
                 }
 
@@ -820,30 +832,31 @@ where
     }
 
     #[allow(clippy::too_many_arguments)]
-    #[instrument(
-        level = "debug",
-        skip(
-            cl_mempool_relay,
-            da_mempool_relay,
-            sampling_relay,
-            tx_selector,
-            blob_selector
-        )
-    )]
+    #[instrument(level = "debug", skip(tx_selector, blob_selector, relays))]
     async fn propose_block(
         parent: HeaderId,
         slot: Slot,
         proof: Risc0LeaderProof,
         tx_selector: TxS,
         blob_selector: BS,
-        cl_mempool_relay: MempoolRelay<ClPool::Item, ClPool::Item, ClPool::Key>,
-        da_mempool_relay: MempoolRelay<DaPoolAdapter::Payload, DaPool::Item, DaPool::Key>,
-        sampling_relay: SamplingRelay<SamplingBackend::BlobId>,
+        relays: &CryptarchiaConsensusRelays<
+            BlendAdapter,
+            BS,
+            ClPool,
+            ClPoolAdapter,
+            DaPool,
+            DaPoolAdapter,
+            A,
+            SamplingBackend,
+            SamplingRng,
+            Storage,
+            TxS,
+        >,
     ) -> Option<Block<ClPool::Item, DaPool::Item>> {
         let mut output = None;
-        let cl_txs = get_mempool_contents(cl_mempool_relay);
-        let da_certs = get_mempool_contents(da_mempool_relay);
-        let blobs_ids = get_sampled_blobs(sampling_relay);
+        let cl_txs = get_mempool_contents(relays.cl_mempool_relay().clone());
+        let da_certs = get_mempool_contents(relays.da_mempool_relay().clone());
+        let blobs_ids = get_sampled_blobs(relays.sampling_relay().clone());
         match futures::join!(cl_txs, da_certs, blobs_ids) {
             (Ok(cl_txs), Ok(da_blobs_info), Ok(blobs_ids)) => {
                 let block = BlockBuilder::new(
