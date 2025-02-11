@@ -567,9 +567,9 @@ pub mod tests {
     pub fn config() -> Config {
         Config {
             epoch_config: EpochConfig {
-                epoch_stake_distribution_stabilization: NonZero::new(4).unwrap(),
-                epoch_period_nonce_buffer: NonZero::new(3).unwrap(),
-                epoch_period_nonce_stabilization: NonZero::new(3).unwrap(),
+                epoch_stake_distribution_stabilization: 4,
+                epoch_period_nonce_buffer: 3,
+                epoch_period_nonce_stabilization: 3,
             },
             consensus_config: cryptarchia_engine::Config {
                 security_param: NonZero::new(1).unwrap(),

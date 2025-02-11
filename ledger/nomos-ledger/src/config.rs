@@ -39,16 +39,14 @@ impl Config {
 
 #[cfg(test)]
 mod tests {
-    use std::num::NonZero;
-
     use cryptarchia_engine::EpochConfig;
     #[test]
     fn epoch_snapshots() {
         let config = super::Config {
             epoch_config: EpochConfig {
-                epoch_stake_distribution_stabilization: NonZero::new(3u8).unwrap(),
-                epoch_period_nonce_buffer: NonZero::new(3).unwrap(),
-                epoch_period_nonce_stabilization: NonZero::new(4).unwrap(),
+                epoch_stake_distribution_stabilization: 3,
+                epoch_period_nonce_buffer: 3,
+                epoch_period_nonce_stabilization: 4,
             },
             consensus_config: cryptarchia_engine::Config {
                 security_param: NonZero::new(5).unwrap(),
@@ -66,9 +64,9 @@ mod tests {
     fn slot_to_epoch() {
         let config = super::Config {
             epoch_config: EpochConfig {
-                epoch_stake_distribution_stabilization: NonZero::new(3u8).unwrap(),
-                epoch_period_nonce_buffer: NonZero::new(3).unwrap(),
-                epoch_period_nonce_stabilization: NonZero::new(4).unwrap(),
+                epoch_stake_distribution_stabilization: 3,
+                epoch_period_nonce_buffer: 3,
+                epoch_period_nonce_stabilization: 4,
             },
             consensus_config: cryptarchia_engine::Config {
                 security_param: NonZero::new(5).unwrap(),
