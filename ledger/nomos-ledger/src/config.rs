@@ -37,12 +37,15 @@ impl Config {
 
 #[cfg(test)]
 mod tests {
+    use cryptarchia_engine::EpochConfig;
     #[test]
     fn epoch_snapshots() {
         let config = super::Config {
-            epoch_stake_distribution_stabilization: 3,
-            epoch_period_nonce_buffer: 3,
-            epoch_period_nonce_stabilization: 4,
+            epoch_config: EpochConfig {
+                epoch_stake_distribution_stabilization: 3,
+                epoch_period_nonce_buffer: 3,
+                epoch_period_nonce_stabilization: 4,
+            },
             consensus_config: cryptarchia_engine::Config {
                 security_param: 5,
                 active_slot_coeff: 0.5,
@@ -58,9 +61,11 @@ mod tests {
     #[test]
     fn slot_to_epoch() {
         let config = super::Config {
-            epoch_stake_distribution_stabilization: 3,
-            epoch_period_nonce_buffer: 3,
-            epoch_period_nonce_stabilization: 4,
+            epoch_config: EpochConfig {
+                epoch_stake_distribution_stabilization: 3,
+                epoch_period_nonce_buffer: 3,
+                epoch_period_nonce_stabilization: 4,
+            },
             consensus_config: cryptarchia_engine::Config {
                 security_param: 5,
                 active_slot_coeff: 0.5,
