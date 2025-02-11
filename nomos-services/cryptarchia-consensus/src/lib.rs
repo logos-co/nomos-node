@@ -146,7 +146,7 @@ impl<Ts, Bs, NetworkAdapterSettings, BlendAdapterSettings> FileBackendSettings
 }
 
 pub struct CryptarchiaConsensus<
-    A,
+    NetAdapter,
     BlendAdapter,
     ClPool,
     ClPoolAdapter,
@@ -160,37 +160,37 @@ pub struct CryptarchiaConsensus<
     SamplingRng,
     SamplingStorage,
 > where
-    A: NetworkAdapter,
-    A::Settings: Send,
+    NetAdapter: NetworkAdapter,
+    NetAdapter::Backend: 'static,
+    NetAdapter::Settings: Send,
     BlendAdapter: blend::BlendAdapter,
     BlendAdapter::Settings: Send,
-    ClPoolAdapter: MempoolAdapter<Payload = ClPool::Item, Key = ClPool::Key>,
     ClPool: MemPool<BlockId = HeaderId>,
-    DaPool: MemPool<BlockId = HeaderId>,
-    DaPoolAdapter: MempoolAdapter<Key = DaPool::Key>,
-    DaPoolAdapter::Payload: DispersedBlobInfo + Into<DaPool::Item> + Debug,
     ClPool::Item: Clone + Eq + Hash + Debug + 'static,
     ClPool::Key: Debug + 'static,
+    ClPoolAdapter: MempoolAdapter<Payload = ClPool::Item, Key = ClPool::Key>,
+    DaPool: MemPool<BlockId = HeaderId>,
     DaPool::Item: Clone + Eq + Hash + Debug + 'static,
     DaPool::Key: Debug + 'static,
-    A::Backend: 'static,
+    DaPoolAdapter: MempoolAdapter<Key = DaPool::Key>,
+    DaPoolAdapter::Payload: DispersedBlobInfo + Into<DaPool::Item> + Debug,
     TxS: TxSelect<Tx = ClPool::Item>,
     TxS::Settings: Send,
     BS: BlobSelect<BlobId = DaPool::Item>,
     BS::Settings: Send,
     Storage: StorageBackend + Send + Sync + 'static,
-    SamplingRng: SeedableRng + RngCore,
     SamplingBackend: DaSamplingServiceBackend<SamplingRng, BlobId = DaPool::Key> + Send,
     SamplingBackend::Settings: Clone,
     SamplingBackend::Blob: Debug + 'static,
     SamplingBackend::BlobId: Debug + 'static,
     SamplingNetworkAdapter: nomos_da_sampling::network::NetworkAdapter,
+    SamplingRng: SeedableRng + RngCore,
     SamplingStorage: nomos_da_sampling::storage::DaStorageAdapter,
 {
     service_state: ServiceStateHandle<Self>,
     // underlying networking backend. We need this so we can relay and check the types properly
     // when implementing ServiceCore for CryptarchiaConsensus
-    network_relay: Relay<NetworkService<A::Backend>>,
+    network_relay: Relay<NetworkService<NetAdapter::Backend>>,
     blend_relay:
         Relay<nomos_blend_service::BlendService<BlendAdapter::Backend, BlendAdapter::Network>>,
     cl_mempool_relay: Relay<TxMempoolService<ClPoolAdapter, ClPool>>,
@@ -212,7 +212,7 @@ pub struct CryptarchiaConsensus<
 }
 
 impl<
-        A,
+        NetAdapter,
         BlendAdapter,
         ClPool,
         ClPoolAdapter,
@@ -227,7 +227,7 @@ impl<
         SamplingStorage,
     > ServiceData
     for CryptarchiaConsensus<
-        A,
+        NetAdapter,
         BlendAdapter,
         ClPool,
         ClPoolAdapter,
@@ -242,17 +242,17 @@ impl<
         SamplingStorage,
     >
 where
-    A: NetworkAdapter,
-    A::Settings: Send,
+    NetAdapter: NetworkAdapter,
+    NetAdapter::Settings: Send,
     BlendAdapter: blend::BlendAdapter,
     BlendAdapter::Settings: Send,
     ClPool: MemPool<BlockId = HeaderId>,
     ClPool::Item: Clone + Eq + Hash + Debug,
     ClPool::Key: Debug,
+    ClPoolAdapter: MempoolAdapter<Payload = ClPool::Item, Key = ClPool::Key>,
     DaPool: MemPool<BlockId = HeaderId>,
     DaPool::Item: Clone + Eq + Hash + Debug,
     DaPool::Key: Debug,
-    ClPoolAdapter: MempoolAdapter<Payload = ClPool::Item, Key = ClPool::Key>,
     DaPoolAdapter: MempoolAdapter<Key = DaPool::Key>,
     DaPoolAdapter::Payload: DispersedBlobInfo + Into<DaPool::Item> + Debug,
     TxS: TxSelect<Tx = ClPool::Item>,
@@ -260,19 +260,27 @@ where
     BS: BlobSelect<BlobId = DaPool::Item>,
     BS::Settings: Send,
     Storage: StorageBackend + Send + Sync + 'static,
-    SamplingRng: SeedableRng + RngCore,
     SamplingBackend: DaSamplingServiceBackend<SamplingRng, BlobId = DaPool::Key> + Send,
     SamplingBackend::Settings: Clone,
     SamplingBackend::Blob: Debug + 'static,
     SamplingBackend::BlobId: Debug + 'static,
     SamplingNetworkAdapter: nomos_da_sampling::network::NetworkAdapter,
+    SamplingRng: SeedableRng + RngCore,
     SamplingStorage: nomos_da_sampling::storage::DaStorageAdapter,
 {
     const SERVICE_ID: ServiceId = CRYPTARCHIA_ID;
-    type Settings =
-        CryptarchiaSettings<TxS::Settings, BS::Settings, A::Settings, BlendAdapter::Settings>;
-    type State =
-        CryptarchiaConsensusState<TxS::Settings, BS::Settings, A::Settings, BlendAdapter::Settings>;
+    type Settings = CryptarchiaSettings<
+        TxS::Settings,
+        BS::Settings,
+        NetAdapter::Settings,
+        BlendAdapter::Settings,
+    >;
+    type State = CryptarchiaConsensusState<
+        TxS::Settings,
+        BS::Settings,
+        NetAdapter::Settings,
+        BlendAdapter::Settings,
+    >;
     type StateOperator = RecoveryOperator<JsonFileBackend<Self::State, Self::Settings>>;
     type Message = ConsensusMsg<Block<ClPool::Item, DaPool::Item>>;
 }
