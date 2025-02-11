@@ -51,7 +51,7 @@ pub use time::Config as TimeConfig;
 use tokio::sync::oneshot::Sender;
 use tokio::sync::{broadcast, oneshot};
 use tokio_stream::wrappers::IntervalStream;
-use tracing::{error, instrument, span, Level};
+use tracing::{error, info, instrument, span, Level};
 use tracing_futures::Instrument;
 
 type MempoolRelay<Payload, Item, Key> = OutboundRelay<MempoolMsg<HeaderId, Payload, Item, Key>>;
@@ -451,10 +451,9 @@ where
         let mut leader = leadership::Leader::new(genesis_id, leader_config, config);
 
         if self.initial_state.should_recover() {
+            info!("Attempting to recover from previously stored state.");
             if !self.initial_state.can_recover() {
-                return Err(DynError::from(
-                    "Security block is missing from recovery state.",
-                ));
+                return Err(DynError::from("Recovery state is incomplete or invalid."));
             }
 
             let CryptarchiaConsensusState {
