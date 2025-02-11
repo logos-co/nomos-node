@@ -5,7 +5,7 @@ use std::collections::{HashMap, HashSet};
 
 pub use config::*;
 use thiserror::Error;
-pub use time::{Epoch, Slot};
+pub use time::{Epoch, EpochConfig, Slot};
 
 #[derive(Clone, Debug)]
 pub struct Cryptarchia<Id> {

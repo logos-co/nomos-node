@@ -2,6 +2,7 @@ use std::{str::FromStr, time::Duration};
 
 use cl::{NoteWitness, NullifierSecret};
 use cryptarchia_consensus::{LeaderConfig, TimeConfig};
+use cryptarchia_engine::EpochConfig;
 use nomos_core::staking::NMO_UNIT;
 use nomos_ledger::LedgerState;
 use rand::thread_rng;
@@ -65,9 +66,11 @@ pub fn create_consensus_configs(
         (ids.len() as u32).into(),
     );
     let ledger_config = nomos_ledger::Config {
-        epoch_stake_distribution_stabilization: 3,
-        epoch_period_nonce_buffer: 3,
-        epoch_period_nonce_stabilization: 4,
+        epoch_config: EpochConfig {
+            epoch_stake_distribution_stabilization: 3,
+            epoch_period_nonce_buffer: 3,
+            epoch_period_nonce_stabilization: 4,
+        },
         consensus_config: cryptarchia_engine::Config {
             security_param: consensus_params.security_param,
             active_slot_coeff: consensus_params.active_slot_coeff,
