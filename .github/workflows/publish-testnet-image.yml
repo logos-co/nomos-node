@@ -3,10 +3,6 @@ name: Publish Testnet Docker Image
 on:
   workflow_dispatch:
     inputs:
-      branch:
-        description: "Branch to build the Docker image from"
-        required: true
-        default: "master"
       tag:
         description: "Docker image tag to use"
         required: true
