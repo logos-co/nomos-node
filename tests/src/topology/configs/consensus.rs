@@ -1,7 +1,7 @@
 use std::num::NonZero;
 
 use cl::{NoteWitness, NullifierSecret};
-use cryptarchia_consensus::LeaderConfig;
+use cryptarchia_consensus::{LeaderConfig, TimeConfig};
 use cryptarchia_engine::EpochConfig;
 use nomos_core::staking::NMO_UNIT;
 use nomos_ledger::LedgerState;
@@ -62,9 +62,9 @@ pub fn create_consensus_configs(
     );
     let ledger_config = nomos_ledger::Config {
         epoch_config: EpochConfig {
-            epoch_stake_distribution_stabilization: NonZero::new(3).unwrap(),
-            epoch_period_nonce_buffer: NonZero::new(3).unwrap(),
-            epoch_period_nonce_stabilization: NonZero::new(4).unwrap(),
+            epoch_stake_distribution_stabilization: 3,
+            epoch_period_nonce_buffer: 3,
+            epoch_period_nonce_stabilization: 4,
         },
         consensus_config: cryptarchia_engine::Config {
             security_param: consensus_params.security_param,

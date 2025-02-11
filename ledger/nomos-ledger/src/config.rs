@@ -20,16 +20,11 @@ impl Config {
     }
 
     pub fn nonce_snapshot(&self, epoch: Epoch) -> Slot {
-        let offset = self.base_period_length().get().saturating_mul(
-            u64::from(self.epoch_config.epoch_period_nonce_buffer.get()).saturating_add(u64::from(
-                self.epoch_config
-                    .epoch_stake_distribution_stabilization
-                    .get(),
-            )),
-        );
-        let base =
-            u64::from(u32::from(epoch).saturating_sub(1)).saturating_mul(self.epoch_length());
-        base.saturating_add(offset).into()
+        let offset = self.base_period_length()
+            * (self.epoch_config.epoch_period_nonce_buffer
+                + self.epoch_config.epoch_stake_distribution_stabilization) as u64;
+        let base = (u32::from(epoch) - 1) as u64 * self.epoch_length();
+        (base + offset).into()
     }
 
     pub fn stake_distribution_snapshot(&self, epoch: Epoch) -> Slot {
