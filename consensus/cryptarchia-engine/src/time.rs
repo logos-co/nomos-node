@@ -57,3 +57,31 @@ impl Add<u32> for Epoch {
         Epoch(self.0 + rhs)
     }
 }
+
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[derive(Clone, Debug, PartialEq)]
+pub struct EpochConfig {
+    // The stake distribution is always taken at the beginning of the previous epoch.
+    // This parameters controls how many slots to wait for it to be stabilized
+    // The value is computed as epoch_stake_distribution_stabilization * int(floor(k / f))
+    pub epoch_stake_distribution_stabilization: u8,
+    // This parameter controls how many slots we wait after the stake distribution
+    // snapshot has stabilized to take the nonce snapshot.
+    pub epoch_period_nonce_buffer: u8,
+    // This parameter controls how many slots we wait for the nonce snapshot to be considered
+    // stabilized
+    pub epoch_period_nonce_stabilization: u8,
+}
+
+impl EpochConfig {
+    pub fn epoch_length(&self, base_period_length: u64) -> u64 {
+        (self.epoch_stake_distribution_stabilization as u64
+            + self.epoch_period_nonce_buffer as u64
+            + self.epoch_period_nonce_stabilization as u64)
+            * base_period_length
+    }
+
+    pub fn epoch(&self, slot: Slot, base_period_length: u64) -> Epoch {
+        ((u64::from(slot) / base_period_length) as u32).into()
+    }
+}
