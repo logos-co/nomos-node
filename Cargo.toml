@@ -37,6 +37,7 @@ members = [
   "nomos-services/storage",
   "nomos-services/system-sig",
   "nomos-services/tracing",
+  "nomos-services/time",
   "nomos-services/utils",
   "nomos-tracing",
   "nomos-utils",

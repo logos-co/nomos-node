@@ -1,0 +1,7 @@
+[package]
+name = "nomos-time-service"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+cryptarchia-engine = { path = "../../consensus/cryptarchia-engine", features = ["serde"] }
