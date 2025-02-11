@@ -6,6 +6,7 @@ use std::time::Duration;
 use std::{net::SocketAddr, process::Child};
 // Crates
 use cryptarchia_consensus::CryptarchiaSettings;
+use kzgrs_backend::common::blob::DaBlob;
 use nomos_blend::message_blend::{
     CryptographicProcessorSettings, MessageBlendSettings, TemporalSchedulerSettings,
 };
@@ -113,7 +114,7 @@ impl Executor {
         &self,
         app_id: [u8; 32],
         range: Range<[u8; 8]>,
-    ) -> Vec<([u8; 8], Vec<Vec<u8>>)> {
+    ) -> Vec<([u8; 8], Vec<DaBlob>)> {
         CLIENT
             .post(format!("http://{}{}", self.addr, DA_GET_RANGE))
             .header("Content-Type", "application/json")
@@ -121,7 +122,7 @@ impl Executor {
             .send()
             .await
             .unwrap()
-            .json::<Vec<([u8; 8], Vec<Vec<u8>>)>>()
+            .json::<Vec<([u8; 8], Vec<DaBlob>)>>()
             .await
             .unwrap()
     }

@@ -259,7 +259,6 @@ fn test_indexer() {
     assert_eq!(index2, index);
 
     let expected_blob_info = blob_info.clone();
-    let blob_0_bytes = Wire::serialize(blobs[0].clone());
 
     node2.spawn(async move {
         let storage_outbound = node2_storage.connect().await.unwrap();
@@ -409,8 +408,7 @@ fn test_indexer() {
         // When Indexer is asked for app_id at index, it will return all blobs that it has for that
         // blob_id.
         let columns = app_id_blobs[0];
-        if !columns.is_empty() && columns[0] == blob_0_bytes.as_ref() && app_id_blobs[1].is_empty()
-        {
+        if !columns.is_empty() && columns[0] == blobs[0] && app_id_blobs[1].is_empty() {
             is_success_tx.store(true, SeqCst);
         }
 

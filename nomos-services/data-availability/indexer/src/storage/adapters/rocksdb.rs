@@ -4,6 +4,7 @@ use std::{marker::PhantomData, ops::Range};
 // crates
 use bytes::Bytes;
 use futures::{stream::FuturesUnordered, Stream};
+use kzgrs_backend::common::blob::DaBlob;
 use nomos_core::da::blob::{
     info::DispersedBlobInfo,
     metadata::{Metadata, Next},
@@ -34,16 +35,16 @@ where
 }
 
 #[async_trait::async_trait]
-impl<S, B> DaStorageAdapter for RocksAdapter<S, B>
+impl<S, Meta> DaStorageAdapter for RocksAdapter<S, Meta>
 where
     S: StorageSerde + Send + Sync + 'static,
-    B: DispersedBlobInfo<BlobId = BlobId> + Metadata + Send + Sync,
-    B::Index: AsRef<[u8]> + Next + Clone + PartialOrd + Send + Sync + 'static,
-    B::AppId: AsRef<[u8]> + Clone + Send + Sync + 'static,
+    Meta: DispersedBlobInfo<BlobId = BlobId> + Metadata + Send + Sync,
+    Meta::Index: AsRef<[u8]> + Next + Clone + PartialOrd + Send + Sync + 'static,
+    Meta::AppId: AsRef<[u8]> + Clone + Send + Sync + 'static,
 {
     type Backend = RocksBackend<S>;
-    type Blob = Bytes;
-    type Info = B;
+    type Blob = DaBlob;
+    type Info = Meta;
     type Settings = RocksAdapterSettings;
 
     async fn new(
@@ -98,7 +99,8 @@ where
         &self,
         app_id: <Self::Info as Metadata>::AppId,
         index_range: Range<<Self::Info as Metadata>::Index>,
-    ) -> Box<dyn Stream<Item = (<Self::Info as Metadata>::Index, Vec<Bytes>)> + Unpin + Send> {
+    ) -> Box<dyn Stream<Item = (<Self::Info as Metadata>::Index, Vec<Self::Blob>)> + Unpin + Send>
+    {
         let futures = FuturesUnordered::new();
 
         // TODO: Using while loop here until `Step` trait is stable.
@@ -127,14 +129,18 @@ where
                 .expect("Failed to send load request to storage relay");
 
             futures.push(async move {
-                match reply_rx.await {
-                    Ok(Some(id)) => (idx, load_blobs(settings.blob_storage_directory, &id).await),
-                    Ok(None) => (idx, Vec::new()),
-                    Err(_) => {
-                        tracing::error!("Failed to receive storage response");
-                        (idx, Vec::new())
-                    }
-                }
+                let Some(id) = reply_rx.await.ok().flatten() else {
+                    tracing::error!("Failed to receive storage response");
+                    return (idx, Vec::new());
+                };
+
+                let blobs = load_blobs(settings.blob_storage_directory, &id).await;
+                let deserialized_blobs: Vec<_> = blobs
+                    .into_iter()
+                    .filter_map(|bytes| S::deserialize::<DaBlob>(bytes).ok())
+                    .collect();
+
+                (idx, deserialized_blobs)
             });
 
             current_index = current_index.next();
