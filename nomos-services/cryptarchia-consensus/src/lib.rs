@@ -391,42 +391,6 @@ where
     }
 
     async fn run(mut self) -> Result<(), overwatch_rs::DynError> {
-        let network_relay: OutboundRelay<_> = self
-            .network_relay
-            .connect()
-            .await
-            .expect("Relay connection with NetworkService should succeed");
-
-        let blend_relay: OutboundRelay<_> = self
-            .blend_relay
-            .connect()
-            .await
-            .expect("Relay connection with nomos_blend_service::BlendService should succeed");
-
-        let cl_mempool_relay: OutboundRelay<_> = self
-            .cl_mempool_relay
-            .connect()
-            .await
-            .expect("Relay connection with MemPoolService should succeed");
-
-        let da_mempool_relay: OutboundRelay<_> = self
-            .da_mempool_relay
-            .connect()
-            .await
-            .expect("Relay connection with MemPoolService should succeed");
-
-        let storage_relay: OutboundRelay<_> = self
-            .storage_relay
-            .connect()
-            .await
-            .expect("Relay connection with StorageService should succeed");
-
-        let sampling_relay: OutboundRelay<_> = self
-            .sampling_relay
-            .connect()
-            .await
-            .expect("Relay connection with SamplingService should succeed");
-
         let relays: CryptarchiaConsensusRelays<
             BlendAdapter,
             BS,
@@ -439,13 +403,13 @@ where
             SamplingRng,
             Storage,
             TxS,
-        > = CryptarchiaConsensusRelays::new(
-            network_relay,
-            blend_relay,
-            cl_mempool_relay,
-            da_mempool_relay,
-            sampling_relay,
-            storage_relay,
+        > = CryptarchiaConsensusRelays::from_relays(
+            self.network_relay,
+            self.blend_relay,
+            self.cl_mempool_relay,
+            self.da_mempool_relay,
+            self.sampling_relay,
+            self.storage_relay,
         )
         .await;
 
