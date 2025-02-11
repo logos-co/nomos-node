@@ -9,6 +9,7 @@ use std::{
 
 use cl::{NoteWitness, NullifierSecret};
 use cryptarchia_consensus::{LeaderConfig, TimeConfig};
+use cryptarchia_engine::EpochConfig;
 use kzgrs_backend::common::blob::DaBlob;
 use nomos_core::{da::DaEncoder as _, staking::NMO_UNIT};
 use nomos_da_verifier::backend::kzgrs::KzgrsDaVerifierSettings;
@@ -53,9 +54,11 @@ fn test_verifier() {
     let commitments = notes.iter().zip(&sks).map(|(n, sk)| n.commit(sk.commit()));
     let genesis_state = LedgerState::from_commitments(commitments, (ids.len() as u32).into());
     let ledger_config = nomos_ledger::Config {
-        epoch_stake_distribution_stabilization: 3,
-        epoch_period_nonce_buffer: 3,
-        epoch_period_nonce_stabilization: 4,
+        epoch_config: EpochConfig {
+            epoch_stake_distribution_stabilization: 3,
+            epoch_period_nonce_buffer: 3,
+            epoch_period_nonce_stabilization: 4,
+        },
         consensus_config: cryptarchia_engine::Config {
             security_param: 10,
             active_slot_coeff: 0.9,

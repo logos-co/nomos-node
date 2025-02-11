@@ -9,6 +9,7 @@ use std::{
 
 use cl::{NoteWitness, NullifierSecret};
 use cryptarchia_consensus::{ConsensusMsg, LeaderConfig, TimeConfig};
+use cryptarchia_engine::EpochConfig;
 use kzgrs_backend::{
     common::blob::DaBlob,
     dispersal::{BlobInfo, Metadata},
@@ -73,9 +74,11 @@ fn test_indexer() {
 
     let genesis_state = LedgerState::from_commitments(commitments, (ids.len() as u32).into());
     let ledger_config = nomos_ledger::Config {
-        epoch_stake_distribution_stabilization: 3,
-        epoch_period_nonce_buffer: 3,
-        epoch_period_nonce_stabilization: 4,
+        epoch_config: EpochConfig {
+            epoch_stake_distribution_stabilization: 3,
+            epoch_period_nonce_buffer: 3,
+            epoch_period_nonce_stabilization: 4,
+        },
         consensus_config: cryptarchia_engine::Config {
             security_param: 10,
             active_slot_coeff: 0.9,

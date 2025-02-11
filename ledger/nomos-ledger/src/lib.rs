@@ -420,7 +420,7 @@ impl core::fmt::Debug for LedgerState {
 pub mod tests {
     use blake2::Digest;
     use cl::{note::NoteWitness as Note, NullifierSecret};
-    use cryptarchia_engine::Slot;
+    use cryptarchia_engine::{EpochConfig, Slot};
     use rand::thread_rng;
 
     use super::*;
@@ -562,9 +562,11 @@ pub mod tests {
 
     pub fn config() -> Config {
         Config {
-            epoch_stake_distribution_stabilization: 4,
-            epoch_period_nonce_buffer: 3,
-            epoch_period_nonce_stabilization: 3,
+            epoch_config: EpochConfig {
+                epoch_stake_distribution_stabilization: 4,
+                epoch_period_nonce_buffer: 3,
+                epoch_period_nonce_stabilization: 3,
+            },
             consensus_config: cryptarchia_engine::Config {
                 security_param: 1,
                 active_slot_coeff: 1.0,
