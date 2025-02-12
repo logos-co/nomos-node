@@ -6,11 +6,20 @@ pub mod openapi {
 
 // std
 use std::fmt::Debug;
+use std::marker::PhantomData;
+use std::path::PathBuf;
 
 // crates
 use futures::StreamExt;
+use overwatch_rs::services::state::ServiceState;
+use serde::de::DeserializeOwned;
+use serde::{Deserialize, Serialize};
+use thiserror::Error;
+use tracing::error;
+use utils::overwatch::recovery::backends::FileBackendSettings;
+use utils::overwatch::{JsonFileBackend, RecoveryOperator};
 // internal
-use crate::backend::MemPool;
+use crate::backend::{MemPool, RecoverableMempool};
 use crate::network::NetworkAdapter;
 use crate::{MempoolMetrics, MempoolMsg};
 use nomos_network::{NetworkMsg, NetworkService};
@@ -18,16 +27,50 @@ use overwatch_rs::services::life_cycle::LifecycleMessage;
 use overwatch_rs::services::{
     handle::ServiceStateHandle,
     relay::{OutboundRelay, Relay},
-    state::{NoOperator, NoState},
     ServiceCore, ServiceData, ServiceId,
 };
-use tracing::error;
+
+#[derive(Error, Debug)]
+pub enum StateError {}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MempoolState<NS, PS, P> {
+    // `pool` is an option so that we don't need it to implement `Mempool`
+    // when implementing `ServiceState` for this type, as otherwise we would need to call `P::new(settings)`.
+    pool: Option<P>,
+    _phantom: PhantomData<(NS, PS)>,
+}
+
+// We need to have three generics instead of two as otherwise we would need `P` to implement `Mempool`
+// to access its `Settings` associated type, which would defeat declaring a new type for the recovery state.
+impl<NS, PS, P> From<P> for MempoolState<NS, PS, P> {
+    fn from(value: P) -> Self {
+        Self {
+            pool: Some(value),
+            _phantom: PhantomData,
+        }
+    }
+}
+
+impl<NS, PS, P> ServiceState for MempoolState<NS, PS, P> {
+    type Error = StateError;
+    type Settings = TxMempoolSettings<PS, NS>;
+
+    fn from_settings(_settings: &Self::Settings) -> Result<Self, Self::Error> {
+        Ok(Self {
+            pool: None,
+            _phantom: PhantomData,
+        })
+    }
+}
 
 pub struct TxMempoolService<N, P>
 where
     N: NetworkAdapter<Payload = P::Item, Key = P::Key>,
-    P: MemPool,
-    P::Settings: Clone,
+    N::Settings: Send,
+    P: RecoverableMempool,
+    P::RecoveryState: Clone + Send + Sync + Serialize + DeserializeOwned,
+    P::Settings: Send + Clone,
     P::Item: Debug + 'static,
     P::Key: Debug + 'static,
     P::BlockId: Debug + 'static,
@@ -40,16 +83,18 @@ where
 impl<N, P> ServiceData for TxMempoolService<N, P>
 where
     N: NetworkAdapter<Payload = P::Item, Key = P::Key>,
-    P: MemPool,
-    P::Settings: Clone,
+    N::Settings: Send,
+    P: RecoverableMempool,
+    P::RecoveryState: Clone + Send + Sync + Serialize + DeserializeOwned,
+    P::Settings: Clone + Send,
     P::Item: Debug + 'static,
     P::Key: Debug + 'static,
     P::BlockId: Debug + 'static,
 {
     const SERVICE_ID: ServiceId = "mempool-cl";
     type Settings = TxMempoolSettings<P::Settings, N::Settings>;
-    type State = NoState<Self::Settings>;
-    type StateOperator = NoOperator<Self::State>;
+    type State = MempoolState<N::Settings, P::Settings, P::RecoveryState>;
+    type StateOperator = RecoveryOperator<JsonFileBackend<Self::State, Self::Settings>>;
     type Message = MempoolMsg<
         <P as MemPool>::BlockId,
         <P as MemPool>::Item,
@@ -61,7 +106,8 @@ where
 #[async_trait::async_trait]
 impl<N, P> ServiceCore for TxMempoolService<N, P>
 where
-    P: MemPool + Send + 'static,
+    P: RecoverableMempool + Send + 'static,
+    P::RecoveryState: Clone + Send + Sync + Serialize + DeserializeOwned,
     P::Settings: Clone + Send + Sync + 'static,
     N::Settings: Clone + Send + Sync + 'static,
     P::Item: Clone + Debug + Send + Sync + 'static,
@@ -71,15 +117,20 @@ where
 {
     fn init(
         service_state: ServiceStateHandle<Self>,
-        _init_state: Self::State,
+        init_state: Self::State,
     ) -> Result<Self, overwatch_rs::DynError> {
         let network_relay = service_state.overwatch_handle.relay();
         let settings = service_state.settings_reader.get_updated_settings();
 
+        let recovered_pool = match init_state.pool {
+            Some(p) => P::recover(settings.backend, p),
+            None => P::new(settings.backend),
+        };
+
         Ok(Self {
             service_state,
             network_relay,
-            pool: P::new(settings.backend),
+            pool: recovered_pool,
         })
     }
 
@@ -108,16 +159,17 @@ where
         loop {
             tokio::select! {
                 Some(msg) = service_state.inbound_relay.recv() => {
-                    Self::handle_mempool_message(msg, &mut pool, &mut network_relay, &mut service_state).await;
+                    Self::handle_mempool_message(msg, &mut pool, &mut network_relay, &mut service_state);
                 }
                 Some((key, item )) = network_items.next() => {
                     pool.add_item(key, item).unwrap_or_else(|e| {
-                        tracing::debug!("could not add item to the pool due to: {}", e)
+                        tracing::debug!("could not add item to the pool due to: {e}");
                     });
+                    service_state.state_updater.update(pool.save().into());
                     tracing::info!(counter.tx_mempool_pending_items = pool.pending_item_count());
                 }
                 Some(msg) = lifecycle_stream.next() =>  {
-                    if Self::should_stop_service(msg).await {
+                    if Self::should_stop_service(msg) {
                         break;
                     }
                 }
@@ -129,7 +181,8 @@ where
 
 impl<N, P> TxMempoolService<N, P>
 where
-    P: MemPool + Send + 'static,
+    P: RecoverableMempool + Send + 'static,
+    P::RecoveryState: Clone + Send + Sync + Serialize + DeserializeOwned,
     P::Settings: Clone + Send + Sync + 'static,
     N::Settings: Clone + Send + Sync + 'static,
     P::Item: Clone + Debug + Send + Sync + 'static,
@@ -137,7 +190,7 @@ where
     P::BlockId: Debug + Send + 'static,
     N: NetworkAdapter<Payload = P::Item, Key = P::Key> + Send + Sync + 'static,
 {
-    async fn should_stop_service(message: LifecycleMessage) -> bool {
+    fn should_stop_service(message: LifecycleMessage) -> bool {
         match message {
             LifecycleMessage::Shutdown(sender) => {
                 if sender.send(()).is_err() {
@@ -152,7 +205,7 @@ where
         }
     }
 
-    async fn handle_mempool_message(
+    fn handle_mempool_message(
         message: MempoolMsg<P::BlockId, P::Item, P::Item, P::Key>,
         pool: &mut P,
         network_relay: &mut OutboundRelay<NetworkMsg<N::Backend>>,
@@ -169,6 +222,7 @@ where
                         // Broadcast the item to the network
                         let net = network_relay.clone();
                         let settings = service_state.settings_reader.get_updated_settings().network;
+                        service_state.state_updater.update(pool.save().into());
                         // move sending to a new task so local operations can complete in the meantime
                         tokio::spawn(async move {
                             let adapter = N::new(settings, net).await;
@@ -205,6 +259,7 @@ where
             }
             MempoolMsg::Prune { ids } => {
                 pool.prune(&ids);
+                service_state.state_updater.update(pool.save().into());
             }
             MempoolMsg::Metrics { reply_channel } => {
                 let metrics = MempoolMetrics {
@@ -231,4 +286,11 @@ where
 pub struct TxMempoolSettings<B, N> {
     pub backend: B,
     pub network: N,
+    pub recovery_file_path: PathBuf,
+}
+
+impl<B, N> FileBackendSettings for TxMempoolSettings<B, N> {
+    fn recovery_file(&self) -> &PathBuf {
+        &self.recovery_file_path
+    }
 }
