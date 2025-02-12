@@ -1,4 +1,5 @@
-mod ntp;
+#[cfg(feature = "ntp")]
+pub mod ntp;
 
 use crate::SlotTickStream;
 use overwatch_rs::overwatch::handle::OverwatchHandle;
