@@ -1,10 +1,8 @@
-use crate::SlotTick;
-use cryptarchia_engine::{Epoch, Slot};
-use futures::Stream;
+use crate::SlotTickStream;
+use overwatch_rs::overwatch::handle::OverwatchHandle;
 
-#[async_trait::async_trait]
 pub trait TimeBackend {
     type Settings;
-    fn init(settings: Self::Settings) -> Self;
-    async fn tick(self) -> impl Stream<Item = SlotTick>;
+    fn init(settings: Self::Settings, overwatch_handle: OverwatchHandle) -> Self;
+    fn tick_stream(&self) -> SlotTickStream;
 }
