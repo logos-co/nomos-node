@@ -140,7 +140,7 @@ where
             }
             SamplingEvent::SamplingError { error } => {
                 if let Some(blob_id) = error.blob_id() {
-                    info_with_id!(blob_id, "SamplingError");
+                    error_with_id!(blob_id, "SamplingError");
                     sampler.handle_sampling_error(*blob_id).await;
                     return;
                 }

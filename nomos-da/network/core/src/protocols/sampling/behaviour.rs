@@ -46,7 +46,7 @@ pub enum SamplingError {
         peer_id: PeerId,
         error: sampling::SampleError,
     },
-    #[error("Error dialing peer [{peer_id}]: {error}")]
+    #[error("Error opening stream [{peer_id}]: {error}")]
     OpenStream {
         peer_id: PeerId,
         error: OpenStreamError,
