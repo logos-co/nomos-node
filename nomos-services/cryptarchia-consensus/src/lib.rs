@@ -502,7 +502,7 @@ where
                         )
                         .await;
 
-                        Self::update_state(&self.service_state, &cryptarchia);
+                        self.service_state.state_updater.update(Self::State::from_cryptarchia(&cryptarchia));
 
                         tracing::info!(counter.consensus_processed_blocks = 1);
                     }
@@ -581,6 +581,19 @@ impl<TxS, BxS, NetworkAdapterSettings, BlendAdapterSettings>
             _network_adapter_settings: Default::default(),
             _blend_adapter_settings: Default::default(),
         }
+    }
+
+    pub(crate) fn from_cryptarchia(cryptarchia: &Cryptarchia) -> Self {
+        let security_block_header = cryptarchia.consensus.get_security_block_header_id();
+        let security_ledger_state = security_block_header
+            .and_then(|header| cryptarchia.ledger.state(&header))
+            .cloned();
+
+        Self::new(
+            Some(cryptarchia.tip()),
+            security_block_header,
+            security_ledger_state,
+        )
     }
 
     pub fn should_recover(&self) -> bool {
@@ -979,21 +992,6 @@ where
         }
 
         cryptarchia
-    }
-
-    fn update_state(service_state: &ServiceStateHandle<Self>, cryptarchia: &Cryptarchia) {
-        let security_block_header = cryptarchia.consensus.get_security_block_header_id();
-        let security_ledger_state = security_block_header
-            .and_then(|header| cryptarchia.ledger.state(&header))
-            .cloned();
-
-        service_state.state_updater.update({
-            <Self as ServiceData>::State::new(
-                Some(cryptarchia.tip()),
-                security_block_header,
-                security_ledger_state,
-            )
-        });
     }
 }
 
