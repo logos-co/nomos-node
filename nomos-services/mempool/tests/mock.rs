@@ -16,13 +16,13 @@ use nomos_mempool::{
     MempoolMsg, TxMempoolService, TxMempoolSettings,
 };
 
+type MockPoolBackend = MockPool<HeaderId, MockTransaction<MockMessage>, MockTxId>;
+
 #[derive(Services)]
 struct MockPoolNode {
     logging: ServiceHandle<Tracing>,
     network: ServiceHandle<NetworkService<Mock>>,
-    mockpool: ServiceHandle<
-        TxMempoolService<MockAdapter, MockPool<HeaderId, MockTransaction<MockMessage>, MockTxId>>,
-    >,
+    mockpool: ServiceHandle<TxMempoolService<MockAdapter, MockPoolBackend>>,
 }
 
 #[test]

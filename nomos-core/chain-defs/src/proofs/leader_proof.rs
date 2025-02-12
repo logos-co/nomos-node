@@ -121,8 +121,7 @@ mod test {
     ) -> [[u8; 32]; MAX_NOTE_COMMS] {
         let note_comm_bytes =
             Vec::from_iter(note_commitments.iter().map(|c| c.as_bytes().to_vec()));
-        let cm_leaves = cl::merkle::padded_leaves::<MAX_NOTE_COMMS>(&note_comm_bytes);
-        cm_leaves
+        cl::merkle::padded_leaves::<MAX_NOTE_COMMS>(&note_comm_bytes)
     }
 
     #[test]

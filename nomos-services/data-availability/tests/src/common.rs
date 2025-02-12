@@ -6,7 +6,7 @@ use nomos_blend::message_blend::{
 };
 use nomos_blend_message::{sphinx::SphinxMessage, BlendMessage};
 use nomos_da_network_service::backends::libp2p::common::DaNetworkBackendSettings;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::time::Duration;
 // crates
 use bytes::Bytes;
@@ -201,6 +201,7 @@ pub struct TestBlendSettings {
     >,
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn new_node(
     leader_config: &LeaderConfig,
     ledger_config: &nomos_ledger::Config,
@@ -209,7 +210,7 @@ pub fn new_node(
     swarm_config: &SwarmConfig,
     blend_config: &TestBlendSettings,
     db_path: PathBuf,
-    blobs_dir: &PathBuf,
+    blobs_dir: &Path,
     initial_peers: Vec<Multiaddr>,
     verifier_settings: KzgrsDaVerifierSettings,
     da_network_settings: TestDaNetworkSettings,
@@ -248,7 +249,7 @@ pub fn new_node(
                         &da_network_settings
                             .peer_addresses
                             .iter()
-                            .map(|(peer_id, _)| peer_id.clone())
+                            .map(|(peer_id, _)| *peer_id)
                             .collect::<Vec<PeerId>>(),
                         da_network_settings.num_subnets.into(),
                         da_network_settings.nodes_per_subnet.into(),
@@ -278,7 +279,7 @@ pub fn new_node(
             },
             indexer: IndexerSettings {
                 storage: IndexerStorageSettings {
-                    blob_storage_directory: blobs_dir.clone(),
+                    blob_storage_directory: blobs_dir.to_path_buf(),
                 },
             },
             cryptarchia: cryptarchia_consensus::CryptarchiaSettings {
@@ -305,7 +306,7 @@ pub fn new_node(
                 verifier_settings,
                 network_adapter_settings: (),
                 storage_adapter_settings: VerifierStorageSettings {
-                    blob_storage_directory: blobs_dir.clone(),
+                    blob_storage_directory: blobs_dir.to_path_buf(),
                 },
             },
             da_sampling: DaSamplingServiceSettings {
@@ -319,7 +320,7 @@ pub fn new_node(
                 },
                 network_adapter_settings: (),
                 storage_adapter_settings: SamplingStorageSettings {
-                    blob_storage_directory: blobs_dir.clone(),
+                    blob_storage_directory: blobs_dir.to_path_buf(),
                 },
             },
         },

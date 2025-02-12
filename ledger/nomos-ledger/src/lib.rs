@@ -493,11 +493,7 @@ pub mod tests {
     ) -> (DummyProof, Vec<(HeaderId, OrphanProof)>) {
         // inefficient implementation, but it's just a test
         fn contains(note_tree: &NoteTree, note: &Note) -> bool {
-            note_tree
-                .commitments()
-                .iter()
-                .find(|n| n == &&commit(*note))
-                .is_some()
+            note_tree.commitments().iter().any(|n| n == &commit(*note))
         }
 
         fn proof(note: Note, cm_root: [u8; 32]) -> DummyProof {
@@ -578,17 +574,17 @@ pub mod tests {
             lead_commitments: commitments.iter().cloned().collect(),
             spend_commitments: commitments.iter().cloned().collect(),
             nullifiers: Default::default(),
-            nonce: [0; 32].into(),
+            nonce: [0; 32],
             slot: 0.into(),
             next_epoch_state: EpochState {
                 epoch: 1.into(),
-                nonce: [0; 32].into(),
+                nonce: [0; 32],
                 commitments: commitments.iter().cloned().collect(),
                 total_stake: 1,
             },
             epoch_state: EpochState {
                 epoch: 0.into(),
-                nonce: [0; 32].into(),
+                nonce: [0; 32],
                 commitments: commitments.iter().cloned().collect(),
                 total_stake: 1,
             },

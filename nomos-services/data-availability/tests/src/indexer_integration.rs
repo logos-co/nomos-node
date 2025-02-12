@@ -116,7 +116,7 @@ fn test_indexer() {
 
     let node1 = new_node(
         &LeaderConfig {
-            notes: vec![notes[0].clone()],
+            notes: vec![notes[0]],
             nf_sk: sks[0],
         },
         &ledger_config,
@@ -144,7 +144,7 @@ fn test_indexer() {
 
     let node2 = new_node(
         &LeaderConfig {
-            notes: vec![notes[1].clone()],
+            notes: vec![notes[1]],
             nf_sk: sks[1],
         },
         &ledger_config,
@@ -267,14 +267,14 @@ fn test_indexer() {
         // Mock both attested blobs by writting directly into the da storage.
         storage_outbound
             .send(nomos_storage::StorageMsg::Store {
-                key: key_bytes(DA_VERIFIED_KEY_PREFIX, node_2_blob_0_idx).into(),
+                key: key_bytes(DA_VERIFIED_KEY_PREFIX, node_2_blob_0_idx),
                 value: Bytes::new(),
             })
             .await
             .unwrap();
         storage_outbound
             .send(nomos_storage::StorageMsg::Store {
-                key: key_bytes(DA_VERIFIED_KEY_PREFIX, node_2_blob_1_idx).into(),
+                key: key_bytes(DA_VERIFIED_KEY_PREFIX, node_2_blob_1_idx),
                 value: Bytes::new(),
             })
             .await
@@ -302,14 +302,14 @@ fn test_indexer() {
         // Mock both attested blobs by writting directly into the da storage.
         storage_outbound
             .send(nomos_storage::StorageMsg::Store {
-                key: key_bytes(DA_VERIFIED_KEY_PREFIX, node_1_blob_0_idx).into(),
+                key: key_bytes(DA_VERIFIED_KEY_PREFIX, node_1_blob_0_idx),
                 value: Bytes::new(),
             })
             .await
             .unwrap();
         storage_outbound
             .send(nomos_storage::StorageMsg::Store {
-                key: key_bytes(DA_VERIFIED_KEY_PREFIX, node_1_blob_1_idx).into(),
+                key: key_bytes(DA_VERIFIED_KEY_PREFIX, node_1_blob_1_idx),
                 value: Bytes::new(),
             })
             .await

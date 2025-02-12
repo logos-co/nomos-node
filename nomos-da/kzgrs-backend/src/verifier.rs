@@ -211,7 +211,7 @@ mod test {
             0,
             &aggregated_poly,
             &aggregated_evals,
-            &global_params,
+            global_params,
             domain,
         )?;
 

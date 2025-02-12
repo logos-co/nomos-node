@@ -97,11 +97,8 @@ mod test {
         Lazy::new(|| GeneralEvaluationDomain::new(COEFFICIENTS_SIZE).unwrap());
     #[test]
     fn test_poly_commit() {
-        let poly = DensePolynomial::from_coefficients_vec((0..10).map(|i| Fr::from(i)).collect());
-        assert!(matches!(
-            commit_polynomial(&poly, &GLOBAL_PARAMETERS),
-            Ok(_)
-        ));
+        let poly = DensePolynomial::from_coefficients_vec((0..10).map(Fr::from).collect());
+        assert!(commit_polynomial(&poly, &GLOBAL_PARAMETERS).is_ok());
     }
 
     #[test]

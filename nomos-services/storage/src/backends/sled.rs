@@ -40,7 +40,6 @@ impl StorageTransaction for SledTransaction {
 }
 
 /// Sled storage backend
-
 pub struct SledBackend<SerdeOp> {
     sled: sled::Db,
     _serde_op: PhantomData<SerdeOp>,
@@ -75,7 +74,7 @@ impl<SerdeOp: StorageSerde + Send + Sync + 'static> StorageBackend for SledBacke
         Ok(self.sled.get(key)?.map(|ivec| ivec.to_vec().into()))
     }
 
-    async fn load_prefix(&mut self, _key: &[u8]) -> Result<Option<Bytes>, Self::Error> {
+    async fn load_prefix(&mut self, _key: &[u8]) -> Result<Vec<Bytes>, Self::Error> {
         unimplemented!()
     }
 

@@ -69,7 +69,7 @@ mod test {
         // future that listens for messages and collects `msg_count` of them, then returns them
         let task_1 = async move {
             swarm_1.listen_on(addr.clone()).unwrap();
-            let res = swarm_1
+            swarm_1
                 .filter_map(|event| async {
                     if let SwarmEvent::Behaviour(ReplicationEvent::IncomingMessage {
                         message,
@@ -83,8 +83,7 @@ mod test {
                 })
                 .take(msg_count)
                 .collect::<Vec<_>>()
-                .await;
-            res
+                .await
         };
         let join1 = tokio::spawn(task_1);
         let (sender, mut receiver) = tokio::sync::mpsc::channel::<()>(10);
@@ -108,11 +107,8 @@ mod test {
                     }
                     // print out events
                     event = swarm_2.select_next_some() => {
-                        match event {
-                            SwarmEvent::ConnectionEstablished{ peer_id,  connection_id, .. } => {
-                                info!("Connected to {peer_id} with connection_id: {connection_id}");
-                            }
-                            _ => {}
+                        if let SwarmEvent::ConnectionEstablished{ peer_id,  connection_id, .. } = event {
+                            info!("Connected to {peer_id} with connection_id: {connection_id}");
                         }
                     }
                     // terminate future
