@@ -450,22 +450,11 @@ where
         };
         let mut leader = leadership::Leader::new(genesis_id, leader_config, config);
 
-        if self.initial_state.should_recover() {
+        if self.initial_state.can_recover() {
             info!("Attempting to recover from previously stored state.");
-            if !self.initial_state.can_recover() {
-                return Err(DynError::from("Recovery state is incomplete or invalid."));
-            }
-
-            let CryptarchiaConsensusState {
-                tip,
-                security_block,
-                ..
-            } = self.initial_state;
-
             cryptarchia = Self::restore_from_recovery(
                 cryptarchia,
-                tip.unwrap(),
-                security_block.unwrap(),
+                &self.initial_state,
                 &mut leader,
                 &relays,
                 &mut self.block_subscription_sender,
@@ -596,12 +585,10 @@ impl<TxS, BxS, NetworkAdapterSettings, BlendAdapterSettings>
         )
     }
 
-    pub fn should_recover(&self) -> bool {
-        self.tip.is_some()
-    }
-
     pub fn can_recover(&self) -> bool {
-        self.should_recover() && self.security_block.is_some()
+        // This only checks whether tip is defined, as that's a state variable that should
+        // always exist. Other attributes might not be present.
+        self.tip.is_some()
     }
 }
 
@@ -962,8 +949,12 @@ where
     /// Restore the cryptarchia state from the
     async fn restore_from_recovery(
         mut cryptarchia: Cryptarchia,
-        tip: HeaderId,
-        security_block_header: HeaderId,
+        state: &CryptarchiaConsensusState<
+            TxS::Settings,
+            BS::Settings,
+            NetAdapter::Settings,
+            BlendAdapter::Settings,
+        >,
         leader: &mut leadership::Leader,
         relays: &CryptarchiaConsensusRelays<
             BlendAdapter,
@@ -972,7 +963,7 @@ where
             ClPoolAdapter,
             DaPool,
             DaPoolAdapter,
-            A,
+            NetAdapter,
             SamplingBackend,
             SamplingRng,
             Storage,
@@ -980,6 +971,15 @@ where
         >,
         block_broadcaster: &mut broadcast::Sender<Block<ClPool::Item, DaPool::Item>>,
     ) -> Cryptarchia {
+        let CryptarchiaConsensusState {
+            tip,
+            security_block,
+            ..
+        } = state;
+
+        let tip = tip.unwrap();
+        let security_block_header = security_block.unwrap();
+
         let blocks_to_tip =
             Self::get_blocks_from_tip(tip, security_block_header, relays.storage_adapter())
                 .await
