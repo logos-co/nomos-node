@@ -13,7 +13,7 @@ COPY . .
 RUN apt-get update && apt-get install -yq \
     git gcc g++ clang libssl-dev pkg-config ca-certificates
 
-RUN cargo install cargo-binstall --version 1.10.19
+RUN cargo install cargo-binstall
 RUN cargo binstall cargo-risczero@1.2.0 --no-confirm
 RUN cargo risczero install
 
