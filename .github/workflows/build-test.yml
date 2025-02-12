@@ -141,3 +141,17 @@ jobs:
         with:
           command: clippy
           args: --all --all-targets --all-features -- --deny warnings
+
+  cargo-deny:
+    name: Check cargo-deny rules
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Run `cargo deny`
+        uses: EmbarkStudios/cargo-deny-action@v2
+        with:
+          # All is set in the config file
+          arguments:
+          command-arguments: "--hide-inclusion-graph -c .cargo-deny.toml --show-stats -D warnings"
