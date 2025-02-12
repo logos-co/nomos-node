@@ -1,3 +1,5 @@
+mod ntp;
+
 use crate::SlotTickStream;
 use overwatch_rs::overwatch::handle::OverwatchHandle;
 
