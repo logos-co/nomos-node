@@ -502,10 +502,13 @@ where
                         )
                         .await;
 
+                        let security_block_header = cryptarchia.consensus.get_security_block_header_id();
+                        let security_ledger_state = security_block_header.and_then(|header| cryptarchia.ledger.state(&header)).cloned();
                         self.service_state.state_updater.update({
                             Self::State::new(
                                 Some(cryptarchia.tip()),
-                                cryptarchia.consensus.get_security_block_header_id()
+                                security_block_header,
+                                security_ledger_state
                             )
                         });
 
@@ -562,6 +565,7 @@ where
 pub struct CryptarchiaConsensusState<TxS, BxS, NetworkAdapterSettings, BlendAdapterSettings> {
     tip: Option<HeaderId>,
     security_block: Option<HeaderId>,
+    security_ledger_state: Option<LedgerState>,
     _txs: PhantomData<TxS>,
     _bxs: PhantomData<BxS>,
     _network_adapter_settings: PhantomData<NetworkAdapterSettings>,
@@ -571,10 +575,15 @@ pub struct CryptarchiaConsensusState<TxS, BxS, NetworkAdapterSettings, BlendAdap
 impl<TxS, BxS, NetworkAdapterSettings, BlendAdapterSettings>
     CryptarchiaConsensusState<TxS, BxS, NetworkAdapterSettings, BlendAdapterSettings>
 {
-    pub fn new(tip: Option<HeaderId>, security_block: Option<HeaderId>) -> Self {
+    pub fn new(
+        tip: Option<HeaderId>,
+        security_block: Option<HeaderId>,
+        security_ledger_state: Option<LedgerState>,
+    ) -> Self {
         Self {
             tip,
             security_block,
+            security_ledger_state,
             _txs: Default::default(),
             _bxs: Default::default(),
             _network_adapter_settings: Default::default(),
@@ -598,7 +607,7 @@ impl<TxS, BxS, NetworkAdapterSettings, BlendAdapterSettings> ServiceState
     type Error = Error;
 
     fn from_settings(_settings: &Self::Settings) -> Result<Self, Self::Error> {
-        Ok(Self::new(None, None))
+        Ok(Self::new(None, None, None))
     }
 }
 
