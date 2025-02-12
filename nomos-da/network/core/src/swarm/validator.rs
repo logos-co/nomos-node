@@ -137,14 +137,14 @@ where
     async fn handle_behaviour_event(&mut self, event: ValidatorBehaviourEvent<Membership>) {
         match event {
             ValidatorBehaviourEvent::Sampling(event) => {
-                tracing::info!(
+                tracing::debug!(
                     counter.behaviour_events_received = 1,
                     event = EVENT_SAMPLING
                 );
                 self.handle_sampling_event(event).await;
             }
             ValidatorBehaviourEvent::Dispersal(event) => {
-                tracing::info!(
+                tracing::debug!(
                     counter.behaviour_events_received = 1,
                     event = EVENT_VALIDATOR_DISPERSAL,
                     blob_size = event.blob_size()
@@ -152,7 +152,7 @@ where
                 self.handle_dispersal_event(event).await;
             }
             ValidatorBehaviourEvent::Replication(event) => {
-                tracing::info!(
+                tracing::debug!(
                     counter.behaviour_events_received = 1,
                     event = EVENT_REPLICATION,
                     blob_size = event.blob_size()
