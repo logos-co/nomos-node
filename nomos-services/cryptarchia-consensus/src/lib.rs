@@ -287,7 +287,7 @@ where
 
 #[async_trait::async_trait]
 impl<
-        A,
+        NetAdapter,
         BlendAdapter,
         ClPool,
         ClPoolAdapter,
@@ -302,7 +302,7 @@ impl<
         SamplingStorage,
     > ServiceCore
     for CryptarchiaConsensus<
-        A,
+        NetAdapter,
         BlendAdapter,
         ClPool,
         ClPoolAdapter,
@@ -317,12 +317,12 @@ impl<
         SamplingStorage,
     >
 where
-    A: NetworkAdapter<Tx = ClPool::Item, BlobCertificate = DaPool::Item>
+    NetAdapter: NetworkAdapter<Tx = ClPool::Item, BlobCertificate = DaPool::Item>
         + Clone
         + Send
         + Sync
         + 'static,
-    A::Settings: Send + Sync + 'static,
+    NetAdapter::Settings: Send + Sync + 'static,
     BlendAdapter: blend::BlendAdapter<Tx = ClPool::Item, BlobCertificate = DaPool::Item>
         + Clone
         + Send
@@ -331,8 +331,6 @@ where
     BlendAdapter::Settings: Send + Sync + 'static,
     ClPool: MemPool<BlockId = HeaderId> + Send + Sync + 'static,
     ClPool::Settings: Send + Sync + 'static,
-    DaPool: MemPool<BlockId = HeaderId, Key = SamplingBackend::BlobId> + Send + Sync + 'static,
-    DaPool::Settings: Send + Sync + 'static,
     ClPool::Item: Transaction<Hash = ClPool::Key>
         + Debug
         + Clone
@@ -343,6 +341,11 @@ where
         + Send
         + Sync
         + 'static,
+    ClPool::Key: Debug + Send + Sync,
+    ClPoolAdapter:
+        MempoolAdapter<Payload = ClPool::Item, Key = ClPool::Key> + Send + Sync + 'static,
+    DaPool: MemPool<BlockId = HeaderId, Key = SamplingBackend::BlobId> + Send + Sync + 'static,
+    DaPool::Settings: Send + Sync + 'static,
     // TODO: Change to specific certificate bounds here
     DaPool::Item: DispersedBlobInfo<BlobId = DaPool::Key>
         + BlobMetadata
@@ -355,9 +358,6 @@ where
         + Send
         + Sync
         + 'static,
-    ClPool::Key: Debug + Send + Sync,
-    ClPoolAdapter:
-        MempoolAdapter<Payload = ClPool::Item, Key = ClPool::Key> + Send + Sync + 'static,
     DaPoolAdapter: MempoolAdapter<Key = DaPool::Key> + Send + Sync + 'static,
     DaPoolAdapter::Payload: DispersedBlobInfo + Into<DaPool::Item> + Debug,
     TxS: TxSelect<Tx = ClPool::Item> + Clone + Send + Sync + 'static,
@@ -365,13 +365,12 @@ where
     BS: BlobSelect<BlobId = DaPool::Item> + Clone + Send + Sync + 'static,
     BS::Settings: Send + Sync + 'static,
     Storage: StorageBackend + Send + Sync + 'static,
-    SamplingRng: SeedableRng + RngCore,
     SamplingBackend: DaSamplingServiceBackend<SamplingRng> + Send,
     SamplingBackend::Settings: Clone,
     SamplingBackend::Blob: Debug + Send + 'static,
     SamplingBackend::BlobId: Debug + Ord + Send + Sync + 'static,
-
     SamplingNetworkAdapter: nomos_da_sampling::network::NetworkAdapter,
+    SamplingRng: SeedableRng + RngCore,
     SamplingStorage: nomos_da_sampling::storage::DaStorageAdapter,
 {
     fn init(
@@ -406,7 +405,7 @@ where
             ClPoolAdapter,
             DaPool,
             DaPoolAdapter,
-            A,
+            NetAdapter,
             SamplingBackend,
             SamplingRng,
             Storage,
@@ -447,7 +446,7 @@ where
         };
 
         let network_adapter =
-            A::new(network_adapter_settings, relays.network_relay().clone()).await;
+            NetAdapter::new(network_adapter_settings, relays.network_relay().clone()).await;
         let tx_selector = TxS::new(transaction_selector_settings);
         let blob_selector = BS::new(blob_selector_settings);
 
@@ -569,7 +568,7 @@ impl<TxS, BxS, NetworkAdapterSettings, BlendAdapterSettings> ServiceState
 }
 
 impl<
-        A,
+        NetAdapter,
         BlendAdapter,
         ClPool,
         ClPoolAdapter,
@@ -584,7 +583,7 @@ impl<
         SamplingStorage,
     >
     CryptarchiaConsensus<
-        A,
+        NetAdapter,
         BlendAdapter,
         ClPool,
         ClPoolAdapter,
@@ -599,8 +598,8 @@ impl<
         SamplingStorage,
     >
 where
-    A: NetworkAdapter + Clone + Send + Sync + 'static,
-    A::Settings: Send,
+    NetAdapter: NetworkAdapter + Clone + Send + Sync + 'static,
+    NetAdapter::Settings: Send,
     BlendAdapter: blend::BlendAdapter + Clone + Send + Sync + 'static,
     BlendAdapter::Settings: Send,
     ClPool: MemPool<BlockId = HeaderId> + Send + Sync + 'static,
@@ -615,6 +614,9 @@ where
         + Send
         + Sync
         + 'static,
+    ClPool::Key: Debug + Send + Sync,
+    ClPoolAdapter:
+        MempoolAdapter<Payload = ClPool::Item, Key = ClPool::Key> + Send + Sync + 'static,
     DaPool::Item: DispersedBlobInfo<BlobId = DaPool::Key>
         + BlobMetadata
         + Debug
@@ -628,22 +630,19 @@ where
         + 'static,
     DaPool: MemPool<BlockId = HeaderId, Key = SamplingBackend::BlobId> + Send + Sync + 'static,
     DaPool::Settings: Send + Sync + 'static,
+    DaPoolAdapter: MempoolAdapter<Key = DaPool::Key> + Send + Sync + 'static,
+    DaPoolAdapter::Payload: DispersedBlobInfo + Into<DaPool::Item> + Debug,
     TxS: TxSelect<Tx = ClPool::Item> + Clone + Send + Sync + 'static,
     TxS::Settings: Send,
     BS: BlobSelect<BlobId = DaPool::Item> + Clone + Send + Sync + 'static,
     BS::Settings: Send,
-    ClPool::Key: Debug + Send + Sync,
-    ClPoolAdapter:
-        MempoolAdapter<Payload = ClPool::Item, Key = ClPool::Key> + Send + Sync + 'static,
-    DaPoolAdapter: MempoolAdapter<Key = DaPool::Key> + Send + Sync + 'static,
-    DaPoolAdapter::Payload: DispersedBlobInfo + Into<DaPool::Item> + Debug,
     Storage: StorageBackend + Send + Sync + 'static,
-    SamplingRng: SeedableRng + RngCore,
     SamplingBackend: DaSamplingServiceBackend<SamplingRng> + Send,
     SamplingBackend::Settings: Clone,
     SamplingBackend::Blob: Debug + 'static,
     SamplingBackend::BlobId: Debug + Ord + Send + Sync + 'static,
     SamplingNetworkAdapter: nomos_da_sampling::network::NetworkAdapter,
+    SamplingRng: SeedableRng + RngCore,
     SamplingStorage: nomos_da_sampling::storage::DaStorageAdapter,
 {
     async fn should_stop_service(message: LifecycleMessage) -> bool {
@@ -729,7 +728,7 @@ where
             ClPoolAdapter,
             DaPool,
             DaPoolAdapter,
-            A,
+            NetAdapter,
             SamplingBackend,
             SamplingRng,
             Storage,
@@ -818,7 +817,7 @@ where
             ClPoolAdapter,
             DaPool,
             DaPoolAdapter,
-            A,
+            NetAdapter,
             SamplingBackend,
             SamplingRng,
             Storage,
