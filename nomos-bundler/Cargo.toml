@@ -2,6 +2,7 @@
 name = "bundler"
 version = "0.1.0"
 edition = "2021"
+license = { workspace = true }
 
 [dependencies]
 tauri-bundler = "2.2.1"

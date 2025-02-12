@@ -2,6 +2,7 @@
 name = "key-management-system"
 version = "0.1.0"
 edition = "2021"
+license = { workspace = true }
 
 [dependencies]
 overwatch-rs = { git = "https://github.com/logos-co/Overwatch", rev = "4160cdd" }

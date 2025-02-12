@@ -2,6 +2,7 @@
 name = "nomos-tracing"
 version = "0.1.0"
 edition = "2021"
+license = { workspace = true }
 
 [dependencies]
 opentelemetry = { version = "0.26" }

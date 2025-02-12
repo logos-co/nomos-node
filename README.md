@@ -57,3 +57,10 @@ To run a node with a different configuration run:
 ```bash
 docker run -v /path/to/config.yml:/etc/nomos/config.yml nomos /etc/nomos/config.yml
 ```
+
+## License
+
+This project is primarily distributed under the terms defined by either the MIT license or the
+Apache License (Version 2.0), at your option.
+
+See [LICENSE-APACHE](LICENSE-APACHE2.0) and [LICENSE-MIT](LICENSE-MIT) for details.

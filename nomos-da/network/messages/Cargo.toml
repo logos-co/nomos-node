@@ -2,6 +2,7 @@
 name = "nomos-da-messages"
 version = "0.1.0"
 edition = "2021"
+license = { workspace = true }
 
 [dependencies]
 nomos-core = { path = "../../../nomos-core/chain-defs" }

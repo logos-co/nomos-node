@@ -2,6 +2,7 @@
 name = "nomos-blend-network"
 version = "0.1.0"
 edition = "2021"
+license = { workspace = true }
 
 [dependencies]
 cached = "0.53.1"

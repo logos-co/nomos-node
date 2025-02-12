@@ -79,7 +79,7 @@ fn build_package(version: String) {
             resources: None,
             resources_map: None,
             copyright: None,
-            license: None,
+            license: Some("MIT or Apache-2.0".to_string()),
             license_file: None,
             category: None,
             file_associations: None,
