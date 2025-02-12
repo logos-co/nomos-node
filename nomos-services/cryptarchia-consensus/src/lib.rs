@@ -592,10 +592,13 @@ where
                         )
                         .await;
 
+                        let security_block_header = cryptarchia.consensus.get_security_block_header_id();
+                        let security_ledger_state = security_block_header.and_then(|header| cryptarchia.ledger.state(&header)).cloned();
                         self.service_state.state_updater.update({
                             Self::State::new(
                                 Some(cryptarchia.tip()),
-                                cryptarchia.consensus.get_security_block_header_id()
+                                security_block_header,
+                                security_ledger_state
                             )
                         });
 
@@ -657,6 +660,7 @@ pub struct CryptarchiaConsensusState<
 > {
     tip: Option<HeaderId>,
     security_block: Option<HeaderId>,
+    security_ledger_state: Option<LedgerState>,
     _txs: PhantomData<TxS>,
     _bxs: PhantomData<BxS>,
     _network_adapter_settings: PhantomData<NetworkAdapterSettings>,
@@ -674,10 +678,15 @@ impl<TxS, BxS, NetworkAdapterSettings, BlendAdapterSettings, TimeBackendSettings
     >
 {
     #[must_use]
-    pub const fn new(tip: Option<HeaderId>, security_block: Option<HeaderId>) -> Self {
+    pub const fn new(
+        tip: Option<HeaderId>,
+        security_block: Option<HeaderId>,
+        security_ledger_state: Option<LedgerState>,
+    ) -> Self {
         Self {
             tip,
             security_block,
+            security_ledger_state,
             _txs: PhantomData,
             _bxs: PhantomData,
             _network_adapter_settings: PhantomData,
@@ -708,7 +717,7 @@ impl<TxS, BxS, NetworkAdapterSettings, BlendAdapterSettings, TimeBackendSettings
     type Error = Error;
 
     fn from_settings(_settings: &Self::Settings) -> Result<Self, Self::Error> {
-        Ok(Self::new(None, None))
+        Ok(Self::new(None, None, None))
     }
 }
 
