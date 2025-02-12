@@ -1,13 +1,10 @@
-mod common;
-#[cfg(feature = "ntp")]
-pub mod ntp;
-pub mod system_time;
+use crate::SlotTick;
+use cryptarchia_engine::{Epoch, Slot};
+use futures::Stream;
 
-use crate::EpochSlotTickStream;
-
-/// Abstraction over slot ticking systems
+#[async_trait::async_trait]
 pub trait TimeBackend {
     type Settings;
     fn init(settings: Self::Settings) -> Self;
-    fn tick_stream(self) -> EpochSlotTickStream;
+    async fn tick(self) -> impl Stream<Item = SlotTick>;
 }
