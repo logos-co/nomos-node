@@ -132,9 +132,10 @@ fn compute_parallelize_batch_proofs(bencher: Bencher, element_count: usize) {
         })
         .input_counter(move |_| ItemsCount::new(element_count))
         .bench_refs(|((evals, poly), domain)| {
-            black_box((0..element_count).into_par_iter().for_each(|i| {
+            (0..element_count).into_par_iter().for_each(|i| {
                 generate_element_proof(i, poly, evals, &GLOBAL_PARAMETERS, *domain).unwrap();
-            }));
+            });
+            black_box(());
         });
 }
 
@@ -155,7 +156,7 @@ fn verify_single_proof(bencher: Bencher) {
         .input_counter(|_| ItemsCount::new(1usize))
         .bench_refs(|(index, elemnent, commitment, proof, domain)| {
             black_box(verify_element_proof(
-                index.clone(),
+                *index,
                 elemnent,
                 commitment,
                 proof,

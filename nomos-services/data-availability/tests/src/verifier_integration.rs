@@ -117,7 +117,7 @@ fn test_verifier() {
 
     let node1 = new_node(
         &LeaderConfig {
-            notes: vec![notes[0].clone()],
+            notes: vec![notes[0]],
             nf_sk: sks[0],
         },
         &ledger_config,
@@ -145,7 +145,7 @@ fn test_verifier() {
 
     let node2 = new_node(
         &LeaderConfig {
-            notes: vec![notes[1].clone()],
+            notes: vec![notes[1]],
             nf_sk: sks[1],
         },
         &ledger_config,
@@ -173,7 +173,7 @@ fn test_verifier() {
 
     let node3 = new_node(
         &LeaderConfig {
-            notes: vec![notes[2].clone()],
+            notes: vec![notes[2]],
             nf_sk: sks[2],
         },
         &ledger_config,

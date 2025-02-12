@@ -41,17 +41,11 @@ fn verify<const SIZE: usize>(bencher: Bencher, column_size: usize) {
             let da_blob = DaBlob {
                 column: encoded_data.extended_data.columns().next().unwrap(),
                 column_idx: 0,
-                column_commitment: encoded_data
-                    .column_commitments
-                    .iter()
-                    .next()
-                    .copied()
-                    .unwrap(),
-                aggregated_column_commitment: encoded_data.aggregated_column_commitment.clone(),
+                column_commitment: encoded_data.column_commitments.first().copied().unwrap(),
+                aggregated_column_commitment: encoded_data.aggregated_column_commitment,
                 aggregated_column_proof: encoded_data
                     .aggregated_column_proofs
-                    .iter()
-                    .next()
+                    .first()
                     .copied()
                     .unwrap(),
                 rows_commitments: encoded_data.row_commitments.clone(),

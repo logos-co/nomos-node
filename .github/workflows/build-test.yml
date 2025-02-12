@@ -117,9 +117,6 @@ jobs:
   lints:
     name: Rust lints
     runs-on: self-hosted
-    strategy:
-      matrix:
-        feature: [ libp2p ]
     steps:
       - uses: actions/checkout@v2
         with:
@@ -139,9 +136,8 @@ jobs:
         with:
           command: fmt
           args: --all --check
-
       - name: Run cargo clippy
         uses: actions-rs/cargo@v1
         with:
           command: clippy
-          args: --all --no-default-features --features ${{ matrix.feature }} -- --deny warnings
+          args: --all --all-targets --all-features -- --deny warnings

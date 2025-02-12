@@ -31,8 +31,7 @@ fn reconstruct<const SIZE: usize>(bencher: Bencher, column_size: usize) {
             let params = DaEncoderParams::new(column_size, true, GLOBAL_PARAMETERS.clone());
             let data = rand_data(SIZE * MB / DaEncoderParams::MAX_BLS12_381_ENCODING_CHUNK_SIZE);
             let encoder = DaEncoder::new(params);
-            let encoded = encoder.encode(&data).unwrap();
-            encoded
+            encoder.encode(&data).unwrap()
         })
         .input_counter(|encoded| BytesCount::new(encoded.data.len()))
         .bench_values(|encoded| {

@@ -37,8 +37,7 @@ fn rs_decode(bencher: Bencher, size: usize) {
             let domain = GeneralEvaluationDomain::<Fr>::new(size).unwrap();
             let (_, poly) = bytes_to_polynomial::<31>(&buffer, domain).unwrap();
             let domain = GeneralEvaluationDomain::<Fr>::new(size * 2).unwrap();
-            let encoded = encode(&poly, domain);
-            encoded
+            encode(&poly, domain)
         })
         .input_counter(move |_buff| BytesCount::new(size * 31))
         .bench_values(|buff| {

@@ -16,6 +16,7 @@ use nomos_mempool::{
     MempoolMsg, TxMempoolService, TxMempoolSettings,
 };
 
+#[allow(clippy::type_complexity)]
 #[derive(Services)]
 struct MockPoolNode {
     logging: ServiceHandle<Tracing>,
