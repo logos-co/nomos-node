@@ -11,19 +11,26 @@ executor-http-client = { path = "../clients/executor-http-client" }
 nomos-node = { path = "../nodes/nomos-node", default-features = false }
 nomos-executor = { path = "../nodes/nomos-executor", default-features = false }
 nomos-network = { path = "../nomos-services/network", features = ["libp2p"] }
-nomos-blend-service = { path = "../nomos-services/blend", features = ["libp2p"] }
+nomos-blend-service = { path = "../nomos-services/blend", features = [
+    "libp2p",
+] }
 nomos-blend = { path = "../nomos-blend/core" }
 nomos-blend-message = { path = "../nomos-blend/message" }
 cryptarchia-consensus = { path = "../nomos-services/cryptarchia-consensus" }
 nomos-tracing = { path = "../nomos-tracing" }
 nomos-tracing-service = { path = "../nomos-services/tracing" }
 nomos-api = { path = "../nomos-services/api" }
-overwatch-rs = { git = "https://github.com/logos-co/Overwatch", rev = "f5f7ea0" }
+overwatch-rs = { workspace = true }
 nomos-core = { path = "../nomos-core/chain-defs" }
-cryptarchia-engine = { path = "../consensus/cryptarchia-engine", features = ["serde"] }
+cryptarchia-engine = { path = "../consensus/cryptarchia-engine", features = [
+    "serde",
+] }
 nomos-ledger = { path = "../ledger/nomos-ledger", features = ["serde"] }
 cl = { path = "../nomos-core/cl" }
-nomos-mempool = { path = "../nomos-services/mempool", features = ["mock", "libp2p"] }
+nomos-mempool = { path = "../nomos-services/mempool", features = [
+    "mock",
+    "libp2p",
+] }
 nomos-da-network-service = { path = "../nomos-services/data-availability/network" }
 nomos-da-dispersal = { path = "../nomos-services/data-availability/dispersal" }
 nomos-da-indexer = { path = "../nomos-services/data-availability/indexer" }

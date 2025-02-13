@@ -5,7 +5,7 @@ edition = "2021"
 license = { workspace = true }
 
 [dependencies]
-overwatch-rs = { git = "https://github.com/logos-co/Overwatch", rev = "4160cdd" }
+overwatch-rs = { workspace = true }
 tokio = { version = "1", features = ["macros"] }
 bytes = "1"
 futures = "0.3"

@@ -48,3 +48,7 @@ resolver = "2"
 
 [workspace.package]
 license = "MIT or Apache-2.0"
+
+[workspace.dependencies]
+overwatch-rs = { git = "https://github.com/logos-co/Overwatch", rev = "742fa88" }
+overwatch-derive = { git = "https://github.com/logos-co/Overwatch", rev = "742fa88" }

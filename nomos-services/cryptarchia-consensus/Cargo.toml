@@ -10,7 +10,9 @@ license = { workspace = true }
 async-trait = "0.1"
 bytes = "1.3"
 chrono = "0.4"
-cryptarchia-engine = { path = "../../consensus/cryptarchia-engine", features = ["serde"] }
+cryptarchia-engine = { path = "../../consensus/cryptarchia-engine", features = [
+    "serde",
+] }
 nomos-ledger = { path = "../../ledger/nomos-ledger", features = ["serde"] }
 nomos_proof_statements = { path = "../../nomos-core/proof_statements" }
 utils = { path = "../utils" }
@@ -21,7 +23,7 @@ nomos-network = { path = "../network" }
 nomos-blend-service = { path = "../blend" }
 nomos-mempool = { path = "../mempool" }
 nomos-core = { path = "../../nomos-core/chain-defs" }
-overwatch-rs = { git = "https://github.com/logos-co/Overwatch", rev = "f5f7ea0" }
+overwatch-rs = { workspace = true }
 nomos-storage = { path = "../storage" }
 rand_chacha = "0.3"
 rand = "0.8"

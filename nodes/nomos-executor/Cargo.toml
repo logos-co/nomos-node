@@ -16,19 +16,28 @@ nomos-core = { path = "../../nomos-core/chain-defs" }
 nomos-da-dispersal = { path = "../../nomos-services/data-availability/dispersal" }
 nomos-da-network-core = { path = "../../nomos-da/network/core" }
 nomos-da-network-service = { path = "../../nomos-services/data-availability/network" }
-nomos-da-sampling = { path = "../../nomos-services/data-availability/sampling", features = ["rocksdb-backend"] }
-nomos-da-verifier = { path = "../../nomos-services/data-availability/verifier", features = ["rocksdb-backend", "libp2p"] }
+nomos-da-sampling = { path = "../../nomos-services/data-availability/sampling", features = [
+    "rocksdb-backend",
+] }
+nomos-da-verifier = { path = "../../nomos-services/data-availability/verifier", features = [
+    "rocksdb-backend",
+    "libp2p",
+] }
 nomos-libp2p = { path = "../../nomos-libp2p" }
 nomos-mempool = { path = "../../nomos-services/mempool", features = [
     "mock",
     "libp2p",
 ] }
 nomos-network = { path = "../../nomos-services/network", features = ["libp2p"] }
-nomos-blend-service = { path = "../../nomos-services/blend", features = ["libp2p"] }
+nomos-blend-service = { path = "../../nomos-services/blend", features = [
+    "libp2p",
+] }
 nomos-node = { path = "../nomos-node" }
-nomos-storage = { path = "../../nomos-services/storage", features = ["rocksdb"] }
-overwatch-rs = { git = "https://github.com/logos-co/Overwatch", rev = "f5f7ea0" }
-overwatch-derive = { git = "https://github.com/logos-co/Overwatch", rev = "f5f7ea0" }
+nomos-storage = { path = "../../nomos-services/storage", features = [
+    "rocksdb",
+] }
+overwatch-rs = { workspace = true }
+overwatch-derive = { workspace = true }
 rand = "0.8"
 rand_chacha = "0.3"
 serde = { version = "1", features = ["derive"] }

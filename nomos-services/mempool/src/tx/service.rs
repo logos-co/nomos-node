@@ -9,6 +9,7 @@ use std::fmt::Debug;
 
 // crates
 use futures::StreamExt;
+use overwatch_rs::OpaqueServiceStateHandle;
 // internal
 use crate::backend::MemPool;
 use crate::network::NetworkAdapter;
@@ -16,7 +17,6 @@ use crate::{MempoolMetrics, MempoolMsg};
 use nomos_network::{NetworkMsg, NetworkService};
 use overwatch_rs::services::life_cycle::LifecycleMessage;
 use overwatch_rs::services::{
-    handle::ServiceStateHandle,
     relay::{OutboundRelay, Relay},
     state::{NoOperator, NoState},
     ServiceCore, ServiceData, ServiceId,
@@ -32,7 +32,7 @@ where
     P::Key: Debug + 'static,
     P::BlockId: Debug + 'static,
 {
-    service_state: ServiceStateHandle<Self>,
+    service_state: OpaqueServiceStateHandle<Self>,
     network_relay: Relay<NetworkService<N::Backend>>,
     pool: P,
 }
@@ -49,7 +49,7 @@ where
     const SERVICE_ID: ServiceId = "mempool-cl";
     type Settings = TxMempoolSettings<P::Settings, N::Settings>;
     type State = NoState<Self::Settings>;
-    type StateOperator = NoOperator<Self::State>;
+    type StateOperator = NoOperator<Self::State, Self::Settings>;
     type Message = MempoolMsg<
         <P as MemPool>::BlockId,
         <P as MemPool>::Item,
@@ -70,7 +70,7 @@ where
     N: NetworkAdapter<Payload = P::Item, Key = P::Key> + Send + Sync + 'static,
 {
     fn init(
-        service_state: ServiceStateHandle<Self>,
+        service_state: OpaqueServiceStateHandle<Self>,
         _init_state: Self::State,
     ) -> Result<Self, overwatch_rs::DynError> {
         let network_relay = service_state.overwatch_handle.relay();
@@ -156,7 +156,7 @@ where
         message: MempoolMsg<P::BlockId, P::Item, P::Item, P::Key>,
         pool: &mut P,
         network_relay: &mut OutboundRelay<NetworkMsg<N::Backend>>,
-        service_state: &mut ServiceStateHandle<Self>,
+        service_state: &mut OpaqueServiceStateHandle<Self>,
     ) {
         match message {
             MempoolMsg::Add {

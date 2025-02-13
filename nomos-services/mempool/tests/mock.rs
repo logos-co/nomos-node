@@ -8,7 +8,7 @@ use nomos_network::{
 };
 use nomos_tracing_service::{Tracing, TracingSettings};
 use overwatch_derive::*;
-use overwatch_rs::{overwatch::OverwatchRunner, services::handle::ServiceHandle};
+use overwatch_rs::{overwatch::OverwatchRunner, OpaqueServiceHandle};
 
 use nomos_mempool::{
     backend::mockpool::MockPool,
@@ -19,9 +19,9 @@ use nomos_mempool::{
 #[allow(clippy::type_complexity)]
 #[derive(Services)]
 struct MockPoolNode {
-    logging: ServiceHandle<Tracing>,
-    network: ServiceHandle<NetworkService<Mock>>,
-    mockpool: ServiceHandle<
+    logging: OpaqueServiceHandle<Tracing>,
+    network: OpaqueServiceHandle<NetworkService<Mock>>,
+    mockpool: OpaqueServiceHandle<
         TxMempoolService<MockAdapter, MockPool<HeaderId, MockTransaction<MockMessage>, MockTxId>>,
     >,
 }

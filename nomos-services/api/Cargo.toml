@@ -12,23 +12,32 @@ instrumentation = []
 [dependencies]
 async-trait = "0.1"
 bytes = "1.2"
-overwatch-rs = { git = "https://github.com/logos-co/Overwatch", rev = "f5f7ea0" }
-overwatch-derive = { git = "https://github.com/logos-co/Overwatch", rev = "f5f7ea0" }
+overwatch-rs = { workspace = true }
+overwatch-derive = { workspace = true }
 tracing = "0.1"
 nomos-core = { path = "../../nomos-core/chain-defs" }
 cryptarchia-consensus = { path = "../cryptarchia-consensus" }
 nomos-network = { path = "../../nomos-services/network" }
-nomos-blend-service = { path = "../../nomos-services/blend", features = ["libp2p"] }
+nomos-blend-service = { path = "../../nomos-services/blend", features = [
+    "libp2p",
+] }
 nomos-mempool = { path = "../../nomos-services/mempool", features = [
     "mock",
     "libp2p",
     "openapi",
 ] }
 nomos-da-dispersal = { path = "../data-availability/dispersal" }
-nomos-da-indexer = { path = "../data-availability/indexer", features = ["rocksdb-backend"] }
+nomos-da-indexer = { path = "../data-availability/indexer", features = [
+    "rocksdb-backend",
+] }
 nomos-da-sampling = { path = "../data-availability/sampling" }
-nomos-da-verifier = { path = "../data-availability/verifier", features = ["rocksdb-backend", "libp2p"] }
-nomos-storage = { path = "../../nomos-services/storage", features = ["rocksdb"] }
+nomos-da-verifier = { path = "../data-availability/verifier", features = [
+    "rocksdb-backend",
+    "libp2p",
+] }
+nomos-storage = { path = "../../nomos-services/storage", features = [
+    "rocksdb",
+] }
 nomos-libp2p = { path = "../../nomos-libp2p" }
 full-replication = { path = "../../nomos-da/full-replication" }
 kzgrs-backend = { path = "../../nomos-da/kzgrs-backend" }

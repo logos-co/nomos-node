@@ -8,6 +8,7 @@ use async_trait::async_trait;
 use bytes::Bytes;
 use futures::StreamExt;
 use overwatch_rs::services::handle::ServiceStateHandle;
+use overwatch_rs::OpaqueServiceStateHandle;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 // internal
@@ -172,7 +173,7 @@ enum StorageServiceError<Backend: StorageBackend> {
 /// Storage service that wraps a [`StorageBackend`]
 pub struct StorageService<Backend: StorageBackend + Send + Sync + 'static> {
     backend: Backend,
-    service_state: ServiceStateHandle<Self>,
+    service_state: OpaqueServiceStateHandle<Self>,
 }
 
 impl<Backend: StorageBackend + Send + Sync + 'static> StorageService<Backend> {
@@ -303,7 +304,7 @@ impl<Backend: StorageBackend + Send + Sync + 'static> StorageService<Backend> {
 #[async_trait]
 impl<Backend: StorageBackend + Send + Sync + 'static> ServiceCore for StorageService<Backend> {
     fn init(
-        service_state: ServiceStateHandle<Self>,
+        service_state: OpaqueServiceStateHandle<Self>,
         _init_state: Self::State,
     ) -> Result<Self, overwatch_rs::DynError> {
         Ok(Self {
@@ -344,6 +345,6 @@ impl<Backend: StorageBackend + Send + Sync> ServiceData for StorageService<Backe
     const SERVICE_ID: ServiceId = "Storage";
     type Settings = Backend::Settings;
     type State = NoState<Self::Settings>;
-    type StateOperator = NoOperator<Self::State>;
+    type StateOperator = NoOperator<Self::State, Self::Settings>;
     type Message = StorageMsg<Backend>;
 }

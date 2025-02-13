@@ -8,7 +8,7 @@ license = { workspace = true }
 async-trait = "0.1"
 futures = "0.3"
 kzgrs-backend = { path = "../../../nomos-da/kzgrs-backend" }
-overwatch-rs = { git = "https://github.com/logos-co/Overwatch", rev = "f5f7ea0" }
+overwatch-rs = { workspace = true }
 nomos-core = { path = "../../../nomos-core/chain-defs" }
 nomos-libp2p = { path = "../../../nomos-libp2p" }
 nomos-da-network-core = { path = "../../../nomos-da/network/core" }

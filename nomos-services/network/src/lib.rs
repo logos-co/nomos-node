@@ -5,6 +5,7 @@ use std::fmt::{self, Debug};
 // crates
 use async_trait::async_trait;
 use futures::StreamExt;
+use overwatch_rs::OpaqueServiceStateHandle;
 use serde::{Deserialize, Serialize};
 use tokio::sync::broadcast;
 use tokio::sync::oneshot;
@@ -54,7 +55,7 @@ impl<B: NetworkBackend> Debug for NetworkConfig<B> {
 
 pub struct NetworkService<B: NetworkBackend + 'static> {
     backend: B,
-    service_state: ServiceStateHandle<Self>,
+    service_state: OpaqueServiceStateHandle<Self>,
 }
 
 pub struct NetworkState<B: NetworkBackend> {
@@ -65,7 +66,7 @@ impl<B: NetworkBackend + 'static> ServiceData for NetworkService<B> {
     const SERVICE_ID: ServiceId = "Network";
     type Settings = NetworkConfig<B>;
     type State = NetworkState<B>;
-    type StateOperator = NoOperator<Self::State>;
+    type StateOperator = NoOperator<Self::State, Self::Settings>;
     type Message = NetworkMsg<B>;
 }
 
@@ -76,7 +77,7 @@ where
     B::State: Send + Sync,
 {
     fn init(
-        service_state: ServiceStateHandle<Self>,
+        service_state: OpaqueServiceStateHandle<Self>,
         _init_state: Self::State,
     ) -> Result<Self, overwatch_rs::DynError> {
         Ok(Self {
