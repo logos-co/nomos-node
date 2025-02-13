@@ -12,23 +12,12 @@ jobs:
       CARGO_INCREMENTAL: 0
       RUSTFLAGS: "-C instrument-coverage"
       LLVM_PROFILE_FILE: "nomos-node-%p-%m.profraw"
+      PATH: "$PATH:/home/github/.cargo/bin"
     runs-on: self-hosted
     steps:
       - uses: actions/checkout@v3
         with:
           submodules: true
-      - name: Ensure Cargo is in PATH
-        run: |
-          echo "Current PATH: $PATH"
-          export PATH=$HOME/.cargo/bin:$PATH
-          echo "Updated PATH: $PATH"
-          cargo --version
-      - name: Check PATH
-        run: echo $PATH
-      - name: Check shell
-        run: echo $SHELL
-      - name: print env
-        run: env
       - uses: arduino/setup-protoc@v3
         with:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
