@@ -567,6 +567,9 @@ impl<M: MembershipHandler<Id = PeerId, NetworkId = SubnetworkId> + 'static> Netw
     }
 
     fn on_swarm_event(&mut self, event: FromSwarm) {
+        if let FromSwarm::ConnectionClosed(connection_closed) = &event {
+            self.connected_peers.remove(&connection_closed.peer_id);
+        }
         self.stream_behaviour.on_swarm_event(event)
     }
 
