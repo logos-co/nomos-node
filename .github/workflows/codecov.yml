@@ -17,13 +17,6 @@ jobs:
       - uses: actions/checkout@v3
         with:
           submodules: true
-      - uses: arduino/setup-protoc@v3
-        with:
-          repo-token: ${{ secrets.GITHUB_TOKEN }}
-      - run: rustup component add llvm-tools-preview
-      - uses: cargo-bins/cargo-binstall@main
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Check current user
         run: whoami
       - name: Check PATH
@@ -32,6 +25,13 @@ jobs:
         run: echo $SHELL
       - name: print env
         run: env
+      - uses: arduino/setup-protoc@v3
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+      - run: rustup component add llvm-tools-preview
+      - uses: cargo-bins/cargo-binstall@main
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Install risc0
         run: cargo binstall -y cargo-risczero && cargo risczero install
         env:
