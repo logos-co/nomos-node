@@ -18,7 +18,7 @@ jobs:
         with:
           submodules: true
       - name: Check current user
-        run: whoami
+        run: source ~/.profile
       - name: Check PATH
         run: echo $PATH
       - name: Check shell
