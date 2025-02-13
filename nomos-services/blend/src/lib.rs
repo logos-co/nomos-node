@@ -20,12 +20,12 @@ use nomos_blend_message::{sphinx::SphinxMessage, BlendMessage};
 use nomos_core::wire;
 use nomos_network::NetworkService;
 use overwatch_rs::services::{
-    handle::ServiceStateHandle,
     life_cycle::LifecycleMessage,
     relay::{Relay, RelayMessage},
     state::{NoOperator, NoState},
     ServiceCore, ServiceData, ServiceId,
 };
+use overwatch_rs::OpaqueServiceStateHandle;
 use rand::SeedableRng;
 use rand_chacha::ChaCha12Rng;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
@@ -49,7 +49,7 @@ where
     Network::BroadcastSettings: Clone + Debug + Serialize + DeserializeOwned,
 {
     backend: Backend,
-    service_state: ServiceStateHandle<Self>,
+    service_state: OpaqueServiceStateHandle<Self>,
     network_relay: Relay<NetworkService<Network::Backend>>,
     membership: Membership<Backend::NodeId, SphinxMessage>,
 }
@@ -64,7 +64,7 @@ where
     const SERVICE_ID: ServiceId = "Blend";
     type Settings = BlendConfig<Backend::Settings, Backend::NodeId>;
     type State = NoState<Self::Settings>;
-    type StateOperator = NoOperator<Self::State>;
+    type StateOperator = NoOperator<Self::State, Self::Settings>;
     type Message = ServiceMessage<Network::BroadcastSettings>;
 }
 
@@ -79,7 +79,7 @@ where
         Clone + Debug + Serialize + DeserializeOwned + Send + Sync + 'static,
 {
     fn init(
-        service_state: ServiceStateHandle<Self>,
+        service_state: OpaqueServiceStateHandle<Self>,
         _init_state: Self::State,
     ) -> Result<Self, overwatch_rs::DynError> {
         let network_relay = service_state.overwatch_handle.relay();

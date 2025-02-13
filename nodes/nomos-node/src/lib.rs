@@ -51,7 +51,7 @@ pub use nomos_system_sig::SystemSig;
 #[cfg(feature = "tracing")]
 pub use nomos_tracing_service::Tracing;
 use overwatch_derive::*;
-use overwatch_rs::services::handle::ServiceHandle;
+use overwatch_rs::OpaqueServiceHandle;
 use rand_chacha::ChaCha20Rng;
 use serde::{de::DeserializeOwned, Serialize};
 use subnetworks_assignations::versions::v1::FillFromNodeList;
@@ -166,19 +166,19 @@ pub type NodeDaVerifier = DaVerifier<VerifierNetworkAdapter<FillFromNodeList>>;
 #[derive(Services)]
 pub struct Nomos {
     #[cfg(feature = "tracing")]
-    tracing: ServiceHandle<Tracing>,
-    network: ServiceHandle<NetworkService<NetworkBackend>>,
-    blend: ServiceHandle<BlendService<BlendBackend, BlendNetworkAdapter>>,
-    da_indexer: ServiceHandle<NodeDaIndexer>,
-    da_verifier: ServiceHandle<NodeDaVerifier>,
-    da_sampling: ServiceHandle<NodeDaSampling>,
-    da_network: ServiceHandle<DaNetworkService<DaNetworkValidatorBackend<NomosDaMembership>>>,
-    cl_mempool: ServiceHandle<TxMempool>,
-    da_mempool: ServiceHandle<DaMempool>,
-    cryptarchia: ServiceHandle<NodeCryptarchia>,
-    http: ServiceHandle<NomosApiService>,
-    storage: ServiceHandle<StorageService<RocksBackend<Wire>>>,
-    system_sig: ServiceHandle<SystemSig>,
+    tracing: OpaqueServiceHandle<Tracing>,
+    network: OpaqueServiceHandle<NetworkService<NetworkBackend>>,
+    blend: OpaqueServiceHandle<BlendService<BlendBackend, BlendNetworkAdapter>>,
+    da_indexer: OpaqueServiceHandle<NodeDaIndexer>,
+    da_verifier: OpaqueServiceHandle<NodeDaVerifier>,
+    da_sampling: OpaqueServiceHandle<NodeDaSampling>,
+    da_network: OpaqueServiceHandle<DaNetworkService<DaNetworkValidatorBackend<NomosDaMembership>>>,
+    cl_mempool: OpaqueServiceHandle<TxMempool>,
+    da_mempool: OpaqueServiceHandle<DaMempool>,
+    cryptarchia: OpaqueServiceHandle<NodeCryptarchia>,
+    http: OpaqueServiceHandle<NomosApiService>,
+    storage: OpaqueServiceHandle<StorageService<RocksBackend<Wire>>>,
+    system_sig: OpaqueServiceHandle<SystemSig>,
 }
 
 pub struct Wire;

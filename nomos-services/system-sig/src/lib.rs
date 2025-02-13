@@ -5,15 +5,14 @@ use futures::stream::StreamExt;
 use log::error;
 // internal
 use overwatch_rs::overwatch::handle::OverwatchHandle;
-use overwatch_rs::services::handle::ServiceStateHandle;
 use overwatch_rs::services::life_cycle::LifecycleMessage;
 use overwatch_rs::services::relay::NoMessage;
 use overwatch_rs::services::state::{NoOperator, NoState};
 use overwatch_rs::services::{ServiceCore, ServiceData, ServiceId};
-use overwatch_rs::DynError;
+use overwatch_rs::{DynError, OpaqueServiceStateHandle};
 
 pub struct SystemSig {
-    service_state: ServiceStateHandle<Self>,
+    service_state: OpaqueServiceStateHandle<Self>,
 }
 
 impl SystemSig {
@@ -42,14 +41,14 @@ impl ServiceData for SystemSig {
     const SERVICE_RELAY_BUFFER_SIZE: usize = 1;
     type Settings = ();
     type State = NoState<Self::Settings>;
-    type StateOperator = NoOperator<Self::State>;
+    type StateOperator = NoOperator<Self::State, Self::Settings>;
     type Message = NoMessage;
 }
 
 #[async_trait::async_trait]
 impl ServiceCore for SystemSig {
     fn init(
-        service_state: ServiceStateHandle<Self>,
+        service_state: OpaqueServiceStateHandle<Self>,
         _init_state: Self::State,
     ) -> Result<Self, DynError> {
         Ok(Self { service_state })

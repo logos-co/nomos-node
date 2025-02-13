@@ -58,7 +58,7 @@ mod tests {
     }
 
     struct Recovery {
-        service_state_handle: ServiceStateHandle<Self>,
+        service_state_handle: OpaqueServiceStateHandle<Self>,
     }
 
     impl ServiceData for Recovery {
@@ -72,7 +72,7 @@ mod tests {
     #[async_trait]
     impl ServiceCore for Recovery {
         fn init(
-            service_state: ServiceStateHandle<Self>,
+            service_state: OpaqueServiceStateHandle<Self>,
             initial_state: Self::State,
         ) -> Result<Self, DynError> {
             assert_eq!(initial_state.value, "");
