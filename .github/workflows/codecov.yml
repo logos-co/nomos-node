@@ -24,6 +24,14 @@ jobs:
       - uses: cargo-bins/cargo-binstall@main
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Check current user
+        run: whoami
+      - name: Check PATH
+        run: echo $PATH
+      - name: Check shell
+        run: echo $SHELL
+      - name: print env
+        run: env
       - name: Install risc0
         run: cargo binstall -y cargo-risczero && cargo risczero install
         env:
