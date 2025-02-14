@@ -22,6 +22,10 @@ jobs:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
       - name: Check PATH
         run: echo $PATH
+      - name: Check whoami
+        run: whoami
+      - name: Check permissions on cargo folder
+        run: ls -la /home/github/.cargo/bin
       - name: Check cargo
         run: /home/github/.cargo/bin/cargo --version
       - run: rustup component add llvm-tools-preview
