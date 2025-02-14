@@ -22,9 +22,10 @@ use crate::protocols::{
     replication::behaviour::ReplicationEvent,
     sampling::behaviour::SamplingEvent,
 };
-use crate::swarm::common::{
+use crate::swarm::common::handlers::{
     handle_replication_event, handle_sampling_event, handle_validator_dispersal_event,
 };
+use crate::swarm::common::monitor::ConnectionMonitor;
 use crate::swarm::validator::ValidatorEventsStream;
 use crate::SubnetworkId;
 use subnetworks_assignations::MembershipHandler;
@@ -47,6 +48,7 @@ pub struct ExecutorSwarm<
     sampling_events_sender: UnboundedSender<SamplingEvent>,
     validation_events_sender: UnboundedSender<DaBlob>,
     dispersal_events_sender: UnboundedSender<DispersalExecutorEvent>,
+    monitor: ConnectionMonitor,
 }
 
 impl<Membership> ExecutorSwarm<Membership>
@@ -64,6 +66,7 @@ where
         let sampling_events_receiver = UnboundedReceiverStream::new(sampling_events_receiver);
         let validation_events_receiver = UnboundedReceiverStream::new(validation_events_receiver);
         let dispersal_events_receiver = UnboundedReceiverStream::new(dispersal_events_receiver);
+        let monitor = ConnectionMonitor::new();
 
         (
             Self {
@@ -71,6 +74,7 @@ where
                 sampling_events_sender,
                 validation_events_sender,
                 dispersal_events_sender,
+                monitor,
             },
             ExecutorEventsStream {
                 validator_events_stream: ValidatorEventsStream {
@@ -143,16 +147,25 @@ where
     }
 
     async fn handle_sampling_event(&mut self, event: SamplingEvent) {
+        if let SamplingEvent::SamplingError { error } = &event {
+            self.monitor.record_sampling_error(error);
+        }
         handle_sampling_event(&mut self.sampling_events_sender, event).await
     }
 
     async fn handle_executor_dispersal_event(&mut self, event: DispersalExecutorEvent) {
+        if let DispersalExecutorEvent::DispersalError { error } = &event {
+            self.monitor.record_executor_dispersal_error(error);
+        }
         if let Err(e) = self.dispersal_events_sender.send(event) {
             debug!("Error distributing sampling message internally: {e:?}");
         }
     }
 
     async fn handle_validator_dispersal_event(&mut self, event: DispersalEvent) {
+        if let DispersalEvent::DispersalError { error } = &event {
+            self.monitor.record_validator_dispersal_error(error);
+        }
         handle_validator_dispersal_event(
             &mut self.validation_events_sender,
             self.swarm.behaviour_mut().replication_behaviour_mut(),
@@ -162,6 +175,9 @@ where
     }
 
     async fn handle_replication_event(&mut self, event: ReplicationEvent) {
+        if let ReplicationEvent::ReplicationError { error } = &event {
+            self.monitor.record_replication_error(error);
+        }
         handle_replication_event(&mut self.validation_events_sender, event).await
     }
 

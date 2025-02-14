@@ -72,16 +72,16 @@ pub enum SamplingError {
 }
 
 impl SamplingError {
-    pub fn peer_id(&self) -> &PeerId {
+    pub fn peer_id(&self) -> Option<&PeerId> {
         match self {
-            SamplingError::Io { peer_id, .. } => peer_id,
-            SamplingError::Protocol { peer_id, .. } => peer_id,
-            SamplingError::OpenStream { peer_id, .. } => peer_id,
-            SamplingError::Deserialize { peer_id, .. } => peer_id,
-            SamplingError::RequestChannel { peer_id, .. } => peer_id,
-            SamplingError::ResponseChannel { peer_id, .. } => peer_id,
-            SamplingError::InvalidBlobId { peer_id, .. } => peer_id,
-            SamplingError::BlobNotFound { peer_id, .. } => peer_id,
+            SamplingError::Io { peer_id, .. } => Some(peer_id),
+            SamplingError::Protocol { peer_id, .. } => Some(peer_id),
+            SamplingError::OpenStream { peer_id, .. } => Some(peer_id),
+            SamplingError::Deserialize { peer_id, .. } => Some(peer_id),
+            SamplingError::RequestChannel { peer_id, .. } => Some(peer_id),
+            SamplingError::ResponseChannel { peer_id, .. } => Some(peer_id),
+            SamplingError::InvalidBlobId { peer_id, .. } => Some(peer_id),
+            SamplingError::BlobNotFound { peer_id, .. } => Some(peer_id),
         }
     }
 
@@ -639,7 +639,9 @@ impl<M: MembershipHandler<Id = PeerId, NetworkId = SubnetworkId> + 'static> Netw
                 }
                 // Something went up on our side of the wire, bubble it up
                 Err(error) => {
-                    connected_peers.remove(error.peer_id());
+                    if let Some(peer_id) = error.peer_id() {
+                        connected_peers.remove(peer_id);
+                    }
                     return Poll::Ready(ToSwarm::GenerateEvent(SamplingEvent::SamplingError {
                         error,
                     }));

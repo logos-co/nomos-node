@@ -20,7 +20,8 @@ use crate::protocols::{
     sampling::behaviour::SamplingEvent,
 };
 use crate::swarm::common::{
-    handle_replication_event, handle_sampling_event, handle_validator_dispersal_event,
+    handlers::{handle_replication_event, handle_sampling_event, handle_validator_dispersal_event},
+    monitor::ConnectionMonitor,
 };
 use crate::SubnetworkId;
 use subnetworks_assignations::MembershipHandler;
@@ -41,6 +42,7 @@ pub struct ValidatorSwarm<
     swarm: Swarm<ValidatorBehaviour<Membership>>,
     sampling_events_sender: UnboundedSender<SamplingEvent>,
     validation_events_sender: UnboundedSender<DaBlob>,
+    monitor: ConnectionMonitor,
 }
 
 impl<Membership> ValidatorSwarm<Membership>
@@ -57,12 +59,14 @@ where
 
         let sampling_events_receiver = UnboundedReceiverStream::new(sampling_events_receiver);
         let validation_events_receiver = UnboundedReceiverStream::new(validation_events_receiver);
+        let monitor = ConnectionMonitor::new();
 
         (
             Self {
                 swarm: Self::build_swarm(key, membership, addresses),
                 sampling_events_sender,
                 validation_events_sender,
+                monitor,
             },
             ValidatorEventsStream {
                 sampling_events_receiver,
@@ -118,10 +122,16 @@ where
     }
 
     async fn handle_sampling_event(&mut self, event: SamplingEvent) {
+        if let SamplingEvent::SamplingError { error } = &event {
+            self.monitor.record_sampling_error(error);
+        }
         handle_sampling_event(&mut self.sampling_events_sender, event).await
     }
 
     async fn handle_dispersal_event(&mut self, event: DispersalEvent) {
+        if let DispersalEvent::DispersalError { error } = &event {
+            self.monitor.record_validator_dispersal_error(error);
+        }
         handle_validator_dispersal_event(
             &mut self.validation_events_sender,
             self.swarm.behaviour_mut().replication_behaviour_mut(),
@@ -131,6 +141,9 @@ where
     }
 
     async fn handle_replication_event(&mut self, event: ReplicationEvent) {
+        if let ReplicationEvent::ReplicationError { error } = &event {
+            self.monitor.record_replication_error(error);
+        }
         handle_replication_event(&mut self.validation_events_sender, event).await
     }
 
