@@ -23,7 +23,7 @@ jobs:
       - name: Check PATH
         run: echo $PATH
       - name: Check cargo
-        run: cargo --version
+        run: /home/github/.cargo/bin/cargo --version
       - run: rustup component add llvm-tools-preview
       - uses: cargo-bins/cargo-binstall@main
         env:
