@@ -20,16 +20,6 @@ jobs:
       - uses: arduino/setup-protoc@v3
         with:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
-      - name: Check PATH
-        run: echo $PATH
-      - name: Check whoami
-        run: whoami
-      - name: Wait
-        run: sleep 5m
-      - name: Check permissions on cargo folder
-        run: ls -la $HOME/.cargo/bin
-      - name: Check cargo
-        run: $HOME/.cargo/bin/cargo --version
       - run: rustup component add llvm-tools-preview
       - uses: cargo-bins/cargo-binstall@main
         env:
