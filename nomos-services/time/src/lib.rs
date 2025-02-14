@@ -8,6 +8,7 @@ use overwatch_rs::services::state::{NoOperator, NoState};
 use overwatch_rs::services::{ServiceCore, ServiceData, ServiceId};
 use overwatch_rs::DynError;
 use std::fmt::{Debug, Formatter};
+use std::pin::Pin;
 use tokio::sync::oneshot;
 
 pub mod backends;
@@ -19,11 +20,11 @@ pub struct SlotTick {
     slot: Slot,
 }
 
-pub type SlotTickStream = Box<dyn Stream<Item = SlotTick> + Send>;
+pub type EpochSlotTickStream = Pin<Box<dyn Stream<Item = SlotTick> + Send + Sync + Unpin>>;
 
 pub enum TimeServiceMessage {
     Subscribe {
-        sender: oneshot::Sender<SlotTickStream>,
+        sender: oneshot::Sender<EpochSlotTickStream>,
     },
 }
 
@@ -76,7 +77,7 @@ where
         let Self::Settings {
             backend_settings, ..
         } = service_state.settings_reader.get_updated_settings();
-        let backend = Backend::init(backend_settings, service_state.overwatch_handle.clone());
+        let backend = Backend::init(backend_settings);
         Ok(Self {
             state: service_state,
             backend,
@@ -87,15 +88,16 @@ where
         let Self { state, backend } = self;
         let mut inbound_relay = state.inbound_relay;
         let mut lifecycle_relay = state.lifecycle_handle.message_stream();
+        let tick_stream = backend.tick_stream();
         loop {
             tokio::select! {
                 Some(service_message) = inbound_relay.recv() => {
                     match service_message {
                         TimeServiceMessage::Subscribe { sender} => {
-                            let stream =
-                            if let Err(e) = sender.send(backend.tick_stream()) {
-                                error!("Error subscribing to time event: Couldn't send back a response");
-                            };
+
+                            // if let Err(e) = sender.send(tick_stream) {
+                            //     error!("Error subscribing to time event: Couldn't send back a response");
+                            // };
                         }
                     }
                 }
