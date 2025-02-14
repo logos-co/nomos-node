@@ -462,7 +462,7 @@ where
 
         let mut incoming_blocks = network_adapter.blocks_stream().await?;
         let mut leader = leadership::Leader::new(genesis_id, leader_config, config);
-        let timer = time::Timer::new(time);
+        let timer = cryptarchia_engine::time::SlotTimer::new(time);
 
         let mut slot_timer = IntervalStream::new(timer.slot_interval());
 
