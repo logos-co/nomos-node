@@ -24,6 +24,8 @@ jobs:
         run: echo $PATH
       - name: Check whoami
         run: whoami
+      - name: Wait
+        run: sleep 5m
       - name: Check permissions on cargo folder
         run: ls -la $HOME/.cargo/bin
       - name: Check cargo
