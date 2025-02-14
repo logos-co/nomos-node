@@ -10,7 +10,7 @@ license = { workspace = true }
 async-trait = "0.1"
 bytes = "1.3"
 chrono = "0.4"
-cryptarchia-engine = { path = "../../consensus/cryptarchia-engine", features = ["serde"] }
+cryptarchia-engine = { path = "../../consensus/cryptarchia-engine", features = ["serde", "tokio"] }
 nomos-ledger = { path = "../../ledger/nomos-ledger", features = ["serde"] }
 nomos_proof_statements = { path = "../../nomos-core/proof_statements" }
 utils = { path = "../utils" }
