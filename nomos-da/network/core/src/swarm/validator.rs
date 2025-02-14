@@ -19,7 +19,7 @@ use crate::protocols::{
     dispersal::validator::behaviour::DispersalEvent, replication::behaviour::ReplicationEvent,
     sampling::behaviour::SamplingEvent,
 };
-use crate::swarm::common::{
+use crate::swarm::common::handlers::{
     handle_replication_event, handle_sampling_event, handle_validator_dispersal_event,
 };
 use crate::SubnetworkId;
@@ -137,14 +137,14 @@ where
     async fn handle_behaviour_event(&mut self, event: ValidatorBehaviourEvent<Membership>) {
         match event {
             ValidatorBehaviourEvent::Sampling(event) => {
-                tracing::debug!(
+                tracing::info!(
                     counter.behaviour_events_received = 1,
                     event = EVENT_SAMPLING
                 );
                 self.handle_sampling_event(event).await;
             }
             ValidatorBehaviourEvent::Dispersal(event) => {
-                tracing::debug!(
+                tracing::info!(
                     counter.behaviour_events_received = 1,
                     event = EVENT_VALIDATOR_DISPERSAL,
                     blob_size = event.blob_size()
@@ -152,7 +152,7 @@ where
                 self.handle_dispersal_event(event).await;
             }
             ValidatorBehaviourEvent::Replication(event) => {
-                tracing::debug!(
+                tracing::info!(
                     counter.behaviour_events_received = 1,
                     event = EVENT_REPLICATION,
                     blob_size = event.blob_size()

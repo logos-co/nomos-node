@@ -16,18 +16,16 @@ pub async fn handle_validator_dispersal_event<Membership>(
 ) where
     Membership: MembershipHandler<NetworkId = SubnetworkId, Id = PeerId>,
 {
-    match event {
-        // Send message for replication
-        DispersalEvent::IncomingMessage { message } => {
-            let blob_message = message.blob;
-            if let Err(e) = validation_events_sender.send(blob_message.data.clone()) {
-                error!("Error sending blob to validation: {e:?}");
-            }
-            replication_behaviour.send_message(replication::ReplicationRequest::new(
-                blob_message,
-                message.subnetwork_id,
-            ));
+    // Send message for replication
+    if let DispersalEvent::IncomingMessage { message } = event {
+        let blob_message = message.blob;
+        if let Err(e) = validation_events_sender.send(blob_message.data.clone()) {
+            error!("Error sending blob to validation: {e:?}");
         }
+        replication_behaviour.send_message(replication::ReplicationRequest::new(
+            blob_message,
+            message.subnetwork_id,
+        ));
     }
 }
 
@@ -44,8 +42,9 @@ pub async fn handle_replication_event(
     validation_events_sender: &mut UnboundedSender<DaBlob>,
     event: ReplicationEvent,
 ) {
-    let ReplicationEvent::IncomingMessage { message, .. } = event;
-    if let Err(e) = validation_events_sender.send(message.blob.data) {
-        error!("Error sending blob to validation: {e:?}");
+    if let ReplicationEvent::IncomingMessage { message, .. } = event {
+        if let Err(e) = validation_events_sender.send(message.blob.data) {
+            error!("Error sending blob to validation: {e:?}");
+        }
     }
 }
