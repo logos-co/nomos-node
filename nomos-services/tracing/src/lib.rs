@@ -1,6 +1,7 @@
 // std
 use std::fmt::{Debug, Formatter};
 use std::io::Write;
+use std::panic;
 use std::sync::{Arc, Mutex};
 // crates
 use futures::StreamExt;
@@ -233,6 +234,8 @@ impl ServiceCore for Tracing {
             .with(LevelFilter::from(config.level))
             .with(layers)
             .init();
+
+        panic::set_hook(Box::new(nomos_tracing::panic::panic_hook));
 
         Ok(Self {
             service_state,
