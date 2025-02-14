@@ -25,9 +25,9 @@ jobs:
       - name: Check whoami
         run: whoami
       - name: Check permissions on cargo folder
-        run: ls -la /home/github/.cargo/bin
+        run: ls -la $HOME/.cargo/bin
       - name: Check cargo
-        run: /home/github/.cargo/bin/cargo --version
+        run: $HOME/.cargo/bin/cargo --version
       - run: rustup component add llvm-tools-preview
       - uses: cargo-bins/cargo-binstall@main
         env:
