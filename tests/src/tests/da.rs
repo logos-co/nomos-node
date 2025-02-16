@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use executor_http_client::ExecutorHttpClient;
 
 use kzgrs_backend::common::blob::DaBlob;
@@ -6,11 +7,57 @@ use nomos_core::wire;
 use reqwest::ClientBuilder;
 use reqwest::Url;
 use std::time::Duration;
+use futures::{stream, StreamExt};
+use tests::adjust_timeout;
 use tests::nodes::executor::Executor;
 use tests::topology::Topology;
 use tests::topology::TopologyConfig;
 
 const APP_ID: &str = "fd3384e132ad02a56c78f45547ee40038dc79002b90d29ed90e08eee762ae715";
+
+const TIMEOUT_MULTIPLIER: f64 = 3.0;
+
+async fn consensus_happy(topology: &Topology) {
+    let nodes = topology.validators();
+    let config = nodes[0].config();
+    let n_blocks = 2;
+    println!("waiting for {n_blocks} blocks");
+    let timeout = (n_blocks as f64 / config.cryptarchia.config.consensus_config.active_slot_coeff
+        * config.cryptarchia.time.slot_duration.as_secs() as f64
+        * TIMEOUT_MULTIPLIER)
+        .floor() as u64;
+    let timeout = adjust_timeout(Duration::from_secs(timeout));
+    let timeout = tokio::time::sleep(timeout);
+    tokio::select! {
+        _ = timeout => panic!("timed out waiting for nodes to produce {} blocks", n_blocks),
+        _ = async { while stream::iter(nodes)
+            .any(|n| async move { (n.consensus_info().await.height as u32) < n_blocks })
+            .await
+        {
+            println!(
+                "waiting... {}",
+                stream::iter(nodes)
+                    .then(|n| async move { format!("{}", n.consensus_info().await.height) })
+                    .collect::<Vec<_>>()
+                    .await
+                    .join(" | ")
+            );
+            tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+        }
+        } => {}
+    }
+
+    println!("{:?}", nodes[0].consensus_info().await);
+
+    let infos = stream::iter(nodes)
+        .then(|n| async move { n.get_headers(None, None).await })
+        .map(|blocks| blocks[2])
+        .collect::<HashSet<_>>()
+        .await;
+
+    assert_eq!(infos.len(), 1, "consensus not reached");
+}
+
 
 async fn disseminate_with_metadata(
     executor: &Executor,
@@ -98,6 +145,8 @@ async fn disseminate_retrieve_reconstruct() {
     let from = 0u64.to_be_bytes();
     let to = 1u64.to_be_bytes();
 
+    consensus_happy(&topology).await;
+
     let executor_blobs = executor
         .get_indexer_range(app_id.clone().try_into().unwrap(), from..to)
         .await;
@@ -129,7 +178,7 @@ async fn local_testnet() {
             &generate_data(index),
             create_metadata(&app_id, index),
         )
-        .await;
+            .await;
 
         index += 1;
         tokio::time::sleep(Duration::from_secs(10)).await;
