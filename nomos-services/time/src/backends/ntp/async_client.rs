@@ -5,6 +5,8 @@ use std::net::SocketAddr;
 use std::time::Duration;
 use tokio::net::ToSocketAddrs;
 use tokio::net::{lookup_host, UdpSocket};
+use tokio::time::error::Elapsed;
+use tokio::time::timeout;
 
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
@@ -12,13 +14,14 @@ pub enum Error {
     Io(std::io::Error),
     #[error("NTP internal error: {0:?}")]
     Sntp(SntpError),
+    #[error("NTP request timeout, elapsed: {0:?}")]
+    Timeout(Elapsed),
 }
 
 #[derive(Copy, Clone)]
 pub struct NTPClientSettings {
     timeout: Duration,
     address: SocketAddr,
-    concurrency_limit: usize,
 }
 #[derive(Clone)]
 pub struct AsyncNTPClient {
@@ -44,6 +47,9 @@ impl AsyncNTPClient {
             hosts.map(move |host| get_time(host, socket, self.ntp_context)),
         )
         .into_stream();
-        checks.select_next_some().await.map_err(Error::Sntp)
+        timeout(self.settings.timeout, checks.select_next_some())
+            .await
+            .map_err(Error::Timeout)?
+            .map_err(Error::Sntp)
     }
 }
