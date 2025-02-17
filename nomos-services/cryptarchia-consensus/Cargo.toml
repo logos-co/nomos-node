@@ -24,7 +24,7 @@ nomos-mempool          = { workspace = true }
 nomos-network          = { workspace = true }
 nomos-storage          = { workspace = true }
 nomos_proof_statements = { workspace = true }
-overwatch-rs           = { git = "https://github.com/logos-co/Overwatch", rev = "f5f7ea0" }
+overwatch-rs           = { workspace = true }
 rand                   = "0.8"
 rand_chacha            = "0.3"
 risc0-zkvm             = "1.1"

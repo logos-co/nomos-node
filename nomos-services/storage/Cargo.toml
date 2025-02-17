@@ -1,34 +1,34 @@
 [package]
-name = "nomos-storage"
-version = "0.1.0"
 edition = "2021"
 license = { workspace = true }
+name    = "nomos-storage"
+version = "0.1.0"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-async-trait = "0.1"
-futures = "0.3"
-tokio = { version = "1", features = ["sync"] }
-bytes = "1.2"
-overwatch-rs = { git = "https://github.com/logos-co/Overwatch", rev = "f5f7ea0" }
-serde = "1.0"
-sled = { version = "0.34", optional = true }
-rocksdb = { version = "0.22", optional = true }
-thiserror = "1.0"
-tracing = "0.1"
+async-trait  = "0.1"
+bytes        = "1.2"
+futures      = "0.3"
+overwatch-rs = { workspace = true }
+rocksdb      = { version = "0.22", optional = true }
+serde        = "1.0"
+sled         = { version = "0.34", optional = true }
+thiserror    = "1.0"
+tokio        = { version = "1", features = ["sync"] }
+tracing      = "0.1"
 
 [dev-dependencies]
-tokio = { version = "1", features = ["sync", "macros", "time"] }
 tempfile = "3"
+tokio    = { version = "1", features = ["macros", "sync", "time"] }
 
 [features]
-default = []
-mock = []
-sled-backend = ["sled"]
+default         = []
+mock            = []
 rocksdb-backend = ["rocksdb"]
+sled-backend    = ["sled"]
 
 [[bin]]
-name = "rocks"
-path = "src/bin/rocks.rs"
+name              = "rocks"
+path              = "src/bin/rocks.rs"
 required-features = ["rocksdb-backend"]

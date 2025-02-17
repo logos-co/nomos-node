@@ -1,15 +1,15 @@
 [package]
-name = "nomos-system-sig"
-version = "0.1.0"
 edition = "2021"
 license = { workspace = true }
+name    = "nomos-system-sig"
+version = "0.1.0"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-async-trait = "0.1"
-async-ctrlc = "1.2"
-overwatch-rs = { git = "https://github.com/logos-co/Overwatch", rev = "f5f7ea0" }
-tokio = "1"
-log = "0.4.20"
-futures = "0.3.28"
+async-ctrlc  = "1.2"
+async-trait  = "0.1"
+futures      = "0.3.28"
+log          = "0.4.20"
+overwatch-rs = { workspace = true }
+tokio        = "1"

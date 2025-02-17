@@ -13,7 +13,7 @@ humantime-serde = { version = "1", optional = true }
 multiaddr       = "0.15"
 nomos-core      = { workspace = true }
 nomos-libp2p    = { workspace = true, optional = true }
-overwatch-rs    = { git = "https://github.com/logos-co/Overwatch", rev = "f5f7ea0" }
+overwatch-rs    = { workspace = true }
 parking_lot     = "0.12"
 rand            = { version = "0.7.3", optional = true }
 serde           = { version = "1.0", features = ["derive"] }

@@ -24,8 +24,8 @@ nomos-mempool            = { workspace = true, features = ["libp2p", "mock"] }
 nomos-network            = { workspace = true, features = ["libp2p"] }
 nomos-node               = { workspace = true }
 nomos-storage            = { workspace = true, features = ["rocksdb"] }
-overwatch-derive         = { git = "https://github.com/logos-co/Overwatch", rev = "f5f7ea0" }
-overwatch-rs             = { git = "https://github.com/logos-co/Overwatch", rev = "f5f7ea0" }
+overwatch-derive         = { workspace = true }
+overwatch-rs             = { workspace = true }
 rand                     = "0.8"
 rand_chacha              = "0.3"
 serde                    = { version = "1", features = ["derive"] }

@@ -38,8 +38,8 @@ nomos-storage            = { workspace = true, features = ["rocksdb"] }
 nomos-system-sig         = { workspace = true }
 nomos-tracing            = { workspace = true }
 nomos-tracing-service    = { workspace = true }
-overwatch-derive         = { git = "https://github.com/logos-co/Overwatch", rev = "f5f7ea0" }
-overwatch-rs             = { git = "https://github.com/logos-co/Overwatch", rev = "f5f7ea0" }
+overwatch-derive         = { workspace = true }
+overwatch-rs             = { workspace = true }
 rand_chacha              = "0.3"
 serde                    = "1"
 serde_json               = "1.0"

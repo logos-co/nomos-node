@@ -30,8 +30,8 @@ nomos-network            = { workspace = true, features = ["mock"] }
 nomos-node               = { workspace = true }
 nomos-storage            = { workspace = true, features = ["rocksdb-backend"] }
 once_cell                = "1.19"
-overwatch-derive         = { git = "https://github.com/logos-co/Overwatch", rev = "f5f7ea0" }
-overwatch-rs             = { git = "https://github.com/logos-co/Overwatch", rev = "f5f7ea0" }
+overwatch-derive         = { workspace = true }
+overwatch-rs             = { workspace = true }
 rand                     = "0.8"
 rand_chacha              = "0.3"
 subnetworks-assignations = { workspace = true }

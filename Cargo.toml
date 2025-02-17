@@ -91,5 +91,9 @@ subnetworks-assignations = { path = "./nomos-da/network/subnetworks-assignations
 tests                    = { path = "./tests" }
 utils                    = { path = "./nomos-services/utils" }
 
+# External
+overwatch-derive = { git = "https://github.com/logos-co/Overwatch", branch = "main" }
+overwatch-rs     = { git = "https://github.com/logos-co/Overwatch", branch = "main" }
+
 [workspace.package]
 license = "MIT or Apache-2.0"
