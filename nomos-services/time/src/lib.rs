@@ -9,12 +9,14 @@ use overwatch_rs::services::{ServiceCore, ServiceData, ServiceId};
 use overwatch_rs::DynError;
 use std::fmt::{Debug, Formatter};
 use std::pin::Pin;
-use tokio::sync::oneshot;
+use tokio::sync::{oneshot, watch};
+use tokio_stream::wrappers::WatchStream;
 
 pub mod backends;
 
 const TIME_SERVICE_TAG: ServiceId = "time-service";
 
+#[derive(Clone, Debug)]
 pub struct SlotTick {
     epoch: Epoch,
     slot: Slot,
@@ -88,20 +90,33 @@ where
         let Self { state, backend } = self;
         let mut inbound_relay = state.inbound_relay;
         let mut lifecycle_relay = state.lifecycle_handle.message_stream();
-        let tick_stream = backend.tick_stream();
+        let mut tick_stream = backend.tick_stream();
+
+        let (watch_sender, watch_receiver) = watch::channel(
+            tick_stream
+                .next()
+                .await
+                .expect("A slot tick should be available"),
+        );
+
         loop {
             tokio::select! {
                 Some(service_message) = inbound_relay.recv() => {
                     match service_message {
                         TimeServiceMessage::Subscribe { sender} => {
-
-                            // if let Err(e) = sender.send(tick_stream) {
-                            //     error!("Error subscribing to time event: Couldn't send back a response");
-                            // };
+                            if let Err(_e) = sender.send(Pin::new(Box::new(WatchStream::from_changes(watch_receiver.clone())))) {
+                                error!("Error subscribing to time event: Couldn't send back a response");
+                            };
                         }
                     }
                 }
-                Some(lifecycle_msg) = lifecycle_relay.next() => {
+                Some(slot_tick) = tick_stream.next() => {
+                    if let Err(e) = watch_sender.send(slot_tick) {
+                        error!("Error updating slot tick: {e}");
+                    }
+
+                }
+                Some(_lifecycle_msg) = lifecycle_relay.next() => {
                     // TODO: Add handling after refactor duplicated handling function in other services.
                     todo!("Handle lifecyle");
                 }
