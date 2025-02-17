@@ -1,5 +1,6 @@
 mod async_client;
 
+use crate::backends::common::slot_timer;
 use crate::backends::ntp::async_client::{AsyncNTPClient, NTPClientSettings};
 use crate::backends::TimeBackend;
 use crate::{EpochSlotTickStream, SlotTick};
@@ -105,26 +106,4 @@ impl Stream for NtpStream {
         }
         self.slot_timer.poll_next_unpin(cx)
     }
-}
-
-fn slot_timer(
-    slot_config: SlotConfig,
-    date: OffsetDateTime,
-    current_slot: Slot,
-    epoch_config: EpochConfig,
-    base_period_length: u64,
-) -> EpochSlotTickStream {
-    Pin::new(Box::new(
-        IntervalStream::new(SlotTimer::new(slot_config).slot_interval(date))
-            .zip(futures::stream::iter(std::iter::successors(
-                Some(current_slot),
-                |&slot| Some(slot + 1),
-            )))
-            .map(move |(_, slot)| {
-                (SlotTick {
-                    epoch: epoch_config.epoch(slot, base_period_length),
-                    slot,
-                })
-            }),
-    ))
 }
