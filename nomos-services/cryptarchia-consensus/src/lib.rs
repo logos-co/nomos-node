@@ -454,26 +454,38 @@ where
         let genesis_id = HeaderId::from([0; 32]);
         let mut leader = leadership::Leader::new(genesis_id, leader_config, config.clone());
 
-        let mut cryptarchia = if !self.initial_state.can_recover() {
-            info!("Building Cryptarchia from genesis.");
-            Cryptarchia::new(genesis_id, genesis_state, config)
-        } else {
-            info!("Rebuilding Cryptarchia from a previously saved security parameters.");
-            let tip = self.initial_state.tip.expect("TODO: handle this error");
-            let (header_id, ledger_state) = if self.initial_state.can_recover_from_security() {
-                let security_block_header_id = self
-                    .initial_state
-                    .security_block
-                    .expect("TODO: handle this error");
-                let security_ledger_state = self
-                    .initial_state
-                    .security_ledger_state
-                    .expect("TODO: handle this error");
+        // TODO: Move to function
+        let mut cryptarchia = match self.initial_state.recovery_strategy() {
+            CryptarchiaRecoveryStrategy::NoRecovery => {
+                info!("Building Cryptarchia from genesis without recovery...");
+                Cryptarchia::new(genesis_id, genesis_state, config)
+            }
+            CryptarchiaRecoveryStrategy::Genesis(GenesisRecoveryStrategy { tip }) => {
+                info!("Building Cryptarchia from genesis with recovery...");
+                Self::build_cryptarchia_from_recovery(
+                    tip,
+                    genesis_id,
+                    genesis_state,
+                    &mut leader,
+                    &relays,
+                    &mut self.block_subscription_sender,
+                    config.clone(),
+                )
+                .await
+            }
+            CryptarchiaRecoveryStrategy::Security(strategy) => {
+                let SecurityRecoveryStrategy {
+                    tip,
+                    security_block_id,
+                    security_ledger_state,
+                } = *strategy;
 
+                info!("Building Cryptarchia from security block with recovery...");
                 info!("Leader is out of date, updating from genesis until security block.");
                 // TODO: OPTIMIZE: Fetch only headers
+                // TODO: Move to function
                 let blocks_to_security = Self::get_blocks_from_tip(
-                    security_block_header_id,
+                    security_block_id,
                     genesis_id,
                     relays.storage_adapter(),
                 )
@@ -481,6 +493,7 @@ where
                 .into_iter()
                 .rev();
 
+                // TODO: Move to stream
                 for block in blocks_to_security {
                     let header = block.header();
                     leader.follow_chain(
@@ -490,22 +503,17 @@ where
                     );
                 }
 
-                (security_block_header_id, security_ledger_state)
-            } else {
-                (genesis_id, genesis_state)
-            };
-
-            info!("Building Cryptarchia from recovery.");
-            Self::build_cryptarchia_from_recovery(
-                tip,
-                header_id,
-                ledger_state,
-                &mut leader,
-                &relays,
-                &mut self.block_subscription_sender,
-                config.clone(),
-            )
-            .await
+                Self::build_cryptarchia_from_recovery(
+                    tip,
+                    security_block_id,
+                    security_ledger_state,
+                    &mut leader,
+                    &relays,
+                    &mut self.block_subscription_sender,
+                    config.clone(),
+                )
+                .await
+            }
         };
 
         let network_adapter =
@@ -588,6 +596,22 @@ where
     }
 }
 
+pub struct GenesisRecoveryStrategy {
+    tip: HeaderId,
+}
+
+pub struct SecurityRecoveryStrategy {
+    tip: HeaderId,
+    security_block_id: HeaderId,
+    security_ledger_state: LedgerState,
+}
+
+pub enum CryptarchiaRecoveryStrategy {
+    NoRecovery,
+    Genesis(GenesisRecoveryStrategy),
+    Security(Box<SecurityRecoveryStrategy>),
+}
+
 #[derive(Clone, Serialize, Deserialize)]
 pub struct CryptarchiaConsensusState<TxS, BxS, NetworkAdapterSettings, BlendAdapterSettings> {
     tip: Option<HeaderId>,
@@ -631,14 +655,35 @@ impl<TxS, BxS, NetworkAdapterSettings, BlendAdapterSettings>
         )
     }
 
-    pub fn can_recover(&self) -> bool {
+    fn can_recover(&self) -> bool {
         // This only checks whether tip is defined, as that's a state variable that should
         // always exist. Other attributes might not be present.
         self.tip.is_some()
     }
 
-    pub fn can_recover_from_security(&self) -> bool {
+    fn can_recover_from_security(&self) -> bool {
         self.can_recover() && self.security_block.is_some() && self.security_ledger_state.is_some()
+    }
+
+    pub fn recovery_strategy(&self) -> CryptarchiaRecoveryStrategy {
+        if self.can_recover_from_security() {
+            let strategy = SecurityRecoveryStrategy {
+                tip: self.tip.expect("tip not available"),
+                security_block_id: self.security_block.expect("security block not available"),
+                security_ledger_state: self
+                    .security_ledger_state
+                    .clone()
+                    .expect("security ledger state not available"),
+            };
+            CryptarchiaRecoveryStrategy::Security(Box::new(strategy))
+        } else if self.can_recover() {
+            let strategy = GenesisRecoveryStrategy {
+                tip: self.tip.expect("tip not available"),
+            };
+            CryptarchiaRecoveryStrategy::Genesis(strategy)
+        } else {
+            CryptarchiaRecoveryStrategy::NoRecovery
+        }
     }
 }
 
