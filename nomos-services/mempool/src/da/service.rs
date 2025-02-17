@@ -148,17 +148,17 @@ where
         loop {
             tokio::select! {
                 Some(msg) = service_state.inbound_relay.recv() => {
-                    Self::handle_mempool_message(msg, &mut pool, &mut network_relay, &mut service_state).await;
+                    Self::handle_mempool_message(msg, &mut pool, &mut network_relay, &mut service_state);
                 }
                 Some((key, item)) = network_items.next() => {
                     sampling_relay.send(DaSamplingServiceMsg::TriggerSampling{blob_id: key.clone()}).await.expect("Sampling trigger message needs to be sent");
                     pool.add_item(key, item).unwrap_or_else(|e| {
-                        tracing::debug!("could not add item to the pool due to: {}", e)
+                        tracing::debug!("could not add item to the pool due to: {e}");
                     });
                     tracing::info!(counter.da_mempool_pending_items = pool.pending_item_count());
                 }
                 Some(msg) = lifecycle_stream.next() =>  {
-                    if Self::should_stop_service(msg).await {
+                    if Self::should_stop_service(msg) {
                         break;
                     }
                 }
@@ -186,7 +186,7 @@ where
     DaStorage: DaStorageAdapter,
     R: SeedableRng + RngCore,
 {
-    async fn should_stop_service(message: LifecycleMessage) -> bool {
+    fn should_stop_service(message: LifecycleMessage) -> bool {
         match message {
             LifecycleMessage::Shutdown(sender) => {
                 if sender.send(()).is_err() {
@@ -201,7 +201,7 @@ where
         }
     }
 
-    async fn handle_mempool_message(
+    fn handle_mempool_message(
         message: MempoolMsg<P::BlockId, N::Payload, P::Item, P::Key>,
         pool: &mut P,
         network_relay: &mut OutboundRelay<NetworkMsg<N::Backend>>,

@@ -65,12 +65,13 @@ fn test_mockmempool() {
             mockpool: TxMempoolSettings {
                 backend: (),
                 network: (),
+                recovery_file_path: "recovery.json".to_string().into(),
             },
             logging: TracingSettings::default(),
         },
         None,
     )
-    .map_err(|e| eprintln!("Error encountered: {}", e))
+    .map_err(|e| eprintln!("Error encountered: {e}"))
     .unwrap();
 
     let network = app.handle().relay::<NetworkService<Mock>>();

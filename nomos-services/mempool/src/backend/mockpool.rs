@@ -1,15 +1,21 @@
 // std
-use linked_hash_map::LinkedHashMap;
 use std::hash::Hash;
 use std::time::SystemTime;
 use std::{collections::BTreeMap, time::UNIX_EPOCH};
 // crates
+use linked_hash_map::LinkedHashMap;
+use serde::de::DeserializeOwned;
+use serde::{Deserialize, Serialize};
 // internal
-use crate::backend::{MemPool, MempoolError};
+use crate::backend::{MemPool, MempoolError, RecoverableMempool};
 
 use super::Status;
 
 /// A mock mempool implementation that stores all transactions in memory in the order received.
+#[derive(Serialize, Deserialize)]
+#[serde(
+    bound = "BlockId: Serialize + DeserializeOwned + Ord, Key: Serialize + DeserializeOwned + Hash + Eq + Ord, Item: Serialize +DeserializeOwned"
+)]
 pub struct MockPool<BlockId, Item, Key> {
     pending_items: LinkedHashMap<Key, Item>,
     in_block_items: BTreeMap<BlockId, Vec<Item>>,
@@ -31,12 +37,29 @@ where
     }
 }
 
+impl<BlockId, Item, Key> Clone for MockPool<BlockId, Item, Key>
+where
+    Key: Hash + Eq + Clone,
+    Item: Clone,
+    BlockId: Clone,
+{
+    fn clone(&self) -> Self {
+        Self {
+            pending_items: self.pending_items.clone(),
+            in_block_items: self.in_block_items.clone(),
+            in_block_items_by_id: self.in_block_items_by_id.clone(),
+            last_item_timestamp: self.last_item_timestamp,
+        }
+    }
+}
+
 impl<BlockId, Item, Key> MockPool<BlockId, Item, Key>
 where
     Key: Hash + Eq + Clone,
 {
+    #[must_use]
     pub fn new() -> Self {
-        Default::default()
+        MockPool::default()
     }
 }
 
@@ -67,7 +90,9 @@ where
         self.last_item_timestamp = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap()
-            .as_millis() as u64;
+            .as_millis()
+            .try_into()
+            .unwrap();
 
         Ok(())
     }
@@ -126,5 +151,22 @@ where
                 }
             })
             .collect()
+    }
+}
+
+impl<BlockId, Item, Key> RecoverableMempool for MockPool<BlockId, Item, Key>
+where
+    Item: Clone + Send + Sync + 'static + Hash,
+    Key: Clone + Ord + Hash,
+    BlockId: Copy + Ord,
+{
+    type RecoveryState = Self;
+
+    fn recover(_settings: Self::Settings, state: Self::RecoveryState) -> Self {
+        state
+    }
+
+    fn save(&self) -> Self::RecoveryState {
+        self.clone()
     }
 }
