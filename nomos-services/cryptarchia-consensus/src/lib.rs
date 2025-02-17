@@ -6,6 +6,7 @@ mod relays;
 pub mod storage;
 mod time;
 
+use crate::leadership::Leader;
 use crate::relays::CryptarchiaConsensusRelays;
 use crate::storage::adapters::StorageAdapter;
 use crate::storage::StorageAdapter as _;
@@ -75,6 +76,20 @@ struct Cryptarchia {
 }
 
 impl Cryptarchia {
+    pub fn from_genesis(
+        header_id: HeaderId,
+        ledger_state: LedgerState,
+        ledger_config: nomos_ledger::Config,
+    ) -> Self {
+        Self {
+            consensus: <cryptarchia_engine::Cryptarchia<_>>::from_genesis(
+                header_id,
+                ledger_config.consensus_config.clone(),
+            ),
+            ledger: <nomos_ledger::Ledger<_>>::from_genesis(header_id, ledger_state, ledger_config),
+        }
+    }
+
     fn tip(&self) -> HeaderId {
         self.consensus.tip()
     }
@@ -437,30 +452,61 @@ where
         } = self.service_state.settings_reader.get_updated_settings();
 
         let genesis_id = HeaderId::from([0; 32]);
-        let mut cryptarchia = Cryptarchia {
-            consensus: <cryptarchia_engine::Cryptarchia<_>>::from_genesis(
-                genesis_id,
-                config.consensus_config.clone(),
-            ),
-            ledger: <nomos_ledger::Ledger<_>>::from_genesis(
-                genesis_id,
-                genesis_state,
-                config.clone(),
-            ),
-        };
-        let mut leader = leadership::Leader::new(genesis_id, leader_config, config);
+        let mut leader = leadership::Leader::new(genesis_id, leader_config, config.clone());
 
-        if self.initial_state.can_recover() {
-            info!("Attempting to recover from previously stored state.");
-            cryptarchia = Self::restore_from_recovery(
-                cryptarchia,
-                &self.initial_state,
+        let mut cryptarchia = if !self.initial_state.can_recover() {
+            info!("Building Cryptarchia from genesis.");
+            Cryptarchia::from_genesis(genesis_id, genesis_state, config)
+        } else {
+            info!("Rebuilding Cryptarchia from a previously saved security parameters.");
+            let tip = self.initial_state.tip.expect("TODO: handle this error");
+            let (header_id, ledger_state) = if self.initial_state.can_recover_from_security() {
+                let security_block_header_id = self
+                    .initial_state
+                    .security_block
+                    .expect("TODO: handle this error");
+                let security_ledger_state = self
+                    .initial_state
+                    .security_ledger_state
+                    .expect("TODO: handle this error");
+
+                info!("Leader is out of date, updating from genesis until security block.");
+                // TODO: OPTIMIZE: Fetch only headers
+                let blocks_to_security = Self::get_blocks_from_tip(
+                    security_block_header_id,
+                    genesis_id,
+                    relays.storage_adapter(),
+                )
+                .await
+                .into_iter()
+                .rev();
+
+                for block in blocks_to_security {
+                    let header = block.header();
+                    leader.follow_chain(
+                        header.parent(),
+                        header.id(),
+                        header.leader_proof().nullifier(),
+                    );
+                }
+
+                (security_block_header_id, security_ledger_state)
+            } else {
+                (genesis_id, genesis_state)
+            };
+
+            info!("Building Cryptarchia from recovery.");
+            Self::build_cryptarchia_from_recovery(
+                tip,
+                header_id,
+                ledger_state,
                 &mut leader,
                 &relays,
                 &mut self.block_subscription_sender,
+                config.clone(),
             )
-            .await;
-        }
+            .await
+        };
 
         let network_adapter =
             NetAdapter::new(network_adapter_settings, relays.network_relay().clone()).await;
@@ -589,6 +635,10 @@ impl<TxS, BxS, NetworkAdapterSettings, BlendAdapterSettings>
         // This only checks whether tip is defined, as that's a state variable that should
         // always exist. Other attributes might not be present.
         self.tip.is_some()
+    }
+
+    pub fn can_recover_from_security(&self) -> bool {
+        self.can_recover() && self.security_block.is_some() && self.security_ledger_state.is_some()
     }
 }
 
@@ -946,16 +996,25 @@ where
         blocks_from_tip.collect::<Vec<_>>().await
     }
 
-    /// Restore the cryptarchia state from the
-    async fn restore_from_recovery(
-        mut cryptarchia: Cryptarchia,
-        state: &CryptarchiaConsensusState<
-            TxS::Settings,
-            BS::Settings,
-            NetAdapter::Settings,
-            BlendAdapter::Settings,
-        >,
-        leader: &mut leadership::Leader,
+    /// Builds a cryptarchia instance from a recovery state.
+    ///
+    /// # Arguments
+    ///
+    /// * `tip` - The header id up to which the ledger state should be restored.
+    /// * `security_header_id` - The header id where the recovery should start from. In case none
+    ///   was stored, the genesis block id should be passed.
+    /// * `security_ledger_state` - The ledger state up to the security block. In case none was
+    ///   stored, the genesis ledger state should be passed.
+    /// * `leader` - The leader instance to be used for the recovery. The passed leader needs to be
+    ///   up-to-date with the state of the ledger up to the security block.
+    /// * `relays` - The relays object containing all the necessary relays for the consensus.
+    /// * `block_broadcaster` - The broadcast channel to send the blocks to the services.
+    /// * `ledger_config` - The ledger configuration.
+    async fn build_cryptarchia_from_recovery(
+        tip: HeaderId,
+        security_header_id: HeaderId,
+        security_ledger_state: LedgerState,
+        leader: &mut Leader,
         relays: &CryptarchiaConsensusRelays<
             BlendAdapter,
             BS,
@@ -970,18 +1029,15 @@ where
             TxS,
         >,
         block_broadcaster: &mut broadcast::Sender<Block<ClPool::Item, DaPool::Item>>,
+        ledger_config: nomos_ledger::Config,
     ) -> Cryptarchia {
-        let CryptarchiaConsensusState {
-            tip,
-            security_block,
-            ..
-        } = state;
+        let mut cryptarchia =
+            Cryptarchia::from_genesis(security_header_id, security_ledger_state, ledger_config);
 
-        let tip = tip.unwrap();
-        let security_block_header = security_block.unwrap();
-
+        // TODO: From<Stream> for Cryptarchia - collect stream - futures stream collect
+        // impl extend for cryptarchia
         let blocks_to_tip =
-            Self::get_blocks_from_tip(tip, security_block_header, relays.storage_adapter())
+            Self::get_blocks_from_tip(tip, security_header_id, relays.storage_adapter())
                 .await
                 .into_iter()
                 .rev();
