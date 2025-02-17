@@ -22,7 +22,7 @@ use crate::protocols::{
     replication::behaviour::ReplicationEvent,
     sampling::behaviour::SamplingEvent,
 };
-use crate::swarm::common::{
+use crate::swarm::common::handlers::{
     handle_replication_event, handle_sampling_event, handle_validator_dispersal_event,
 };
 use crate::swarm::validator::ValidatorEventsStream;

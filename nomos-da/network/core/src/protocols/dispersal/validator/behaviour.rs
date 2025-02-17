@@ -14,31 +14,53 @@ use libp2p_stream::IncomingStreams;
 use log::debug;
 use nomos_da_messages::dispersal;
 use nomos_da_messages::packing::{pack_to_writer, unpack_from_reader};
-use std::io::Error;
 use std::task::{Context, Poll};
 use subnetworks_assignations::MembershipHandler;
+use thiserror::Error;
+
+#[derive(Debug, Error)]
+pub enum DispersalError {
+    #[error("Stream disconnected: {error}")]
+    Io {
+        peer_id: PeerId,
+        error: std::io::Error,
+    },
+}
+
+impl DispersalError {
+    pub fn peer_id(&self) -> Option<&PeerId> {
+        match self {
+            Self::Io { peer_id, .. } => Some(peer_id),
+        }
+    }
+}
 
 #[derive(Debug)]
 pub enum DispersalEvent {
     /// Received a n
     IncomingMessage {
-        message: dispersal::DispersalRequest,
+        message: Box<dispersal::DispersalRequest>,
     },
+    /// Something went wrong receiving the blob
+    DispersalError { error: DispersalError },
 }
 
 impl DispersalEvent {
     pub fn blob_size(&self) -> Option<usize> {
         match self {
             DispersalEvent::IncomingMessage { message } => Some(message.blob.data.column_len()),
+            _ => None,
         }
     }
 }
 
+type DispersalTask =
+    BoxFuture<'static, Result<(PeerId, dispersal::DispersalRequest, Stream), DispersalError>>;
+
 pub struct DispersalValidatorBehaviour<Membership> {
     stream_behaviour: libp2p_stream::Behaviour,
     incoming_streams: IncomingStreams,
-    tasks:
-        FuturesUnordered<BoxFuture<'static, Result<(dispersal::DispersalRequest, Stream), Error>>>,
+    tasks: FuturesUnordered<DispersalTask>,
     membership: Membership,
 }
 
@@ -66,14 +88,26 @@ impl<Membership: MembershipHandler> DispersalValidatorBehaviour<Membership> {
     /// This task handles a single message receive. Then it writes up the acknowledgment into the same
     /// stream as response and finish.
     async fn handle_new_stream(
+        peer_id: PeerId,
         mut stream: Stream,
-    ) -> Result<(dispersal::DispersalRequest, Stream), Error> {
-        let message: dispersal::DispersalRequest = unpack_from_reader(&mut stream).await?;
+    ) -> Result<(PeerId, dispersal::DispersalRequest, Stream), DispersalError> {
+        let message: dispersal::DispersalRequest = unpack_from_reader(&mut stream)
+            .await
+            .map_err(|error| DispersalError::Io { peer_id, error })?;
+
         let blob_id = message.blob.blob_id;
         let response = dispersal::DispersalResponse::BlobId(blob_id);
-        pack_to_writer(&response, &mut stream).await?;
-        stream.flush().await?;
-        Ok((message, stream))
+
+        pack_to_writer(&response, &mut stream)
+            .await
+            .map_err(|error| DispersalError::Io { peer_id, error })?;
+
+        stream
+            .flush()
+            .await
+            .map_err(|error| DispersalError::Io { peer_id, error })?;
+
+        Ok((peer_id, message, stream))
     }
 }
 
@@ -136,10 +170,10 @@ impl<M: MembershipHandler<Id = PeerId, NetworkId = SubnetworkId> + 'static> Netw
             ..
         } = self;
         match tasks.poll_next_unpin(cx) {
-            Poll::Ready(Some(Ok((message, stream)))) => {
-                tasks.push(Self::handle_new_stream(stream).boxed());
+            Poll::Ready(Some(Ok((peer_id, message, stream)))) => {
+                tasks.push(Self::handle_new_stream(peer_id, stream).boxed());
                 return Poll::Ready(ToSwarm::GenerateEvent(DispersalEvent::IncomingMessage {
-                    message,
+                    message: Box::new(message),
                 }));
             }
             Poll::Ready(Some(Err(error))) => {
@@ -147,8 +181,8 @@ impl<M: MembershipHandler<Id = PeerId, NetworkId = SubnetworkId> + 'static> Netw
             }
             _ => {}
         }
-        if let Poll::Ready(Some((_peer_id, stream))) = incoming_streams.poll_next_unpin(cx) {
-            tasks.push(Self::handle_new_stream(stream).boxed());
+        if let Poll::Ready(Some((peer_id, stream))) = incoming_streams.poll_next_unpin(cx) {
+            tasks.push(Self::handle_new_stream(peer_id, stream).boxed());
         }
         // TODO: probably must be smarter when to wake this
         cx.waker().wake_by_ref();

@@ -13,6 +13,7 @@ use libp2p::swarm::{
 use libp2p::{Multiaddr, PeerId};
 use log::{error, trace};
 use subnetworks_assignations::MembershipHandler;
+use thiserror::Error;
 
 use crate::SubnetworkId;
 
@@ -23,11 +24,40 @@ use super::handler::{
 
 type SwarmEvent = ToSwarm<ReplicationEvent, Either<BehaviourEventToHandler, void::Void>>;
 
+#[derive(Debug, Error)]
+pub enum ReplicationError {
+    #[error("Stream disconnected: {error}")]
+    Io {
+        peer_id: PeerId,
+        error: std::io::Error,
+    },
+}
+
+impl ReplicationError {
+    pub fn peer_id(&self) -> Option<&PeerId> {
+        match self {
+            Self::Io { peer_id, .. } => Some(peer_id),
+        }
+    }
+}
+
 /// Nomos DA BroadcastEvents to be bubble up to logic layers
 #[allow(dead_code)] // todo: remove when used in tests
 #[derive(Debug)]
 pub enum ReplicationEvent {
-    IncomingMessage { peer_id: PeerId, message: DaMessage },
+    IncomingMessage {
+        peer_id: PeerId,
+        message: Box<DaMessage>,
+    },
+    ReplicationError {
+        error: ReplicationError,
+    },
+}
+
+impl From<ReplicationError> for ReplicationEvent {
+    fn from(error: ReplicationError) -> Self {
+        Self::ReplicationError { error }
+    }
 }
 
 impl ReplicationEvent {
@@ -36,6 +66,7 @@ impl ReplicationEvent {
             ReplicationEvent::IncomingMessage { message, .. } => {
                 Some(message.blob.data.column_len())
             }
+            _ => None,
         }
     }
 }
@@ -52,10 +83,7 @@ pub struct ReplicationBehaviour<Membership> {
     /// nomos DA subnetworks
     membership: Membership,
     /// Relation of connected peers of replication subnetworks
-    ///
-    /// **TODO**: Node needs only one connection per peer for Nomos DA network communications.
-    /// Allowing multiple connections from the same peer id is only temporal and will be removed!
-    connected: HashMap<PeerId, HashSet<ConnectionId>>,
+    connected: HashMap<PeerId, ConnectionId>,
     /// Outgoing event queue
     outgoing_events: VecDeque<SwarmEvent>,
     /// Seen messages cache holds a record of seen messages, messages will be removed from this
@@ -123,16 +151,14 @@ where
             .filter(|(peer_id, _connection_id)| peers.contains(peer_id))
             .collect();
 
-        for (peer_id, connection_ids) in connected_peers {
-            for connection_id in connection_ids.iter() {
-                self.outgoing_events.push_back(SwarmEvent::NotifyHandler {
-                    peer_id: *peer_id,
-                    handler: NotifyHandler::One(*connection_id),
-                    event: Either::Left(BehaviourEventToHandler::OutgoingMessage {
-                        message: message.clone(),
-                    }),
-                })
-            }
+        for (peer_id, connection_id) in connected_peers {
+            self.outgoing_events.push_back(SwarmEvent::NotifyHandler {
+                peer_id: *peer_id,
+                handler: NotifyHandler::One(*connection_id),
+                event: Either::Left(BehaviourEventToHandler::OutgoingMessage {
+                    message: message.clone(),
+                }),
+            })
         }
         self.try_wake();
     }
@@ -163,10 +189,7 @@ where
             return Ok(Either::Right(libp2p::swarm::dummy::ConnectionHandler));
         }
         trace!("{}, Connected to {peer_id}", self.local_peer_id);
-        self.connected
-            .entry(peer_id)
-            .or_default()
-            .insert(connection_id);
+        self.connected.insert(peer_id, connection_id);
         Ok(Either::Left(ReplicationHandler::new()))
     }
 
@@ -178,26 +201,13 @@ where
         _role_override: Endpoint,
     ) -> Result<THandler<Self>, ConnectionDenied> {
         trace!("{}, Connected to {peer_id}", self.local_peer_id);
-        self.connected
-            .entry(peer_id)
-            .or_default()
-            .insert(connection_id);
+        self.connected.insert(peer_id, connection_id);
         Ok(Either::Left(ReplicationHandler::new()))
     }
 
     fn on_swarm_event(&mut self, event: FromSwarm) {
-        if let FromSwarm::ConnectionClosed(ConnectionClosed {
-            peer_id,
-            connection_id,
-            ..
-        }) = event
-        {
-            if let Some(connections) = self.connected.get_mut(&peer_id) {
-                connections.remove(&connection_id);
-                if connections.is_empty() {
-                    self.connected.remove(&peer_id);
-                }
-            }
+        if let FromSwarm::ConnectionClosed(ConnectionClosed { peer_id, .. }) = event {
+            self.connected.remove(&peer_id);
         }
     }
 
@@ -215,12 +225,16 @@ where
             HandlerEventToBehaviour::IncomingMessage { message } => {
                 self.replicate_message(message.clone());
                 self.outgoing_events.push_back(ToSwarm::GenerateEvent(
-                    ReplicationEvent::IncomingMessage { message, peer_id },
+                    ReplicationEvent::IncomingMessage {
+                        peer_id,
+                        message: Box::new(message),
+                    },
                 ));
             }
             HandlerEventToBehaviour::OutgoingMessageError { error } => {
-                error!("Couldn't send message due to {error}");
-                todo!("Retry?")
+                self.outgoing_events.push_back(ToSwarm::GenerateEvent(
+                    ReplicationError::Io { peer_id, error }.into(),
+                ));
             }
         }
         self.try_wake();

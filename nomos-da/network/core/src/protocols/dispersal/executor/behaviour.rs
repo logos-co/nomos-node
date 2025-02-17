@@ -38,6 +38,7 @@ use subnetworks_assignations::MembershipHandler;
 pub enum DispersalError {
     #[error("Stream disconnected: {error}")]
     Io {
+        peer_id: PeerId,
         error: std::io::Error,
         blob_id: BlobId,
         subnetwork_id: SubnetworkId,
@@ -81,16 +82,26 @@ impl DispersalError {
             DispersalError::OpenStreamError { .. } => None,
         }
     }
+
+    pub fn peer_id(&self) -> Option<&PeerId> {
+        match self {
+            Self::Io { peer_id, .. } => Some(peer_id),
+            Self::OpenStreamError { peer_id, .. } => Some(peer_id),
+            _ => None,
+        }
+    }
 }
 
 impl Clone for DispersalError {
     fn clone(&self) -> Self {
         match self {
             DispersalError::Io {
+                peer_id,
                 error,
                 blob_id,
                 subnetwork_id,
             } => DispersalError::Io {
+                peer_id: *peer_id,
                 error: std::io::Error::new(error.kind(), error.to_string()),
                 blob_id: *blob_id,
                 subnetwork_id: *subnetwork_id,
@@ -266,8 +277,10 @@ where
         let blob_id = message.id();
         let blob_id: BlobId = blob_id.clone().try_into().unwrap();
         let message = dispersal::DispersalRequest::new(Blob::new(blob_id, message), subnetwork_id);
+        let peer_id = stream.peer_id;
         pack_to_writer(&message, &mut stream.stream)
             .map_err(|error| DispersalError::Io {
+                peer_id,
                 error,
                 blob_id,
                 subnetwork_id,
@@ -278,6 +291,7 @@ where
             .flush()
             .await
             .map_err(|error| DispersalError::Io {
+                peer_id,
                 error,
                 blob_id,
                 subnetwork_id,
@@ -285,6 +299,7 @@ where
         let response: dispersal::DispersalResponse = unpack_from_reader(&mut stream.stream)
             .await
             .map_err(|error| DispersalError::Io {
+            peer_id,
             error,
             blob_id,
             subnetwork_id,
