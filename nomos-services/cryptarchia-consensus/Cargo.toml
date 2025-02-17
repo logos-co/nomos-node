@@ -29,6 +29,7 @@ rand                   = "0.8"
 rand_chacha            = "0.3"
 risc0-zkvm             = "1.1"
 serde                  = { version = "1", features = ["derive"] }
+serde_json             = { version = "1", optional = true }
 serde_with             = "3.0.0"
 thiserror              = "1.0"
 time                   = { version = "0.3", features = ["serde"] }
@@ -38,14 +39,12 @@ tokio-util             = "0.7"
 tracing                = "0.1"
 tracing-futures        = "0.2"
 utils                  = { workspace = true }
+utoipa                 = { version = "4.0", optional = true }
 
-serde_json = { version = "1", optional = true }
-utoipa     = { version = "4.0", optional = true }
+[dev-dependencies]
+serde_json = "1.0.96"
 
 [features]
 default = []
 libp2p  = ["nomos-blend-service/libp2p", "nomos-libp2p", "nomos-network/libp2p"]
 openapi = ["dep:utoipa", "serde_json"]
-
-[dev-dependencies]
-serde_json = "1.0.96"

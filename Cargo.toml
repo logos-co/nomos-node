@@ -1,5 +1,5 @@
 [workspace]
-exclude = ["nomos-core/risc0_proofs"]
+exclude = ["nomos-core/risc0_proofs/*"]
 members = [
   "clients/executor-http-client",
   "consensus/carnot-engine",

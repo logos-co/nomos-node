@@ -49,9 +49,11 @@ tokio                    = { version = "1", features = ["sync"] }
 tracing                  = "0.1"
 tracing-subscriber       = "0.3"
 uuid                     = { version = "1.10", features = ["v4"] }
+
 # openapi related dependencies
 utoipa            = "4.0"
 utoipa-swagger-ui = { version = "4.0" }
+
 # axum related dependencies
 axum       = { version = "0.6" }
 hyper      = { version = "0.14", features = ["full"] }
