@@ -1,5 +1,5 @@
 use futures::stream::FuturesUnordered;
-use futures::{FutureExt, StreamExt, TryStreamExt};
+use futures::{StreamExt, TryStreamExt};
 use sntpc::{get_time, Error as SntpError, NtpContext, NtpResult, StdTimestampGen};
 use std::net::SocketAddr;
 use std::time::Duration;
