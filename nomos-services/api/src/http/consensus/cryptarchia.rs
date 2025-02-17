@@ -34,6 +34,7 @@ pub type Cryptarchia<
     SamplingNetworkAdapter,
     SamplingRng,
     SamplingStorage,
+    TimeBackend,
     const SIZE: usize,
 > = CryptarchiaConsensus<
     ConsensusNetworkAdapter<Tx, BlobInfo>,
@@ -49,6 +50,7 @@ pub type Cryptarchia<
     SamplingNetworkAdapter,
     SamplingRng,
     SamplingStorage,
+    TimeBackend,
 >;
 
 pub async fn cryptarchia_info<
@@ -58,6 +60,7 @@ pub async fn cryptarchia_info<
     SamplingNetworkAdapter,
     SamplingRng,
     SamplingStorage,
+    TimeBackend,
     const SIZE: usize,
 >(
     handle: &OverwatchHandle,
