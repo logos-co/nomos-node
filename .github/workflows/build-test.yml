@@ -136,6 +136,10 @@ jobs:
         with:
           command: fmt
           args: --all --check
+      - name: Install taplo
+        run: cargo install taplo-cli --locked
+      - name: Check taplo formatting
+        run: taplo fmt --check          
       - name: Run cargo clippy
         uses: actions-rs/cargo@v1
         with:

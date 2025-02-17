@@ -1,52 +1,52 @@
 [package]
-name = "nomos-da-tests"
-version = "0.1.0"
 edition = "2021"
 license = { workspace = true }
+name    = "nomos-da-tests"
+version = "0.1.0"
 
 [dependencies]
-blst = "0.3.11"
-bytes = "1.2"
-cryptarchia-consensus = { path = "../../../nomos-services/cryptarchia-consensus" }
-cryptarchia-engine = { path = "../../../consensus/cryptarchia-engine", features = ["serde"] }
-nomos-ledger = { path = "../../../ledger/nomos-ledger", features = ["serde"] }
-cl = { path = "../../../nomos-core/cl" }
-full-replication = { path = "../../../nomos-da/full-replication" }
-hex = "0.4.3"
-kzgrs-backend = { path = "../../../nomos-da/kzgrs-backend" }
-nomos-core = { path = "../../../nomos-core/chain-defs" }
-nomos-da-indexer = { path = "../indexer", features = ["rocksdb-backend"] }
-nomos-da-verifier = { path = "../verifier", features = ["rocksdb-backend", "libp2p"] }
-nomos-da-sampling = { path = "../sampling" }
-nomos-da-network-service = { path = "../network" }
-nomos-da-storage = { path = "../../../nomos-da/storage" }
-nomos-node = { path = "../../../nodes/nomos-node" }
-nomos-mempool = { path = "../../../nomos-services/mempool" }
-nomos-storage = { path = "../../../nomos-services/storage", features = ["rocksdb-backend"] }
-nomos-network = { path = "../../network", features = ["mock"] }
-nomos-blend-service = { path = "../../blend" }
-nomos-blend = { path = "../../../nomos-blend/core" }
-nomos-blend-message = { path = "../../../nomos-blend/message" }
-nomos-libp2p = { path = "../../../nomos-libp2p" }
-libp2p = { version = "0.55", features = ["ed25519"] }
-once_cell = "1.19"
-overwatch-rs = { git = "https://github.com/logos-co/Overwatch", rev = "f5f7ea0" }
-overwatch-derive = { git = "https://github.com/logos-co/Overwatch", rev = "f5f7ea0" }
-rand = "0.8"
-rand_chacha = "0.3"
-subnetworks-assignations = { path = "../../../nomos-da/network/subnetworks-assignations" }
-tokio = { version = "1", features = ["sync"] }
-tokio-stream = "0.1.15"
-tempfile = "3.6"
-tracing = "0.1"
-time = "0.3"
-tracing-subscriber = "0.2.25"
+blst                     = "0.3.11"
+bytes                    = "1.2"
+cl                       = { workspace = true }
+cryptarchia-consensus    = { workspace = true }
+cryptarchia-engine       = { workspace = true, features = ["serde"] }
+full-replication         = { workspace = true }
+hex                      = "0.4.3"
+kzgrs-backend            = { workspace = true }
+libp2p                   = { version = "0.55", features = ["ed25519"] }
+nomos-blend              = { workspace = true }
+nomos-blend-message      = { workspace = true }
+nomos-blend-service      = { workspace = true }
+nomos-core               = { workspace = true }
+nomos-da-indexer         = { workspace = true, features = ["rocksdb-backend"] }
+nomos-da-network-service = { workspace = true }
+nomos-da-sampling        = { workspace = true }
+nomos-da-storage         = { workspace = true }
+nomos-da-verifier        = { workspace = true, features = ["libp2p", "rocksdb-backend"] }
+nomos-ledger             = { workspace = true, features = ["serde"] }
+nomos-libp2p             = { workspace = true }
+nomos-mempool            = { workspace = true }
+nomos-network            = { workspace = true, features = ["mock"] }
+nomos-node               = { workspace = true }
+nomos-storage            = { workspace = true, features = ["rocksdb-backend"] }
+once_cell                = "1.19"
+overwatch-derive         = { git = "https://github.com/logos-co/Overwatch", rev = "f5f7ea0" }
+overwatch-rs             = { git = "https://github.com/logos-co/Overwatch", rev = "f5f7ea0" }
+rand                     = "0.8"
+rand_chacha              = "0.3"
+subnetworks-assignations = { workspace = true }
+tempfile                 = "3.6"
+time                     = "0.3"
+tokio                    = { version = "1", features = ["sync"] }
+tokio-stream             = "0.1.15"
+tracing                  = "0.1"
+tracing-subscriber       = "0.2.25"
 
 [dev-dependencies]
-blake2 = { version = "0.10" }
+blake2       = { version = "0.10" }
 x25519-dalek = { version = "2", features = ["getrandom", "static_secrets"] }
 
 [features]
-default = ["libp2p"]
-libp2p = []
+default         = ["libp2p"]
 instrumentation = []
+libp2p          = []
