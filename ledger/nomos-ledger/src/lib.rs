@@ -92,7 +92,7 @@ impl<Id> Ledger<Id>
 where
     Id: Eq + Hash + Copy,
 {
-    pub fn from_genesis(id: Id, state: LedgerState, config: Config) -> Self {
+    pub fn new(id: Id, state: LedgerState, config: Config) -> Self {
         Self {
             states: [(id, state)].into_iter().collect(),
             config,
@@ -597,10 +597,7 @@ pub mod tests {
 
     fn ledger(commitments: &[NoteCommitment]) -> (Ledger<HeaderId>, HeaderId) {
         let genesis_state = genesis_state(commitments);
-        (
-            Ledger::from_genesis([0; 32], genesis_state, config()),
-            [0; 32],
-        )
+        (Ledger::new([0; 32], genesis_state, config()), [0; 32])
     }
 
     fn apply_and_add_note(

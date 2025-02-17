@@ -76,17 +76,17 @@ struct Cryptarchia {
 }
 
 impl Cryptarchia {
-    pub fn from_genesis(
+    pub fn new(
         header_id: HeaderId,
         ledger_state: LedgerState,
         ledger_config: nomos_ledger::Config,
     ) -> Self {
         Self {
-            consensus: <cryptarchia_engine::Cryptarchia<_>>::from_genesis(
+            consensus: <cryptarchia_engine::Cryptarchia<_>>::new(
                 header_id,
                 ledger_config.consensus_config.clone(),
             ),
-            ledger: <nomos_ledger::Ledger<_>>::from_genesis(header_id, ledger_state, ledger_config),
+            ledger: <nomos_ledger::Ledger<_>>::new(header_id, ledger_state, ledger_config),
         }
     }
 
@@ -456,7 +456,7 @@ where
 
         let mut cryptarchia = if !self.initial_state.can_recover() {
             info!("Building Cryptarchia from genesis.");
-            Cryptarchia::from_genesis(genesis_id, genesis_state, config)
+            Cryptarchia::new(genesis_id, genesis_state, config)
         } else {
             info!("Rebuilding Cryptarchia from a previously saved security parameters.");
             let tip = self.initial_state.tip.expect("TODO: handle this error");
@@ -1032,7 +1032,7 @@ where
         ledger_config: nomos_ledger::Config,
     ) -> Cryptarchia {
         let mut cryptarchia =
-            Cryptarchia::from_genesis(security_header_id, security_ledger_state, ledger_config);
+            Cryptarchia::new(security_header_id, security_ledger_state, ledger_config);
 
         // TODO: From<Stream> for Cryptarchia - collect stream - futures stream collect
         // impl extend for cryptarchia
