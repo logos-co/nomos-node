@@ -31,14 +31,11 @@ use nomos_mempool::{
 use nomos_network::NetworkService;
 use nomos_storage::{backends::StorageBackend, StorageMsg, StorageService};
 use nomos_time::{SlotTick, TimeService, TimeServiceMessage};
-use overwatch_rs::{
-    services::{
-        relay::{OutboundRelay, Relay, RelayMessage},
-        state::ServiceState,
-        ServiceCore, ServiceData, ServiceId,
-    },
-    DynError, OpaqueServiceStateHandle,
-};
+use overwatch_rs::services::life_cycle::LifecycleMessage;
+use overwatch_rs::services::relay::{OutboundRelay, Relay, RelayMessage};
+use overwatch_rs::services::state::ServiceState;
+use overwatch_rs::services::{ServiceCore, ServiceData, ServiceId};
+use overwatch_rs::{DynError, OpaqueServiceStateHandle};
 use rand::{RngCore, SeedableRng};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_with::serde_as;
@@ -46,7 +43,8 @@ use services_utils::overwatch::{
     lifecycle, recovery::backends::FileBackendSettings, JsonFileBackend, RecoveryOperator,
 };
 use thiserror::Error;
-use tokio::sync::{broadcast, oneshot, oneshot::Sender};
+use tokio::sync::oneshot::Sender;
+use tokio::sync::{broadcast, oneshot};
 use tracing::{error, instrument, span, Level};
 use tracing_futures::Instrument;
 
@@ -123,7 +121,7 @@ impl Cryptarchia {
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
-pub struct CryptarchiaSettings<Ts, Bs, NetworkAdapterSettings, BlendAdapterSettings> {
+pub struct CryptarchiaSettings<Ts, Bs, NetworkAdapterSettings, BlendAdapterSettings, TimeConfig> {
     #[serde(default)]
     pub transaction_selector_settings: Ts,
     #[serde(default)]
@@ -136,8 +134,8 @@ pub struct CryptarchiaSettings<Ts, Bs, NetworkAdapterSettings, BlendAdapterSetti
     pub recovery_file: PathBuf,
 }
 
-impl<Ts, Bs, NetworkAdapterSettings, BlendAdapterSettings> FileBackendSettings
-    for CryptarchiaSettings<Ts, Bs, NetworkAdapterSettings, BlendAdapterSettings>
+impl<Ts, Bs, NetworkAdapterSettings, BlendAdapterSettings, TimeConfig> FileBackendSettings
+    for CryptarchiaSettings<Ts, Bs, NetworkAdapterSettings, BlendAdapterSettings, TimeConfig>
 {
     fn recovery_file(&self) -> &PathBuf {
         &self.recovery_file
@@ -287,6 +285,7 @@ where
         BS::Settings,
         NetAdapter::Settings,
         BlendAdapter::Settings,
+        TimeBackend::Settings,
     >;
     type State = CryptarchiaConsensusState<
         TxS::Settings,
@@ -475,7 +474,6 @@ where
 
         let mut incoming_blocks = network_adapter.blocks_stream().await?;
         let mut leader = leadership::Leader::new(genesis_id, leader_config, config);
-        let timer = cryptarchia_engine::time::SlotTimer::new(time);
 
         let mut slot_timer = {
             let (sender, receiver) = oneshot::channel();
@@ -608,7 +606,13 @@ impl<TxS, BxS, NetworkAdapterSettings, BlendAdapterSettings, TimeBackendSettings
         TimeBackendSettings,
     >
 {
-    type Settings = CryptarchiaSettings<TxS, BxS, NetworkAdapterSettings, BlendAdapterSettings>;
+    type Settings = CryptarchiaSettings<
+        TxS,
+        BxS,
+        NetworkAdapterSettings,
+        BlendAdapterSettings,
+        TimeBackendSettings,
+    >;
     type Error = Error;
 
     fn from_settings(_settings: &Self::Settings) -> Result<Self, Self::Error> {
