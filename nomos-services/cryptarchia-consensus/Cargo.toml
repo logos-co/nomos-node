@@ -21,6 +21,7 @@ nomos-network = { path = "../network" }
 nomos-blend-service = { path = "../blend" }
 nomos-mempool = { path = "../mempool" }
 nomos-core = { path = "../../nomos-core/chain-defs" }
+nomos-time = { path = "../time" }
 overwatch-rs = { git = "https://github.com/logos-co/Overwatch", rev = "f5f7ea0" }
 nomos-storage = { path = "../storage" }
 nomos-utils = { path = "../../nomos-utils" }

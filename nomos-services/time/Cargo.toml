@@ -1,5 +1,5 @@
 [package]
-name = "nomos-time-service"
+name = "nomos-time"
 version = "0.1.0"
 edition = "2021"
 

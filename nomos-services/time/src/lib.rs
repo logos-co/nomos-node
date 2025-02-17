@@ -18,8 +18,8 @@ const TIME_SERVICE_TAG: ServiceId = "time-service";
 
 #[derive(Clone, Debug)]
 pub struct SlotTick {
-    epoch: Epoch,
-    slot: Slot,
+    pub epoch: Epoch,
+    pub slot: Slot,
 }
 
 pub type EpochSlotTickStream = Pin<Box<dyn Stream<Item = SlotTick> + Send + Sync + Unpin>>;
