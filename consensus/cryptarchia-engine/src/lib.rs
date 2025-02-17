@@ -145,7 +145,7 @@ impl<Id> Cryptarchia<Id>
 where
     Id: Eq + std::hash::Hash + Copy,
 {
-    pub fn from_genesis(id: Id, config: Config) -> Self {
+    pub fn new(id: Id, config: Config) -> Self {
         Self {
             branches: Branches::from_genesis(id),
             local_chain: Branch {
@@ -257,7 +257,7 @@ pub mod tests {
     #[test]
     fn test_fork_choice() {
         // TODO: use cryptarchia
-        let mut engine = Cryptarchia::from_genesis([0; 32], config());
+        let mut engine = Cryptarchia::new([0; 32], config());
         // by setting a low k we trigger the density choice rule, and the shorter chain
         // is denser after the fork
         engine.config.security_param = NonZero::new(10).unwrap();
@@ -348,7 +348,7 @@ pub mod tests {
 
     #[test]
     fn test_getters() {
-        let engine = Cryptarchia::from_genesis([0; 32], config());
+        let engine = Cryptarchia::new([0; 32], config());
         let id_0 = engine.genesis();
 
         // Get branch directly from HashMap
@@ -379,7 +379,7 @@ pub mod tests {
 
     #[test]
     fn test_get_security_block() {
-        let mut engine = Cryptarchia::from_genesis([0; 32], config());
+        let mut engine = Cryptarchia::new([0; 32], config());
         let mut parent_header = engine.genesis();
 
         assert!(engine.get_security_block_header_id().is_none());
