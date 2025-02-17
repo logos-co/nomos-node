@@ -1,5 +1,5 @@
-use bytes::Bytes;
 use core::ops::Range;
+use kzgrs_backend::common::blob::DaBlob;
 use nomos_blend_service::network::libp2p::Libp2pAdapter as BlendNetworkAdapter;
 use nomos_core::da::blob::info::DispersedBlobInfo;
 use nomos_core::da::blob::{metadata, select::FillSize as FillSizeWithBlobs, Blob};
@@ -49,7 +49,7 @@ pub type DaIndexer<
     const SIZE: usize,
 > = DataIndexerService<
     // Indexer specific.
-    Bytes,
+    DaBlob,
     IndexerStorageAdapter<SS, V>,
     CryptarchiaConsensusAdapter<Tx, V>,
     // Cryptarchia specific, should be the same as in `Cryptarchia` type above.
@@ -128,7 +128,7 @@ pub async fn get_range<
     handle: &OverwatchHandle,
     app_id: <V as metadata::Metadata>::AppId,
     range: Range<<V as metadata::Metadata>::Index>,
-) -> Result<Vec<(<V as metadata::Metadata>::Index, Vec<Bytes>)>, DynError>
+) -> Result<Vec<(<V as metadata::Metadata>::Index, Vec<DaBlob>)>, DynError>
 where
     Tx: Transaction
         + Eq

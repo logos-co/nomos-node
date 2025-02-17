@@ -34,7 +34,7 @@ use tracing::{error, instrument};
 const DA_INDEXER_TAG: ServiceId = "DA-Indexer";
 
 pub type ConsensusRelay<
-    A,
+    NetAdapter,
     BlendAdapter,
     ClPool,
     ClPoolAdapter,
@@ -49,7 +49,7 @@ pub type ConsensusRelay<
     SamplingStorage,
 > = Relay<
     CryptarchiaConsensus<
-        A,
+        NetAdapter,
         BlendAdapter,
         ClPool,
         ClPoolAdapter,
@@ -66,10 +66,10 @@ pub type ConsensusRelay<
 >;
 
 pub struct DataIndexerService<
-    B,
+    Blob,
     DaStorage,
     Consensus,
-    A,
+    NetAdapter,
     BlendAdapter,
     ClPool,
     ClPoolAdapter,
@@ -83,9 +83,9 @@ pub struct DataIndexerService<
     SamplingRng,
     SamplingStorage,
 > where
-    B: 'static,
-    A: NetworkAdapter,
-    A::Settings: Send,
+    Blob: 'static,
+    NetAdapter: NetworkAdapter,
+    NetAdapter::Settings: Send,
     BlendAdapter: cryptarchia_consensus::blend::BlendAdapter,
     BlendAdapter::Settings: Send,
     ClPoolAdapter: MempoolAdapter<Payload = ClPool::Item, Key = ClPool::Key>,
@@ -97,12 +97,12 @@ pub struct DataIndexerService<
     ClPool::Key: Debug + 'static,
     DaPool::Item: Metadata + Clone + Eq + Hash + Debug + 'static,
     DaPool::Key: Debug + 'static,
-    A::Backend: 'static,
+    NetAdapter::Backend: 'static,
     TxS: TxSelect<Tx = ClPool::Item>,
     TxS::Settings: Send,
     BS: BlobSelect<BlobId = DaPool::Item>,
     BS::Settings: Send,
-    DaStorage: DaStorageAdapter<Info = DaPool::Item, Blob = B>,
+    DaStorage: DaStorageAdapter<Info = DaPool::Item, Blob = Blob>,
     ConsensusStorage: StorageBackend + Send + Sync + 'static,
     SamplingRng: SeedableRng + RngCore,
     SamplingBackend: DaSamplingServiceBackend<SamplingRng, BlobId = DaPool::Key> + Send,
@@ -116,7 +116,7 @@ pub struct DataIndexerService<
     storage_relay: Relay<StorageService<DaStorage::Backend>>,
     #[allow(clippy::type_complexity)]
     consensus_relay: ConsensusRelay<
-        A,
+        NetAdapter,
         BlendAdapter,
         ClPool,
         ClPoolAdapter,
@@ -132,18 +132,18 @@ pub struct DataIndexerService<
     >,
 }
 
-pub enum DaMsg<B, V: Metadata> {
+pub enum DaMsg<Blob, Meta: Metadata> {
     AddIndex {
-        info: V,
+        info: Meta,
     },
     GetRange {
-        app_id: <V as Metadata>::AppId,
-        range: Range<<V as Metadata>::Index>,
-        reply_channel: Sender<Vec<(<V as Metadata>::Index, Vec<B>)>>,
+        app_id: <Meta as Metadata>::AppId,
+        range: Range<<Meta as Metadata>::Index>,
+        reply_channel: Sender<Vec<(<Meta as Metadata>::Index, Vec<Blob>)>>,
     },
 }
 
-impl<B: 'static, V: Metadata + 'static> Debug for DaMsg<B, V> {
+impl<Blob: 'static, Meta: Metadata + 'static> Debug for DaMsg<Blob, Meta> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             DaMsg::AddIndex { .. } => {
@@ -156,13 +156,13 @@ impl<B: 'static, V: Metadata + 'static> Debug for DaMsg<B, V> {
     }
 }
 
-impl<B: 'static, V: Metadata + 'static> RelayMessage for DaMsg<B, V> {}
+impl<Blob: 'static, Meta: Metadata + 'static> RelayMessage for DaMsg<Blob, Meta> {}
 
 impl<
-        B,
+        Blob,
         DaStorage,
         Consensus,
-        A,
+        NetAdapter,
         BlendAdapter,
         ClPool,
         ClPoolAdapter,
@@ -177,10 +177,10 @@ impl<
         SamplingStorage,
     > ServiceData
     for DataIndexerService<
-        B,
+        Blob,
         DaStorage,
         Consensus,
-        A,
+        NetAdapter,
         BlendAdapter,
         ClPool,
         ClPoolAdapter,
@@ -195,9 +195,9 @@ impl<
         SamplingStorage,
     >
 where
-    B: 'static,
-    A: NetworkAdapter,
-    A::Settings: Send,
+    Blob: 'static,
+    NetAdapter: NetworkAdapter,
+    NetAdapter::Settings: Send,
     BlendAdapter: cryptarchia_consensus::blend::BlendAdapter,
     BlendAdapter::Settings: Send,
     ClPoolAdapter: MempoolAdapter<Payload = ClPool::Item, Key = ClPool::Key>,
@@ -209,12 +209,12 @@ where
     ClPool::Key: Debug + 'static,
     DaPool::Item: Metadata + Clone + Eq + Hash + Debug + 'static,
     DaPool::Key: Debug + 'static,
-    A::Backend: 'static,
+    NetAdapter::Backend: 'static,
     TxS: TxSelect<Tx = ClPool::Item>,
     TxS::Settings: Send,
     BS: BlobSelect<BlobId = DaPool::Item>,
     BS::Settings: Send,
-    DaStorage: DaStorageAdapter<Info = DaPool::Item, Blob = B>,
+    DaStorage: DaStorageAdapter<Info = DaPool::Item, Blob = Blob>,
     ConsensusStorage: StorageBackend + Send + Sync + 'static,
     SamplingRng: SeedableRng + RngCore,
     SamplingBackend: DaSamplingServiceBackend<SamplingRng, BlobId = DaPool::Key> + Send,
@@ -228,14 +228,14 @@ where
     type Settings = IndexerSettings<DaStorage::Settings>;
     type State = NoState<Self::Settings>;
     type StateOperator = NoOperator<Self::State>;
-    type Message = DaMsg<B, DaPool::Item>;
+    type Message = DaMsg<Blob, DaPool::Item>;
 }
 
 impl<
-        B,
+        Blob,
         DaStorage,
         Consensus,
-        A,
+        NetAdapter,
         BlendAdapter,
         ClPool,
         ClPoolAdapter,
@@ -250,10 +250,10 @@ impl<
         SamplingStorage,
     >
     DataIndexerService<
-        B,
+        Blob,
         DaStorage,
         Consensus,
-        A,
+        NetAdapter,
         BlendAdapter,
         ClPool,
         ClPoolAdapter,
@@ -268,9 +268,9 @@ impl<
         SamplingStorage,
     >
 where
-    B: Send + Sync + 'static,
-    A: NetworkAdapter,
-    A::Settings: Send,
+    Blob: Send + Sync + 'static,
+    NetAdapter: NetworkAdapter,
+    NetAdapter::Settings: Send,
     BlendAdapter: cryptarchia_consensus::blend::BlendAdapter,
     BlendAdapter::Settings: Send,
     ClPoolAdapter: MempoolAdapter<Payload = ClPool::Item, Key = ClPool::Key>,
@@ -284,12 +284,12 @@ where
     <DaPool::Item as DispersedBlobInfo>::BlobId: AsRef<[u8]>,
     DaPool::Key: Debug + 'static,
     <DaPool::Item as Metadata>::Index: Send + Sync,
-    A::Backend: 'static,
+    NetAdapter::Backend: 'static,
     TxS: TxSelect<Tx = ClPool::Item>,
     TxS::Settings: Send,
     BS: BlobSelect<BlobId = DaPool::Item>,
     BS::Settings: Send,
-    DaStorage: DaStorageAdapter<Info = DaPool::Item, Blob = B>,
+    DaStorage: DaStorageAdapter<Info = DaPool::Item, Blob = Blob>,
     ConsensusStorage: StorageBackend + Send + Sync + 'static,
     SamplingRng: SeedableRng + RngCore,
     SamplingBackend: DaSamplingServiceBackend<SamplingRng, BlobId = DaPool::Key> + Send,
@@ -314,7 +314,7 @@ where
     #[instrument(skip_all)]
     async fn handle_da_msg(
         storage_adapter: &DaStorage,
-        msg: DaMsg<B, DaPool::Item>,
+        msg: DaMsg<Blob, DaPool::Item>,
     ) -> Result<(), DynError> {
         match msg {
             DaMsg::AddIndex { info } => {
@@ -354,10 +354,10 @@ where
 
 #[async_trait::async_trait]
 impl<
-        B,
+        Blob,
         DaStorage,
         Consensus,
-        A,
+        NetAdapter,
         BlendAdapter,
         ClPool,
         ClPoolAdapter,
@@ -372,10 +372,10 @@ impl<
         SamplingStorage,
     > ServiceCore
     for DataIndexerService<
-        B,
+        Blob,
         DaStorage,
         Consensus,
-        A,
+        NetAdapter,
         BlendAdapter,
         ClPool,
         ClPoolAdapter,
@@ -390,9 +390,9 @@ impl<
         SamplingStorage,
     >
 where
-    B: Debug + Send + Sync,
-    A: NetworkAdapter,
-    A::Settings: Send,
+    Blob: Debug + Send + Sync,
+    NetAdapter: NetworkAdapter,
+    NetAdapter::Settings: Send,
     BlendAdapter: cryptarchia_consensus::blend::BlendAdapter,
     BlendAdapter::Settings: Send,
     ClPoolAdapter: MempoolAdapter<Payload = ClPool::Item, Key = ClPool::Key>,
@@ -426,12 +426,12 @@ where
     <DaPool::Item as Metadata>::AppId: Send + Sync,
     <DaPool::Item as Metadata>::Index: Send + Sync,
     <<DaPool as MemPool>::Item as DispersedBlobInfo>::BlobId: AsRef<[u8]>,
-    A::Backend: 'static,
+    NetAdapter::Backend: 'static,
     TxS: TxSelect<Tx = ClPool::Item>,
     TxS::Settings: Send,
     BS: BlobSelect<BlobId = DaPool::Item>,
     BS::Settings: Send,
-    DaStorage: DaStorageAdapter<Info = DaPool::Item, Blob = B> + Send + Sync + 'static,
+    DaStorage: DaStorageAdapter<Info = DaPool::Item, Blob = Blob> + Send + Sync + 'static,
     DaStorage::Settings: Clone + Send + Sync + 'static,
     ConsensusStorage: StorageBackend + Send + Sync + 'static,
     Consensus: ConsensusAdapter<Tx = ClPool::Item, Cert = DaPool::Item> + Send + Sync,

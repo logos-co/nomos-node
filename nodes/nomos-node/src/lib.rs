@@ -123,7 +123,7 @@ pub type DaMempool = DaMempoolService<
 
 pub type DaIndexer<SamplingAdapter> = DataIndexerService<
     // Indexer specific.
-    Bytes,
+    DaBlob,
     IndexerStorageAdapter<Wire, BlobInfo>,
     CryptarchiaConsensusAdapter<Tx, BlobInfo>,
     // Cryptarchia specific, should be the same as in `Cryptarchia` type above.

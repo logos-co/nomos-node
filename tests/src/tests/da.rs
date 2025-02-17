@@ -1,8 +1,6 @@
 use executor_http_client::ExecutorHttpClient;
 
-use kzgrs_backend::common::blob::DaBlob;
 use kzgrs_backend::reconstruction::reconstruct_without_missing_data;
-use nomos_core::wire;
 use reqwest::ClientBuilder;
 use reqwest::Url;
 use std::time::Duration;
@@ -71,13 +69,6 @@ async fn disseminate_and_retrieve() {
     // are in the same subnetwork.
     assert!(executor_idx_0_blobs.len() == 2);
     assert!(validator_idx_0_blobs.len() == 2);
-    for b in executor_idx_0_blobs.iter() {
-        assert!(!b.is_empty())
-    }
-
-    for b in validator_idx_0_blobs.iter() {
-        assert!(!b.is_empty())
-    }
 }
 
 #[ignore = "todo: make work in parallel to other tests"]
@@ -106,7 +97,6 @@ async fn disseminate_retrieve_reconstruct() {
         .iter()
         .filter(|(i, _)| i == &from)
         .flat_map(|(_, blobs)| blobs)
-        .map(|blob| wire::deserialize::<DaBlob>(blob).unwrap())
         .collect();
 
     // Reconstruction is performed from the one of the two blobs.
