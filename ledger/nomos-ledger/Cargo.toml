@@ -22,4 +22,9 @@ sha2                   = "0.10"
 thiserror              = "1"
 
 [features]
-serde = ["dep:serde", "nomos-utils/serde", "rpds/serde"]
+serde = [
+    "cryptarchia-engine/serde",
+    "dep:serde",
+    "nomos-utils/serde",
+    "rpds/serde",
+]

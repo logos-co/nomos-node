@@ -12,4 +12,4 @@ async-trait  = "0.1"
 futures      = "0.3.28"
 log          = "0.4.20"
 overwatch-rs = { workspace = true }
-tokio        = "1"
+tokio        = { version = "1", features = ["macros"] }

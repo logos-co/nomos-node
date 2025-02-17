@@ -12,7 +12,7 @@ instrumentation = []
 [dependencies]
 async-trait              = "0.1"
 bytes                    = "1.2"
-cryptarchia-consensus    = { workspace = true }
+cryptarchia-consensus    = { workspace = true, features = ["libp2p"] }
 full-replication         = { workspace = true }
 kzgrs-backend            = { workspace = true }
 nomos-blend-service      = { workspace = true, features = ["libp2p"] }
