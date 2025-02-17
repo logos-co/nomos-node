@@ -70,7 +70,7 @@ jobs:
     runs-on: ${{ matrix.platform.builder }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - run: rustup target add ${{ matrix.platform.target_triple }}
         name: Install Rust toolchain

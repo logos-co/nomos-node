@@ -14,7 +14,7 @@ jobs:
       LLVM_PROFILE_FILE: "nomos-node-%p-%m.profraw"
     runs-on: self-hosted
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           submodules: true
       - uses: arduino/setup-protoc@v3
@@ -28,11 +28,6 @@ jobs:
         run: cargo binstall -y cargo-risczero && cargo risczero install
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - name: Cargo build
-        uses: actions-rs/cargo@v1
-        with:
-          command: build
-          args: --all --no-default-features --features libp2p
       - name: Run tests
         uses: actions-rs/cargo@v1
         env:
@@ -40,7 +35,7 @@ jobs:
           CONSENSUS_SLOT_TIME: 5
         with:
           command: test
-          args: --all --no-default-features --features libp2p
+          args: --all --all-features
       - name: Run Grcov
         run: |
           rm -rf /tmp/coverage 
