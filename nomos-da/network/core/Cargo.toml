@@ -5,8 +5,8 @@ edition = "2021"
 license = { workspace = true }
 
 [dependencies]
-libp2p = { version = "0.53", features = ["macros", "tokio", "quic"] }
-libp2p-stream = "0.1.0-alpha"
+libp2p = { version = "0.55", features = ["macros", "tokio", "quic"] }
+libp2p-stream = "0.3.0-alpha"
 futures = "0.3"
 tracing = "0.1"
 indexmap = "2.2"
@@ -27,7 +27,7 @@ thiserror = "1.0"
 
 [dev-dependencies]
 tokio = { version = "1", features = ["macros", "rt-multi-thread", "time"] }
-libp2p = { version = "0.53", features = ["ed25519", "ping", "macros", "quic", "tcp", "yamux", "noise"] }
+libp2p = { version = "0.55", features = ["ed25519", "ping", "macros", "quic", "tcp", "yamux", "noise"] }
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 kzgrs-backend = { path = "../../kzgrs-backend", features = ["testutils"] }
 blake2 = "0.10"
