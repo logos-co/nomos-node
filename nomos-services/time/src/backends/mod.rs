@@ -4,7 +4,6 @@ pub mod ntp;
 mod system_time;
 
 use crate::EpochSlotTickStream;
-use overwatch_rs::overwatch::handle::OverwatchHandle;
 
 pub trait TimeBackend {
     type Settings;
