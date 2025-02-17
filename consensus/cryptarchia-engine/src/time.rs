@@ -1,5 +1,3 @@
-#[cfg(feature = "serde")]
-use serde::{Deserialize, Serialize};
 use std::ops::Add;
 use std::time::Duration;
 use time::OffsetDateTime;
