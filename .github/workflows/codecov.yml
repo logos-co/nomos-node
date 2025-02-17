@@ -12,7 +12,7 @@ jobs:
       CARGO_INCREMENTAL: 0
       RUSTFLAGS: "-C instrument-coverage"
       LLVM_PROFILE_FILE: "nomos-node-%p-%m.profraw"
-    runs-on: self-hosted
+    runs-on: [ self-hosted, macOS-latest ]
     steps:
       - uses: actions/checkout@v3
         with:
