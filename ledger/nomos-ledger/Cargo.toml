@@ -23,8 +23,8 @@ thiserror              = "1"
 
 [features]
 serde = [
-    "cryptarchia-engine/serde",
-    "dep:serde",
-    "nomos-utils/serde",
-    "rpds/serde",
+  "cryptarchia-engine/serde",
+  "dep:serde",
+  "nomos-utils/serde",
+  "rpds/serde",
 ]
