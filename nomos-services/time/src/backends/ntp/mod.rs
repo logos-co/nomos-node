@@ -4,17 +4,14 @@ use crate::backends::common::slot_timer;
 use crate::backends::ntp::async_client::{AsyncNTPClient, NTPClientSettings};
 use crate::backends::TimeBackend;
 use crate::{EpochSlotTickStream, SlotTick};
-use cryptarchia_engine::time::SlotTimer;
-use cryptarchia_engine::{Epoch, EpochConfig, Slot, SlotConfig};
-use futures::stream::BoxStream;
+use cryptarchia_engine::{EpochConfig, Slot, SlotConfig};
 use futures::{Stream, StreamExt};
-use overwatch_rs::overwatch::handle::OverwatchHandle;
 use sntpc::{fraction_to_nanoseconds, NtpResult};
 use std::pin::Pin;
 use std::task::{Context, Poll};
 use std::time::Duration;
 use time::OffsetDateTime;
-use tokio::time::{interval, Interval, MissedTickBehavior};
+use tokio::time::{interval, MissedTickBehavior};
 use tokio_stream::wrappers::IntervalStream;
 
 pub struct NtpSettings {
