@@ -47,6 +47,7 @@ pub type DaIndexer<
     SamplingNetworkAdapter,
     SamplingRng,
     SamplingStorage,
+    TimeBackend,
     const SIZE: usize,
 > = DataIndexerService<
     // Indexer specific.
@@ -67,6 +68,7 @@ pub type DaIndexer<
     SamplingNetworkAdapter,
     SamplingRng,
     SamplingStorage,
+    TimeBackend,
 >;
 
 pub type DaVerifier<Blob, Membership, VerifierBackend, StorageSerializer> = DaVerifierService<
