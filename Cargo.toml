@@ -1,50 +1,95 @@
 [workspace]
+exclude = ["nomos-core/risc0_proofs"]
 members = [
-    "nomos-core/chain-defs",
-    "nomos-core/cl",
-    "nomos-da/full-replication",
-    "nomos-da/kzgrs",
-    "nomos-da/kzgrs-backend",
-    "nomos-da/storage",
-    "nomos-da/network/core",
-    "nomos-da/network/messages",
-    "nomos-da/network/subnetworks-assignations",
-    "nomos-libp2p",
-    "nomos-services/api",
-    "nomos-services/tracing",
-    "nomos-services/network",
-    "nomos-services/storage",
-    "nomos-services/cryptarchia-consensus",
-    "nomos-services/mempool",
-    "nomos-services/system-sig",
-    "nomos-services/data-availability/indexer",
-    "nomos-services/data-availability/network",
-    "nomos-services/data-availability/sampling",
-    "nomos-services/data-availability/verifier",
-    "nomos-services/data-availability/dispersal",
-    "nomos-services/data-availability/tests",
-    "nomos-services/blend",
-    "nomos-services/utils",
-    "nomos-blend/core",
-    "nomos-blend/message",
-    "nomos-blend/network",
-    "nomos-tracing",
-    "nomos-cli",
-    "nomos-utils",
-    "nodes/nomos-node",
-    "nodes/nomos-executor",
+    "clients/executor-http-client",
     "consensus/carnot-engine",
     "consensus/cryptarchia-engine",
     "ledger/nomos-ledger",
+    "nodes/nomos-executor",
+    "nodes/nomos-node",
+    "nomos-blend/core",
+    "nomos-blend/message",
+    "nomos-blend/network",
+    "nomos-bundler",
+    "nomos-cli",
+    "nomos-core/chain-defs",
     "nomos-core/cl",
+    "nomos-core/proof_statements",
+    "nomos-da/full-replication",
+    "nomos-da/kzgrs",
+    "nomos-da/kzgrs-backend",
+    "nomos-da/network/core",
+    "nomos-da/network/messages",
+    "nomos-da/network/subnetworks-assignations",
+    "nomos-da/storage",
+    "nomos-libp2p",
+    "nomos-services/api",
+    "nomos-services/blend",
+    "nomos-services/cryptarchia-consensus",
+    "nomos-services/data-availability/dispersal",
+    "nomos-services/data-availability/indexer",
+    "nomos-services/data-availability/network",
+    "nomos-services/data-availability/sampling",
+    "nomos-services/data-availability/tests",
+    "nomos-services/data-availability/verifier",
+    "nomos-services/key-management-system",
+    "nomos-services/mempool",
+    "nomos-services/network",
+    "nomos-services/storage",
+    "nomos-services/system-sig",
+    "nomos-services/tracing",
+    "nomos-services/utils",
+    "nomos-tracing",
+    "nomos-utils",
     "testnet/cfgsync",
     "tests",
-    "clients/executor-http-client",
-    "nomos-services/key-management-system",
-    "nomos-bundler",
 ]
-exclude = ["proof_of_leadership/risc0/risc0_proofs", "nomos-core/risc0_proofs"]
 resolver = "2"
+
+[workspace.dependencies]
+# Internal
+bundler                  = { path = "./nomos-bundler" }
+carnot-engine            = { path = "./consensus/carnot-engine" }
+cfgsync                  = { path = "./testnet/cfgsync" }
+cl                       = { path = "./nomos-core/cl" }
+cryptarchia-consensus    = { path = "./nomos-services/cryptarchia-consensus" }
+cryptarchia-engine       = { path = "./consensus/cryptarchia-engine" }
+executor-http-client     = { path = "./clients/executor-http-client" }
+full-replication         = { path = "./nomos-da/full-replication" }
+key-management-system    = { path = "./nomos-services/key-management-system" }
+kzgrs                    = { path = "./nomos-da/kzgrs" }
+kzgrs-backend            = { path = "./nomos-da/kzgrs-backend" }
+nomos-api                = { path = "./nomos-services/api" }
+nomos-blend              = { path = "./nomos-blend/core" }
+nomos-blend-message      = { path = "./nomos-blend/message" }
+nomos-blend-network      = { path = "./nomos-blend/network" }
+nomos-blend-service      = { path = "./nomos-services/blend" }
+nomos-cli                = { path = "./nomos-cli" }
+nomos-core               = { path = "./nomos-core/chain-defs" }
+nomos-da-dispersal       = { path = "./nomos-services/data-availability/dispersal" }
+nomos-da-indexer         = { path = "./nomos-services/data-availability/indexer" }
+nomos-da-messages        = { path = "./nomos-da/network/messages" }
+nomos-da-network-core    = { path = "./nomos-da/network/core" }
+nomos-da-network-service = { path = "./nomos-services/data-availability/network" }
+nomos-da-sampling        = { path = "./nomos-services/data-availability/sampling" }
+nomos-da-storage         = { path = "./nomos-da/storage" }
+nomos-da-tests           = { path = "./nomos-services/data-availability/tests" }
+nomos-da-verifier        = { path = "./nomos-services/data-availability/verifier" }
+nomos-executor           = { path = "./nodes/nomos-executor", default-features = false }
+nomos-ledger             = { path = "./ledger/nomos-ledger" }
+nomos-libp2p             = { path = "./nomos-libp2p" }
+nomos-mempool            = { path = "./nomos-services/mempool" }
+nomos-network            = { path = "./nomos-services/network" }
+nomos-node               = { path = "./nodes/nomos-node", default-features = false }
+nomos-storage            = { path = "./nomos-services/storage" }
+nomos-system-sig         = { path = "./nomos-services/system-sig" }
+nomos-tracing            = { path = "./nomos-tracing" }
+nomos-tracing-service    = { path = "./nomos-services/tracing" }
+nomos-utils              = { path = "./nomos-utils" }
+nomos_proof_statements   = { path = "./nomos-core/proof_statements" }
+subnetworks-assignations = { path = "./nomos-da/network/subnetworks-assignations" }
+tests                    = { path = "./tests" }
+utils                    = { path = "./nomos-services/utils" }
 
 [workspace.package]
 license = "MIT or Apache-2.0"
