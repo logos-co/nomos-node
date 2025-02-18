@@ -18,4 +18,5 @@ runs:
           ~/.cargo/registry/index/
           ~/.cargo/registry/cache/
           ~/.cargo/git/db/
+          target/
         key: ${{ inputs.key }}->#${{ github.run_id }}
