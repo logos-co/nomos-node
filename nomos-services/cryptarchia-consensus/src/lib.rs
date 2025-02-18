@@ -3,11 +3,16 @@ mod leadership;
 mod messages;
 pub mod network;
 mod relays;
+mod states;
 pub mod storage;
 mod time;
 
 use crate::leadership::Leader;
 use crate::relays::CryptarchiaConsensusRelays;
+use crate::states::{
+    CryptarchiaConsensusState, CryptarchiaInitialisationStrategy, GenesisRecoveryStrategy,
+    SecurityRecoveryStrategy,
+};
 use crate::storage::adapters::StorageAdapter;
 use crate::storage::StorageAdapter as _;
 use core::fmt::Debug;
@@ -35,7 +40,6 @@ use nomos_network::NetworkService;
 use nomos_storage::{backends::StorageBackend, StorageMsg, StorageService};
 use overwatch_rs::services::life_cycle::LifecycleMessage;
 use overwatch_rs::services::relay::{OutboundRelay, Relay, RelayMessage};
-use overwatch_rs::services::state::ServiceState;
 use overwatch_rs::services::{handle::ServiceStateHandle, ServiceCore, ServiceData, ServiceId};
 use overwatch_rs::DynError;
 use rand::{RngCore, SeedableRng};
@@ -43,7 +47,6 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_with::serde_as;
 use std::collections::BTreeSet;
 use std::hash::Hash;
-use std::marker::PhantomData;
 use std::path::PathBuf;
 use thiserror::Error;
 pub use time::Config as TimeConfig;
@@ -456,12 +459,14 @@ where
 
         // TODO: Move to function
         let mut cryptarchia = match self.initial_state.recovery_strategy() {
-            CryptarchiaRecoveryStrategy::NoRecovery => {
-                info!("Building Cryptarchia from genesis without recovery...");
+            CryptarchiaInitialisationStrategy::Genesis => {
+                info!("Building Cryptarchia from genesis...");
                 Cryptarchia::new(genesis_id, genesis_state, config)
             }
-            CryptarchiaRecoveryStrategy::Genesis(GenesisRecoveryStrategy { tip }) => {
-                info!("Building Cryptarchia from genesis with recovery...");
+            CryptarchiaInitialisationStrategy::RecoveryFromGenesis(GenesisRecoveryStrategy {
+                tip,
+            }) => {
+                info!("Recovering Cryptarchia from genesis...");
                 Self::build_cryptarchia_from_recovery(
                     tip,
                     genesis_id,
@@ -473,14 +478,14 @@ where
                 )
                 .await
             }
-            CryptarchiaRecoveryStrategy::Security(strategy) => {
+            CryptarchiaInitialisationStrategy::RecoveryFromSecurity(strategy) => {
                 let SecurityRecoveryStrategy {
                     tip,
                     security_block_id,
                     security_ledger_state,
                 } = *strategy;
 
-                info!("Building Cryptarchia from security block with recovery...");
+                info!("Recovering Cryptarchia from security...");
                 info!("Leader is out of date, updating from genesis until security block.");
                 // TODO: OPTIMIZE: Fetch only headers
                 // TODO: Move to function
@@ -593,108 +598,6 @@ where
             // Probably related to too many generics.
         }.instrument(span!(Level::TRACE, CRYPTARCHIA_ID)).await;
         Ok(())
-    }
-}
-
-pub struct GenesisRecoveryStrategy {
-    tip: HeaderId,
-}
-
-pub struct SecurityRecoveryStrategy {
-    tip: HeaderId,
-    security_block_id: HeaderId,
-    security_ledger_state: LedgerState,
-}
-
-pub enum CryptarchiaRecoveryStrategy {
-    NoRecovery,
-    Genesis(GenesisRecoveryStrategy),
-    Security(Box<SecurityRecoveryStrategy>),
-}
-
-#[derive(Clone, Serialize, Deserialize)]
-pub struct CryptarchiaConsensusState<TxS, BxS, NetworkAdapterSettings, BlendAdapterSettings> {
-    tip: Option<HeaderId>,
-    security_block: Option<HeaderId>,
-    security_ledger_state: Option<LedgerState>,
-    _txs: PhantomData<TxS>,
-    _bxs: PhantomData<BxS>,
-    _network_adapter_settings: PhantomData<NetworkAdapterSettings>,
-    _blend_adapter_settings: PhantomData<BlendAdapterSettings>,
-}
-
-impl<TxS, BxS, NetworkAdapterSettings, BlendAdapterSettings>
-    CryptarchiaConsensusState<TxS, BxS, NetworkAdapterSettings, BlendAdapterSettings>
-{
-    pub fn new(
-        tip: Option<HeaderId>,
-        security_block: Option<HeaderId>,
-        security_ledger_state: Option<LedgerState>,
-    ) -> Self {
-        Self {
-            tip,
-            security_block,
-            security_ledger_state,
-            _txs: Default::default(),
-            _bxs: Default::default(),
-            _network_adapter_settings: Default::default(),
-            _blend_adapter_settings: Default::default(),
-        }
-    }
-
-    pub(crate) fn from_cryptarchia(cryptarchia: &Cryptarchia) -> Self {
-        let security_block_header = cryptarchia.consensus.get_security_block_header_id();
-        let security_ledger_state = security_block_header
-            .and_then(|header| cryptarchia.ledger.state(&header))
-            .cloned();
-
-        Self::new(
-            Some(cryptarchia.tip()),
-            security_block_header,
-            security_ledger_state,
-        )
-    }
-
-    fn can_recover(&self) -> bool {
-        // This only checks whether tip is defined, as that's a state variable that should
-        // always exist. Other attributes might not be present.
-        self.tip.is_some()
-    }
-
-    fn can_recover_from_security(&self) -> bool {
-        self.can_recover() && self.security_block.is_some() && self.security_ledger_state.is_some()
-    }
-
-    pub fn recovery_strategy(&self) -> CryptarchiaRecoveryStrategy {
-        if self.can_recover_from_security() {
-            let strategy = SecurityRecoveryStrategy {
-                tip: self.tip.expect("tip not available"),
-                security_block_id: self.security_block.expect("security block not available"),
-                security_ledger_state: self
-                    .security_ledger_state
-                    .clone()
-                    .expect("security ledger state not available"),
-            };
-            CryptarchiaRecoveryStrategy::Security(Box::new(strategy))
-        } else if self.can_recover() {
-            let strategy = GenesisRecoveryStrategy {
-                tip: self.tip.expect("tip not available"),
-            };
-            CryptarchiaRecoveryStrategy::Genesis(strategy)
-        } else {
-            CryptarchiaRecoveryStrategy::NoRecovery
-        }
-    }
-}
-
-impl<TxS, BxS, NetworkAdapterSettings, BlendAdapterSettings> ServiceState
-    for CryptarchiaConsensusState<TxS, BxS, NetworkAdapterSettings, BlendAdapterSettings>
-{
-    type Settings = CryptarchiaSettings<TxS, BxS, NetworkAdapterSettings, BlendAdapterSettings>;
-    type Error = Error;
-
-    fn from_settings(_settings: &Self::Settings) -> Result<Self, Self::Error> {
-        Ok(Self::new(None, None, None))
     }
 }
 
