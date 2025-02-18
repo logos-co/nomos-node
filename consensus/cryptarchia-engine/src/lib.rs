@@ -1,11 +1,11 @@
 pub mod config;
 
-mod time;
+pub mod time;
 
 pub use config::*;
 use std::collections::{HashMap, HashSet};
 use thiserror::Error;
-pub use time::{Epoch, Slot};
+pub use time::{Epoch, EpochConfig, Slot, SlotConfig};
 
 #[derive(Clone, Debug)]
 pub struct Cryptarchia<Id> {

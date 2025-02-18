@@ -5,11 +5,11 @@ use std::{
         atomic::{AtomicBool, Ordering::SeqCst},
         Arc,
     },
-    time::Duration,
 };
 // crates
 use cl::{NoteWitness, NullifierSecret};
-use cryptarchia_consensus::{LeaderConfig, TimeConfig};
+use cryptarchia_consensus::LeaderConfig;
+use cryptarchia_engine::EpochConfig;
 use kzgrs_backend::common::blob::DaBlob;
 use nomos_core::{da::DaEncoder as _, staking::NMO_UNIT};
 use nomos_da_verifier::backend::kzgrs::KzgrsDaVerifierSettings;
@@ -18,7 +18,6 @@ use nomos_libp2p::Multiaddr;
 use nomos_libp2p::SwarmConfig;
 use rand::{thread_rng, Rng};
 use tempfile::{NamedTempFile, TempDir};
-use time::OffsetDateTime;
 use tracing_subscriber::fmt::TestWriter;
 use tracing_subscriber::EnvFilter;
 // internal
@@ -56,17 +55,15 @@ fn test_verifier() {
     let commitments = notes.iter().zip(&sks).map(|(n, sk)| n.commit(sk.commit()));
     let genesis_state = LedgerState::from_commitments(commitments, (ids.len() as u32).into());
     let ledger_config = nomos_ledger::Config {
-        epoch_stake_distribution_stabilization: 3,
-        epoch_period_nonce_buffer: 3,
-        epoch_period_nonce_stabilization: 4,
+        epoch_config: EpochConfig {
+            epoch_stake_distribution_stabilization: 3,
+            epoch_period_nonce_buffer: 3,
+            epoch_period_nonce_stabilization: 4,
+        },
         consensus_config: cryptarchia_engine::Config {
             security_param: 10,
             active_slot_coeff: 0.9,
         },
-    };
-    let time_config = TimeConfig {
-        slot_duration: Duration::from_secs(1),
-        chain_start_time: OffsetDateTime::now_utc(),
     };
 
     let swarm_config1 = SwarmConfig {
@@ -122,7 +119,6 @@ fn test_verifier() {
         },
         &ledger_config,
         &genesis_state,
-        &time_config,
         &swarm_config1,
         &blend_configs[0],
         NamedTempFile::new().unwrap().path().to_path_buf(),
@@ -150,7 +146,6 @@ fn test_verifier() {
         },
         &ledger_config,
         &genesis_state,
-        &time_config,
         &swarm_config2,
         &blend_configs[1],
         NamedTempFile::new().unwrap().path().to_path_buf(),
@@ -178,7 +173,6 @@ fn test_verifier() {
         },
         &ledger_config,
         &genesis_state,
-        &time_config,
         &swarm_config3,
         &blend_configs[2],
         NamedTempFile::new().unwrap().path().to_path_buf(),

@@ -47,6 +47,7 @@ pub type ConsensusRelay<
     SamplingNetworkAdapter,
     SamplingRng,
     SamplingStorage,
+    TimeBackend,
 > = Relay<
     CryptarchiaConsensus<
         NetAdapter,
@@ -62,6 +63,7 @@ pub type ConsensusRelay<
         SamplingNetworkAdapter,
         SamplingRng,
         SamplingStorage,
+        TimeBackend,
     >,
 >;
 
@@ -82,6 +84,7 @@ pub struct DataIndexerService<
     SamplingNetworkAdapter,
     SamplingRng,
     SamplingStorage,
+    TimeBackend,
 > where
     Blob: 'static,
     NetAdapter: NetworkAdapter,
@@ -111,6 +114,8 @@ pub struct DataIndexerService<
     SamplingBackend::BlobId: Debug + 'static,
     SamplingNetworkAdapter: nomos_da_sampling::network::NetworkAdapter,
     SamplingStorage: nomos_da_sampling::storage::DaStorageAdapter,
+    TimeBackend: nomos_time::backends::TimeBackend,
+    TimeBackend::Settings: Clone + Send + Sync,
 {
     service_state: ServiceStateHandle<Self>,
     storage_relay: Relay<StorageService<DaStorage::Backend>>,
@@ -129,6 +134,7 @@ pub struct DataIndexerService<
         SamplingNetworkAdapter,
         SamplingRng,
         SamplingStorage,
+        TimeBackend,
     >,
 }
 
@@ -175,6 +181,7 @@ impl<
         SamplingNetworkAdapter,
         SamplingRng,
         SamplingStorage,
+        TimeBackend,
     > ServiceData
     for DataIndexerService<
         Blob,
@@ -193,6 +200,7 @@ impl<
         SamplingNetworkAdapter,
         SamplingRng,
         SamplingStorage,
+        TimeBackend,
     >
 where
     Blob: 'static,
@@ -223,6 +231,8 @@ where
     SamplingBackend::BlobId: Debug + 'static,
     SamplingNetworkAdapter: nomos_da_sampling::network::NetworkAdapter,
     SamplingStorage: nomos_da_sampling::storage::DaStorageAdapter,
+    TimeBackend: nomos_time::backends::TimeBackend,
+    TimeBackend::Settings: Clone + Send + Sync,
 {
     const SERVICE_ID: ServiceId = DA_INDEXER_TAG;
     type Settings = IndexerSettings<DaStorage::Settings>;
@@ -248,6 +258,7 @@ impl<
         SamplingNetworkAdapter,
         SamplingRng,
         SamplingStorage,
+        TimeBackend,
     >
     DataIndexerService<
         Blob,
@@ -266,6 +277,7 @@ impl<
         SamplingNetworkAdapter,
         SamplingRng,
         SamplingStorage,
+        TimeBackend,
     >
 where
     Blob: Send + Sync + 'static,
@@ -298,6 +310,8 @@ where
     SamplingBackend::BlobId: Debug + 'static,
     SamplingNetworkAdapter: nomos_da_sampling::network::NetworkAdapter,
     SamplingStorage: nomos_da_sampling::storage::DaStorageAdapter,
+    TimeBackend: nomos_time::backends::TimeBackend,
+    TimeBackend::Settings: Clone + Send + Sync,
 {
     #[instrument(skip_all)]
     async fn handle_new_block(
@@ -355,6 +369,7 @@ impl<
         SamplingNetworkAdapter,
         SamplingRng,
         SamplingStorage,
+        TimeBackend,
     > ServiceCore
     for DataIndexerService<
         Blob,
@@ -373,6 +388,7 @@ impl<
         SamplingNetworkAdapter,
         SamplingRng,
         SamplingStorage,
+        TimeBackend,
     >
 where
     Blob: Debug + Send + Sync,
@@ -427,6 +443,8 @@ where
     SamplingBackend::BlobId: Debug + 'static,
     SamplingNetworkAdapter: nomos_da_sampling::network::NetworkAdapter,
     SamplingStorage: nomos_da_sampling::storage::DaStorageAdapter,
+    TimeBackend: nomos_time::backends::TimeBackend,
+    TimeBackend::Settings: Clone + Send + Sync,
 {
     fn init(
         service_state: ServiceStateHandle<Self>,

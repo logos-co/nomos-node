@@ -6,6 +6,7 @@ use std::time::Duration;
 use std::{net::SocketAddr, process::Child};
 // Crates
 use cryptarchia_consensus::{CryptarchiaInfo, CryptarchiaSettings};
+use cryptarchia_engine::SlotConfig;
 use kzgrs_backend::common::blob::DaBlob;
 use nomos_blend::message_blend::{
     CryptographicProcessorSettings, MessageBlendSettings, TemporalSchedulerSettings,
@@ -26,6 +27,8 @@ use nomos_node::api::paths::{
 };
 use nomos_node::{api::backend::AxumBackendSettings, Config, RocksBackendSettings};
 use nomos_node::{BlobInfo, HeaderId, Tx};
+use nomos_time::backends::system_time::SystemTimeBackendSettings;
+use nomos_time::TimeServiceSettings;
 use reqwest::Url;
 use tempfile::NamedTempFile;
 // Internal
@@ -262,9 +265,8 @@ pub fn create_validator_config(config: GeneralConfig) -> Config {
         },
         cryptarchia: CryptarchiaSettings {
             leader_config: config.consensus_config.leader_config,
-            config: config.consensus_config.ledger_config,
+            config: config.consensus_config.ledger_config.clone(),
             genesis_state: config.consensus_config.genesis_state,
-            time: config.consensus_config.time,
             transaction_selector_settings: (),
             blob_selector_settings: (),
             network_adapter_settings:
@@ -327,6 +329,16 @@ pub fn create_validator_config(config: GeneralConfig) -> Config {
             db_path: "./db".into(),
             read_only: false,
             column_family: Some("blocks".into()),
+        },
+        time: TimeServiceSettings {
+            backend_settings: SystemTimeBackendSettings {
+                slot_config: SlotConfig {
+                    slot_duration: config.time_config.slot_duration.clone(),
+                    chain_start_time: config.time_config.chain_start_time.clone(),
+                },
+                epoch_config: config.consensus_config.ledger_config.epoch_config,
+                base_period_length: config.consensus_config.ledger_config.base_period_length(),
+            },
         },
     }
 }

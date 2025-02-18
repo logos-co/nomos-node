@@ -5,6 +5,9 @@ pub mod da;
 pub mod network;
 pub mod tracing;
 
+pub mod time;
+
+use crate::topology::configs::time::GeneralTimeConfig;
 use api::GeneralApiConfig;
 use blend::GeneralBlendConfig;
 use consensus::GeneralConsensusConfig;
@@ -20,4 +23,5 @@ pub struct GeneralConfig {
     pub network_config: GeneralNetworkConfig,
     pub blend_config: GeneralBlendConfig,
     pub tracing_config: GeneralTracingConfig,
+    pub time_config: GeneralTimeConfig,
 }
