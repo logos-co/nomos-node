@@ -26,10 +26,10 @@ use overwatch_rs::DynError;
 use rand::{RngCore, SeedableRng};
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
+use services_utils::overwatch::lifecycle;
 use storage::DaStorageAdapter;
 use tokio::sync::oneshot::Sender;
 use tracing::instrument;
-use utils::overwatch::lifecycle;
 
 const DA_INDEXER_TAG: ServiceId = "DA-Indexer";
 

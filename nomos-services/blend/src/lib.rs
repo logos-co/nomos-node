@@ -28,13 +28,13 @@ use overwatch_rs::services::{
 use rand::SeedableRng;
 use rand_chacha::ChaCha12Rng;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use services_utils::overwatch::lifecycle;
 use std::fmt::Debug;
 use std::hash::Hash;
 use std::time::Duration;
 use tokio::sync::mpsc;
 use tokio::time;
 use tokio_stream::wrappers::{IntervalStream, UnboundedReceiverStream};
-use utils::overwatch::lifecycle;
 
 /// A blend service that sends messages to the blend network
 /// and broadcasts fully unwrapped messages through the [`NetworkService`].

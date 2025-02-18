@@ -25,8 +25,8 @@ use tracing::{error, instrument};
 // internal
 use backend::{DaSamplingServiceBackend, SamplingState};
 use nomos_tracing::{error_with_id, info_with_id};
+use services_utils::overwatch::lifecycle;
 use storage::DaStorageAdapter;
-use utils::overwatch::lifecycle;
 
 const DA_SAMPLING_TAG: ServiceId = "DA-Sampling";
 

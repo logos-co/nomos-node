@@ -8,11 +8,11 @@ use overwatch_rs::services::relay::RelayMessage;
 use overwatch_rs::services::state::{NoOperator, NoState};
 use overwatch_rs::services::{ServiceCore, ServiceData, ServiceId};
 use overwatch_rs::DynError;
+use services_utils::overwatch::lifecycle;
 use std::fmt::{Debug, Formatter};
 use std::future::Future;
 use std::pin::Pin;
 use tokio::sync::oneshot;
-use utils::overwatch::lifecycle;
 
 mod backend;
 mod keys;

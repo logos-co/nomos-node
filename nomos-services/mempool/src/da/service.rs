@@ -27,7 +27,7 @@ use overwatch_rs::services::{
     state::{NoOperator, NoState},
     ServiceCore, ServiceData, ServiceId,
 };
-use utils::overwatch::lifecycle;
+use services_utils::overwatch::lifecycle;
 
 pub struct DaMempoolService<N, P, DB, DN, R, SamplingStorage>
 where

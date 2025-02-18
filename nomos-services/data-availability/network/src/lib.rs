@@ -17,7 +17,7 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::oneshot;
 
 // internal
-use utils::overwatch::lifecycle;
+use services_utils::overwatch::lifecycle;
 
 const DA_NETWORK_TAG: ServiceId = "DA-Network";
 

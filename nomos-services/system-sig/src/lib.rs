@@ -9,7 +9,7 @@ use overwatch_rs::services::relay::NoMessage;
 use overwatch_rs::services::state::{NoOperator, NoState};
 use overwatch_rs::services::{ServiceCore, ServiceData, ServiceId};
 use overwatch_rs::DynError;
-use utils::overwatch::lifecycle;
+use services_utils::overwatch::lifecycle;
 
 pub struct SystemSig {
     service_state: ServiceStateHandle<Self>,

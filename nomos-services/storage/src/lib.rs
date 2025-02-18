@@ -14,10 +14,10 @@ use overwatch_rs::services::{ServiceCore, ServiceData, ServiceId};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 // std
+use services_utils::overwatch::lifecycle;
 use std::fmt::{Debug, Formatter};
 use std::marker::PhantomData;
 use tracing::error;
-use utils::overwatch::lifecycle;
 
 /// Storage message that maps to [`StorageBackend`] trait
 pub enum StorageMsg<Backend: StorageBackend> {
