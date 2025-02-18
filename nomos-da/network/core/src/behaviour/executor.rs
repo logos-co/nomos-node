@@ -1,11 +1,12 @@
 // std
-
-use libp2p::identity::Keypair;
-use libp2p::PeerId;
+use std::time::Duration;
 // crates
+use libp2p::identity::Keypair;
 use libp2p::swarm::NetworkBehaviour;
+use libp2p::PeerId;
 // internal
 use crate::address_book::AddressBook;
+use crate::maintenance::monitor::{ConnectionMonitor, ConnectionMonitorBehaviour};
 use crate::{
     protocols::dispersal::executor::behaviour::DispersalExecutorBehaviour,
     protocols::dispersal::validator::behaviour::DispersalValidatorBehaviour,
@@ -25,19 +26,31 @@ use subnetworks_assignations::MembershipHandler;
 /// 2) Dispersal so we do not bottleneck executors.
 /// 3) Replication is the least important (and probably the least used), it is also dependant of dispersal.
 #[derive(NetworkBehaviour)]
-pub struct ExecutorBehaviour<Membership: MembershipHandler> {
+pub struct ExecutorBehaviour<Monitor, Membership>
+where
+    Monitor: ConnectionMonitor,
+    Membership: MembershipHandler,
+{
     sampling: SamplingBehaviour<Membership>,
     executor_dispersal: DispersalExecutorBehaviour<Membership>,
     validator_dispersal: DispersalValidatorBehaviour<Membership>,
     replication: ReplicationBehaviour<Membership>,
+    monitor: ConnectionMonitorBehaviour<Monitor>,
 }
 
-impl<Membership> ExecutorBehaviour<Membership>
+impl<Monitor, Membership> ExecutorBehaviour<Monitor, Membership>
 where
+    Monitor: ConnectionMonitor,
     Membership: MembershipHandler + Clone + Send + 'static,
     <Membership as MembershipHandler>::NetworkId: Send,
 {
-    pub fn new(key: &Keypair, membership: Membership, addresses: AddressBook) -> Self {
+    pub fn new(
+        key: &Keypair,
+        membership: Membership,
+        addresses: AddressBook,
+        monitor: Monitor,
+        redial_cooldown: Duration,
+    ) -> Self {
         let peer_id = PeerId::from_public_key(&key.public());
         Self {
             sampling: SamplingBehaviour::new(peer_id, membership.clone(), addresses.clone()),
@@ -48,6 +61,7 @@ where
             ),
             validator_dispersal: DispersalValidatorBehaviour::new(membership.clone()),
             replication: ReplicationBehaviour::new(peer_id, membership),
+            monitor: ConnectionMonitorBehaviour::new(monitor, redial_cooldown),
         }
     }
 
@@ -93,5 +107,9 @@ where
 
     pub fn replication_behaviour_mut(&mut self) -> &mut ReplicationBehaviour<Membership> {
         &mut self.replication
+    }
+
+    pub fn monitor_behaviour_mut(&mut self) -> &mut ConnectionMonitorBehaviour<Monitor> {
+        &mut self.monitor
     }
 }

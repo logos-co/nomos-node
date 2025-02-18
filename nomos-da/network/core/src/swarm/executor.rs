@@ -1,5 +1,5 @@
-use std::io;
 // std
+use std::io;
 use std::time::Duration;
 // crates
 use futures::StreamExt;
@@ -22,12 +22,21 @@ use crate::protocols::{
     replication::behaviour::ReplicationEvent,
     sampling::behaviour::SamplingEvent,
 };
-use crate::swarm::common::handlers::{
-    handle_replication_event, handle_sampling_event, handle_validator_dispersal_event,
+use crate::swarm::{
+    common::{
+        handlers::{
+            handle_replication_event, handle_sampling_event, handle_validator_dispersal_event,
+            monitor_event,
+        },
+        monitor::DAConnectionMonitor,
+    },
+    validator::ValidatorEventsStream,
 };
-use crate::swarm::validator::ValidatorEventsStream;
 use crate::SubnetworkId;
 use subnetworks_assignations::MembershipHandler;
+
+use super::common::monitor::MonitorEvent;
+use super::DAConnectionMonitorSettings;
 
 // Metrics
 const EVENT_SAMPLING: &str = "sampling";
@@ -43,7 +52,7 @@ pub struct ExecutorEventsStream {
 pub struct ExecutorSwarm<
     Membership: MembershipHandler<NetworkId = SubnetworkId, Id = PeerId> + 'static,
 > {
-    swarm: Swarm<ExecutorBehaviour<Membership>>,
+    swarm: Swarm<ExecutorBehaviour<DAConnectionMonitor, Membership>>,
     sampling_events_sender: UnboundedSender<SamplingEvent>,
     validation_events_sender: UnboundedSender<DaBlob>,
     dispersal_events_sender: UnboundedSender<DispersalExecutorEvent>,
@@ -57,6 +66,8 @@ where
         key: Keypair,
         membership: Membership,
         addresses: AddressBook,
+        monitor_settings: DAConnectionMonitorSettings,
+        redial_cooldown: Duration,
     ) -> (Self, ExecutorEventsStream) {
         let (sampling_events_sender, sampling_events_receiver) = unbounded_channel();
         let (validation_events_sender, validation_events_receiver) = unbounded_channel();
@@ -64,10 +75,11 @@ where
         let sampling_events_receiver = UnboundedReceiverStream::new(sampling_events_receiver);
         let validation_events_receiver = UnboundedReceiverStream::new(validation_events_receiver);
         let dispersal_events_receiver = UnboundedReceiverStream::new(dispersal_events_receiver);
+        let monitor = DAConnectionMonitor::new(monitor_settings);
 
         (
             Self {
-                swarm: Self::build_swarm(key, membership, addresses),
+                swarm: Self::build_swarm(key, membership, addresses, monitor, redial_cooldown),
                 sampling_events_sender,
                 validation_events_sender,
                 dispersal_events_sender,
@@ -85,11 +97,15 @@ where
         key: Keypair,
         membership: Membership,
         addresses: AddressBook,
-    ) -> Swarm<ExecutorBehaviour<Membership>> {
+        monitor: DAConnectionMonitor,
+        redial_cooldown: Duration,
+    ) -> Swarm<ExecutorBehaviour<DAConnectionMonitor, Membership>> {
         SwarmBuilder::with_existing_identity(key)
             .with_tokio()
             .with_quic()
-            .with_behaviour(|key| ExecutorBehaviour::new(key, membership, addresses))
+            .with_behaviour(|key| {
+                ExecutorBehaviour::new(key, membership, addresses, monitor, redial_cooldown)
+            })
             .expect("Validator behaviour should build")
             .with_swarm_config(|cfg| {
                 cfg.with_idle_connection_timeout(Duration::from_secs(u64::MAX))
@@ -134,25 +150,39 @@ where
         self.swarm.local_peer_id()
     }
 
-    pub fn protocol_swarm(&self) -> &Swarm<ExecutorBehaviour<Membership>> {
+    pub fn protocol_swarm(&self) -> &Swarm<ExecutorBehaviour<DAConnectionMonitor, Membership>> {
         &self.swarm
     }
 
-    pub fn protocol_swarm_mut(&mut self) -> &mut Swarm<ExecutorBehaviour<Membership>> {
+    pub fn protocol_swarm_mut(
+        &mut self,
+    ) -> &mut Swarm<ExecutorBehaviour<DAConnectionMonitor, Membership>> {
         &mut self.swarm
     }
 
     async fn handle_sampling_event(&mut self, event: SamplingEvent) {
+        monitor_event(
+            self.swarm.behaviour_mut().monitor_behaviour_mut(),
+            MonitorEvent::from(&event),
+        );
         handle_sampling_event(&mut self.sampling_events_sender, event).await
     }
 
     async fn handle_executor_dispersal_event(&mut self, event: DispersalExecutorEvent) {
+        monitor_event(
+            self.swarm.behaviour_mut().monitor_behaviour_mut(),
+            MonitorEvent::from(&event),
+        );
         if let Err(e) = self.dispersal_events_sender.send(event) {
             debug!("Error distributing sampling message internally: {e:?}");
         }
     }
 
     async fn handle_validator_dispersal_event(&mut self, event: DispersalEvent) {
+        monitor_event(
+            self.swarm.behaviour_mut().monitor_behaviour_mut(),
+            MonitorEvent::from(&event),
+        );
         handle_validator_dispersal_event(
             &mut self.validation_events_sender,
             self.swarm.behaviour_mut().replication_behaviour_mut(),
@@ -162,10 +192,17 @@ where
     }
 
     async fn handle_replication_event(&mut self, event: ReplicationEvent) {
+        monitor_event(
+            self.swarm.behaviour_mut().monitor_behaviour_mut(),
+            MonitorEvent::from(&event),
+        );
         handle_replication_event(&mut self.validation_events_sender, event).await
     }
 
-    async fn handle_behaviour_event(&mut self, event: ExecutorBehaviourEvent<Membership>) {
+    async fn handle_behaviour_event(
+        &mut self,
+        event: ExecutorBehaviourEvent<DAConnectionMonitor, Membership>,
+    ) {
         match event {
             ExecutorBehaviourEvent::Sampling(event) => {
                 tracing::info!(
@@ -197,6 +234,7 @@ where
                 );
                 self.handle_replication_event(event).await;
             }
+            _ => {}
         }
     }
 
