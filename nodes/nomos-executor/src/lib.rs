@@ -51,6 +51,7 @@ pub type ExecutorApiService = ApiService<
         nomos_da_sampling::network::adapters::executor::Libp2pAdapter<NomosDaMembership>,
         ChaCha20Rng,
         SamplingStorageAdapter<DaBlob, Wire>,
+        nomos_time::backends::system_time::SystemTimeBackend,
         MB16,
     >,
 >;

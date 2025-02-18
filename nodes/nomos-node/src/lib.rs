@@ -75,6 +75,7 @@ pub type NomosApiService = ApiService<
         nomos_da_sampling::network::adapters::validator::Libp2pAdapter<NomosDaMembership>,
         ChaCha20Rng,
         SamplingStorageAdapter<DaBlob, Wire>,
+        nomos_time::backends::system_time::SystemTimeBackend,
         MB16,
     >,
 >;
@@ -102,6 +103,7 @@ pub type Cryptarchia<SamplingAdapter> = cryptarchia_consensus::CryptarchiaConsen
     SamplingAdapter,
     ChaCha20Rng,
     SamplingStorageAdapter<DaBlob, Wire>,
+    nomos_time::backends::system_time::SystemTimeBackend,
 >;
 
 pub type NodeCryptarchia =
@@ -144,6 +146,7 @@ pub type DaIndexer<SamplingAdapter> = DataIndexerService<
     SamplingAdapter,
     ChaCha20Rng,
     SamplingStorageAdapter<DaBlob, Wire>,
+    nomos_time::backends::system_time::SystemTimeBackend,
 >;
 
 pub type NodeDaIndexer =
