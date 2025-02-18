@@ -1,3 +1,4 @@
+use nomos_ledger::leader_proof::LeaderProof;
 use std::collections::HashMap;
 
 use cl::{
@@ -6,6 +7,7 @@ use cl::{
     InputWitness,
 };
 use cryptarchia_engine::Slot;
+use nomos_core::header::Header;
 use nomos_core::{header::HeaderId, proofs::leader_proof::Risc0LeaderProof};
 use nomos_ledger::{Config, EpochState, NoteTree};
 use nomos_proof_statements::leadership::{LeaderPrivate, LeaderPublic};
@@ -57,6 +59,13 @@ impl Leader {
                 .collect();
             self.notes.insert(id, notes);
         }
+    }
+
+    pub fn follow_chain_with_header(&mut self, header: &Header) {
+        let parent_id = header.parent();
+        let id = header.id();
+        let nullifier = header.leader_proof().nullifier();
+        self.follow_chain(parent_id, id, nullifier);
     }
 
     pub async fn build_proof_for(
