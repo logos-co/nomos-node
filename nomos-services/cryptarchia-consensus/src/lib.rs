@@ -868,11 +868,11 @@ where
         );
     }
 
-    /// Retrieves the blocks in the range from `to` to `from` from the storage.
-    /// Both `to` and `from` are included in the range and must be valid headers.
+    /// Retrieves the blocks in the range from `from` to `to` from the storage.
+    /// Both `from` and `to` are included in the range and must be valid headers.
     async fn get_blocks_in_range(
-        to: HeaderId,
         from: HeaderId,
+        to: HeaderId,
         storage_adapter: &StorageAdapter<Storage, TxS::Tx, BS::BlobId>,
     ) -> Vec<Block<ClPool::Item, DaPool::Item>> {
         let blocks_from_tip = futures::stream::unfold(to, |header_id| async move {
@@ -900,17 +900,17 @@ where
     ///
     /// * `leader` - The leader instance to be updated. It should be up-to-date with the state of
     ///    the ledger up to `from`.
-    /// * `to` - The header id up to which the leader should be updated.
     /// * `from` - The header id from which the leader should be updated.
+    /// * `to` - The header id up to which the leader should be updated.
     /// * `storage_adapter` - The storage adapter to fetch the blocks from.
     async fn follow_chain_in_range(
         leader: &mut Leader,
-        to: HeaderId,
         from: HeaderId,
+        to: HeaderId,
         storage_adapter: &StorageAdapter<Storage, TxS::Tx, BS::BlobId>,
     ) {
         // TODO: OPTIMIZE: Fetch only headers
-        let blocks_to_security = Self::get_blocks_in_range(to, from, storage_adapter)
+        let blocks_to_security = Self::get_blocks_in_range(from, to, storage_adapter)
             .await
             .into_iter()
             .rev();
@@ -995,8 +995,8 @@ where
                 info!("Leader is out of date, updating from genesis until security block.");
                 Self::follow_chain_in_range(
                     leader,
-                    security_block_id,
                     genesis_id,
+                    security_block_id,
                     relays.storage_adapter(),
                 )
                 .await;
@@ -1056,7 +1056,7 @@ where
         // TODO: From<Stream> for Cryptarchia - collect stream - futures stream collect
         // impl extend for cryptarchia
         let blocks_to_tip =
-            Self::get_blocks_in_range(tip, security_header_id, relays.storage_adapter())
+            Self::get_blocks_in_range(security_header_id, tip, relays.storage_adapter())
                 .await
                 .into_iter()
                 .rev();
