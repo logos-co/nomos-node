@@ -7,7 +7,6 @@ use backends::StorageBackend;
 use backends::{StorageSerde, StorageTransaction};
 use bytes::Bytes;
 use futures::StreamExt;
-use nomos_utils::lifecycle;
 use overwatch_rs::services::handle::ServiceStateHandle;
 use overwatch_rs::services::relay::RelayMessage;
 use overwatch_rs::services::state::{NoOperator, NoState};
@@ -18,6 +17,7 @@ use serde::Serialize;
 use std::fmt::{Debug, Formatter};
 use std::marker::PhantomData;
 use tracing::error;
+use utils::overwatch::lifecycle;
 
 /// Storage message that maps to [`StorageBackend`] trait
 pub enum StorageMsg<Backend: StorageBackend> {

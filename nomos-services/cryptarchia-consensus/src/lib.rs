@@ -30,7 +30,6 @@ use nomos_mempool::{
 };
 use nomos_network::NetworkService;
 use nomos_storage::{backends::StorageBackend, StorageMsg, StorageService};
-use nomos_utils::lifecycle;
 use overwatch_rs::services::relay::{OutboundRelay, Relay, RelayMessage};
 use overwatch_rs::services::state::ServiceState;
 use overwatch_rs::services::{handle::ServiceStateHandle, ServiceCore, ServiceData, ServiceId};
@@ -49,6 +48,7 @@ use tokio::sync::{broadcast, oneshot};
 use tokio_stream::wrappers::IntervalStream;
 use tracing::{error, instrument, span, Level};
 use tracing_futures::Instrument;
+use utils::overwatch::lifecycle;
 use utils::overwatch::recovery::backends::FileBackendSettings;
 use utils::overwatch::{JsonFileBackend, RecoveryOperator};
 

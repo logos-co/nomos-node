@@ -7,7 +7,6 @@ use std::pin::Pin;
 use async_trait::async_trait;
 use backends::NetworkBackend;
 use futures::{Stream, StreamExt};
-use nomos_utils::lifecycle;
 use overwatch_rs::services::{
     handle::ServiceStateHandle,
     relay::RelayMessage,
@@ -16,7 +15,9 @@ use overwatch_rs::services::{
 };
 use serde::{Deserialize, Serialize};
 use tokio::sync::oneshot;
+
 // internal
+use utils::overwatch::lifecycle;
 
 const DA_NETWORK_TAG: ServiceId = "DA-Network";
 

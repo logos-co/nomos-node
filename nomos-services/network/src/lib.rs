@@ -16,8 +16,7 @@ use overwatch_rs::services::{
     state::{NoOperator, ServiceState},
     ServiceCore, ServiceData, ServiceId,
 };
-
-use nomos_utils::lifecycle;
+use utils::overwatch::lifecycle;
 
 pub enum NetworkMsg<B: NetworkBackend> {
     Process(B::Message),

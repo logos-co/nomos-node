@@ -21,13 +21,13 @@ use nomos_da_sampling::{
     DaSamplingService, DaSamplingServiceMsg,
 };
 use nomos_network::{NetworkMsg, NetworkService};
-use nomos_utils::lifecycle;
 use overwatch_rs::services::{
     handle::ServiceStateHandle,
     relay::{OutboundRelay, Relay},
     state::{NoOperator, NoState},
     ServiceCore, ServiceData, ServiceId,
 };
+use utils::overwatch::lifecycle;
 
 pub struct DaMempoolService<N, P, DB, DN, R, SamplingStorage>
 where

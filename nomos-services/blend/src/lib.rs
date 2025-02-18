@@ -19,7 +19,6 @@ use nomos_blend::{
 use nomos_blend_message::{sphinx::SphinxMessage, BlendMessage};
 use nomos_core::wire;
 use nomos_network::NetworkService;
-use nomos_utils::lifecycle;
 use overwatch_rs::services::{
     handle::ServiceStateHandle,
     relay::{Relay, RelayMessage},
@@ -35,6 +34,7 @@ use std::time::Duration;
 use tokio::sync::mpsc;
 use tokio::time;
 use tokio_stream::wrappers::{IntervalStream, UnboundedReceiverStream};
+use utils::overwatch::lifecycle;
 
 /// A blend service that sends messages to the blend network
 /// and broadcasts fully unwrapped messages through the [`NetworkService`].

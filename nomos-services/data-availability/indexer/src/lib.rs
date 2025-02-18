@@ -18,7 +18,6 @@ use nomos_mempool::{backend::MemPool, network::NetworkAdapter as MempoolAdapter}
 use nomos_storage::backends::StorageBackend;
 use nomos_storage::StorageService;
 use nomos_tracing::info_with_id;
-use nomos_utils::lifecycle;
 use overwatch_rs::services::handle::ServiceStateHandle;
 use overwatch_rs::services::relay::{Relay, RelayMessage};
 use overwatch_rs::services::state::{NoOperator, NoState};
@@ -30,6 +29,7 @@ use serde::{Deserialize, Serialize};
 use storage::DaStorageAdapter;
 use tokio::sync::oneshot::Sender;
 use tracing::instrument;
+use utils::overwatch::lifecycle;
 
 const DA_INDEXER_TAG: ServiceId = "DA-Indexer";
 

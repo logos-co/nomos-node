@@ -3,7 +3,6 @@ use crate::secure_key::SecuredKey;
 use bytes::Bytes;
 use futures::StreamExt;
 use log::error;
-use nomos_utils::lifecycle;
 use overwatch_rs::services::handle::ServiceStateHandle;
 use overwatch_rs::services::relay::RelayMessage;
 use overwatch_rs::services::state::{NoOperator, NoState};
@@ -13,6 +12,7 @@ use std::fmt::{Debug, Formatter};
 use std::future::Future;
 use std::pin::Pin;
 use tokio::sync::oneshot;
+use utils::overwatch::lifecycle;
 
 mod backend;
 mod keys;

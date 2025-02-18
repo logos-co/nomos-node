@@ -23,8 +23,8 @@ use tracing::instrument;
 use backend::VerifierBackend;
 use network::NetworkAdapter;
 use nomos_tracing::info_with_id;
-use nomos_utils::lifecycle;
 use storage::DaStorageAdapter;
+use utils::overwatch::lifecycle;
 
 const DA_VERIFIER_TAG: ServiceId = "DA-Verifier";
 pub enum DaVerifierMsg<B, A> {
