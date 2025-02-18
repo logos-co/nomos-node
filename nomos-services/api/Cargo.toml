@@ -30,6 +30,7 @@ nomos-da-sampling = { path = "../data-availability/sampling" }
 nomos-da-verifier = { path = "../data-availability/verifier", features = ["rocksdb-backend", "libp2p"] }
 nomos-storage = { path = "../../nomos-services/storage", features = ["rocksdb"] }
 nomos-libp2p = { path = "../../nomos-libp2p" }
+nomos-time = { path = "../time" }
 full-replication = { path = "../../nomos-da/full-replication" }
 kzgrs-backend = { path = "../../nomos-da/kzgrs-backend" }
 rand = "0.8"

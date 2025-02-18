@@ -29,6 +29,7 @@ nomos-da-dispersal = { path = "../nomos-services/data-availability/dispersal" }
 nomos-da-indexer = { path = "../nomos-services/data-availability/indexer" }
 nomos-da-verifier = { path = "../nomos-services/data-availability/verifier" }
 nomos-da-sampling = { path = "../nomos-services/data-availability/sampling" }
+nomos-time = { path = "../nomos-services/time" }
 nomos-storage = { path = "../nomos-services/storage" }
 subnetworks-assignations = { path = "../nomos-da/network/subnetworks-assignations" }
 full-replication = { path = "../nomos-da/full-replication" }

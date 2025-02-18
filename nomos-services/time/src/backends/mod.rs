@@ -1,7 +1,7 @@
 mod common;
 #[cfg(feature = "ntp")]
 pub mod ntp;
-mod system_time;
+pub mod system_time;
 
 use crate::EpochSlotTickStream;
 

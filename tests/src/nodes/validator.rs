@@ -28,6 +28,7 @@ use nomos_node::{api::backend::AxumBackendSettings, Config, RocksBackendSettings
 use nomos_node::{BlobInfo, HeaderId, Tx};
 use reqwest::Url;
 use tempfile::NamedTempFile;
+use nomos_time::TimeServiceSettings;
 // Internal
 use super::{create_tempdir, persist_tempdir, GetRangeReq, CLIENT};
 use crate::adjust_timeout;
@@ -328,5 +329,6 @@ pub fn create_validator_config(config: GeneralConfig) -> Config {
             read_only: false,
             column_family: Some("blocks".into()),
         },
+        time: TimeServiceSettings { backend_settings:  },
     }
 }
