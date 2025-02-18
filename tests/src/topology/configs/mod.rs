@@ -5,6 +5,8 @@ pub mod da;
 pub mod network;
 pub mod tracing;
 
+pub mod time;
+
 use api::GeneralApiConfig;
 use blend::GeneralBlendConfig;
 use consensus::GeneralConsensusConfig;

@@ -4,10 +4,12 @@ use crate::EpochSlotTickStream;
 use cryptarchia_engine::{EpochConfig, Slot, SlotConfig};
 use time::OffsetDateTime;
 
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[derive(Clone, Debug)]
 pub struct SystemTimeBackendSettings {
-    slot_config: SlotConfig,
-    epoch_config: EpochConfig,
-    base_period_length: u64,
+    pub slot_config: SlotConfig,
+    pub epoch_config: EpochConfig,
+    pub base_period_length: u64,
 }
 
 pub struct SystemTimeBackend {

@@ -18,6 +18,7 @@ pub enum Error {
     Timeout(Elapsed),
 }
 
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Copy, Clone)]
 pub struct NTPClientSettings {
     timeout: Duration,

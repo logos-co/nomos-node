@@ -40,9 +40,10 @@ impl Debug for TimeServiceMessage {
 
 impl RelayMessage for TimeServiceMessage {}
 
-#[derive(Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[derive(Clone, Debug)]
 pub struct TimeServiceSettings<BackendSettings> {
-    backend_settings: BackendSettings,
+    pub backend_settings: BackendSettings,
 }
 
 pub struct TimeService<Backend>
