@@ -9,6 +9,10 @@ on:
 
 name: PR check
 
+concurrency:
+  group: ${{ github.workflow }}@${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   check:
     name: Check
@@ -18,12 +22,14 @@ jobs:
       matrix:
         feature: [ libp2p ]
     steps:
-      - uses: actions/checkout@v2
-        with:
-          submodules: true
+      - uses: actions/checkout@v4
       - uses: arduino/setup-protoc@v3
         with:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Setup Cargo cache
+        uses: ./.github/actions/setup-cargo-cache
+        with:
+          key: ${{ github.ref }}->${{ github.workflow }}->${{ github.job }}->${{ matrix.feature }}          
       - uses: cargo-bins/cargo-binstall@main
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -35,6 +41,11 @@ jobs:
         with:
           command: check
           args: --all --all-targets --no-default-features --features ${{ matrix.feature }}
+      - name: Update Cargo cache
+        if: success() || failure()
+        uses: ./.github/actions/update-cargo-cache
+        with:
+          key: ${{ github.ref }}->${{ github.workflow }}->${{ github.job }}->${{ matrix.feature }}
 
   test:
     name: Test Suite
@@ -46,15 +57,17 @@ jobs:
         os: [ self-hosted, macos-latest ] # drop windows for now as risc0 does not support it
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v2
-        with:
-          submodules: true
+      - uses: actions/checkout@v4
       - name: Remove unwanted software
         if: matrix.os == 'ubuntu-latest'
         uses: ./.github/actions/prune-vm
       - uses: arduino/setup-protoc@v3
         with:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Setup Cargo cache
+        uses: ./.github/actions/setup-cargo-cache
+        with:
+          key: ${{ github.ref }}->${{ github.workflow }}->${{ github.job }}->${{ matrix.os }}->${{ matrix.feature }}
       # Setup Rust toolchain with GNU for Windows
       - name: Setup Rust with GNU toolchain (Windows)
         if: matrix.os == 'windows-latest'
@@ -99,6 +112,11 @@ jobs:
         with:
           command: test
           args: --no-default-features --features ${{ matrix.feature }}
+      - name: Update Cargo cache
+        if: success() || failure()
+        uses: ./.github/actions/update-cargo-cache
+        with:
+          key: ${{ github.ref }}->${{ github.workflow }}->${{ github.job }}->${{ matrix.os }}->${{ matrix.feature }}
       - name: Cargo bench (no-run)
         if: matrix.os != 'windows-latest'
         uses: actions-rs/cargo@v1
@@ -118,12 +136,14 @@ jobs:
     name: Rust lints
     runs-on: self-hosted
     steps:
-      - uses: actions/checkout@v2
-        with:
-          submodules: true
+      - uses: actions/checkout@v4
       - uses: arduino/setup-protoc@v3
         with:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Setup Cargo cache
+        uses: ./.github/actions/setup-cargo-cache
+        with:
+          key: ${{ github.ref }}->${{ github.workflow }}->${{ github.job }}
       - uses: cargo-bins/cargo-binstall@main
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -141,6 +161,11 @@ jobs:
         with:
           command: clippy
           args: --all --all-targets --all-features -- --deny warnings
+      - name: Update Cargo cache
+        if: success() || failure()
+        uses: ./.github/actions/update-cargo-cache
+        with:
+          key: ${{ github.ref }}->${{ github.workflow }}->${{ github.job }}
 
   cargo-deny:
     name: Check cargo-deny rules

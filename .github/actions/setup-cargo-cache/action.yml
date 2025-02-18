@@ -1,0 +1,23 @@
+name: Setup Cargo cache
+
+inputs:
+  key:
+    description: The key to use for the cache
+    required: true
+
+description: Set up cache read operations for Cargo artifacts
+
+runs:
+  using: composite
+  steps:
+    - name: Set up Cargo cache
+      uses: actions/cache/restore@v4
+      with:
+        path: |
+          ~/.cargo/bin/
+          ~/.cargo/registry/index/
+          ~/.cargo/registry/cache/
+          ~/.cargo/git/db/
+        key: ${{ inputs.key }}->#${{ github.run_id }}
+        restore-keys: |
+          ${{ inputs.key }}
