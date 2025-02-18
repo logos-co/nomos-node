@@ -468,7 +468,7 @@ where
                 tip,
             }) => {
                 info!("Recovering Cryptarchia from genesis...");
-                Self::build_cryptarchia_from_recovery(
+                Self::recover_cryptarchia(
                     tip,
                     genesis_id,
                     genesis_state,
@@ -509,7 +509,7 @@ where
                     );
                 }
 
-                Self::build_cryptarchia_from_recovery(
+                Self::recover_cryptarchia(
                     tip,
                     security_block_id,
                     security_ledger_state,
@@ -930,7 +930,7 @@ where
         blocks_from_tip.collect::<Vec<_>>().await
     }
 
-    /// Builds a cryptarchia instance from a recovery state.
+    /// Recovers cryptarchia from a previously saved state.
     ///
     /// # Arguments
     ///
@@ -944,7 +944,7 @@ where
     /// * `relays` - The relays object containing all the necessary relays for the consensus.
     /// * `block_broadcaster` - The broadcast channel to send the blocks to the services.
     /// * `ledger_config` - The ledger configuration.
-    async fn build_cryptarchia_from_recovery(
+    async fn recover_cryptarchia(
         tip: HeaderId,
         security_header_id: HeaderId,
         security_ledger_state: LedgerState,
