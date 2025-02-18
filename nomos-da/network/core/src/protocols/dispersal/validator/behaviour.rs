@@ -36,6 +36,17 @@ impl DispersalError {
     }
 }
 
+impl Clone for DispersalError {
+    fn clone(&self) -> Self {
+        match self {
+            DispersalError::Io { peer_id, error } => DispersalError::Io {
+                peer_id: *peer_id,
+                error: std::io::Error::new(error.kind(), error.to_string()),
+            },
+        }
+    }
+}
+
 #[derive(Debug)]
 pub enum DispersalEvent {
     /// Received a n
