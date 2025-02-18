@@ -25,6 +25,9 @@ use crate::swarm::common::handlers::{
 use crate::SubnetworkId;
 use subnetworks_assignations::MembershipHandler;
 
+use super::common::handlers::monitor_event;
+use super::common::monitor::{DAConnectionMonitor, DAConnectionMonitorSettings, MonitorEvent};
+
 // Metrics
 const EVENT_SAMPLING: &str = "sampling";
 const EVENT_VALIDATOR_DISPERSAL: &str = "validator_dispersal";
@@ -38,7 +41,7 @@ pub struct ValidatorEventsStream {
 pub struct ValidatorSwarm<
     Membership: MembershipHandler<NetworkId = SubnetworkId, Id = PeerId> + 'static,
 > {
-    swarm: Swarm<ValidatorBehaviour<Membership>>,
+    swarm: Swarm<ValidatorBehaviour<DAConnectionMonitor, Membership>>,
     sampling_events_sender: UnboundedSender<SamplingEvent>,
     validation_events_sender: UnboundedSender<DaBlob>,
 }
@@ -51,6 +54,8 @@ where
         key: Keypair,
         membership: Membership,
         addresses: AddressBook,
+        monitor_settings: DAConnectionMonitorSettings,
+        redial_cooldown: Duration,
     ) -> (Self, ValidatorEventsStream) {
         let (sampling_events_sender, sampling_events_receiver) = unbounded_channel();
         let (validation_events_sender, validation_events_receiver) = unbounded_channel();
@@ -58,9 +63,11 @@ where
         let sampling_events_receiver = UnboundedReceiverStream::new(sampling_events_receiver);
         let validation_events_receiver = UnboundedReceiverStream::new(validation_events_receiver);
 
+        let monitor = DAConnectionMonitor::new(monitor_settings);
+
         (
             Self {
-                swarm: Self::build_swarm(key, membership, addresses),
+                swarm: Self::build_swarm(key, membership, addresses, monitor, redial_cooldown),
                 sampling_events_sender,
                 validation_events_sender,
             },
@@ -74,11 +81,15 @@ where
         key: Keypair,
         membership: Membership,
         addresses: AddressBook,
-    ) -> Swarm<ValidatorBehaviour<Membership>> {
+        monitor: DAConnectionMonitor,
+        redial_cooldown: Duration,
+    ) -> Swarm<ValidatorBehaviour<DAConnectionMonitor, Membership>> {
         SwarmBuilder::with_existing_identity(key)
             .with_tokio()
             .with_quic()
-            .with_behaviour(|key| ValidatorBehaviour::new(key, membership, addresses))
+            .with_behaviour(|key| {
+                ValidatorBehaviour::new(key, membership, addresses, monitor, redial_cooldown)
+            })
             .expect("Validator behaviour should build")
             .with_swarm_config(|cfg| {
                 cfg.with_idle_connection_timeout(Duration::from_secs(u64::MAX))
@@ -109,19 +120,29 @@ where
         self.swarm.local_peer_id()
     }
 
-    pub fn protocol_swarm(&self) -> &Swarm<ValidatorBehaviour<Membership>> {
+    pub fn protocol_swarm(&self) -> &Swarm<ValidatorBehaviour<DAConnectionMonitor, Membership>> {
         &self.swarm
     }
 
-    pub fn protocol_swarm_mut(&mut self) -> &mut Swarm<ValidatorBehaviour<Membership>> {
+    pub fn protocol_swarm_mut(
+        &mut self,
+    ) -> &mut Swarm<ValidatorBehaviour<DAConnectionMonitor, Membership>> {
         &mut self.swarm
     }
 
     async fn handle_sampling_event(&mut self, event: SamplingEvent) {
+        monitor_event(
+            self.swarm.behaviour_mut().monitor_behaviour_mut(),
+            MonitorEvent::from(&event),
+        );
         handle_sampling_event(&mut self.sampling_events_sender, event).await
     }
 
     async fn handle_dispersal_event(&mut self, event: DispersalEvent) {
+        monitor_event(
+            self.swarm.behaviour_mut().monitor_behaviour_mut(),
+            MonitorEvent::from(&event),
+        );
         handle_validator_dispersal_event(
             &mut self.validation_events_sender,
             self.swarm.behaviour_mut().replication_behaviour_mut(),
@@ -131,10 +152,17 @@ where
     }
 
     async fn handle_replication_event(&mut self, event: ReplicationEvent) {
+        monitor_event(
+            self.swarm.behaviour_mut().monitor_behaviour_mut(),
+            MonitorEvent::from(&event),
+        );
         handle_replication_event(&mut self.validation_events_sender, event).await
     }
 
-    async fn handle_behaviour_event(&mut self, event: ValidatorBehaviourEvent<Membership>) {
+    async fn handle_behaviour_event(
+        &mut self,
+        event: ValidatorBehaviourEvent<DAConnectionMonitor, Membership>,
+    ) {
         match event {
             ValidatorBehaviourEvent::Sampling(event) => {
                 tracing::info!(
@@ -159,6 +187,7 @@ where
                 );
                 self.handle_replication_event(event).await;
             }
+            _ => {}
         }
     }
 

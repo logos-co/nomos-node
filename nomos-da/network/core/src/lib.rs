@@ -1,5 +1,6 @@
 pub mod address_book;
 pub mod behaviour;
+pub mod maintenance;
 pub mod protocol;
 pub mod protocols;
 pub mod swarm;

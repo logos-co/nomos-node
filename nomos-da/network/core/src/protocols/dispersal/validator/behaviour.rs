@@ -4,6 +4,7 @@ use either::Either;
 use futures::future::BoxFuture;
 use futures::stream::FuturesUnordered;
 use futures::{AsyncWriteExt, FutureExt, StreamExt};
+use libp2p::core::transport::PortUse;
 use libp2p::core::Endpoint;
 use libp2p::swarm::{
     ConnectionDenied, ConnectionId, FromSwarm, NetworkBehaviour, THandler, THandlerInEvent,
@@ -31,6 +32,17 @@ impl DispersalError {
     pub fn peer_id(&self) -> Option<&PeerId> {
         match self {
             Self::Io { peer_id, .. } => Some(peer_id),
+        }
+    }
+}
+
+impl Clone for DispersalError {
+    fn clone(&self) -> Self {
+        match self {
+            DispersalError::Io { peer_id, error } => DispersalError::Io {
+                peer_id: *peer_id,
+                error: std::io::Error::new(error.kind(), error.to_string()),
+            },
         }
     }
 }
@@ -141,6 +153,7 @@ impl<M: MembershipHandler<Id = PeerId, NetworkId = SubnetworkId> + 'static> Netw
         _peer: PeerId,
         _addr: &Multiaddr,
         _role_override: Endpoint,
+        _port_use: PortUse,
     ) -> Result<THandler<Self>, ConnectionDenied> {
         Ok(Either::Right(libp2p::swarm::dummy::ConnectionHandler))
     }
