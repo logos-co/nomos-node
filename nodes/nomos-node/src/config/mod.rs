@@ -19,7 +19,6 @@ use nomos_libp2p::{ed25519::SecretKey, Multiaddr};
 use nomos_network::{backends::libp2p::Libp2p as NetworkBackend, NetworkService};
 use nomos_storage::backends::rocksdb::RocksBackend;
 use nomos_time::TimeService;
-use nomos_tracing::logging::{gelf::GelfConfig, local::FileConfig};
 use nomos_tracing_service::{LoggerLayer, Tracing};
 use overwatch_rs::services::ServiceData;
 use serde::{Deserialize, Serialize};
