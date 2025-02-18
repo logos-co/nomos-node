@@ -2,11 +2,10 @@
 
 // crates
 use futures::stream::StreamExt;
-use log::error;
+use nomos_utils::lifecycle;
 // internal
 use overwatch_rs::overwatch::handle::OverwatchHandle;
 use overwatch_rs::services::handle::ServiceStateHandle;
-use overwatch_rs::services::life_cycle::LifecycleMessage;
 use overwatch_rs::services::relay::NoMessage;
 use overwatch_rs::services::state::{NoOperator, NoState};
 use overwatch_rs::services::{ServiceCore, ServiceData, ServiceId};
@@ -17,21 +16,6 @@ pub struct SystemSig {
 }
 
 impl SystemSig {
-    async fn should_stop_service(msg: LifecycleMessage) -> bool {
-        match msg {
-            LifecycleMessage::Shutdown(sender) => {
-                if sender.send(()).is_err() {
-                    error!(
-                        "Error sending successful shutdown signal from service {}",
-                        Self::SERVICE_ID
-                    );
-                }
-                true
-            }
-            LifecycleMessage::Kill => true,
-        }
-    }
-
     async fn ctrlc_signal_received(overwatch_handle: &OverwatchHandle) {
         overwatch_handle.kill().await
     }
@@ -65,7 +49,7 @@ impl ServiceCore for SystemSig {
                     Self::ctrlc_signal_received(&service_state.overwatch_handle).await;
                 }
                 Some(msg) = lifecycle_stream.next() => {
-                    if  Self::should_stop_service(msg).await {
+                    if  lifecycle::should_stop_service(&msg, Self::SERVICE_ID).await {
                         break;
                     }
                 }

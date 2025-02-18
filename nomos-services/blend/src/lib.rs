@@ -19,9 +19,9 @@ use nomos_blend::{
 use nomos_blend_message::{sphinx::SphinxMessage, BlendMessage};
 use nomos_core::wire;
 use nomos_network::NetworkService;
+use nomos_utils::lifecycle;
 use overwatch_rs::services::{
     handle::ServiceStateHandle,
-    life_cycle::LifecycleMessage,
     relay::{Relay, RelayMessage},
     state::{NoOperator, NoState},
     ServiceCore, ServiceData, ServiceId,
@@ -191,7 +191,8 @@ where
                     Self::wrap_and_send_to_persistent_transmission(msg, &mut cryptographic_processor, &persistent_sender);
                 }
                 Some(msg) = lifecycle_stream.next() => {
-                    if Self::should_stop_service(msg).await {
+                    if lifecycle::should_stop_service(&msg, Self::SERVICE_ID).await {
+                        // TODO: Maybe add a call to backend to handle this. Maybe trying to save unprocessed messages?
                         break;
                     }
                 }
@@ -210,22 +211,6 @@ where
     Network: NetworkAdapter,
     Network::BroadcastSettings: Clone + Debug + Serialize + DeserializeOwned,
 {
-    async fn should_stop_service(msg: LifecycleMessage) -> bool {
-        match msg {
-            LifecycleMessage::Kill => true,
-            LifecycleMessage::Shutdown(signal_sender) => {
-                // TODO: Maybe add a call to backend to handle this. Maybe trying to save unprocessed messages?
-                if signal_sender.send(()).is_err() {
-                    tracing::error!(
-                        "Error sending successful shutdown signal from service {}",
-                        Self::SERVICE_ID
-                    );
-                }
-                true
-            }
-        }
-    }
-
     fn wrap_and_send_to_persistent_transmission(
         message: Vec<u8>,
         cryptographic_processor: &mut CryptographicProcessor<

@@ -10,7 +10,6 @@ use nomos_core::da::blob::Blob;
 use nomos_da_network_service::NetworkService;
 use nomos_storage::StorageService;
 use overwatch_rs::services::handle::ServiceStateHandle;
-use overwatch_rs::services::life_cycle::LifecycleMessage;
 use overwatch_rs::services::relay::{Relay, RelayMessage};
 use overwatch_rs::services::state::{NoOperator, NoState};
 use overwatch_rs::services::{ServiceCore, ServiceData, ServiceId};
@@ -24,6 +23,7 @@ use tracing::instrument;
 use backend::VerifierBackend;
 use network::NetworkAdapter;
 use nomos_tracing::info_with_id;
+use nomos_utils::lifecycle;
 use storage::DaStorageAdapter;
 
 const DA_VERIFIER_TAG: ServiceId = "DA-Verifier";
@@ -91,21 +91,6 @@ where
             verifier.verify(blob)?;
             storage_adapter.add_blob(blob, &()).await?;
             Ok(())
-        }
-    }
-
-    async fn should_stop_service(message: LifecycleMessage) -> bool {
-        match message {
-            LifecycleMessage::Shutdown(sender) => {
-                if sender.send(()).is_err() {
-                    error!(
-                        "Error sending successful shutdown signal from service {}",
-                        Self::SERVICE_ID
-                    );
-                }
-                true
-            }
-            LifecycleMessage::Kill => true,
         }
     }
 }
@@ -207,7 +192,7 @@ where
                     };
                 }
                 Some(msg) = lifecycle_stream.next() => {
-                    if Self::should_stop_service(msg).await {
+                    if lifecycle::should_stop_service(&msg, Self::SERVICE_ID).await {
                         break;
                     }
                 }
