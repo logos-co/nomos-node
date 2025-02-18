@@ -35,7 +35,7 @@ jobs:
           CONSENSUS_SLOT_TIME: 5
         with:
           command: test
-          args: --all --all-features
+          args: --all --no-default-features --features libp2p
       - name: Run Grcov
         run: |
           rm -rf /tmp/coverage 

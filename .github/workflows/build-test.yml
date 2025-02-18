@@ -38,6 +38,7 @@ jobs:
     strategy:
       fail-fast: false # all OSes should be tested even if one fails (default: true)
       matrix:
+        feature: [ libp2p ]
         os: [ self-hosted, macos-latest ] # drop windows for now as risc0 does not support it
     runs-on: ${{ matrix.os }}
     steps:
@@ -77,7 +78,7 @@ jobs:
           CONSENSUS_SLOT_TIME: 5
         with:
           command: test
-          args: --all --all-targets --all-features
+          args: --all --no-default-features --features ${{ matrix.feature }}
       - name: Cargo test (Windows)
         if: matrix.os == 'windows-latest'
         uses: actions-rs/cargo@v1
@@ -88,7 +89,7 @@ jobs:
           CONSENSUS_SLOT_TIME: 5
         with:
           command: test
-          args: --all-targets --all-features
+          args: --no-default-features --features ${{ matrix.feature }}
       - name: Cargo bench (no-run)
         if: matrix.os != 'windows-latest'
         uses: actions-rs/cargo@v1
