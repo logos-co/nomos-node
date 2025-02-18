@@ -1,4 +1,5 @@
 pub mod fisheryates;
+pub mod lifecycle;
 
 #[cfg(feature = "serde")]
 pub mod serde {

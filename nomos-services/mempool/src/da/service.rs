@@ -21,14 +21,13 @@ use nomos_da_sampling::{
     DaSamplingService, DaSamplingServiceMsg,
 };
 use nomos_network::{NetworkMsg, NetworkService};
-use overwatch_rs::services::life_cycle::LifecycleMessage;
+use nomos_utils::lifecycle;
 use overwatch_rs::services::{
     handle::ServiceStateHandle,
     relay::{OutboundRelay, Relay},
     state::{NoOperator, NoState},
     ServiceCore, ServiceData, ServiceId,
 };
-use tracing::error;
 
 pub struct DaMempoolService<N, P, DB, DN, R, SamplingStorage>
 where
@@ -158,7 +157,7 @@ where
                     tracing::info!(counter.da_mempool_pending_items = pool.pending_item_count());
                 }
                 Some(msg) = lifecycle_stream.next() =>  {
-                    if Self::should_stop_service(msg).await {
+                    if lifecycle::should_stop_service::<Self>(&msg).await {
                         break;
                     }
                 }
@@ -186,21 +185,6 @@ where
     DaStorage: DaStorageAdapter,
     R: SeedableRng + RngCore,
 {
-    async fn should_stop_service(message: LifecycleMessage) -> bool {
-        match message {
-            LifecycleMessage::Shutdown(sender) => {
-                if sender.send(()).is_err() {
-                    error!(
-                        "Error sending successful shutdown signal from service {}",
-                        Self::SERVICE_ID
-                    );
-                }
-                true
-            }
-            LifecycleMessage::Kill => true,
-        }
-    }
-
     async fn handle_mempool_message(
         message: MempoolMsg<P::BlockId, N::Payload, P::Item, P::Key>,
         pool: &mut P,

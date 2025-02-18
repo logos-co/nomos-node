@@ -10,14 +10,14 @@ use tokio::sync::broadcast;
 use tokio::sync::oneshot;
 // internal
 use backends::NetworkBackend;
-use overwatch_rs::services::life_cycle::LifecycleMessage;
 use overwatch_rs::services::{
     handle::ServiceStateHandle,
     relay::RelayMessage,
     state::{NoOperator, ServiceState},
     ServiceCore, ServiceData, ServiceId,
 };
-use tracing::error;
+
+use nomos_utils::lifecycle;
 
 pub enum NetworkMsg<B: NetworkBackend> {
     Process(B::Message),
@@ -105,7 +105,8 @@ where
                     Self::handle_network_service_message(msg, &mut backend).await;
                 }
                 Some(msg) = lifecycle_stream.next() => {
-                    if Self::should_stop_service(msg).await {
+                    if lifecycle::should_stop_service::<Self>(&msg).await {
+                        // TODO: Maybe add a call to backend to handle this. Maybe trying to save unprocessed messages?
                         break;
                     }
                 }
@@ -135,22 +136,6 @@ where
                         "client hung up before a subscription handle could be established"
                     )
                 }),
-        }
-    }
-
-    async fn should_stop_service(msg: LifecycleMessage) -> bool {
-        match msg {
-            LifecycleMessage::Kill => true,
-            LifecycleMessage::Shutdown(signal_sender) => {
-                // TODO: Maybe add a call to backend to handle this. Maybe trying to save unprocessed messages?
-                if signal_sender.send(()).is_err() {
-                    error!(
-                        "Error sending successful shutdown signal from service {}",
-                        Self::SERVICE_ID
-                    );
-                }
-                true
-            }
         }
     }
 }
