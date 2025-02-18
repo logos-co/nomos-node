@@ -112,11 +112,6 @@ jobs:
         with:
           command: test
           args: --no-default-features --features ${{ matrix.feature }}
-      - name: Update Cargo cache
-        if: success() || failure()
-        uses: ./.github/actions/update-cargo-cache
-        with:
-          key: ${{ github.ref }}->${{ github.workflow }}->${{ github.job }}->${{ matrix.os }}->${{ matrix.feature }}
       - name: Cargo bench (no-run)
         if: matrix.os != 'windows-latest'
         uses: actions-rs/cargo@v1
@@ -126,6 +121,11 @@ jobs:
         with:
           command: bench
           args: --no-run
+      - name: Update Cargo cache
+        if: success() || failure()
+        uses: ./.github/actions/update-cargo-cache
+        with:
+          key: ${{ github.ref }}->${{ github.workflow }}->${{ github.job }}->${{ matrix.os }}->${{ matrix.feature }}          
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
