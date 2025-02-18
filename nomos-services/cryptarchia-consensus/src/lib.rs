@@ -893,6 +893,34 @@ where
         blocks_from_tip.collect::<Vec<_>>().await
     }
 
+    /// Sends the `leader` a block range from `from` to `to` from the storage so it can update its
+    ///     state.
+    ///
+    /// # Arguments
+    ///
+    /// * `leader` - The leader instance to be updated. It should be up-to-date with the state of
+    ///    the ledger up to `from`.
+    /// * `to` - The header id up to which the leader should be updated.
+    /// * `from` - The header id from which the leader should be updated.
+    /// * `storage_adapter` - The storage adapter to fetch the blocks from.
+    async fn follow_chain_in_range(
+        leader: &mut Leader,
+        to: HeaderId,
+        from: HeaderId,
+        storage_adapter: &StorageAdapter<Storage, TxS::Tx, BS::BlobId>,
+    ) {
+        // TODO: OPTIMIZE: Fetch only headers
+        let blocks_to_security = Self::get_blocks_in_range(to, from, storage_adapter)
+            .await
+            .into_iter()
+            .rev();
+
+        // TODO: Move to stream
+        for block in blocks_to_security {
+            leader.follow_chain_with_header(block.header());
+        }
+    }
+
     /// Builds cryptarchia
     /// The build process is determined by the initial state passed:
     /// - If the initial state doesn't contain any recovery information, cryptarchia is built from
@@ -952,7 +980,7 @@ where
                     leader,
                     relays,
                     block_subscription_sender,
-                    ledger_config.clone(),
+                    ledger_config,
                 )
                 .await
             }
@@ -965,26 +993,13 @@ where
 
                 info!("Recovering Cryptarchia from security...");
                 info!("Leader is out of date, updating from genesis until security block.");
-                // TODO: OPTIMIZE: Fetch only headers
-                // TODO: Move to function
-                let blocks_to_security = Self::get_blocks_in_range(
+                Self::follow_chain_in_range(
+                    leader,
                     security_block_id,
                     genesis_id,
                     relays.storage_adapter(),
                 )
-                .await
-                .into_iter()
-                .rev();
-
-                // TODO: Move to stream
-                for block in blocks_to_security {
-                    let header = block.header();
-                    leader.follow_chain(
-                        header.parent(),
-                        header.id(),
-                        header.leader_proof().nullifier(),
-                    );
-                }
+                .await;
 
                 Self::recover_cryptarchia(
                     tip,
@@ -993,7 +1008,7 @@ where
                     leader,
                     relays,
                     block_subscription_sender,
-                    ledger_config.clone(),
+                    ledger_config,
                 )
                 .await
             }
