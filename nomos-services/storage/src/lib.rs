@@ -7,7 +7,6 @@ use backends::StorageBackend;
 use backends::{StorageSerde, StorageTransaction};
 use bytes::Bytes;
 use futures::StreamExt;
-use nomos_utils::lifecycle;
 use overwatch_rs::services::handle::ServiceStateHandle;
 use overwatch_rs::services::relay::RelayMessage;
 use overwatch_rs::services::state::{NoOperator, NoState};
@@ -15,6 +14,7 @@ use overwatch_rs::services::{ServiceCore, ServiceData, ServiceId};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 // std
+use services_utils::overwatch::lifecycle;
 use std::fmt::{Debug, Formatter};
 use std::marker::PhantomData;
 use tracing::error;

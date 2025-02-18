@@ -2,7 +2,6 @@
 
 // crates
 use futures::stream::StreamExt;
-use nomos_utils::lifecycle;
 // internal
 use overwatch_rs::overwatch::handle::OverwatchHandle;
 use overwatch_rs::services::handle::ServiceStateHandle;
@@ -10,6 +9,7 @@ use overwatch_rs::services::relay::NoMessage;
 use overwatch_rs::services::state::{NoOperator, NoState};
 use overwatch_rs::services::{ServiceCore, ServiceData, ServiceId};
 use overwatch_rs::DynError;
+use services_utils::overwatch::lifecycle;
 
 pub struct SystemSig {
     service_state: ServiceStateHandle<Self>,
