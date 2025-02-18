@@ -1,12 +1,9 @@
-use std::num::NonZero;
-
 use cl::{NoteWitness, NullifierSecret};
 use cryptarchia_consensus::LeaderConfig;
 use cryptarchia_engine::EpochConfig;
 use nomos_core::staking::NMO_UNIT;
 use nomos_ledger::LedgerState;
 use rand::thread_rng;
-use time::OffsetDateTime;
 
 #[derive(Clone)]
 pub struct ConsensusParams {

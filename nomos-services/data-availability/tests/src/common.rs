@@ -10,6 +10,17 @@ use kzgrs_backend::{
     dispersal::BlobInfo,
     encoder::{DaEncoder, DaEncoderParams},
 };
+use nomos_blend_message::{sphinx::SphinxMessage, BlendMessage};
+use nomos_da_network_service::backends::libp2p::common::DaNetworkBackendSettings;
+use std::path::{Path, PathBuf};
+use std::time::Duration;
+// crates
+use cryptarchia_consensus::TimeConfig;
+use bytes::Bytes;
+use kzgrs_backend::common::blob::DaBlob;
+use kzgrs_backend::dispersal::BlobInfo;
+use kzgrs_backend::encoder::DaEncoder;
+use kzgrs_backend::encoder::DaEncoderParams;
 use libp2p::identity::{
     ed25519::{self, Keypair as Ed25519Keypair},
     Keypair, PeerId,
@@ -123,7 +134,7 @@ pub(crate) type Cryptarchia = cryptarchia_consensus::CryptarchiaConsensus<
     SamplingLibp2pAdapter<NomosDaMembership>,
     IntegrationRng,
     SamplingStorageAdapter<DaBlob, Wire>,
-    SystemTimeBackend,
+    nomos_time::backends::system_time::SystemTimeBackend,
 >;
 
 pub type DaSampling = DaSamplingService<
@@ -156,7 +167,7 @@ pub(crate) type DaIndexer = DataIndexerService<
     SamplingLibp2pAdapter<NomosDaMembership>,
     IntegrationRng,
     SamplingStorageAdapter<DaBlob, Wire>,
-    SystemTimeBackend,
+    nomos_time::backends::system_time::SystemTimeBackend,
 >;
 
 pub(crate) type TxMempool = TxMempoolService<
@@ -224,7 +235,6 @@ pub fn new_node(
     leader_config: &LeaderConfig,
     ledger_config: &nomos_ledger::Config,
     genesis_state: &LedgerState,
-    slot_config: &SlotConfig,
     swarm_config: &SwarmConfig,
     blend_config: &TestBlendSettings,
     db_path: PathBuf,

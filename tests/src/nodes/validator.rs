@@ -7,7 +7,7 @@ use std::{
 };
 
 use cryptarchia_consensus::{CryptarchiaInfo, CryptarchiaSettings};
-use cryptarchia_engine::time::SlotConfig;
+use cryptarchia_engine::SlotConfig;
 use kzgrs_backend::common::blob::DaBlob;
 use nomos_blend::message_blend::{
     CryptographicProcessorSettings, MessageBlendSettings, TemporalSchedulerSettings,
@@ -43,9 +43,10 @@ use nomos_node::{
 use nomos_time::{backends::system_time::SystemTimeBackendSettings, TimeServiceSettings};
 use nomos_tracing::logging::local::FileConfig;
 use nomos_tracing_service::LoggerLayer;
+use nomos_time::backends::system_time::SystemTimeBackendSettings;
+use nomos_time::TimeServiceSettings;
 use reqwest::Url;
 use tempfile::NamedTempFile;
-use nomos_time::TimeServiceSettings;
 // Internal
 use super::{create_tempdir, persist_tempdir, GetRangeReq, CLIENT};
 use crate::{
@@ -276,7 +277,7 @@ pub fn create_validator_config(config: GeneralConfig) -> Config {
         },
         cryptarchia: CryptarchiaSettings {
             leader_config: config.consensus_config.leader_config,
-            config: config.consensus_config.ledger_config,
+            config: config.consensus_config.ledger_config.clone(),
             genesis_state: config.consensus_config.genesis_state,
             transaction_selector_settings: (),
             blob_selector_settings: (),
@@ -343,6 +344,15 @@ pub fn create_validator_config(config: GeneralConfig) -> Config {
             read_only: false,
             column_family: Some("blocks".into()),
         },
-        time: TimeServiceSettings { backend_settings:  },
+        time: TimeServiceSettings {
+            backend_settings: SystemTimeBackendSettings {
+                slot_config: SlotConfig {
+                    slot_duration: config.time_config.slot_duration.clone(),
+                    chain_start_time: config.time_config.chain_start_time.clone(),
+                },
+                epoch_config: config.consensus_config.ledger_config.epoch_config,
+                base_period_length: config.consensus_config.ledger_config.base_period_length(),
+            },
+        },
     }
 }

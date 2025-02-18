@@ -8,6 +8,7 @@ use configs::{
 };
 use rand::{thread_rng, Rng};
 
+use crate::topology::configs::time::default_time_config;
 use crate::{
     nodes::{
         executor::{create_executor_config, Executor},
