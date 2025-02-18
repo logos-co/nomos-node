@@ -1,0 +1,13 @@
+exclude = ["target/**"]
+
+[formatting]
+align_entries       = true
+allowed_blank_lines = 1
+reorder_arrays      = true
+reorder_keys        = true
+
+[[rule]]
+keys = ["build-dependencies", "dependencies", "dev-dependencies"]
+
+[rule.formatting]
+column_width = 120

@@ -1,13 +1,12 @@
 [package]
-name = "subnetworks-assignations"
-version = "0.1.0"
 edition = "2021"
 license = { workspace = true }
+name    = "subnetworks-assignations"
+version = "0.1.0"
 
 [dependencies]
 libp2p-identity = { version = "0.2", features = ["peerid", "serde"] }
-serde = "1"
-
+serde           = "1"
 
 [dev-dependencies]
 libp2p-identity = { version = "0.2", features = ["rand"] }

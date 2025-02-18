@@ -8,10 +8,8 @@ use nomos_da_network_service::backends::libp2p::executor::DaNetworkExecutorBacke
 use nomos_da_network_service::NetworkService as DaNetworkService;
 use nomos_network::backends::libp2p::Libp2p as NetworkBackend;
 use nomos_node::{
-    config::{
-        update_blend, update_cryptarchia_consensus, update_network, update_tracing, BlendArgs,
-    },
-    CryptarchiaArgs, HttpArgs, LogArgs, NetworkArgs, NetworkService, Tracing, Wire,
+    config::{update_blend, update_cryptarchia_consensus, update_network, BlendArgs},
+    CryptarchiaArgs, HttpArgs, LogArgs, NetworkArgs, NetworkService, Wire,
 };
 use nomos_storage::backends::rocksdb::RocksBackend;
 use overwatch_rs::services::ServiceData;
@@ -22,7 +20,8 @@ use crate::ExecutorApiService;
 
 #[derive(Deserialize, Debug, Clone, Serialize)]
 pub struct Config {
-    pub tracing: <Tracing as ServiceData>::Settings,
+    #[cfg(feature = "tracing")]
+    pub tracing: <nomos_node::Tracing as ServiceData>::Settings,
     pub network: <NetworkService<NetworkBackend> as ServiceData>::Settings,
     pub blend: <BlendService<BlendBackend, BlendNetworkAdapter> as ServiceData>::Settings,
     pub da_dispersal: <crate::DaDispersal as ServiceData>::Settings,
@@ -39,13 +38,14 @@ pub struct Config {
 impl Config {
     pub fn update_from_args(
         mut self,
-        log_args: LogArgs,
+        #[allow(unused_variables)] log_args: LogArgs,
         network_args: NetworkArgs,
         blend_args: BlendArgs,
         http_args: HttpArgs,
         cryptarchia_args: CryptarchiaArgs,
     ) -> Result<Self> {
-        update_tracing(&mut self.tracing, log_args)?;
+        #[cfg(feature = "tracing")]
+        nomos_node::config::update_tracing(&mut self.tracing, log_args)?;
         update_network(&mut self.network, network_args)?;
         update_blend(&mut self.blend, blend_args)?;
         update_http(&mut self.http, http_args)?;

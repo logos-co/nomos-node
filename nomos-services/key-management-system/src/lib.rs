@@ -122,7 +122,10 @@ where
     Backend::SupportedKeyTypes: Debug + Send,
     Backend::Settings: Clone + Send + Sync,
 {
-    fn init(service_state: ServiceStateHandle<Self>) -> Result<Self, DynError> {
+    fn init(
+        service_state: ServiceStateHandle<Self>,
+        _initial_state: Self::State,
+    ) -> Result<Self, DynError> {
         let KMSServiceSettings { backend_settings } =
             service_state.settings_reader.get_updated_settings();
         let backend = Backend::new(backend_settings);

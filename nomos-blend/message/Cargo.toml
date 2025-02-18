@@ -1,20 +1,16 @@
 [package]
-name = "nomos-blend-message"
-version = "0.1.0"
 edition = "2021"
 license = { workspace = true }
+name    = "nomos-blend-message"
+version = "0.1.0"
 
 [dependencies]
-itertools = "0.13"
-rand_chacha = "0.3"
-sha2 = "0.10"
+itertools     = "0.13"
+rand_chacha   = "0.3"
+sha2          = "0.10"
 sphinx-packet = "0.2"
-thiserror = "1.0.65"
-x25519-dalek = { version = "2.0.1", features = [
-    "getrandom",
-    "static_secrets",
-    "serde",
-] }
+thiserror     = "1.0.65"
+x25519-dalek  = { version = "2.0.1", features = ["getrandom", "serde", "static_secrets"] }
 
 [dev-dependencies]
-nomos-core = { path = "../../nomos-core/chain-defs" }
+nomos-core = { workspace = true }

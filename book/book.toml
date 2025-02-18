@@ -1,6 +1,6 @@
 [book]
-authors = []
-language = "en"
+authors      = []
+language     = "en"
 multilingual = false
-src = "src"
-title = "Nomos Node"
+src          = "src"
+title        = "Nomos Node"

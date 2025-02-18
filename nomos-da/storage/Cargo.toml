@@ -1,11 +1,11 @@
 [package]
-name = "nomos-da-storage"
-version = "0.1.0"
 edition = "2021"
 license = { workspace = true }
+name    = "nomos-da-storage"
+version = "0.1.0"
 
 [dependencies]
-bytes = "1.2"
-hex = "0.4.3"
-tokio = { version = "1", features = ["fs", "io-util"] }
+bytes   = "1.2"
+hex     = "0.4.3"
+tokio   = { version = "1", features = ["fs", "io-util"] }
 tracing = "0.1"
