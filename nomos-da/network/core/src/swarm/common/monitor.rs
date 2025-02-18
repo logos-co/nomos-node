@@ -139,7 +139,7 @@ impl PeerStats {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct DAConnectionMonitorSettings {
     pub max_dispersal_failures: usize,
     pub max_sampling_failures: usize,
