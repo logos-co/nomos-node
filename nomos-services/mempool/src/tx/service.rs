@@ -14,14 +14,13 @@ use crate::backend::MemPool;
 use crate::network::NetworkAdapter;
 use crate::{MempoolMetrics, MempoolMsg};
 use nomos_network::{NetworkMsg, NetworkService};
-use overwatch_rs::services::life_cycle::LifecycleMessage;
+use nomos_utils::lifecycle;
 use overwatch_rs::services::{
     handle::ServiceStateHandle,
     relay::{OutboundRelay, Relay},
     state::{NoOperator, NoState},
     ServiceCore, ServiceData, ServiceId,
 };
-use tracing::error;
 
 pub struct TxMempoolService<N, P>
 where
@@ -117,7 +116,7 @@ where
                     tracing::info!(counter.tx_mempool_pending_items = pool.pending_item_count());
                 }
                 Some(msg) = lifecycle_stream.next() =>  {
-                    if Self::should_stop_service(msg).await {
+                    if lifecycle::should_stop_service::<Self>(&msg).await {
                         break;
                     }
                 }
@@ -137,21 +136,6 @@ where
     P::BlockId: Debug + Send + 'static,
     N: NetworkAdapter<Payload = P::Item, Key = P::Key> + Send + Sync + 'static,
 {
-    async fn should_stop_service(message: LifecycleMessage) -> bool {
-        match message {
-            LifecycleMessage::Shutdown(sender) => {
-                if sender.send(()).is_err() {
-                    error!(
-                        "Error sending successful shutdown signal from service {}",
-                        Self::SERVICE_ID
-                    );
-                }
-                true
-            }
-            LifecycleMessage::Kill => true,
-        }
-    }
-
     async fn handle_mempool_message(
         message: MempoolMsg<P::BlockId, P::Item, P::Item, P::Key>,
         pool: &mut P,

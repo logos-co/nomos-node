@@ -3,8 +3,8 @@ use crate::secure_key::SecuredKey;
 use bytes::Bytes;
 use futures::StreamExt;
 use log::error;
+use nomos_utils::lifecycle;
 use overwatch_rs::services::handle::ServiceStateHandle;
-use overwatch_rs::services::life_cycle::LifecycleMessage;
 use overwatch_rs::services::relay::RelayMessage;
 use overwatch_rs::services::state::{NoOperator, NoState};
 use overwatch_rs::services::{ServiceCore, ServiceData, ServiceId};
@@ -122,7 +122,10 @@ where
     Backend::SupportedKeyTypes: Debug + Send,
     Backend::Settings: Clone + Send + Sync,
 {
-    fn init(service_state: ServiceStateHandle<Self>) -> Result<Self, DynError> {
+    fn init(
+        service_state: ServiceStateHandle<Self>,
+        _initial_state: Self::State,
+    ) -> Result<Self, DynError> {
         let KMSServiceSettings { backend_settings } =
             service_state.settings_reader.get_updated_settings();
         let backend = Backend::new(backend_settings);
@@ -144,7 +147,9 @@ where
                     Self::handle_kms_message(msg, &mut backend).await;
                 }
                 Some(msg) = lifecycle_stream.next() => {
-                    Self::should_stop_service(msg).await;
+                    if lifecycle::should_stop_service::<Self>(&msg).await {
+                        return Ok(());
+                    }
                 }
             }
         }
@@ -158,20 +163,6 @@ where
     Backend::SupportedKeyTypes: Debug,
     Backend::Settings: Clone,
 {
-    async fn should_stop_service(message: LifecycleMessage) -> bool {
-        match message {
-            LifecycleMessage::Shutdown(sender) => {
-                if sender.send(()).is_err() {
-                    error!(
-                        "Error sending successful shutdown signal from service {}",
-                        Self::SERVICE_ID
-                    );
-                }
-                true
-            }
-            LifecycleMessage::Kill => true,
-        }
-    }
     async fn handle_kms_message(msg: KMSMessage<Backend>, backend: &mut Backend) {
         match msg {
             KMSMessage::Register {

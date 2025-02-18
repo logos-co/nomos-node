@@ -5,7 +5,7 @@ edition = "2021"
 license = { workspace = true }
 
 [dependencies]
-overwatch-rs = { git = "https://github.com/logos-co/Overwatch", rev = "4160cdd" }
+overwatch-rs = { git = "https://github.com/logos-co/Overwatch", rev = "f5f7ea0" }
 tokio = { version = "1", features = ["macros"] }
 bytes = "1"
 futures = "0.3"
@@ -15,6 +15,7 @@ thiserror = "2"
 zeroize = { version = "1", features = ["zeroize_derive"] }
 ed25519-dalek = { version = "2", features = ["serde", "zeroize"] }
 serde = { version = "1", features = ["derive"] }
+nomos-utils = { path = "../../nomos-utils" }
 
 [dev-dependencies]
 ed25519-dalek = { version = "2", features = ["rand_core"] }

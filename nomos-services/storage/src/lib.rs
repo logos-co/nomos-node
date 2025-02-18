@@ -1,22 +1,22 @@
 pub mod backends;
 
-// std
-use std::fmt::{Debug, Formatter};
-use std::marker::PhantomData;
 // crates
 use async_trait::async_trait;
-use bytes::Bytes;
-use futures::StreamExt;
-use overwatch_rs::services::handle::ServiceStateHandle;
-use serde::de::DeserializeOwned;
-use serde::Serialize;
 // internal
 use backends::StorageBackend;
 use backends::{StorageSerde, StorageTransaction};
-use overwatch_rs::services::life_cycle::LifecycleMessage;
+use bytes::Bytes;
+use futures::StreamExt;
+use nomos_utils::lifecycle;
+use overwatch_rs::services::handle::ServiceStateHandle;
 use overwatch_rs::services::relay::RelayMessage;
 use overwatch_rs::services::state::{NoOperator, NoState};
 use overwatch_rs::services::{ServiceCore, ServiceData, ServiceId};
+use serde::de::DeserializeOwned;
+use serde::Serialize;
+// std
+use std::fmt::{Debug, Formatter};
+use std::marker::PhantomData;
 use tracing::error;
 
 /// Storage message that maps to [`StorageBackend`] trait
@@ -176,21 +176,6 @@ pub struct StorageService<Backend: StorageBackend + Send + Sync + 'static> {
 }
 
 impl<Backend: StorageBackend + Send + Sync + 'static> StorageService<Backend> {
-    async fn should_stop_service(msg: LifecycleMessage) -> bool {
-        match msg {
-            LifecycleMessage::Shutdown(sender) => {
-                // TODO: Try to finish pending transactions if any and close connections properly
-                if sender.send(()).is_err() {
-                    error!(
-                        "Error sending successful shutdown signal from service {}",
-                        Self::SERVICE_ID
-                    );
-                }
-                true
-            }
-            LifecycleMessage::Kill => true,
-        }
-    }
     async fn handle_storage_message(msg: StorageMsg<Backend>, backend: &mut Backend) {
         if let Err(e) = match msg {
             StorageMsg::Load { key, reply_channel } => {
@@ -330,7 +315,8 @@ impl<Backend: StorageBackend + Send + Sync + 'static> ServiceCore for StorageSer
                     Self::handle_storage_message(msg, backend).await;
                 }
                 Some(msg) = lifecycle_stream.next() => {
-                    if Self::should_stop_service(msg).await {
+                    if lifecycle::should_stop_service::<Self>(&msg).await {
+                        // TODO: Try to finish pending transactions if any and close connections properly
                         break;
                     }
                 }

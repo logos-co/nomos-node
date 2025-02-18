@@ -13,7 +13,6 @@ use nomos_da_network_service::backends::libp2p::common::SamplingEvent;
 use nomos_da_network_service::NetworkService;
 use nomos_storage::StorageService;
 use overwatch_rs::services::handle::ServiceStateHandle;
-use overwatch_rs::services::life_cycle::LifecycleMessage;
 use overwatch_rs::services::relay::{Relay, RelayMessage};
 use overwatch_rs::services::state::{NoOperator, NoState};
 use overwatch_rs::services::{ServiceCore, ServiceData, ServiceId};
@@ -26,6 +25,7 @@ use tracing::{error, instrument};
 // internal
 use backend::{DaSamplingServiceBackend, SamplingState};
 use nomos_tracing::{error_with_id, info_with_id};
+use nomos_utils::lifecycle;
 use storage::DaStorageAdapter;
 
 const DA_SAMPLING_TAG: ServiceId = "DA-Sampling";
@@ -79,21 +79,6 @@ where
     DaNetwork::Settings: Clone,
     DaStorage: DaStorageAdapter<Blob = DaBlob>,
 {
-    async fn should_stop_service(message: LifecycleMessage) -> bool {
-        match message {
-            LifecycleMessage::Shutdown(sender) => {
-                if sender.send(()).is_err() {
-                    error!(
-                        "Error sending successful shutdown signal from service {}",
-                        Self::SERVICE_ID
-                    );
-                }
-                true
-            }
-            LifecycleMessage::Kill => true,
-        }
-    }
-
     #[instrument(skip_all)]
     async fn handle_service_message(
         msg: <Self as ServiceData>::Message,
@@ -260,7 +245,7 @@ where
                     Self::handle_sampling_message(sampling_message, &mut sampler, &storage_adapter).await;
                 }
                 Some(msg) = lifecycle_stream.next() => {
-                    if Self::should_stop_service(msg).await {
+                    if lifecycle::should_stop_service::<Self>(&msg).await {
                         break;
                     }
                 }

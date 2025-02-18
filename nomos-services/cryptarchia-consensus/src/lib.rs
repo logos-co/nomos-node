@@ -30,7 +30,7 @@ use nomos_mempool::{
 };
 use nomos_network::NetworkService;
 use nomos_storage::{backends::StorageBackend, StorageMsg, StorageService};
-use overwatch_rs::services::life_cycle::LifecycleMessage;
+use nomos_utils::lifecycle;
 use overwatch_rs::services::relay::{OutboundRelay, Relay, RelayMessage};
 use overwatch_rs::services::state::ServiceState;
 use overwatch_rs::services::{handle::ServiceStateHandle, ServiceCore, ServiceData, ServiceId};
@@ -518,7 +518,7 @@ where
                         Self::process_message(&cryptarchia, &self.block_subscription_sender, msg);
                     }
                     Some(msg) = lifecycle_stream.next() => {
-                        if Self::should_stop_service(msg).await {
+                        if lifecycle::should_stop_service::<Self>(&msg).await {
                             break;
                         }
                     }
@@ -646,21 +646,6 @@ where
     SamplingNetworkAdapter: nomos_da_sampling::network::NetworkAdapter,
     SamplingStorage: nomos_da_sampling::storage::DaStorageAdapter,
 {
-    async fn should_stop_service(message: LifecycleMessage) -> bool {
-        match message {
-            LifecycleMessage::Shutdown(sender) => {
-                if sender.send(()).is_err() {
-                    error!(
-                        "Error sending successful shutdown signal from service {}",
-                        Self::SERVICE_ID
-                    );
-                }
-                true
-            }
-            LifecycleMessage::Kill => true,
-        }
-    }
-
     fn process_message(
         cryptarchia: &Cryptarchia,
         block_channel: &broadcast::Sender<Block<ClPool::Item, DaPool::Item>>,
