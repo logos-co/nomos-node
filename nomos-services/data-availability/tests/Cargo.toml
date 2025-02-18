@@ -29,6 +29,7 @@ nomos-mempool            = { workspace = true }
 nomos-network            = { workspace = true, features = ["mock"] }
 nomos-node               = { workspace = true }
 nomos-storage            = { workspace = true, features = ["rocksdb-backend"] }
+nomos-time               = { workspace = true }
 once_cell                = "1.19"
 overwatch-derive         = { workspace = true }
 overwatch-rs             = { workspace = true }
