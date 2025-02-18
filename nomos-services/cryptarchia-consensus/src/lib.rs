@@ -123,7 +123,7 @@ impl Cryptarchia {
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
-pub struct CryptarchiaSettings<Ts, Bs, NetworkAdapterSettings, BlendAdapterSettings, TimeConfig> {
+pub struct CryptarchiaSettings<Ts, Bs, NetworkAdapterSettings, BlendAdapterSettings> {
     #[serde(default)]
     pub transaction_selector_settings: Ts,
     #[serde(default)]
@@ -136,8 +136,8 @@ pub struct CryptarchiaSettings<Ts, Bs, NetworkAdapterSettings, BlendAdapterSetti
     pub recovery_file: PathBuf,
 }
 
-impl<Ts, Bs, NetworkAdapterSettings, BlendAdapterSettings, TimeConfig> FileBackendSettings
-    for CryptarchiaSettings<Ts, Bs, NetworkAdapterSettings, BlendAdapterSettings, TimeConfig>
+impl<Ts, Bs, NetworkAdapterSettings, BlendAdapterSettings> FileBackendSettings
+    for CryptarchiaSettings<Ts, Bs, NetworkAdapterSettings, BlendAdapterSettings>
 {
     fn recovery_file(&self) -> &PathBuf {
         &self.recovery_file
@@ -287,7 +287,6 @@ where
         BS::Settings,
         NetAdapter::Settings,
         BlendAdapter::Settings,
-        TimeBackend::Settings,
     >;
     type State = CryptarchiaConsensusState<
         TxS::Settings,
@@ -454,7 +453,6 @@ where
             genesis_state,
             transaction_selector_settings,
             blob_selector_settings,
-            time,
             leader_config,
             network_adapter_settings,
             blend_adapter_settings,
@@ -613,13 +611,7 @@ impl<TxS, BxS, NetworkAdapterSettings, BlendAdapterSettings, TimeBackendSettings
         TimeBackendSettings,
     >
 {
-    type Settings = CryptarchiaSettings<
-        TxS,
-        BxS,
-        NetworkAdapterSettings,
-        BlendAdapterSettings,
-        TimeBackendSettings,
-    >;
+    type Settings = CryptarchiaSettings<TxS, BxS, NetworkAdapterSettings, BlendAdapterSettings>;
     type Error = Error;
 
     fn from_settings(_settings: &Self::Settings) -> Result<Self, Self::Error> {

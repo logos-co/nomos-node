@@ -6,6 +6,7 @@ use nomos_libp2p::{Multiaddr, PeerId};
 use nomos_node::BlendBackend;
 use nomos_tracing_service::{LoggerLayer, MetricsLayer, TracingLayer, TracingSettings};
 use rand::{thread_rng, Rng};
+use tests::topology::configs::time::default_time_config;
 use tests::topology::configs::{
     api::GeneralApiConfig,
     blend::create_blend_configs,
@@ -126,6 +127,9 @@ pub fn create_node_configs(
         let tracing_config =
             update_tracing_identifier(tracing_settings.clone(), host.identifier.clone());
 
+        // Time config
+        let time_config = default_time_config();
+
         configured_hosts.insert(
             host.clone(),
             GeneralConfig {
@@ -135,6 +139,7 @@ pub fn create_node_configs(
                 blend_config,
                 api_config,
                 tracing_config,
+                time_config,
             },
         );
     }

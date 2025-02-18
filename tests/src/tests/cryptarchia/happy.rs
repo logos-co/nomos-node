@@ -20,7 +20,12 @@ async fn happy_test(topology: &Topology) {
     let n_blocks = security_param * CHAIN_LENGTH_MULTIPLIER;
     println!("waiting for {n_blocks} blocks");
     let timeout = (n_blocks as f64 / config.cryptarchia.config.consensus_config.active_slot_coeff
-        * config.cryptarchia.time.slot_duration.as_secs() as f64
+        * config
+            .time
+            .backend_settings
+            .slot_config
+            .slot_duration
+            .as_secs() as f64
         * TIMEOUT_MULTIPLIER)
         .floor() as u64;
     let timeout = adjust_timeout(Duration::from_secs(timeout));

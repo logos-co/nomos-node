@@ -190,7 +190,6 @@ pub fn create_executor_config(config: GeneralConfig) -> Config {
             leader_config: config.consensus_config.leader_config,
             config: config.consensus_config.ledger_config,
             genesis_state: config.consensus_config.genesis_state,
-            time: config.consensus_config.time,
             transaction_selector_settings: (),
             blob_selector_settings: (),
             network_adapter_settings:
