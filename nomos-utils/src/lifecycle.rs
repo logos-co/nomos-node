@@ -1,18 +1,22 @@
 use overwatch_rs::services::life_cycle::LifecycleMessage;
+use overwatch_rs::services::ServiceData;
 use tracing::{debug, error};
 
 /// Handles the shutdown signal from `Overwatch`
-pub async fn should_stop_service(msg: &LifecycleMessage, service_id: &str) -> bool {
+pub async fn should_stop_service<S: ServiceData>(msg: &LifecycleMessage) -> bool {
     match msg {
         LifecycleMessage::Shutdown(sender) => {
             if sender.send(()).is_err() {
-                error!("Error sending successful shutdown signal from service {service_id}",);
+                error!(
+                    "Error sending successful shutdown signal from service {}",
+                    S::SERVICE_ID
+                );
             }
-            debug!(service_id, "Shutting down service");
+            debug!("{} {}", S::SERVICE_ID, "Shutting down service");
             true
         }
         LifecycleMessage::Kill => {
-            debug!(service_id, "Killing service");
+            debug!("{} {}", S::SERVICE_ID, "Killing service");
             true
         }
     }

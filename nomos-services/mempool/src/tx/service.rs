@@ -116,7 +116,7 @@ where
                     tracing::info!(counter.tx_mempool_pending_items = pool.pending_item_count());
                 }
                 Some(msg) = lifecycle_stream.next() =>  {
-                    if lifecycle::should_stop_service(&msg, Self::SERVICE_ID).await {
+                    if lifecycle::should_stop_service::<Self>(&msg).await {
                         break;
                     }
                 }

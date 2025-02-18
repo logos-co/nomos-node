@@ -147,7 +147,7 @@ where
                     Self::handle_kms_message(msg, &mut backend).await;
                 }
                 Some(msg) = lifecycle_stream.next() => {
-                    if lifecycle::should_stop_service(&msg, Self::SERVICE_ID).await {
+                    if lifecycle::should_stop_service::<Self>(&msg).await {
                         return Ok(());
                     }
                 }

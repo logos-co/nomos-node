@@ -315,7 +315,7 @@ impl<Backend: StorageBackend + Send + Sync + 'static> ServiceCore for StorageSer
                     Self::handle_storage_message(msg, backend).await;
                 }
                 Some(msg) = lifecycle_stream.next() => {
-                    if lifecycle::should_stop_service(&msg, Self::SERVICE_ID).await {
+                    if lifecycle::should_stop_service::<Self>(&msg).await {
                         // TODO: Try to finish pending transactions if any and close connections properly
                         break;
                     }
