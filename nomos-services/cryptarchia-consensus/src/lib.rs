@@ -868,20 +868,22 @@ where
         );
     }
 
-    async fn get_blocks_from_tip(
-        tip: HeaderId,
-        security_block_header: HeaderId,
+    /// Retrieves the blocks in the range from `to` to `from` from the storage.
+    /// Both `to` and `from` are included in the range and must be valid headers.
+    async fn get_blocks_in_range(
+        to: HeaderId,
+        from: HeaderId,
         storage_adapter: &StorageAdapter<Storage, TxS::Tx, BS::BlobId>,
     ) -> Vec<Block<ClPool::Item, DaPool::Item>> {
-        let blocks_from_tip = futures::stream::unfold(tip, |header_id| async move {
-            if header_id == security_block_header {
+        let blocks_from_tip = futures::stream::unfold(to, |header_id| async move {
+            if header_id == from {
                 None
             } else {
                 let block = storage_adapter
                     .get_block(&header_id)
                     .await
                     .unwrap_or_else(|| {
-                        panic!("Could not retrieve block {tip} from storage during recovery")
+                        panic!("Could not retrieve block {to} from storage during recovery")
                     });
                 let parent_header_id = block.header().parent();
                 Some((block, parent_header_id))
@@ -965,7 +967,7 @@ where
                 info!("Leader is out of date, updating from genesis until security block.");
                 // TODO: OPTIMIZE: Fetch only headers
                 // TODO: Move to function
-                let blocks_to_security = Self::get_blocks_from_tip(
+                let blocks_to_security = Self::get_blocks_in_range(
                     security_block_id,
                     genesis_id,
                     relays.storage_adapter(),
@@ -1039,7 +1041,7 @@ where
         // TODO: From<Stream> for Cryptarchia - collect stream - futures stream collect
         // impl extend for cryptarchia
         let blocks_to_tip =
-            Self::get_blocks_from_tip(tip, security_header_id, relays.storage_adapter())
+            Self::get_blocks_in_range(tip, security_header_id, relays.storage_adapter())
                 .await
                 .into_iter()
                 .rev();
