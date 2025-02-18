@@ -56,6 +56,7 @@ pub struct AxumBackend<
     SamplingNetworkAdapter,
     SamplingRng,
     SamplingStorage,
+    TimeBackend,
     const SIZE: usize,
 > {
     settings: AxumBackendSettings,
@@ -71,6 +72,7 @@ pub struct AxumBackend<
     _sampling_network_adapter: core::marker::PhantomData<SamplingNetworkAdapter>,
     _sampling_rng: core::marker::PhantomData<SamplingRng>,
     _sampling_storage: core::marker::PhantomData<SamplingStorage>,
+    _time_backend: core::marker::PhantomData<TimeBackend>,
 }
 
 #[derive(OpenApi)]
@@ -100,6 +102,7 @@ impl<
         SamplingNetworkAdapter,
         SamplingRng,
         SamplingStorage,
+        TimeBackend,
         const SIZE: usize,
     > Backend
     for AxumBackend<
@@ -115,6 +118,7 @@ impl<
         SamplingNetworkAdapter,
         SamplingRng,
         SamplingStorage,
+        TimeBackend,
         SIZE,
     >
 where
@@ -183,6 +187,8 @@ where
     SamplingBackend::BlobId: Debug + 'static,
     SamplingNetworkAdapter: nomos_da_sampling::network::NetworkAdapter + Send + 'static,
     SamplingStorage: nomos_da_sampling::storage::DaStorageAdapter + Send + 'static,
+    TimeBackend: nomos_time::backends::TimeBackend + Send + 'static,
+    TimeBackend::Settings: Clone + Send + Sync,
 {
     type Error = hyper::Error;
     type Settings = AxumBackendSettings;
@@ -205,6 +211,7 @@ where
             _sampling_network_adapter: core::marker::PhantomData,
             _sampling_rng: core::marker::PhantomData,
             _sampling_storage: core::marker::PhantomData,
+            _time_backend: core::marker::PhantomData,
         })
     }
 
@@ -243,6 +250,7 @@ where
                         SamplingNetworkAdapter,
                         SamplingRng,
                         SamplingStorage,
+                        TimeBackend,
                         SIZE,
                     >,
                 ),
@@ -257,6 +265,7 @@ where
                         SamplingNetworkAdapter,
                         SamplingRng,
                         SamplingStorage,
+                        TimeBackend,
                         SIZE,
                     >,
                 ),
@@ -285,6 +294,7 @@ where
                         SamplingNetworkAdapter,
                         SamplingRng,
                         SamplingStorage,
+                        TimeBackend,
                         SIZE,
                     >,
                 ),

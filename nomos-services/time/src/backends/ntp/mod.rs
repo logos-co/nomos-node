@@ -14,6 +14,7 @@ use time::OffsetDateTime;
 use tokio::time::{interval, MissedTickBehavior};
 use tokio_stream::wrappers::IntervalStream;
 
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct NtpSettings {
     pub ntp_server: String,
     pub timeout: Duration,

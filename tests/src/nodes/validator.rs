@@ -43,7 +43,7 @@ use nomos_tracing::logging::local::FileConfig;
 use nomos_tracing_service::LoggerLayer;
 use reqwest::Url;
 use tempfile::NamedTempFile;
-
+use nomos_time::TimeServiceSettings;
 use super::{create_tempdir, persist_tempdir, GetRangeReq, CLIENT};
 use crate::{
     adjust_timeout, nodes::LOGS_PREFIX, topology::configs::GeneralConfig, IS_DEBUG_TRACING,
@@ -341,6 +341,7 @@ pub fn create_validator_config(config: GeneralConfig) -> Config {
             read_only: false,
             column_family: Some("blocks".into()),
         },
+        time: TimeServiceSettings { backend_settings:  },
         mempool: MempoolConfig {
             recovery_path: "./recovery/mempool.json".into(),
         },

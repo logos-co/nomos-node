@@ -1,15 +1,12 @@
 use std::{str::FromStr, time::Duration};
 
 use cl::{NoteWitness, NullifierSecret};
-use cryptarchia_consensus::{LeaderConfig, TimeConfig};
+use cryptarchia_consensus::LeaderConfig;
 use cryptarchia_engine::EpochConfig;
 use nomos_core::staking::NMO_UNIT;
 use nomos_ledger::LedgerState;
 use rand::thread_rng;
 use time::OffsetDateTime;
-
-const DEFAULT_SLOT_TIME: u64 = 2;
-const CONSENSUS_SLOT_TIME_VAR: &str = "CONSENSUS_SLOT_TIME";
 
 #[derive(Clone)]
 pub struct ConsensusParams {
@@ -40,7 +37,6 @@ pub struct GeneralConsensusConfig {
     pub leader_config: LeaderConfig,
     pub ledger_config: nomos_ledger::Config,
     pub genesis_state: LedgerState,
-    pub time: TimeConfig,
 }
 
 pub fn create_consensus_configs(
@@ -76,13 +72,6 @@ pub fn create_consensus_configs(
             active_slot_coeff: consensus_params.active_slot_coeff,
         },
     };
-    let slot_duration = std::env::var(CONSENSUS_SLOT_TIME_VAR)
-        .map(|s| <u64>::from_str(&s).unwrap())
-        .unwrap_or(DEFAULT_SLOT_TIME);
-    let time_config = TimeConfig {
-        slot_duration: Duration::from_secs(slot_duration),
-        chain_start_time: OffsetDateTime::now_utc(),
-    };
 
     notes
         .into_iter()
@@ -94,7 +83,6 @@ pub fn create_consensus_configs(
             },
             ledger_config: ledger_config.clone(),
             genesis_state: genesis_state.clone(),
-            time: time_config.clone(),
         })
         .collect()
 }

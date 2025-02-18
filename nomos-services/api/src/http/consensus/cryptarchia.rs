@@ -86,6 +86,8 @@ where
     SamplingBackend::BlobId: Debug + 'static,
     SamplingNetworkAdapter: nomos_da_sampling::network::NetworkAdapter,
     SamplingStorage: nomos_da_sampling::storage::DaStorageAdapter,
+    TimeBackend: nomos_time::backends::TimeBackend,
+    TimeBackend::Settings: Clone + Send + Sync,
 {
     let relay = handle
         .relay::<Cryptarchia<
@@ -95,6 +97,7 @@ where
             SamplingNetworkAdapter,
             SamplingRng,
             SamplingStorage,
+            TimeBackend,
             SIZE,
         >>()
         .connect()
@@ -115,6 +118,7 @@ pub async fn cryptarchia_headers<
     SamplingNetworkAdapter,
     SamplingRng,
     SamplingStorage,
+    TimeBackend,
     const SIZE: usize,
 >(
     handle: &OverwatchHandle,
@@ -142,6 +146,8 @@ where
     SamplingBackend::BlobId: Debug + 'static,
     SamplingNetworkAdapter: nomos_da_sampling::network::NetworkAdapter,
     SamplingStorage: nomos_da_sampling::storage::DaStorageAdapter,
+    TimeBackend: nomos_time::backends::TimeBackend,
+    TimeBackend::Settings: Clone + Send + Sync,
 {
     let relay = handle
         .relay::<Cryptarchia<
@@ -151,6 +157,7 @@ where
             SamplingNetworkAdapter,
             SamplingRng,
             SamplingStorage,
+            TimeBackend,
             SIZE,
         >>()
         .connect()

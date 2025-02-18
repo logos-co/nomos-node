@@ -130,7 +130,6 @@ pub struct CryptarchiaSettings<Ts, Bs, NetworkAdapterSettings, BlendAdapterSetti
     pub blob_selector_settings: Bs,
     pub config: nomos_ledger::Config,
     pub genesis_state: LedgerState,
-    pub time: TimeConfig,
     pub leader_config: LeaderConfig,
     pub network_adapter_settings: NetworkAdapterSettings,
     pub blend_adapter_settings: BlendAdapterSettings,

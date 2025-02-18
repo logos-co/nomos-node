@@ -103,6 +103,7 @@ impl EpochConfig {
     }
 }
 
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Copy, Clone, Debug)]
 pub struct SlotConfig {
     pub slot_duration: Duration,

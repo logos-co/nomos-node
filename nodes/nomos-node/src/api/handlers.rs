@@ -110,6 +110,7 @@ pub async fn cryptarchia_info<
     SamplingNetworkAdapter,
     SamplingRng,
     SamplingStorage,
+    TimeBackend,
     const SIZE: usize,
 >(
     State(handle): State<OverwatchHandle>,
@@ -135,6 +136,8 @@ where
     SamplingBackend::BlobId: Debug + 'static,
     SamplingNetworkAdapter: nomos_da_sampling::network::NetworkAdapter,
     SamplingStorage: nomos_da_sampling::storage::DaStorageAdapter,
+    TimeBackend: nomos_time::backends::TimeBackend,
+    TimeBackend::Settings: Clone + Send + Sync,
 {
     make_request_and_return_response!(consensus::cryptarchia_info::<
         Tx,
@@ -143,6 +146,7 @@ where
         SamplingNetworkAdapter,
         SamplingRng,
         SamplingStorage,
+        TimeBackend,
         SIZE,
     >(&handle))
 }
@@ -162,6 +166,7 @@ pub async fn cryptarchia_headers<
     SamplingNetworkAdapter,
     SamplingRng,
     SamplingStorage,
+    TimeBackend,
     const SIZE: usize,
 >(
     State(store): State<OverwatchHandle>,
@@ -188,6 +193,8 @@ where
     SamplingBackend::BlobId: Debug + 'static,
     SamplingNetworkAdapter: nomos_da_sampling::network::NetworkAdapter,
     SamplingStorage: nomos_da_sampling::storage::DaStorageAdapter,
+    TimeBackend: nomos_time::backends::TimeBackend,
+    TimeBackend::Settings: Clone + Send + Sync,
 {
     let CryptarchiaInfoQuery { from, to } = query;
     make_request_and_return_response!(consensus::cryptarchia_headers::<
@@ -197,6 +204,7 @@ where
         SamplingNetworkAdapter,
         SamplingRng,
         SamplingStorage,
+        TimeBackend,
         SIZE,
     >(&store, from, to))
 }
@@ -261,6 +269,7 @@ pub async fn get_range<
     SamplingNetworkAdapter,
     SamplingRng,
     SamplingStorage,
+    TimeBackend,
     const SIZE: usize,
 >(
     State(handle): State<OverwatchHandle>,
@@ -313,6 +322,8 @@ where
     SamplingBackend::BlobId: Debug + 'static,
     SamplingNetworkAdapter: nomos_da_sampling::network::NetworkAdapter,
     SamplingStorage: nomos_da_sampling::storage::DaStorageAdapter,
+    TimeBackend: nomos_time::backends::TimeBackend,
+    TimeBackend::Settings: Clone + Send + Sync,
 {
     make_request_and_return_response!(da::get_range::<
         Tx,
@@ -323,6 +334,7 @@ where
         SamplingNetworkAdapter,
         SamplingRng,
         SamplingStorage,
+        TimeBackend,
         SIZE,
     >(&handle, app_id, range))
 }
