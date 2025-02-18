@@ -984,7 +984,8 @@ where
         to: HeaderId,
         storage_adapter: &StorageAdapter<Storage, TxS::Tx, BS::BlobId>,
     ) -> Vec<Block<ClPool::Item, DaPool::Item>> {
-        let blocks_from_tip = futures::stream::unfold(to, |header_id| async move {
+        // `blocks` is in `to..from` order
+        let blocks = futures::stream::unfold(to, |header_id| async move {
             if header_id == from {
                 None
             } else {
@@ -999,7 +1000,9 @@ where
             }
         });
 
-        blocks_from_tip.collect::<Vec<_>>().await
+        // To avoid confusion, the order is reversed so it fits in the natural
+        // `from..to` order
+        blocks.collect::<Vec<_>>().await.into_iter().rev().collect()
     }
 
     /// Sends the `leader` a block range from `from` to `to` from the storage so
@@ -1007,8 +1010,8 @@ where
     ///
     /// # Arguments
     ///
-    /// * `leader` - The leader instance to be updated. It should be up-to-date with the state of
-    ///    the ledger up to `from`.
+    /// * `leader` - The leader instance to be updated. It should be up-to-date
+    ///   with the state of the ledger up to `from`.
     /// * `from` - The header id from which the leader should be updated.
     /// * `to` - The header id up to which the leader should be updated.
     /// * `storage_adapter` - The storage adapter to fetch the blocks from.
@@ -1019,13 +1022,9 @@ where
         storage_adapter: &StorageAdapter<Storage, TxS::Tx, BS::BlobId>,
     ) {
         // TODO: OPTIMIZE: Fetch only headers
-        let blocks_to_security = Self::get_blocks_in_range(from, to, storage_adapter)
-            .await
-            .into_iter()
-            .rev();
+        let blocks = Self::get_blocks_in_range(from, to, storage_adapter).await;
 
-        // TODO: Move to stream
-        for block in blocks_to_security {
+        for block in blocks {
             leader.follow_chain_with_header(block.header());
         }
     }
@@ -1087,9 +1086,9 @@ where
             }) => {
                 info!("Recovering Cryptarchia from genesis...");
                 Self::recover_cryptarchia(
-                    tip,
                     genesis_id,
                     genesis_state,
+                    tip,
                     leader,
                     relays,
                     block_subscription_sender,
@@ -1115,9 +1114,9 @@ where
                 .await;
 
                 Self::recover_cryptarchia(
-                    tip,
                     security_block_id,
                     security_ledger_state,
+                    tip,
                     leader,
                     relays,
                     block_subscription_sender,
@@ -1132,11 +1131,12 @@ where
     ///
     /// # Arguments
     ///
-    /// * `tip` - The header id up to which the ledger state should be restored.
-    /// * `security_header_id` - The header id where the recovery should start
-    ///   from. In case none was stored, the genesis block id should be passed.
-    /// * `security_ledger_state` - The ledger state up to the security block.
-    ///   In case none was stored, the genesis ledger state should be passed.
+    /// * `from_header_id` - The header id where the recovery should start from.
+    ///   In case none was stored, the genesis block id should be passed.
+    /// * `from_ledger_state` - The ledger state up to the security block. In
+    ///   case none was stored, the genesis ledger state should be passed.
+    /// * `to_header_id` - The header id up to which the ledger state should be
+    ///   restored.
     /// * `leader` - The leader instance to be used for the recovery. The passed
     ///   leader needs to be up-to-date with the state of the ledger up to the
     ///   security block.
@@ -1146,9 +1146,9 @@ where
     ///   services.
     /// * `ledger_config` - The ledger configuration.
     async fn recover_cryptarchia(
-        tip: HeaderId,
-        security_header_id: HeaderId,
-        security_ledger_state: LedgerState,
+        from_header_id: HeaderId,
+        from_ledger_state: LedgerState,
+        to_header_id: HeaderId,
         leader: &mut Leader,
         relays: &CryptarchiaConsensusRelays<
             BlendAdapter,
@@ -1167,18 +1167,12 @@ where
         block_subscription_sender: &mut broadcast::Sender<Block<ClPool::Item, DaPool::Item>>,
         ledger_config: nomos_ledger::Config,
     ) -> Cryptarchia {
-        let mut cryptarchia =
-            Cryptarchia::new(security_header_id, security_ledger_state, ledger_config);
+        let mut cryptarchia = Cryptarchia::new(from_header_id, from_ledger_state, ledger_config);
 
-        // TODO: From<Stream> for Cryptarchia - collect stream - futures stream collect
-        // impl extend for cryptarchia
-        let blocks_to_tip =
-            Self::get_blocks_in_range(security_header_id, tip, relays.storage_adapter())
-                .await
-                .into_iter()
-                .rev();
+        let blocks =
+            Self::get_blocks_in_range(from_header_id, to_header_id, relays.storage_adapter()).await;
 
-        for block in blocks_to_tip {
+        for block in blocks {
             cryptarchia = Self::process_block(
                 cryptarchia,
                 leader,
