@@ -457,69 +457,16 @@ where
         let genesis_id = HeaderId::from([0; 32]);
         let mut leader = leadership::Leader::new(genesis_id, leader_config, config.clone());
 
-        // TODO: Move to function
-        let mut cryptarchia = match self.initial_state.recovery_strategy() {
-            CryptarchiaInitialisationStrategy::Genesis => {
-                info!("Building Cryptarchia from genesis...");
-                Cryptarchia::new(genesis_id, genesis_state, config)
-            }
-            CryptarchiaInitialisationStrategy::RecoveryFromGenesis(GenesisRecoveryStrategy {
-                tip,
-            }) => {
-                info!("Recovering Cryptarchia from genesis...");
-                Self::recover_cryptarchia(
-                    tip,
-                    genesis_id,
-                    genesis_state,
-                    &mut leader,
-                    &relays,
-                    &mut self.block_subscription_sender,
-                    config.clone(),
-                )
-                .await
-            }
-            CryptarchiaInitialisationStrategy::RecoveryFromSecurity(strategy) => {
-                let SecurityRecoveryStrategy {
-                    tip,
-                    security_block_id,
-                    security_ledger_state,
-                } = *strategy;
-
-                info!("Recovering Cryptarchia from security...");
-                info!("Leader is out of date, updating from genesis until security block.");
-                // TODO: OPTIMIZE: Fetch only headers
-                // TODO: Move to function
-                let blocks_to_security = Self::get_blocks_from_tip(
-                    security_block_id,
-                    genesis_id,
-                    relays.storage_adapter(),
-                )
-                .await
-                .into_iter()
-                .rev();
-
-                // TODO: Move to stream
-                for block in blocks_to_security {
-                    let header = block.header();
-                    leader.follow_chain(
-                        header.parent(),
-                        header.id(),
-                        header.leader_proof().nullifier(),
-                    );
-                }
-
-                Self::recover_cryptarchia(
-                    tip,
-                    security_block_id,
-                    security_ledger_state,
-                    &mut leader,
-                    &relays,
-                    &mut self.block_subscription_sender,
-                    config.clone(),
-                )
-                .await
-            }
-        };
+        let mut cryptarchia = Self::build_cryptarchia(
+            &self.initial_state,
+            genesis_id,
+            genesis_state,
+            &mut leader,
+            config.clone(),
+            &relays,
+            &mut self.block_subscription_sender,
+        )
+        .await;
 
         let network_adapter =
             NetAdapter::new(network_adapter_settings, relays.network_relay().clone()).await;
@@ -944,6 +891,113 @@ where
         blocks_from_tip.collect::<Vec<_>>().await
     }
 
+    /// Builds cryptarchia
+    /// The build process is determined by the initial state passed:
+    /// - If the initial state doesn't contain any recovery information, cryptarchia is built from
+    ///     genesis.
+    /// - If it does, the recovery process is started: Recovery is done from genesis or security
+    ///     depending on the available information.
+    ///
+    /// # Arguments
+    ///
+    /// * `initial_state` - The initial state of cryptarchia.
+    /// * `genesis_id` - The genesis block id.
+    /// * `genesis_state` - The genesis ledger state.
+    /// * `leader` - The leader instance. It needs to be a Leader initialised to genesis. This
+    ///     function will update the leader if needed.
+    /// * `ledger_config` - The ledger configuration.
+    /// * `relays` - The relays object containing all the necessary relays for the consensus.
+    /// * `block_subscription_sender` - The broadcast channel to send the blocks to the services.
+    async fn build_cryptarchia(
+        initial_state: &CryptarchiaConsensusState<
+            TxS::Settings,
+            BS::Settings,
+            NetAdapter::Settings,
+            BlendAdapter::Settings,
+        >,
+        genesis_id: HeaderId,
+        genesis_state: LedgerState,
+        leader: &mut Leader,
+        ledger_config: nomos_ledger::Config,
+        relays: &CryptarchiaConsensusRelays<
+            BlendAdapter,
+            BS,
+            ClPool,
+            ClPoolAdapter,
+            DaPool,
+            DaPoolAdapter,
+            NetAdapter,
+            SamplingBackend,
+            SamplingRng,
+            Storage,
+            TxS,
+        >,
+        block_subscription_sender: &mut broadcast::Sender<Block<ClPool::Item, DaPool::Item>>,
+    ) -> Cryptarchia {
+        match initial_state.recovery_strategy() {
+            CryptarchiaInitialisationStrategy::Genesis => {
+                info!("Building Cryptarchia from genesis...");
+                Cryptarchia::new(genesis_id, genesis_state, ledger_config)
+            }
+            CryptarchiaInitialisationStrategy::RecoveryFromGenesis(GenesisRecoveryStrategy {
+                tip,
+            }) => {
+                info!("Recovering Cryptarchia from genesis...");
+                Self::recover_cryptarchia(
+                    tip,
+                    genesis_id,
+                    genesis_state,
+                    leader,
+                    relays,
+                    block_subscription_sender,
+                    ledger_config.clone(),
+                )
+                .await
+            }
+            CryptarchiaInitialisationStrategy::RecoveryFromSecurity(strategy) => {
+                let SecurityRecoveryStrategy {
+                    tip,
+                    security_block_id,
+                    security_ledger_state,
+                } = *strategy;
+
+                info!("Recovering Cryptarchia from security...");
+                info!("Leader is out of date, updating from genesis until security block.");
+                // TODO: OPTIMIZE: Fetch only headers
+                // TODO: Move to function
+                let blocks_to_security = Self::get_blocks_from_tip(
+                    security_block_id,
+                    genesis_id,
+                    relays.storage_adapter(),
+                )
+                .await
+                .into_iter()
+                .rev();
+
+                // TODO: Move to stream
+                for block in blocks_to_security {
+                    let header = block.header();
+                    leader.follow_chain(
+                        header.parent(),
+                        header.id(),
+                        header.leader_proof().nullifier(),
+                    );
+                }
+
+                Self::recover_cryptarchia(
+                    tip,
+                    security_block_id,
+                    security_ledger_state,
+                    leader,
+                    relays,
+                    block_subscription_sender,
+                    ledger_config.clone(),
+                )
+                .await
+            }
+        }
+    }
+
     /// Recovers cryptarchia from a previously saved state.
     ///
     /// # Arguments
@@ -976,7 +1030,7 @@ where
             Storage,
             TxS,
         >,
-        block_broadcaster: &mut broadcast::Sender<Block<ClPool::Item, DaPool::Item>>,
+        block_subscription_sender: &mut broadcast::Sender<Block<ClPool::Item, DaPool::Item>>,
         ledger_config: nomos_ledger::Config,
     ) -> Cryptarchia {
         let mut cryptarchia =
@@ -991,8 +1045,14 @@ where
                 .rev();
 
         for block in blocks_to_tip {
-            cryptarchia =
-                Self::process_block(cryptarchia, leader, block, relays, block_broadcaster).await
+            cryptarchia = Self::process_block(
+                cryptarchia,
+                leader,
+                block,
+                relays,
+                block_subscription_sender,
+            )
+            .await
         }
 
         cryptarchia
