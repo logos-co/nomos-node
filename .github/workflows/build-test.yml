@@ -37,7 +37,7 @@ jobs:
           command-arguments: "--hide-inclusion-graph -c .cargo-deny.toml --show-stats -D warnings"          
   
   lints:
-    name: Rust lints
+    name: Check Rust lints
     runs-on: self-hosted
     steps:
       - name: Checkout repository
@@ -70,7 +70,7 @@ jobs:
           key: ${{ github.ref }}->${{ github.workflow }}->${{ github.job }}
  
   tests:
-    name: Test suite
+    name: Run test suite
     if: ${{ !startsWith(github.event.pull_request.title, '[WIP]') && !contains(github.event.label.name,  'DO NOT MERGE') }}
     strategy:
       fail-fast: false # all OSes should be tested even if one fails (default: true)
@@ -133,6 +133,7 @@ jobs:
           path: tests/.tmp*
   
   build-docker:
+    name: Trigger Docker build
     runs-on: ubuntu-latest
     needs:
       - formatting
