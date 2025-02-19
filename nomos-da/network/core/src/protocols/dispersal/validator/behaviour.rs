@@ -4,6 +4,7 @@ use either::Either;
 use futures::future::BoxFuture;
 use futures::stream::FuturesUnordered;
 use futures::{AsyncWriteExt, FutureExt, StreamExt};
+use libp2p::core::transport::PortUse;
 use libp2p::core::Endpoint;
 use libp2p::swarm::{
     ConnectionDenied, ConnectionId, FromSwarm, NetworkBehaviour, THandler, THandlerInEvent,
@@ -141,6 +142,7 @@ impl<M: MembershipHandler<Id = PeerId, NetworkId = SubnetworkId> + 'static> Netw
         _peer: PeerId,
         _addr: &Multiaddr,
         _role_override: Endpoint,
+        _port_use: PortUse,
     ) -> Result<THandler<Self>, ConnectionDenied> {
         Ok(Either::Right(libp2p::swarm::dummy::ConnectionHandler))
     }

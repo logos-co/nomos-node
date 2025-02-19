@@ -1,10 +1,12 @@
 // std
 use std::collections::{HashMap, HashSet, VecDeque};
+use std::convert::Infallible;
 use std::task::{Context, Poll, Waker};
 
 // crates
 use either::Either;
 use indexmap::IndexSet;
+use libp2p::core::transport::PortUse;
 use libp2p::core::Endpoint;
 use libp2p::swarm::{
     ConnectionClosed, ConnectionDenied, ConnectionId, FromSwarm, NetworkBehaviour, NotifyHandler,
@@ -22,7 +24,7 @@ use super::handler::{
     BehaviourEventToHandler, DaMessage, HandlerEventToBehaviour, ReplicationHandler,
 };
 
-type SwarmEvent = ToSwarm<ReplicationEvent, Either<BehaviourEventToHandler, void::Void>>;
+type SwarmEvent = ToSwarm<ReplicationEvent, Either<BehaviourEventToHandler, Infallible>>;
 
 #[derive(Debug, Error)]
 pub enum ReplicationError {
@@ -199,6 +201,7 @@ where
         peer_id: PeerId,
         _addr: &Multiaddr,
         _role_override: Endpoint,
+        _port_use: PortUse,
     ) -> Result<THandler<Self>, ConnectionDenied> {
         trace!("{}, Connected to {peer_id}", self.local_peer_id);
         self.connected.insert(peer_id, connection_id);
@@ -219,7 +222,7 @@ where
     ) {
         let event = match event {
             Either::Left(e) => e,
-            Either::Right(v) => void::unreachable(v),
+            Either::Right(v) => libp2p::core::util::unreachable(v),
         };
         match event {
             HandlerEventToBehaviour::IncomingMessage { message } => {
@@ -351,6 +354,7 @@ mod tests {
                 peer_id_j,
                 &Multiaddr::empty(),
                 Endpoint::Dialer,
+                Default::default(),
             )
             .unwrap();
 
