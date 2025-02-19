@@ -36,7 +36,8 @@ pub trait ConnectionMonitor {
     fn reset_peer(&mut self, peer_id: &PeerId);
 }
 
-/// A `NetworkBehaviour` that maintains consistent number of  connections to DA subnetwork nodes.
+/// A `NetworkBehaviour` that block connections to malicious peers or temporarily disconnects from
+/// unhealthy peers.
 #[derive(Debug)]
 pub struct ConnectionMonitorBehaviour<Monitor> {
     monitor: Monitor,

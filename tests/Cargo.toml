@@ -13,6 +13,7 @@ criterion                = { version = "0.5", features = ["async_tokio"] }
 cryptarchia-consensus    = { workspace = true }
 cryptarchia-engine       = { workspace = true, features = ["serde"] }
 executor-http-client     = { workspace = true }
+fixed                    = "1"
 fraction                 = "0.13"
 full-replication         = { workspace = true }
 futures                  = "0.3"
