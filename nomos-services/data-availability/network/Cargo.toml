@@ -8,7 +8,7 @@ version = "0.1.0"
 async-trait              = "0.1"
 futures                  = "0.3"
 kzgrs-backend            = { workspace = true }
-libp2p                   = { version = "0.53", features = ["ed25519"] }
+libp2p                   = { version = "0.55", features = ["ed25519"] }
 log                      = "0.4.22"
 nomos-core               = { workspace = true }
 nomos-da-network-core    = { workspace = true }

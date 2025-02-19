@@ -6,11 +6,12 @@ version = "0.1.0"
 
 [dependencies]
 either                   = "1.13.0"
+fixed                    = { version = "1", features = ["serde-str"] }
 futures                  = "0.3"
 indexmap                 = "2.2"
 kzgrs-backend            = { workspace = true }
-libp2p                   = { version = "0.53", features = ["macros", "quic", "tokio"] }
-libp2p-stream            = "0.1.0-alpha"
+libp2p                   = { version = "0.55", features = ["macros", "quic", "tokio"] }
+libp2p-stream            = "0.3.0-alpha"
 log                      = "0.4"
 nomos-core               = { workspace = true }
 nomos-da-messages        = { workspace = true }
@@ -23,11 +24,11 @@ tokio                    = { version = "1" }
 tokio-stream             = "0.1"
 tracing                  = "0.1"
 tracing-subscriber       = "0.3.18"
-void                     = "1.0.2"
 
 [dev-dependencies]
 blake2             = "0.10"
 kzgrs-backend      = { workspace = true, features = ["testutils"] }
-libp2p             = { version = "0.53", features = ["ed25519", "macros", "noise", "ping", "quic", "tcp", "yamux"] }
+libp2p             = { version = "0.55", features = ["ed25519", "macros", "noise", "ping", "quic", "tcp", "yamux"] }
+libp2p-swarm-test  = "0.5.0"
 tokio              = { version = "1", features = ["macros", "rt-multi-thread", "time"] }
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
