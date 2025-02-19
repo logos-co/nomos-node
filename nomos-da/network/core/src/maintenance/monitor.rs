@@ -2,7 +2,6 @@
 use std::{
     collections::{HashMap, HashSet, VecDeque},
     convert::Infallible,
-    fmt,
     task::{Context, Poll, Waker},
     time::{Duration, Instant},
 };
@@ -15,6 +14,7 @@ use libp2p::{
     },
     Multiaddr, PeerId,
 };
+use thiserror::Error;
 // internal
 
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -139,36 +139,18 @@ where
 }
 
 /// A connection to this peer was explicitly blocked or malicious.
-#[derive(Debug)]
+#[derive(Debug, Error)]
+#[error("peer {peer} is in the block list")]
 pub struct Blocked {
     peer: PeerId,
 }
 
-impl fmt::Display for Blocked {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "peer {} is in the block list", self.peer)
-    }
-}
-
-impl std::error::Error for Blocked {}
-
 /// A connection to this peer is temporarily blocked due to being unhealthy.
-#[derive(Debug)]
+#[derive(Debug, Error)]
+#[error("peer {peer} is temporarily blocked due to being unhealthy")]
 pub struct TemporarilyBlocked {
     peer: PeerId,
 }
-
-impl std::fmt::Display for TemporarilyBlocked {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "peer {} is temporarily blocked due to being unhealthy",
-            self.peer
-        )
-    }
-}
-
-impl std::error::Error for TemporarilyBlocked {}
 
 impl<Monitor> NetworkBehaviour for ConnectionMonitorBehaviour<Monitor>
 where
