@@ -1,9 +1,5 @@
-# copy of https://github.com/actions-rs/meta/blob/master/recipes/quickstart.md
-# Steps for checking PRs.
 on:
   pull_request:
-    branches:
-      - "*"
   push:
     branches: [ master ]
 
@@ -14,158 +10,17 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  check:
-    name: Check
-    runs-on: [ 'self-hosted' ]
-    strategy:
-      fail-fast: true
-      matrix:
-        feature: [ libp2p ]
+  formatting:
+    name: Check formatting
+    runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: arduino/setup-protoc@v3
-        with:
-          repo-token: ${{ secrets.GITHUB_TOKEN }}
-      - name: Setup Cargo cache
-        uses: ./.github/actions/setup-cargo-cache
-        with:
-          key: ${{ github.ref }}->${{ github.workflow }}->${{ github.job }}->${{ matrix.feature }}          
-      - uses: cargo-bins/cargo-binstall@main
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - name: Install risc0
-        run: cargo binstall -y cargo-risczero && cargo risczero install
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - uses: actions-rs/cargo@v1
-        with:
-          command: check
-          args: --all --all-targets --no-default-features --features ${{ matrix.feature }}
-      - name: Update Cargo cache
-        if: success() || failure()
-        uses: ./.github/actions/update-cargo-cache
-        with:
-          key: ${{ github.ref }}->${{ github.workflow }}->${{ github.job }}->${{ matrix.feature }}
-
-  test:
-    name: Test Suite
-    if: ${{ !startsWith(github.event.pull_request.title, '[WIP]') && !contains(github.event.label.name,  'DO NOT MERGE') }}
-    strategy:
-      fail-fast: false # all OSes should be tested even if one fails (default: true)
-      matrix:
-        feature: [ libp2p ]
-        os: [ self-hosted, macos-latest ] # drop windows for now as risc0 does not support it
-    runs-on: ${{ matrix.os }}
-    steps:
-      - uses: actions/checkout@v4
-      - name: Remove unwanted software
-        if: matrix.os == 'ubuntu-latest'
-        uses: ./.github/actions/prune-vm
-      - uses: arduino/setup-protoc@v3
-        with:
-          repo-token: ${{ secrets.GITHUB_TOKEN }}
-      - name: Setup Cargo cache
-        uses: ./.github/actions/setup-cargo-cache
-        with:
-          key: ${{ github.ref }}->${{ github.workflow }}->${{ github.job }}->${{ matrix.os }}->${{ matrix.feature }}
-      # Setup Rust toolchain with GNU for Windows
-      - name: Setup Rust with GNU toolchain (Windows)
-        if: matrix.os == 'windows-latest'
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable-msvc
-          target: x86_64-pc-windows-msvc
-          override: true
-      # Setup build environment (Windows)
-      - name: Setup build environment (Windows)
-        if: matrix.os == 'windows-latest'
-        uses: ./.github/actions/mingw-env
-      - uses: cargo-bins/cargo-binstall@main
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - name: Install risc0
-        run: cargo binstall -y cargo-risczero && cargo risczero install
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - name: Cargo build
-        uses: actions-rs/cargo@v1
-        with:
-          command: build
-          args: --all --no-default-features --features ${{ matrix.feature }}
-      - name: Cargo test (Other OSes)
-        if: matrix.os != 'windows-latest'
-        uses: actions-rs/cargo@v1
-        env:
-          RISC0_DEV_MODE: true
-          CONSENSUS_SLOT_TIME: 5
-        with:
-          command: test
-          args: --all --no-default-features --features ${{ matrix.feature }}
-      - name: Cargo test (Windows)
-        if: matrix.os == 'windows-latest'
-        uses: actions-rs/cargo@v1
-        env:
-          # Because Windows runners in Github Actions tend to be slow.
-          SLOW_TEST_ENV: true
-          RISC0_DEV_MODE: true
-          CONSENSUS_SLOT_TIME: 5
-        with:
-          command: test
-          args: --no-default-features --features ${{ matrix.feature }}
-      - name: Cargo bench (no-run)
-        if: matrix.os != 'windows-latest'
-        uses: actions-rs/cargo@v1
-        env:
-          RISC0_DEV_MODE: true
-          CONSENSUS_SLOT_TIME: 5
-        with:
-          command: bench
-          args: --no-run
-      - name: Update Cargo cache
-        if: success() || failure()
-        uses: ./.github/actions/update-cargo-cache
-        with:
-          key: ${{ github.ref }}->${{ github.workflow }}->${{ github.job }}->${{ matrix.os }}->${{ matrix.feature }}          
-      - uses: actions/upload-artifact@v4
-        if: failure()
-        with:
-          name: integration-test-artifacts
-          path: tests/.tmp*
-
-  lints:
-    name: Rust lints
-    runs-on: self-hosted
-    steps:
-      - uses: actions/checkout@v4
-      - uses: arduino/setup-protoc@v3
-        with:
-          repo-token: ${{ secrets.GITHUB_TOKEN }}
-      - name: Setup Cargo cache
-        uses: ./.github/actions/setup-cargo-cache
-        with:
-          key: ${{ github.ref }}->${{ github.workflow }}->${{ github.job }}
-      - uses: cargo-bins/cargo-binstall@main
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - name: Install risc0
-        run: cargo binstall -y cargo-risczero && cargo risczero install
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Checkout repository
+        uses: actions/checkout@v4        
       - name: Run cargo fmt
         uses: actions-rs/cargo@v1
         with:
           command: fmt
           args: --all --check
-      - name: Run cargo clippy
-        uses: actions-rs/cargo@v1
-        with:
-          command: clippy
-          args: --all --all-targets --all-features -- --deny warnings
-      - name: Update Cargo cache
-        if: success() || failure()
-        uses: ./.github/actions/update-cargo-cache
-        with:
-          key: ${{ github.ref }}->${{ github.workflow }}->${{ github.job }}
 
   cargo-deny:
     name: Check cargo-deny rules
@@ -179,4 +34,121 @@ jobs:
         with:
           # All is set in the config file
           arguments:
-          command-arguments: "--hide-inclusion-graph -c .cargo-deny.toml --show-stats -D warnings"
+          command-arguments: "--hide-inclusion-graph -c .cargo-deny.toml --show-stats -D warnings"          
+  
+  lints:
+    name: Rust lints
+    runs-on: self-hosted
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Install protoc compiler
+        uses: arduino/setup-protoc@v3
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Set up Cargo cache
+        uses: ./.github/actions/setup-cargo-cache
+        with:
+          key: ${{ github.ref }}->${{ github.workflow }}->${{ github.job }}
+      - name: Install cargo-binstall
+        uses: cargo-bins/cargo-binstall@main
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Install risc0
+        run: cargo binstall -y cargo-risczero && cargo risczero install
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Run cargo clippy
+        uses: actions-rs/cargo@v1
+        with:
+          command: clippy
+          args: --all --all-targets --all-features -- --deny warnings
+      - name: Update Cargo cache
+        if: success() || failure()
+        uses: ./.github/actions/update-cargo-cache
+        with:
+          key: ${{ github.ref }}->${{ github.workflow }}->${{ github.job }}
+ 
+  tests:
+    name: Test suite
+    if: ${{ !startsWith(github.event.pull_request.title, '[WIP]') && !contains(github.event.label.name,  'DO NOT MERGE') }}
+    strategy:
+      fail-fast: false # all OSes should be tested even if one fails (default: true)
+      matrix:
+        os: [ self-hosted, macos-latest ] # drop windows for now as risc0 does not support it
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Remove unneeded software
+        if: matrix.os == 'ubuntu-latest'
+        uses: ./.github/actions/prune-vm
+      - name: Install protoc compiler
+        uses: arduino/setup-protoc@v3
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Setup Cargo cache
+        uses: ./.github/actions/setup-cargo-cache
+        with:
+          key: ${{ github.ref }}->${{ github.workflow }}->${{ github.job }}->${{ matrix.os }}
+      - name: Install cargo-binstall
+        uses: cargo-bins/cargo-binstall@main
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Install risc0
+        run: cargo binstall -y cargo-risczero && cargo risczero install
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Cargo build
+        uses: actions-rs/cargo@v1
+        with:
+          command: build
+          args: --all --no-default-features --all-features
+      - name: Cargo test
+        uses: actions-rs/cargo@v1
+        env:
+          RISC0_DEV_MODE: true
+          CONSENSUS_SLOT_TIME: 5
+        with:
+          command: test
+          args: --all --no-default-features --all-features
+      - name: Cargo bench (no-run)
+        uses: actions-rs/cargo@v1
+        env:
+          RISC0_DEV_MODE: true
+          CONSENSUS_SLOT_TIME: 5
+        with:
+          command: bench
+          args: --no-run
+      - name: Update Cargo cache
+        if: success() || failure()
+        uses: ./.github/actions/update-cargo-cache
+        with:
+          key: ${{ github.ref }}->${{ github.workflow }}->${{ github.job }}->${{ matrix.os }}
+      - name: Upload integration tests results
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: integration-test-artifacts
+          path: tests/.tmp*
+  
+  build-docker:
+    runs-on: ubuntu-latest
+    needs:
+      - formatting
+      - cargo-deny
+      - lints
+      - tests
+    env:
+      DOCKER_BUILD_WORKFLOW_FILE: build-docker.yml # Change this in case of file renamings
+    steps:
+      - name: Trigger "Docker build" workflow
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: '${{ env.DOCKER_BUILD_WORKFLOW_FILE }}',
+              ref: '${{ github.ref }}',
+            })
