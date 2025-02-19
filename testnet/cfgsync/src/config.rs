@@ -269,6 +269,7 @@ mod cfgsync_tests {
                 old_blobs_check_interval: Duration::from_secs(5),
                 blobs_validity_duration: Duration::from_secs(u64::MAX),
                 global_params_path: "".into(),
+                policy_settings: Default::default(),
                 monitor_settings: Default::default(),
                 redial_cooldown: Duration::ZERO,
             },

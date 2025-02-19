@@ -1,5 +1,5 @@
-use std::io;
 // std
+use std::io;
 use std::time::Duration;
 // crates
 use futures::StreamExt;
@@ -19,14 +19,17 @@ use crate::protocols::{
     dispersal::validator::behaviour::DispersalEvent, replication::behaviour::ReplicationEvent,
     sampling::behaviour::SamplingEvent,
 };
+use crate::swarm::common::handlers::monitor_event;
 use crate::swarm::common::handlers::{
     handle_replication_event, handle_sampling_event, handle_validator_dispersal_event,
 };
-use crate::SubnetworkId;
+use crate::swarm::common::monitor::{DAConnectionMonitorSettings, MonitorEvent};
+use crate::swarm::common::policy::DAConnectionPolicy;
+use crate::{
+    swarm::{ConnectionMonitor, DAConnectionPolicySettings},
+    SubnetworkId,
+};
 use subnetworks_assignations::MembershipHandler;
-
-use super::common::handlers::monitor_event;
-use super::common::monitor::{DAConnectionMonitor, DAConnectionMonitorSettings, MonitorEvent};
 
 // Metrics
 const EVENT_SAMPLING: &str = "sampling";
@@ -41,7 +44,7 @@ pub struct ValidatorEventsStream {
 pub struct ValidatorSwarm<
     Membership: MembershipHandler<NetworkId = SubnetworkId, Id = PeerId> + 'static,
 > {
-    swarm: Swarm<ValidatorBehaviour<DAConnectionMonitor, Membership>>,
+    swarm: Swarm<ValidatorBehaviour<ConnectionMonitor, Membership>>,
     sampling_events_sender: UnboundedSender<SamplingEvent>,
     validation_events_sender: UnboundedSender<DaBlob>,
 }
@@ -54,6 +57,7 @@ where
         key: Keypair,
         membership: Membership,
         addresses: AddressBook,
+        policy_settings: DAConnectionPolicySettings,
         monitor_settings: DAConnectionMonitorSettings,
         redial_cooldown: Duration,
     ) -> (Self, ValidatorEventsStream) {
@@ -63,7 +67,8 @@ where
         let sampling_events_receiver = UnboundedReceiverStream::new(sampling_events_receiver);
         let validation_events_receiver = UnboundedReceiverStream::new(validation_events_receiver);
 
-        let monitor = DAConnectionMonitor::new(monitor_settings);
+        let policy = DAConnectionPolicy::new(policy_settings);
+        let monitor = ConnectionMonitor::new(monitor_settings, policy);
 
         (
             Self {
@@ -81,9 +86,9 @@ where
         key: Keypair,
         membership: Membership,
         addresses: AddressBook,
-        monitor: DAConnectionMonitor,
+        monitor: ConnectionMonitor,
         redial_cooldown: Duration,
-    ) -> Swarm<ValidatorBehaviour<DAConnectionMonitor, Membership>> {
+    ) -> Swarm<ValidatorBehaviour<ConnectionMonitor, Membership>> {
         SwarmBuilder::with_existing_identity(key)
             .with_tokio()
             .with_quic()
@@ -120,13 +125,13 @@ where
         self.swarm.local_peer_id()
     }
 
-    pub fn protocol_swarm(&self) -> &Swarm<ValidatorBehaviour<DAConnectionMonitor, Membership>> {
+    pub fn protocol_swarm(&self) -> &Swarm<ValidatorBehaviour<ConnectionMonitor, Membership>> {
         &self.swarm
     }
 
     pub fn protocol_swarm_mut(
         &mut self,
-    ) -> &mut Swarm<ValidatorBehaviour<DAConnectionMonitor, Membership>> {
+    ) -> &mut Swarm<ValidatorBehaviour<ConnectionMonitor, Membership>> {
         &mut self.swarm
     }
 
@@ -161,7 +166,7 @@ where
 
     async fn handle_behaviour_event(
         &mut self,
-        event: ValidatorBehaviourEvent<DAConnectionMonitor, Membership>,
+        event: ValidatorBehaviourEvent<ConnectionMonitor, Membership>,
     ) {
         match event {
             ValidatorBehaviourEvent::Sampling(event) => {

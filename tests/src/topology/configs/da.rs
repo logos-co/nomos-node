@@ -7,7 +7,7 @@ use std::{
 };
 
 use fixed::types::U57F7;
-use nomos_da_network_core::swarm::DAConnectionMonitorSettings;
+use nomos_da_network_core::swarm::{DAConnectionMonitorSettings, DAConnectionPolicySettings};
 use nomos_libp2p::{ed25519, Multiaddr, PeerId};
 use nomos_node::NomosDaMembership;
 use once_cell::sync::Lazy;
@@ -35,6 +35,7 @@ pub struct DaParams {
     pub old_blobs_check_interval: Duration,
     pub blobs_validity_duration: Duration,
     pub global_params_path: String,
+    pub policy_settings: DAConnectionPolicySettings,
     pub monitor_settings: DAConnectionMonitorSettings,
     pub redial_cooldown: Duration,
 }
@@ -49,11 +50,8 @@ impl Default for DaParams {
             old_blobs_check_interval: Duration::from_secs(5),
             blobs_validity_duration: Duration::from_secs(u64::MAX),
             global_params_path: GLOBAL_PARAMS_PATH.to_string(),
+            policy_settings: DAConnectionPolicySettings::default(),
             monitor_settings: DAConnectionMonitorSettings {
-                max_dispersal_failures: 0,
-                max_sampling_failures: 0,
-                max_replication_failures: 0,
-                malicious_threshold: 0,
                 failure_time_window: Duration::from_secs(1),
                 time_decay_factor: U57F7::ZERO,
             },
@@ -77,6 +75,7 @@ pub struct GeneralDaConfig {
     pub num_subnets: u16,
     pub old_blobs_check_interval: Duration,
     pub blobs_validity_duration: Duration,
+    pub policy_settings: DAConnectionPolicySettings,
     pub monitor_settings: DAConnectionMonitorSettings,
     pub redial_cooldown: Duration,
 }
@@ -136,6 +135,7 @@ pub fn create_da_configs(ids: &[[u8; 32]], da_params: DaParams) -> Vec<GeneralDa
                 num_subnets: da_params.num_subnets,
                 old_blobs_check_interval: da_params.old_blobs_check_interval,
                 blobs_validity_duration: da_params.blobs_validity_duration,
+                policy_settings: da_params.policy_settings.clone(),
                 monitor_settings: da_params.monitor_settings.clone(),
                 redial_cooldown: da_params.redial_cooldown,
             }
