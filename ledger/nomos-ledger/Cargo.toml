@@ -1,26 +1,30 @@
 [package]
-name = "nomos-ledger"
-version = "0.1.0"
 edition = "2021"
 license = { workspace = true }
+name    = "nomos-ledger"
+version = "0.1.0"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 blake2 = "0.10"
-rpds = "1"
-thiserror = "1"
-serde = { version = "1.0", features = ["derive"], optional = true }
 # TODO: we only need types definition from this crate
-cryptarchia-engine = { path = "../../consensus/cryptarchia-engine" }
-cl = { path = "../../nomos-core/cl" }
-risc0-zkvm = { version = "1.1", optional = true }
-nomos_proof_statements = { path = "../../nomos-core/proof_statements" }
-rand = "0.8.5"
-rand_core = "0.6.0"
-sha2 = "0.10"
-
-nomos-utils = { path = "../../nomos-utils", optional = true }
+cl                     = { workspace = true }
+cryptarchia-engine     = { workspace = true }
+nomos-utils            = { workspace = true, optional = true }
+nomos_proof_statements = { workspace = true }
+rand                   = "0.8.5"
+rand_core              = "0.6.0"
+risc0-zkvm             = { version = "1.1", optional = true }
+rpds                   = "1"
+serde                  = { version = "1.0", features = ["derive"], optional = true }
+sha2                   = "0.10"
+thiserror              = "1"
 
 [features]
-serde = ["dep:serde", "nomos-utils/serde", "rpds/serde"]
+serde = [
+  "cryptarchia-engine/serde",
+  "dep:serde",
+  "nomos-utils/serde",
+  "rpds/serde",
+]

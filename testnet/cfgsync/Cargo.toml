@@ -1,25 +1,25 @@
 [package]
-name = "cfgsync"
-version = "0.1.0"
 edition = "2021"
 license = { workspace = true }
+name    = "cfgsync"
+version = "0.1.0"
 
 [dependencies]
-axum = { version = "0.6" }
-clap = { version = "4", features = ["derive"] }
-nomos-executor = { path = "../../nodes/nomos-executor" }
-nomos-libp2p = { path = "../../nomos-libp2p" }
-nomos-node = { path = "../../nodes/nomos-node" }
-nomos-blend = { path = "../../nomos-blend/core" }
-nomos-blend-message = { path = "../../nomos-blend/message" }
-nomos-tracing = { path = "../../nomos-tracing" }
-nomos-tracing-service = { path = "../../nomos-services/tracing" }
-rand = "0.8"
-reqwest = { version = "0.11", features = ["json", "rustls-tls"] }
-tests = { path = "../../tests" }
-tokio = { version = "1", features = ["rt-multi-thread"] }
-tracing = "0.1"
-serde = { version = "1", features = ["derive"] }
-serde_json = "1"
-serde_yaml = "0.9"
-nomos-blend-service = { path = "../../nomos-services/blend" }
+axum                  = { version = "0.6" }
+clap                  = { version = "4", features = ["derive"] }
+nomos-blend           = { workspace = true }
+nomos-blend-message   = { workspace = true }
+nomos-blend-service   = { workspace = true }
+nomos-executor        = { workspace = true }
+nomos-libp2p          = { workspace = true }
+nomos-node            = { workspace = true }
+nomos-tracing         = { workspace = true }
+nomos-tracing-service = { workspace = true }
+rand                  = "0.8"
+reqwest               = { version = "0.11", features = ["json", "rustls-tls"] }
+serde                 = { version = "1", features = ["derive"] }
+serde_json            = "1"
+serde_yaml            = "0.9"
+tests                 = { workspace = true }
+tokio                 = { version = "1", features = ["rt-multi-thread"] }
+tracing               = "0.1"

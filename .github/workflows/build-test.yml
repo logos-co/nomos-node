@@ -13,12 +13,8 @@ jobs:
   check:
     name: Check
     runs-on: [ 'self-hosted' ]
-    strategy:
-      fail-fast: true
-      matrix:
-        feature: [ libp2p ]
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
         with:
           submodules: true
       - uses: arduino/setup-protoc@v3
@@ -34,7 +30,7 @@ jobs:
       - uses: actions-rs/cargo@v1
         with:
           command: check
-          args: --all --all-targets --no-default-features --features ${{ matrix.feature }}
+          args: --all --all-targets --all-features
 
   test:
     name: Test Suite
@@ -46,7 +42,7 @@ jobs:
         os: [ self-hosted, macos-latest ] # drop windows for now as risc0 does not support it
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
         with:
           submodules: true
       - name: Remove unwanted software
@@ -118,7 +114,7 @@ jobs:
     name: Rust lints
     runs-on: self-hosted
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
         with:
           submodules: true
       - uses: arduino/setup-protoc@v3
@@ -136,8 +132,16 @@ jobs:
         with:
           command: fmt
           args: --all --check
+      - name: Install taplo
+        run: cargo install taplo-cli --locked
+        # If taplo-cli is already installed, we ignore the error
+        continue-on-error: true
+      - name: Check taplo formatting
+        run: taplo fmt --check          
       - name: Run cargo clippy
         uses: actions-rs/cargo@v1
+        env:
+          RISC0_SKIP_BUILD: true
         with:
           command: clippy
           args: --all --all-targets --all-features -- --deny warnings
