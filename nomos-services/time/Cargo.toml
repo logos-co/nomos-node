@@ -1,23 +1,23 @@
 [package]
-name = "nomos-time"
-version = "0.1.0"
 edition = "2021"
+name    = "nomos-time"
+version = "0.1.0"
 
 [dependencies]
+async-trait        = "0.1"
 cryptarchia-engine = { path = "../../consensus/cryptarchia-engine", features = ["serde", "tokio"] }
-async-trait = "0.1"
-overwatch-rs = { git = "https://github.com/logos-co/Overwatch", rev = "f5f7ea0" }
-tokio = { version = "1", features = ["macros", "sync"] }
-tokio-stream = "0.1"
-futures = "0.3"
-nomos-tracing = { path = "../../nomos-tracing" }
-log = "0.4.22"
-sntpc = { version = "0.5", optional = true }
-url = "2.5"
-thiserror = { version = "2.0", optional = true }
-time = "0.3"
-serde = { version = "1.0", optional = true, features = ["derive"] }
+futures            = "0.3"
+log                = "0.4.22"
+nomos-tracing      = { path = "../../nomos-tracing" }
+overwatch-rs       = { git = "https://github.com/logos-co/Overwatch", rev = "f5f7ea0" }
+serde              = { version = "1.0", optional = true, features = ["derive"] }
+sntpc              = { version = "0.5", optional = true }
+thiserror          = { version = "2.0", optional = true }
+time               = "0.3"
+tokio              = { version = "1", features = ["macros", "sync"] }
+tokio-stream       = "0.1"
+url                = "2.5"
 
 [features]
 default = []
-ntp = ["sntpc/tokio-socket", "thiserror/default"]
+ntp     = ["sntpc/tokio-socket", "thiserror/default"]
