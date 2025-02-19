@@ -1,4 +1,5 @@
 // std
+use fixed::types::U57F7;
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
 // crates
@@ -78,9 +79,9 @@ impl From<SamplingEvent> for MonitorEvent {
 #[derive(Default, Debug)]
 pub struct PeerStats {
     // Failure rate tracking (sliding window)
-    dispersal_failures_rate: f64,
-    sampling_failures_rate: f64,
-    replication_failures_rate: f64,
+    dispersal_failures_rate: U57F7,
+    sampling_failures_rate: U57F7,
+    replication_failures_rate: U57F7,
 
     last_dispersal_failure: Option<Instant>,
     last_sampling_failure: Option<Instant>,
@@ -92,8 +93,8 @@ impl PeerStats {
         &self,
         now: Instant,
         window: Duration,
-        factor: f64,
-    ) -> f64 {
+        factor: U57F7,
+    ) -> U57F7 {
         compute_failure_rate(
             now,
             self.last_dispersal_failure.unwrap_or(now),
@@ -107,8 +108,8 @@ impl PeerStats {
         &self,
         now: Instant,
         window: Duration,
-        factor: f64,
-    ) -> f64 {
+        factor: U57F7,
+    ) -> U57F7 {
         compute_failure_rate(
             now,
             self.last_sampling_failure.unwrap_or(now),
@@ -123,8 +124,8 @@ impl PeerStats {
         &self,
         now: Instant,
         window: Duration,
-        factor: f64,
-    ) -> f64 {
+        factor: U57F7,
+    ) -> U57F7 {
         compute_failure_rate(
             now,
             self.last_replication_failure.unwrap_or(now),
@@ -142,7 +143,7 @@ pub struct DAConnectionMonitorSettings {
     pub max_replication_failures: usize,
     pub malicious_threshold: usize,
     pub failure_time_window: Duration,
-    pub time_decay_factor: f64,
+    pub time_decay_factor: U57F7,
 }
 
 pub struct DAConnectionMonitor {
@@ -178,16 +179,16 @@ impl DAConnectionMonitor {
                 self.settings.time_decay_factor,
             );
 
-            if dispersal_rate >= self.settings.malicious_threshold as f64
-                || sampling_rate >= self.settings.malicious_threshold as f64
-                || replication_rate >= self.settings.malicious_threshold as f64
+            if dispersal_rate >= self.settings.malicious_threshold
+                || sampling_rate >= self.settings.malicious_threshold
+                || replication_rate >= self.settings.malicious_threshold
             {
                 return PeerStatus::Malicious;
             }
 
-            if dispersal_rate >= self.settings.max_dispersal_failures as f64
-                || sampling_rate >= self.settings.max_sampling_failures as f64
-                || replication_rate >= self.settings.max_replication_failures as f64
+            if dispersal_rate >= self.settings.max_dispersal_failures
+                || sampling_rate >= self.settings.max_sampling_failures
+                || replication_rate >= self.settings.max_replication_failures
             {
                 return PeerStatus::Unhealthy;
             }
@@ -212,7 +213,7 @@ impl ConnectionMonitor for DAConnectionMonitor {
                         now,
                         self.settings.failure_time_window,
                         self.settings.time_decay_factor,
-                    ) + 1.0; // Compute updated rate and increment by one because its a new error.
+                    ) + U57F7::ONE; // Compute updated rate and increment by one because its a new error.
                     stats.last_dispersal_failure = Some(now);
                 }
                 MonitorEvent::Replication(_) => {
@@ -220,7 +221,7 @@ impl ConnectionMonitor for DAConnectionMonitor {
                         now,
                         self.settings.failure_time_window,
                         self.settings.time_decay_factor,
-                    ) + 1.0; // Compute updated rate and increment by one because its a new error.
+                    ) + U57F7::ONE; // Compute updated rate and increment by one because its a new error.
                     stats.last_replication_failure = Some(now);
                 }
                 MonitorEvent::Sampling(_) => {
@@ -228,7 +229,7 @@ impl ConnectionMonitor for DAConnectionMonitor {
                         now,
                         self.settings.failure_time_window,
                         self.settings.time_decay_factor,
-                    ) + 1.0; // Compute updated rate and increment by one because its a new error.
+                    ) + U57F7::ONE; // Compute updated rate and increment by one because its a new error.
                     stats.last_sampling_failure = Some(now);
                 }
                 MonitorEvent::Noop => {}
@@ -251,17 +252,18 @@ impl ConnectionMonitor for DAConnectionMonitor {
 fn compute_failure_rate(
     now: Instant,
     last_failure: Instant,
-    failure_rate: f64,
+    failure_rate: U57F7,
     failure_time_window: Duration,
-    decay_factor: f64,
-) -> f64 {
+    decay_factor: U57F7,
+) -> U57F7 {
     let elapsed = now.duration_since(last_failure).as_secs_f64();
     let mut new_failure_rate = failure_rate;
 
     // Apply exponential decay to the failure rate
     if elapsed > 0.0 {
         let time_based_decay = (-elapsed / failure_time_window.as_secs_f64()).exp();
-        new_failure_rate *= time_based_decay * decay_factor;
+        let decay_factor_fixed = U57F7::from_num(time_based_decay);
+        new_failure_rate *= decay_factor_fixed * decay_factor;
     }
 
     new_failure_rate
@@ -280,7 +282,7 @@ mod tests {
             max_replication_failures: 2,
             malicious_threshold: 3,
             failure_time_window: Duration::from_secs(10),
-            time_decay_factor: 0.8,
+            time_decay_factor: U57F7::lit("0.8"),
         };
         DAConnectionMonitor::new(settings)
     }
