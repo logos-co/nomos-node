@@ -6,7 +6,7 @@ version = "0.1.0"
 
 [dependencies]
 async-trait        = "0.1"
-cryptarchia-engine = { path = "../../consensus/cryptarchia-engine", features = ["serde", "tokio"] }
+cryptarchia-engine = { workspace = true, features = ["serde", "tokio"] }
 futures            = "0.3"
 log                = "0.4.22"
 nomos-tracing      = { workspace = true }
