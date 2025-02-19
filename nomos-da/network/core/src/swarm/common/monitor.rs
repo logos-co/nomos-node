@@ -79,13 +79,15 @@ impl From<&SamplingEvent> for MonitorEvent {
     }
 }
 
+/// Tracks failure rates for different protocols using exponential weighted moving average.
 #[derive(Default, Debug)]
 pub struct PeerStats {
-    // Failure rate tracking (sliding window)
+    // Calculated using EWMA to give more weight to recent failures while gradually decaying over time.
     dispersal_failures_rate: U57F7,
     sampling_failures_rate: U57F7,
     replication_failures_rate: U57F7,
 
+    // Track the time of the last failure for decay calculations.
     last_dispersal_failure: Option<Instant>,
     last_sampling_failure: Option<Instant>,
     last_replication_failure: Option<Instant>,
@@ -165,7 +167,7 @@ impl DAConnectionMonitor {
     fn evaluate_peer(&self, now: Instant, peer_id: &PeerId) -> PeerStatus {
         if let Some(stats) = self.peer_stats.get(peer_id) {
             // We need to recompute the failure rate upon the evaluation as time has moved on and
-            // the failure rate must have decayed..
+            // the failure rate must have decayed.
             let dispersal_rate = stats.compute_dispersal_failure_rate(
                 now,
                 self.settings.failure_time_window,
@@ -182,6 +184,8 @@ impl DAConnectionMonitor {
                 self.settings.time_decay_factor,
             );
 
+            // TODO: Instead of deciding the peer status here, use ConnectionPolicy once it's
+            // implemented.
             if dispersal_rate >= self.settings.malicious_threshold
                 || sampling_rate >= self.settings.malicious_threshold
                 || replication_rate >= self.settings.malicious_threshold
@@ -354,7 +358,7 @@ mod tests {
             PeerStatus::Unhealthy
         );
 
-        // Simulate evaluation after 10 sseconds waiting, failure rate should decay,
+        // Simulate evaluation after 10 seconds waiting, failure rate should decay,
         // making the peer Healthy again.
         let later = Instant::now() + Duration::from_secs(10);
         assert_eq!(monitor.evaluate_peer(later, &peer_id), PeerStatus::Healthy);
