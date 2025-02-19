@@ -7,6 +7,7 @@ use overwatch_rs::services::relay::RelayMessage;
 use overwatch_rs::services::state::{NoOperator, NoState};
 use overwatch_rs::services::{ServiceCore, ServiceData, ServiceId};
 use overwatch_rs::DynError;
+use services_utils::overwatch::lifecycle::should_stop_service;
 use std::fmt::{Debug, Formatter};
 use std::pin::Pin;
 use tokio::sync::{oneshot, watch};
@@ -117,9 +118,10 @@ where
                     }
 
                 }
-                Some(_lifecycle_msg) = lifecycle_relay.next() => {
-                    // TODO: Add handling after refactor duplicated handling function in other services.
-                    todo!("Handle lifecyle");
+                Some(lifecycle_msg) = lifecycle_relay.next() => {
+                    if should_stop_service::<Self>(&lifecycle_msg).await {
+                        break;
+                    }
                 }
             }
         }
