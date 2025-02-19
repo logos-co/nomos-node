@@ -3,7 +3,7 @@ use std::{
     time::Duration,
 };
 
-use cryptarchia_consensus::{LeaderConfig, TimeConfig};
+use cryptarchia_consensus::LeaderConfig;
 use kzgrs_backend::{
     common::blob::DaBlob,
     dispersal::BlobInfo,
@@ -118,6 +118,7 @@ pub(crate) type Cryptarchia = cryptarchia_consensus::CryptarchiaConsensus<
     SamplingLibp2pAdapter<NomosDaMembership>,
     IntegrationRng,
     SamplingStorageAdapter<DaBlob, Wire>,
+    nomos_time::backends::system_time::SystemTimeBackend,
 >;
 
 pub type DaSampling = DaSamplingService<
@@ -150,6 +151,7 @@ pub(crate) type DaIndexer = DataIndexerService<
     SamplingLibp2pAdapter<NomosDaMembership>,
     IntegrationRng,
     SamplingStorageAdapter<DaBlob, Wire>,
+    nomos_time::backends::system_time::SystemTimeBackend,
 >;
 
 pub(crate) type TxMempool = TxMempoolService<
@@ -216,7 +218,6 @@ pub fn new_node(
     leader_config: &LeaderConfig,
     ledger_config: &nomos_ledger::Config,
     genesis_state: &LedgerState,
-    time_config: &TimeConfig,
     swarm_config: &SwarmConfig,
     blend_config: &TestBlendSettings,
     db_path: PathBuf,
@@ -302,7 +303,6 @@ pub fn new_node(
                 blob_selector_settings: (),
                 config: ledger_config.clone(),
                 genesis_state: genesis_state.clone(),
-                time: time_config.clone(),
                 leader_config: leader_config.clone(),
                 network_adapter_settings:
                     cryptarchia_consensus::network::adapters::libp2p::LibP2pAdapterSettings {
