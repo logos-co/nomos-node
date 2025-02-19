@@ -108,8 +108,8 @@ where
         removed
     }
 
-    pub fn record_event(&mut self, event: impl Into<Monitor::Event>) {
-        if let Some(output) = self.monitor.record_event(event.into()) {
+    pub fn record_event(&mut self, event: Monitor::Event) {
+        if let Some(output) = self.monitor.record_event(event) {
             match output.peer_status {
                 PeerStatus::Malicious => {
                     self.block_peer(output.peer_id);

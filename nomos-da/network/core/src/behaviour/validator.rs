@@ -1,11 +1,14 @@
 // std
 
+use std::time::Duration;
+
 use libp2p::identity::Keypair;
 use libp2p::PeerId;
 // crates
 use libp2p::swarm::NetworkBehaviour;
 // internal
 use crate::address_book::AddressBook;
+use crate::maintenance::monitor::{ConnectionMonitor, ConnectionMonitorBehaviour};
 use crate::{
     protocols::dispersal::validator::behaviour::DispersalValidatorBehaviour,
     protocols::replication::behaviour::ReplicationBehaviour,
@@ -23,23 +26,36 @@ use subnetworks_assignations::MembershipHandler;
 /// 2) Dispersal so we do not bottleneck executors.
 /// 3) Replication is the least important (and probably the least used), it is also dependant of dispersal.
 #[derive(NetworkBehaviour)]
-pub struct ValidatorBehaviour<Membership: MembershipHandler> {
+pub struct ValidatorBehaviour<Monitor, Membership>
+where
+    Monitor: ConnectionMonitor,
+    Membership: MembershipHandler,
+{
     sampling: SamplingBehaviour<Membership>,
     dispersal: DispersalValidatorBehaviour<Membership>,
     replication: ReplicationBehaviour<Membership>,
+    monitor: ConnectionMonitorBehaviour<Monitor>,
 }
 
-impl<Membership> ValidatorBehaviour<Membership>
+impl<Monitor, Membership> ValidatorBehaviour<Monitor, Membership>
 where
+    Monitor: ConnectionMonitor,
     Membership: MembershipHandler + Clone + Send + 'static,
     <Membership as MembershipHandler>::NetworkId: Send,
 {
-    pub fn new(key: &Keypair, membership: Membership, addresses: AddressBook) -> Self {
+    pub fn new(
+        key: &Keypair,
+        membership: Membership,
+        addresses: AddressBook,
+        monitor: Monitor,
+        redial_cooldown: Duration,
+    ) -> Self {
         let peer_id = PeerId::from_public_key(&key.public());
         Self {
             sampling: SamplingBehaviour::new(peer_id, membership.clone(), addresses),
             dispersal: DispersalValidatorBehaviour::new(membership.clone()),
             replication: ReplicationBehaviour::new(peer_id, membership),
+            monitor: ConnectionMonitorBehaviour::new(monitor, redial_cooldown),
         }
     }
 
@@ -72,5 +88,9 @@ where
 
     pub fn replication_behaviour_mut(&mut self) -> &mut ReplicationBehaviour<Membership> {
         &mut self.replication
+    }
+
+    pub fn monitor_behaviour_mut(&mut self) -> &mut ConnectionMonitorBehaviour<Monitor> {
+        &mut self.monitor
     }
 }

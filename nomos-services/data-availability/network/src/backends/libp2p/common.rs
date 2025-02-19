@@ -10,12 +10,14 @@ use nomos_da_network_core::protocols::sampling::behaviour::{
     BehaviourSampleReq, BehaviourSampleRes, SamplingError,
 };
 use nomos_da_network_core::swarm::validator::ValidatorEventsStream;
+use nomos_da_network_core::swarm::DAConnectionMonitorSettings;
 use nomos_da_network_core::SubnetworkId;
 use nomos_libp2p::secret_key_serde;
 use nomos_libp2p::{ed25519, Multiaddr, PeerId};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::fmt::Debug;
+use std::time::Duration;
 use subnetworks_assignations::MembershipHandler;
 use tokio::sync::mpsc::error::SendError;
 use tokio::sync::mpsc::UnboundedSender;
@@ -32,6 +34,8 @@ pub struct DaNetworkBackendSettings<Membership> {
     pub membership: Membership,
     pub addresses: HashMap<PeerId, Multiaddr>,
     pub listening_address: Multiaddr,
+    pub monitor_settings: DAConnectionMonitorSettings,
+    pub redial_cooldown: Duration,
 }
 
 /// Sampling events coming from da network
