@@ -4,6 +4,9 @@ inputs:
   key:
     description: The key to use for the cache
     required: true
+  github-token:
+    description: Valid GitHub token to interact with GitHub REST API
+    required: true
 
 description: Set up cache read operations for Cargo artifacts
 
@@ -22,3 +25,8 @@ runs:
         key: ${{ inputs.key }}->#${{ github.run_id }}
         restore-keys: |
           ${{ inputs.key }}
+    - name: Delete retrieved cache
+      uses: ./.github/actions/prune-cache
+      with:
+        key-prefix: ${{ inputs.key }}->#
+        github-token: ${{ inputs.github-token }}

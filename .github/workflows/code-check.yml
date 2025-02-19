@@ -42,38 +42,35 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-      # - name: Install protoc compiler
-      #   uses: arduino/setup-protoc@v3
-      #   with:
-      #     repo-token: ${{ secrets.GITHUB_TOKEN }}
-      # - name: Set up Cargo cache
-      #   uses: ./.github/actions/setup-cargo-cache
-      #   with:
-      #     key: ${{ github.ref }}->${{ github.workflow }}->${{ github.job }}
-      # - name: Install cargo-binstall
-      #   uses: cargo-bins/cargo-binstall@main
-      #   env:
-      #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      # - name: Install risc0
-      #   run: cargo binstall -y cargo-risczero && cargo risczero install
-      #   env:
-      #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      # - name: Run cargo clippy
-      #   uses: actions-rs/cargo@v1
-      #   with:
-      #     command: clippy
-      #     args: --all --all-targets --all-features -- --deny warnings
-      - name: Obtain cache entries to delete
-        run: |
-          curl  \
-            -H "Accept: application/vnd.github.v3+json" \
-            -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
-            https://api.github.com/repos/logos-co/nomos-node/actions/caches | jq '.actions_caches[] | select(.key | startswith("refs/pull/1058/merge->PR check->lints->#")) | .id'
-      # - name: Update Cargo cache
-      #   if: success() || failure()
-      #   uses: ./.github/actions/update-cargo-cache
-      #   with:
-      #     key: ${{ github.ref }}->${{ github.workflow }}->${{ github.job }}
+      - name: Install protoc compiler
+        uses: arduino/setup-protoc@v3
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Set up Cargo cache
+        uses: ./.github/actions/setup-cargo-cache
+        with:
+          key: ${{ github.ref }}->${{ github.workflow }}->${{ github.job }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Install cargo-binstall
+        uses: cargo-bins/cargo-binstall@main
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Install risc0
+        run: cargo binstall -y cargo-risczero && cargo risczero install
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Run cargo clippy
+        uses: actions-rs/cargo@v1
+        env:
+          RISC0_SKIP_BUILD: true
+        with:
+          command: clippy
+          args: --all --all-targets --all-features -- -D warnings
+      - name: Update Cargo cache
+        if: success() || failure()
+        uses: ./.github/actions/update-cargo-cache
+        with:
+          key: ${{ github.ref }}->${{ github.workflow }}->${{ github.job }}
  
   # tests:
   #   name: Run test suite

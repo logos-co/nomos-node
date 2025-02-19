@@ -1,0 +1,32 @@
+name: Prune unnecessary cache
+
+inputs:
+  key-prefix:
+    description: The cache key prefix to prune
+    required: true
+  github-token:
+    description: The GH token to use for the API request
+    required: true
+
+description: Prune unnecessary cache for the provided key
+
+runs:
+  using: composite
+  steps:
+    - name: Obtain cache entry to delete
+      id: fetch-outdated-cache
+      shell: bash
+      run: |
+        CACHE=$(curl  \
+          -H "Accept: application/vnd.github.v3+json" \
+          -H "Authorization: token ${{ inputs.github-token }}" \
+          https://api.github.com/repos/logos-co/nomos-node/actions/caches | jq '.actions_caches[] | select(.key | startswith("${{ inputs.key-prefix }}")) | .id')
+        echo "cache=$CACHE" >> "$GITHUB_OUTPUT"
+    - name: Delete cache entry
+      if: steps.fetch-outdated-cache.outputs.cache != null
+      shell: bash
+      run: |
+        curl -X DELETE \
+          -H "Accept: application/vnd.github.v3+json" \
+          -H "Authorization: token ${{ inputs.github-token }}" \
+          https://api.github.com/repos/logos-co/nomos-node/actions/caches/${{ steps.fetch-outdated-cache.outputs.cache }}
