@@ -134,6 +134,8 @@ jobs:
           args: --all --check
       - name: Install taplo
         run: cargo install taplo-cli --locked
+        # If taplo-cli is already installed, we ignore the error
+        continue-on-error: true
       - name: Check taplo formatting
         run: taplo fmt --check          
       - name: Run cargo clippy
