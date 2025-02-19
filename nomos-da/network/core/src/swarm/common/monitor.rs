@@ -1,9 +1,10 @@
 // std
-use fixed::types::U57F7;
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
 // crates
+use fixed::types::U57F7;
 use libp2p::PeerId;
+use serde::{Deserialize, Serialize};
 // internal
 use crate::maintenance::monitor::{ConnectionMonitor, ConnectionMonitorOutput, PeerStatus};
 use crate::protocols::dispersal::executor::behaviour::{
@@ -35,43 +36,45 @@ impl MonitorEvent {
     }
 }
 
-impl From<DispersalExecutorEvent> for MonitorEvent {
-    fn from(event: DispersalExecutorEvent) -> Self {
+impl From<&DispersalExecutorEvent> for MonitorEvent {
+    fn from(event: &DispersalExecutorEvent) -> Self {
         match event {
             DispersalExecutorEvent::DispersalSuccess { .. } => MonitorEvent::Noop,
             DispersalExecutorEvent::DispersalError { error } => {
-                MonitorEvent::ExecutorDispersal(error)
+                MonitorEvent::ExecutorDispersal(error.clone())
             }
         }
     }
 }
 
-impl From<DispersalValidatorEvent> for MonitorEvent {
-    fn from(event: DispersalValidatorEvent) -> Self {
+impl From<&DispersalValidatorEvent> for MonitorEvent {
+    fn from(event: &DispersalValidatorEvent) -> Self {
         match event {
             DispersalValidatorEvent::IncomingMessage { .. } => MonitorEvent::Noop,
             DispersalValidatorEvent::DispersalError { error } => {
-                MonitorEvent::ValidatorDispersal(error)
+                MonitorEvent::ValidatorDispersal(error.clone())
             }
         }
     }
 }
 
-impl From<ReplicationEvent> for MonitorEvent {
-    fn from(event: ReplicationEvent) -> Self {
+impl From<&ReplicationEvent> for MonitorEvent {
+    fn from(event: &ReplicationEvent) -> Self {
         match event {
             ReplicationEvent::IncomingMessage { .. } => MonitorEvent::Noop,
-            ReplicationEvent::ReplicationError { error } => MonitorEvent::Replication(error),
+            ReplicationEvent::ReplicationError { error } => {
+                MonitorEvent::Replication(error.clone())
+            }
         }
     }
 }
 
-impl From<SamplingEvent> for MonitorEvent {
-    fn from(event: SamplingEvent) -> Self {
+impl From<&SamplingEvent> for MonitorEvent {
+    fn from(event: &SamplingEvent) -> Self {
         match event {
             SamplingEvent::SamplingSuccess { .. } => MonitorEvent::Noop,
             SamplingEvent::IncomingSample { .. } => MonitorEvent::Noop,
-            SamplingEvent::SamplingError { error } => MonitorEvent::Sampling(error),
+            SamplingEvent::SamplingError { error } => MonitorEvent::Sampling(error.clone()),
         }
     }
 }
@@ -136,7 +139,7 @@ impl PeerStats {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DAConnectionMonitorSettings {
     pub max_dispersal_failures: usize,
     pub max_sampling_failures: usize,

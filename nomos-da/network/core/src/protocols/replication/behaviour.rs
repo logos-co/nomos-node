@@ -43,6 +43,17 @@ impl ReplicationError {
     }
 }
 
+impl Clone for ReplicationError {
+    fn clone(&self) -> Self {
+        match self {
+            ReplicationError::Io { peer_id, error } => ReplicationError::Io {
+                peer_id: *peer_id,
+                error: std::io::Error::new(error.kind(), error.to_string()),
+            },
+        }
+    }
+}
+
 /// Nomos DA BroadcastEvents to be bubble up to logic layers
 #[allow(dead_code)] // todo: remove when used in tests
 #[derive(Debug)]

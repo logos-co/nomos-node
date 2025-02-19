@@ -1,3 +1,4 @@
+use crate::maintenance::monitor::{ConnectionMonitor, ConnectionMonitorBehaviour};
 use crate::protocols::dispersal::validator::behaviour::DispersalEvent;
 use crate::protocols::replication::behaviour::{ReplicationBehaviour, ReplicationEvent};
 use crate::protocols::sampling::behaviour::SamplingEvent;
@@ -47,4 +48,11 @@ pub async fn handle_replication_event(
             error!("Error sending blob to validation: {e:?}");
         }
     }
+}
+
+pub fn monitor_event<Monitor: ConnectionMonitor>(
+    monitor_behaviour: &mut ConnectionMonitorBehaviour<Monitor>,
+    event: Monitor::Event,
+) {
+    monitor_behaviour.record_event(event);
 }

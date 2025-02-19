@@ -85,6 +85,8 @@ where
             keypair,
             config.membership.clone(),
             config.addresses.clone().into_iter().collect(),
+            config.monitor_settings,
+            config.redial_cooldown,
         );
         let address = config.listening_address;
         // put swarm to listen at the specified configuration address
