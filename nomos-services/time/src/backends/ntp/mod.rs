@@ -40,7 +40,7 @@ impl TimeBackend for Ntp {
 
     fn tick_stream(self) -> EpochSlotTickStream {
         let Self { settings, client } = self;
-        let mut update_interval = interval(settings.update_interval.clone());
+        let mut update_interval = interval(settings.update_interval);
         update_interval.set_missed_tick_behavior(MissedTickBehavior::Skip);
         let ntp_server = settings.ntp_server.clone();
         let interval: NtpResultStream = Pin::new(Box::new(
