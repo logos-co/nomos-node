@@ -7,7 +7,6 @@ use std::pin::Pin;
 use async_trait::async_trait;
 use backends::NetworkBackend;
 use futures::{Stream, StreamExt};
-use overwatch_rs::services::life_cycle::LifecycleMessage;
 use overwatch_rs::services::{
     handle::ServiceStateHandle,
     relay::RelayMessage,
@@ -16,8 +15,9 @@ use overwatch_rs::services::{
 };
 use serde::{Deserialize, Serialize};
 use tokio::sync::oneshot;
-use tracing::error;
+
 // internal
+use services_utils::overwatch::lifecycle;
 
 const DA_NETWORK_TAG: ServiceId = "DA-Network";
 
@@ -107,7 +107,8 @@ where
                     Self::handle_network_service_message(msg, &mut backend).await;
                 }
                 Some(msg) = lifecycle_stream.next() => {
-                    if Self::should_stop_service(msg).await {
+                    if lifecycle::should_stop_service::<Self>(&msg).await {
+                        // TODO: Maybe add a call to backend to handle this. Maybe trying to save unprocessed messages?
                         backend.shutdown();
                         break;
                     }
@@ -139,22 +140,6 @@ where
                         "client hung up before a subscription handle could be established"
                     )
                 }),
-        }
-    }
-
-    async fn should_stop_service(msg: LifecycleMessage) -> bool {
-        match msg {
-            LifecycleMessage::Kill => true,
-            LifecycleMessage::Shutdown(signal_sender) => {
-                // TODO: Maybe add a call to backend to handle this. Maybe trying to save unprocessed messages?
-                if signal_sender.send(()).is_err() {
-                    error!(
-                        "Error sending successful shutdown signal from service {}",
-                        Self::SERVICE_ID
-                    );
-                }
-                true
-            }
         }
     }
 }

@@ -18,6 +18,7 @@ overwatch-rs        = { workspace = true }
 rand                = "0.8.5"
 rand_chacha         = "0.3"
 serde               = { version = "1.0", features = ["derive"] }
+services-utils      = { workspace = true }
 tokio               = { version = "1", features = ["macros", "sync"] }
 tokio-stream        = "0.1"
 tracing             = "0.1"

@@ -22,6 +22,7 @@ overwatch-rs             = { workspace = true }
 rand                     = "0.8.5"
 rand_chacha              = "0.3.1"
 serde                    = { version = "1.0", features = ["derive"] }
+services-utils           = { workspace = true }
 subnetworks-assignations = { workspace = true }
 thiserror                = "1.0.63"
 tokio                    = { version = "1", features = ["macros", "sync"] }

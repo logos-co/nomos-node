@@ -19,7 +19,6 @@ use nomos_storage::backends::StorageBackend;
 use nomos_storage::StorageService;
 use nomos_tracing::info_with_id;
 use overwatch_rs::services::handle::ServiceStateHandle;
-use overwatch_rs::services::life_cycle::LifecycleMessage;
 use overwatch_rs::services::relay::{Relay, RelayMessage};
 use overwatch_rs::services::state::{NoOperator, NoState};
 use overwatch_rs::services::{ServiceCore, ServiceData, ServiceId};
@@ -27,9 +26,10 @@ use overwatch_rs::DynError;
 use rand::{RngCore, SeedableRng};
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
+use services_utils::overwatch::lifecycle;
 use storage::DaStorageAdapter;
 use tokio::sync::oneshot::Sender;
-use tracing::{error, instrument};
+use tracing::instrument;
 
 const DA_INDEXER_TAG: ServiceId = "DA-Indexer";
 
@@ -335,21 +335,6 @@ where
             }
         }
     }
-
-    async fn should_stop_service(message: LifecycleMessage) -> bool {
-        match message {
-            LifecycleMessage::Shutdown(sender) => {
-                if sender.send(()).is_err() {
-                    error!(
-                        "Error sending successful shutdown signal from service {}",
-                        Self::SERVICE_ID
-                    );
-                }
-                true
-            }
-            LifecycleMessage::Kill => true,
-        }
-    }
 }
 
 #[async_trait::async_trait]
@@ -495,7 +480,7 @@ where
                     }
                 }
                 Some(msg) = lifecycle_stream.next() => {
-                    if Self::should_stop_service(msg).await {
+                    if lifecycle::should_stop_service::<Self>(&msg).await {
                         break;
                     }
                 }
