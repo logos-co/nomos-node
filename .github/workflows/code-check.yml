@@ -3,7 +3,7 @@ on:
   push:
     branches: [ master ]
 
-name: PR check
+name: Code checks
 
 concurrency:
   group: ${{ github.workflow }}@${{ github.ref }}
