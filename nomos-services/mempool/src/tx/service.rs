@@ -14,13 +14,13 @@ use crate::backend::MemPool;
 use crate::network::NetworkAdapter;
 use crate::{MempoolMetrics, MempoolMsg};
 use nomos_network::{NetworkMsg, NetworkService};
-use nomos_utils::lifecycle;
 use overwatch_rs::services::{
     handle::ServiceStateHandle,
     relay::{OutboundRelay, Relay},
     state::{NoOperator, NoState},
     ServiceCore, ServiceData, ServiceId,
 };
+use services_utils::overwatch::lifecycle;
 
 pub struct TxMempoolService<N, P>
 where

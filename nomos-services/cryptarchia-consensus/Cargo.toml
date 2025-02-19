@@ -13,7 +13,7 @@ chrono = "0.4"
 cryptarchia-engine = { path = "../../consensus/cryptarchia-engine", features = ["serde"] }
 nomos-ledger = { path = "../../ledger/nomos-ledger", features = ["serde"] }
 nomos_proof_statements = { path = "../../nomos-core/proof_statements" }
-utils = { path = "../utils" }
+services-utils = { path = "../utils" }
 cl = { path = "../../nomos-core/cl" }
 futures = "0.3"
 nomos-da-sampling = { path = "../data-availability/sampling" }
@@ -23,7 +23,6 @@ nomos-mempool = { path = "../mempool" }
 nomos-core = { path = "../../nomos-core/chain-defs" }
 overwatch-rs = { git = "https://github.com/logos-co/Overwatch", rev = "f5f7ea0" }
 nomos-storage = { path = "../storage" }
-nomos-utils = { path = "../../nomos-utils" }
 rand_chacha = "0.3"
 rand = "0.8"
 serde = { version = "1", features = ["derive"] }

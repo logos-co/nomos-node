@@ -30,7 +30,6 @@ use nomos_mempool::{
 };
 use nomos_network::NetworkService;
 use nomos_storage::{backends::StorageBackend, StorageMsg, StorageService};
-use nomos_utils::lifecycle;
 use overwatch_rs::services::relay::{OutboundRelay, Relay, RelayMessage};
 use overwatch_rs::services::state::ServiceState;
 use overwatch_rs::services::{handle::ServiceStateHandle, ServiceCore, ServiceData, ServiceId};
@@ -38,6 +37,9 @@ use overwatch_rs::DynError;
 use rand::{RngCore, SeedableRng};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_with::serde_as;
+use services_utils::overwatch::lifecycle;
+use services_utils::overwatch::recovery::backends::FileBackendSettings;
+use services_utils::overwatch::{JsonFileBackend, RecoveryOperator};
 use std::collections::BTreeSet;
 use std::hash::Hash;
 use std::marker::PhantomData;
@@ -49,8 +51,6 @@ use tokio::sync::{broadcast, oneshot};
 use tokio_stream::wrappers::IntervalStream;
 use tracing::{error, instrument, span, Level};
 use tracing_futures::Instrument;
-use utils::overwatch::recovery::backends::FileBackendSettings;
-use utils::overwatch::{JsonFileBackend, RecoveryOperator};
 
 type MempoolRelay<Payload, Item, Key> = OutboundRelay<MempoolMsg<HeaderId, Payload, Item, Key>>;
 type SamplingRelay<BlobId> = OutboundRelay<DaSamplingServiceMsg<BlobId>>;

@@ -19,7 +19,6 @@ use nomos_blend::{
 use nomos_blend_message::{sphinx::SphinxMessage, BlendMessage};
 use nomos_core::wire;
 use nomos_network::NetworkService;
-use nomos_utils::lifecycle;
 use overwatch_rs::services::{
     handle::ServiceStateHandle,
     relay::{Relay, RelayMessage},
@@ -29,6 +28,7 @@ use overwatch_rs::services::{
 use rand::SeedableRng;
 use rand_chacha::ChaCha12Rng;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use services_utils::overwatch::lifecycle;
 use std::fmt::Debug;
 use std::hash::Hash;
 use std::time::Duration;
