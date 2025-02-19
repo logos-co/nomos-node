@@ -12,11 +12,11 @@ use nomos_tracing::logging::loki::{create_loki_layer, LokiConfig};
 use nomos_tracing::metrics::otlp::{create_otlp_metrics_layer, OtlpMetricsConfig};
 use overwatch_rs::services::life_cycle::LifecycleMessage;
 use overwatch_rs::services::{
-    handle::ServiceStateHandle,
     relay::NoMessage,
     state::{NoOperator, NoState},
     ServiceCore, ServiceData,
 };
+use overwatch_rs::OpaqueServiceStateHandle;
 use serde::{Deserialize, Serialize};
 use tracing::{error, Level};
 use tracing_appender::non_blocking::WorkerGuard;
@@ -27,7 +27,7 @@ use tracing_subscriber::util::SubscriberInitExt;
 use nomos_tracing::tracing::otlp::{create_otlp_tracing_layer, OtlpTracingConfig};
 
 pub struct Tracing {
-    service_state: ServiceStateHandle<Self>,
+    service_state: OpaqueServiceStateHandle<Self>,
     logger_guard: Option<WorkerGuard>,
 }
 
@@ -146,14 +146,14 @@ impl ServiceData for Tracing {
     const SERVICE_ID: &'static str = "Tracing";
     type Settings = TracingSettings;
     type State = NoState<Self::Settings>;
-    type StateOperator = NoOperator<Self::State>;
+    type StateOperator = NoOperator<Self::State, Self::Settings>;
     type Message = NoMessage;
 }
 
 #[async_trait::async_trait]
 impl ServiceCore for Tracing {
     fn init(
-        service_state: ServiceStateHandle<Self>,
+        service_state: OpaqueServiceStateHandle<Self>,
         _init_state: Self::State,
     ) -> Result<Self, overwatch_rs::DynError> {
         #[cfg(test)]

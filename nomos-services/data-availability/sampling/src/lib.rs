@@ -12,11 +12,10 @@ use nomos_core::da::BlobId;
 use nomos_da_network_service::backends::libp2p::common::SamplingEvent;
 use nomos_da_network_service::NetworkService;
 use nomos_storage::StorageService;
-use overwatch_rs::services::handle::ServiceStateHandle;
 use overwatch_rs::services::relay::{Relay, RelayMessage};
 use overwatch_rs::services::state::{NoOperator, NoState};
 use overwatch_rs::services::{ServiceCore, ServiceData, ServiceId};
-use overwatch_rs::DynError;
+use overwatch_rs::{DynError, OpaqueServiceStateHandle};
 use rand::{RngCore, SeedableRng};
 use serde::{Deserialize, Serialize};
 use tokio::sync::oneshot;
@@ -65,7 +64,7 @@ where
 {
     network_relay: Relay<NetworkService<DaNetwork::Backend>>,
     storage_relay: Relay<StorageService<DaStorage::Backend>>,
-    service_state: ServiceStateHandle<Self>,
+    service_state: OpaqueServiceStateHandle<Self>,
     sampler: Backend,
 }
 
@@ -171,7 +170,7 @@ where
     type Settings =
         DaSamplingServiceSettings<Backend::Settings, DaNetwork::Settings, DaStorage::Settings>;
     type State = NoState<Self::Settings>;
-    type StateOperator = NoOperator<Self::State>;
+    type StateOperator = NoOperator<Self::State, Self::Settings>;
     type Message = DaSamplingServiceMsg<Backend::BlobId>;
 }
 
@@ -190,7 +189,7 @@ where
     DaStorage: DaStorageAdapter<Blob = DaBlob> + Sync + Send,
 {
     fn init(
-        service_state: ServiceStateHandle<Self>,
+        service_state: OpaqueServiceStateHandle<Self>,
         _init_state: Self::State,
     ) -> Result<Self, DynError> {
         let DaSamplingServiceSettings {

@@ -31,7 +31,7 @@ use nomos_node::{
     Wire, MB16,
 };
 use overwatch_derive::Services;
-use overwatch_rs::services::handle::ServiceHandle;
+use overwatch_rs::OpaqueServiceHandle;
 
 pub type ExecutorApiService = ApiService<
     AxumBackend<
@@ -86,18 +86,18 @@ pub type ExecutorDaVerifier = DaVerifier<VerifierNetworkAdapter<NomosDaMembershi
 #[derive(Services)]
 pub struct NomosExecutor {
     #[cfg(feature = "tracing")]
-    tracing: ServiceHandle<nomos_node::Tracing>,
-    network: ServiceHandle<NetworkService<NetworkBackend>>,
-    blend: ServiceHandle<BlendService<BlendBackend, BlendNetworkAdapter>>,
-    da_dispersal: ServiceHandle<DaDispersal>,
-    da_indexer: ServiceHandle<ExecutorDaIndexer>,
-    da_verifier: ServiceHandle<ExecutorDaVerifier>,
-    da_sampling: ServiceHandle<ExecutorDaSampling>,
-    da_network: ServiceHandle<DaNetworkService<DaNetworkExecutorBackend<NomosDaMembership>>>,
-    cl_mempool: ServiceHandle<TxMempool>,
-    da_mempool: ServiceHandle<DaMempool>,
-    cryptarchia: ServiceHandle<ExecutorCryptarchia>,
-    http: ServiceHandle<ExecutorApiService>,
-    storage: ServiceHandle<StorageService<RocksBackend<Wire>>>,
-    system_sig: ServiceHandle<SystemSig>,
+    tracing: OpaqueServiceHandle<nomos_node::Tracing>,
+    network: OpaqueServiceHandle<NetworkService<NetworkBackend>>,
+    blend: OpaqueServiceHandle<BlendService<BlendBackend, BlendNetworkAdapter>>,
+    da_dispersal: OpaqueServiceHandle<DaDispersal>,
+    da_indexer: OpaqueServiceHandle<ExecutorDaIndexer>,
+    da_verifier: OpaqueServiceHandle<ExecutorDaVerifier>,
+    da_sampling: OpaqueServiceHandle<ExecutorDaSampling>,
+    da_network: OpaqueServiceHandle<DaNetworkService<DaNetworkExecutorBackend<NomosDaMembership>>>,
+    cl_mempool: OpaqueServiceHandle<TxMempool>,
+    da_mempool: OpaqueServiceHandle<DaMempool>,
+    cryptarchia: OpaqueServiceHandle<ExecutorCryptarchia>,
+    http: OpaqueServiceHandle<ExecutorApiService>,
+    storage: OpaqueServiceHandle<StorageService<RocksBackend<Wire>>>,
+    system_sig: OpaqueServiceHandle<SystemSig>,
 }

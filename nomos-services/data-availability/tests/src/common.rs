@@ -66,7 +66,7 @@ use nomos_storage::StorageService;
 use once_cell::sync::Lazy;
 use overwatch_derive::*;
 use overwatch_rs::overwatch::{Overwatch, OverwatchRunner};
-use overwatch_rs::services::handle::ServiceHandle;
+use overwatch_rs::OpaqueServiceHandle;
 use rand::{Rng, RngCore};
 use subnetworks_assignations::versions::v1::FillFromNodeList;
 // internal
@@ -165,19 +165,19 @@ pub(crate) const MB16: usize = 1024 * 1024 * 16;
 
 #[derive(Services)]
 pub struct TestNode {
-    //logging: ServiceHandle<Logger>,
-    network: ServiceHandle<NetworkService<NetworkBackend>>,
-    blend: ServiceHandle<
+    //logging: OpaqueServiceHandle<Logger>,
+    network: OpaqueServiceHandle<NetworkService<NetworkBackend>>,
+    blend: OpaqueServiceHandle<
         BlendService<BlendBackend, nomos_blend_service::network::libp2p::Libp2pAdapter>,
     >,
-    cl_mempool: ServiceHandle<TxMempool>,
-    da_network: ServiceHandle<DaNetworkService<DaNetworkValidatorBackend<FillFromNodeList>>>,
-    da_mempool: ServiceHandle<DaMempool>,
-    storage: ServiceHandle<StorageService<RocksBackend<Wire>>>,
-    cryptarchia: ServiceHandle<Cryptarchia>,
-    indexer: ServiceHandle<DaIndexer>,
-    verifier: ServiceHandle<DaVerifier>,
-    da_sampling: ServiceHandle<DaSampling>,
+    cl_mempool: OpaqueServiceHandle<TxMempool>,
+    da_network: OpaqueServiceHandle<DaNetworkService<DaNetworkValidatorBackend<FillFromNodeList>>>,
+    da_mempool: OpaqueServiceHandle<DaMempool>,
+    storage: OpaqueServiceHandle<StorageService<RocksBackend<Wire>>>,
+    cryptarchia: OpaqueServiceHandle<Cryptarchia>,
+    indexer: OpaqueServiceHandle<DaIndexer>,
+    verifier: OpaqueServiceHandle<DaVerifier>,
+    da_sampling: OpaqueServiceHandle<DaSampling>,
 }
 
 pub struct TestDaNetworkSettings {
@@ -374,7 +374,7 @@ pub fn new_blend_configs(listening_addresses: Vec<Multiaddr>) -> Vec<TestBlendSe
 // The services defined in it are not used.
 #[derive(Services)]
 pub struct TestClient {
-    storage: ServiceHandle<StorageService<RocksBackend<Wire>>>,
+    storage: OpaqueServiceHandle<StorageService<RocksBackend<Wire>>>,
 }
 
 // Client node is just an empty overwatch service to spawn a task that could communicate with other
