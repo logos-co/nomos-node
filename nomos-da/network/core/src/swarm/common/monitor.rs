@@ -141,25 +141,40 @@ impl PeerStats {
     }
 }
 
+pub trait PeerHealthPolicy {
+    type PeerStats;
+
+    /// Evaluates whether a peer is malicious.
+    ///
+    /// Returns `true` if the peer is deemed malicious, otherwise `false`.
+    fn is_peer_malicious(&self, stats: &Self::PeerStats) -> bool;
+
+    /// Evaluates whether a peer is unhealthy.
+    ///
+    /// Returns `true` if the peer is deemed unhealthy, otherwise `false`.
+    fn is_peer_unhealthy(&self, stats: &Self::PeerStats) -> bool;
+}
+
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct DAConnectionMonitorSettings {
-    pub max_dispersal_failures: usize,
-    pub max_sampling_failures: usize,
-    pub max_replication_failures: usize,
-    pub malicious_threshold: usize,
     pub failure_time_window: Duration,
     pub time_decay_factor: U57F7,
 }
 
-pub struct DAConnectionMonitor {
+pub struct DAConnectionMonitor<Policy> {
     peer_stats: HashMap<PeerId, PeerStats>,
+    policy: Policy,
     settings: DAConnectionMonitorSettings,
 }
 
-impl DAConnectionMonitor {
-    pub fn new(settings: DAConnectionMonitorSettings) -> Self {
+impl<Policy> DAConnectionMonitor<Policy>
+where
+    Policy: PeerHealthPolicy<PeerStats = PeerStats>,
+{
+    pub fn new(settings: DAConnectionMonitorSettings, policy: Policy) -> Self {
         Self {
             peer_stats: HashMap::new(),
+            policy,
             settings,
         }
     }
@@ -184,19 +199,11 @@ impl DAConnectionMonitor {
                 self.settings.time_decay_factor,
             );
 
-            // TODO: Instead of deciding the peer status here, use ConnectionPolicy once it's
-            // implemented.
-            if dispersal_rate >= self.settings.malicious_threshold
-                || sampling_rate >= self.settings.malicious_threshold
-                || replication_rate >= self.settings.malicious_threshold
-            {
+            if self.policy.is_peer_malicious(stats) {
                 return PeerStatus::Malicious;
             }
 
-            if dispersal_rate >= self.settings.max_dispersal_failures
-                || sampling_rate >= self.settings.max_sampling_failures
-                || replication_rate >= self.settings.max_replication_failures
-            {
+            if self.policy.is_peer_unhealthy(stats) {
                 return PeerStatus::Unhealthy;
             }
 
@@ -283,15 +290,22 @@ mod tests {
     use std::time::Duration;
 
     fn setup_monitor() -> DAConnectionMonitor {
-        let settings = DAConnectionMonitorSettings {
+        let monitor_settings = DAConnectionMonitorSettings {
+            failure_time_window: Duration::from_secs(10),
+            time_decay_factor: U57F7::lit("0.8"),
+        };
+        let policy_settings = DAConnectionPolicySettings {
             max_dispersal_failures: 2,
             max_sampling_failures: 2,
             max_replication_failures: 2,
             malicious_threshold: 3,
-            failure_time_window: Duration::from_secs(10),
-            time_decay_factor: U57F7::lit("0.8"),
         };
-        DAConnectionMonitor::new(settings)
+        DAConnectionMonitor::new(
+            monitor_settings,
+            DAConnectionPolicy {
+                settings: policy_settings,
+            },
+        )
     }
 
     #[test]
