@@ -31,7 +31,6 @@ use nomos_mempool::{
 use nomos_network::NetworkService;
 use nomos_storage::{backends::StorageBackend, StorageMsg, StorageService};
 use nomos_time::{SlotTick, TimeService, TimeServiceMessage};
-use overwatch_rs::services::life_cycle::LifecycleMessage;
 use overwatch_rs::services::relay::{OutboundRelay, Relay, RelayMessage};
 use overwatch_rs::services::state::ServiceState;
 use overwatch_rs::services::{ServiceCore, ServiceData, ServiceId};

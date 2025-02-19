@@ -9,7 +9,7 @@ cryptarchia-engine = { path = "../../consensus/cryptarchia-engine", features = [
 futures            = "0.3"
 log                = "0.4.22"
 nomos-tracing      = { path = "../../nomos-tracing" }
-overwatch-rs       = { git = "https://github.com/logos-co/Overwatch", rev = "f5f7ea0" }
+overwatch-rs       = { workspace = true }
 serde              = { version = "1.0", optional = true, features = ["derive"] }
 sntpc              = { version = "0.5", optional = true }
 thiserror          = { version = "2.0", optional = true }
