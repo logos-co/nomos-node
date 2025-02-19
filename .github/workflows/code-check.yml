@@ -102,11 +102,18 @@ jobs:
         run: cargo binstall -y cargo-risczero && cargo risczero install
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # TODO: Investigate how to get rid of this seemingly necessary build step before running the tests
       - name: Cargo build
         uses: actions-rs/cargo@v1
         with:
           command: build
-          args: --all --no-default-features --features ${{ matrix.feature }}
+          args: --all --all-targets --no-default-features --features ${{ matrix.feature }}
+      # We store the result of `cargo build` in the cache, that is then re-used in the next run, and can be picked up by the next `cargo test` step.
+      - name: Update Cargo cache
+        if: success() || failure()
+        uses: ./.github/actions/update-cargo-cache
+        with:
+          key: ${{ github.ref }}->${{ github.workflow }}->${{ github.job }}          
       - name: Cargo test
         uses: actions-rs/cargo@v1
         env:
@@ -123,11 +130,6 @@ jobs:
         with:
           command: bench
           args: --no-run
-      - name: Update Cargo cache
-        if: success() || failure()
-        uses: ./.github/actions/update-cargo-cache
-        with:
-          key: ${{ github.ref }}->${{ github.workflow }}->${{ github.job }}
       - name: Upload integration tests results
         uses: actions/upload-artifact@v4
         if: failure()
