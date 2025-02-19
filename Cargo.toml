@@ -82,6 +82,7 @@ nomos-network            = { path = "./nomos-services/network" }
 nomos-node               = { path = "./nodes/nomos-node", default-features = false }
 nomos-storage            = { path = "./nomos-services/storage" }
 nomos-system-sig         = { path = "./nomos-services/system-sig" }
+nomos-time               = { path = "./nomos-services/time" }
 nomos-tracing            = { path = "./nomos-tracing" }
 nomos-tracing-service    = { path = "./nomos-services/tracing" }
 nomos-utils              = { path = "./nomos-utils" }
