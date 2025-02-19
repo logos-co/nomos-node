@@ -7,10 +7,10 @@ use backends::StorageBackend;
 use backends::{StorageSerde, StorageTransaction};
 use bytes::Bytes;
 use futures::StreamExt;
-use overwatch_rs::services::handle::ServiceStateHandle;
 use overwatch_rs::services::relay::RelayMessage;
 use overwatch_rs::services::state::{NoOperator, NoState};
 use overwatch_rs::services::{ServiceCore, ServiceData, ServiceId};
+use overwatch_rs::OpaqueServiceStateHandle;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 // std
@@ -172,7 +172,7 @@ enum StorageServiceError<Backend: StorageBackend> {
 /// Storage service that wraps a [`StorageBackend`]
 pub struct StorageService<Backend: StorageBackend + Send + Sync + 'static> {
     backend: Backend,
-    service_state: ServiceStateHandle<Self>,
+    service_state: OpaqueServiceStateHandle<Self>,
 }
 
 impl<Backend: StorageBackend + Send + Sync + 'static> StorageService<Backend> {
@@ -288,7 +288,7 @@ impl<Backend: StorageBackend + Send + Sync + 'static> StorageService<Backend> {
 #[async_trait]
 impl<Backend: StorageBackend + Send + Sync + 'static> ServiceCore for StorageService<Backend> {
     fn init(
-        service_state: ServiceStateHandle<Self>,
+        service_state: OpaqueServiceStateHandle<Self>,
         _init_state: Self::State,
     ) -> Result<Self, overwatch_rs::DynError> {
         Ok(Self {
@@ -301,7 +301,7 @@ impl<Backend: StorageBackend + Send + Sync + 'static> ServiceCore for StorageSer
         let Self {
             mut backend,
             service_state:
-                ServiceStateHandle {
+                OpaqueServiceStateHandle::<Self> {
                     mut inbound_relay,
                     lifecycle_handle,
                     ..
@@ -330,6 +330,6 @@ impl<Backend: StorageBackend + Send + Sync> ServiceData for StorageService<Backe
     const SERVICE_ID: ServiceId = "Storage";
     type Settings = Backend::Settings;
     type State = NoState<Self::Settings>;
-    type StateOperator = NoOperator<Self::State>;
+    type StateOperator = NoOperator<Self::State, Self::Settings>;
     type Message = StorageMsg<Backend>;
 }

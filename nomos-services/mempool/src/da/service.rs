@@ -22,11 +22,11 @@ use nomos_da_sampling::{
 };
 use nomos_network::{NetworkMsg, NetworkService};
 use overwatch_rs::services::{
-    handle::ServiceStateHandle,
     relay::{OutboundRelay, Relay},
     state::{NoOperator, NoState},
     ServiceCore, ServiceData, ServiceId,
 };
+use overwatch_rs::OpaqueServiceStateHandle;
 use services_utils::overwatch::lifecycle;
 
 pub struct DaMempoolService<N, P, DB, DN, R, SamplingStorage>
@@ -46,7 +46,7 @@ where
     SamplingStorage: DaStorageAdapter,
     R: SeedableRng + RngCore,
 {
-    service_state: ServiceStateHandle<Self>,
+    service_state: OpaqueServiceStateHandle<Self>,
     network_relay: Relay<NetworkService<N::Backend>>,
     sampling_relay: Relay<DaSamplingService<DB, DN, R, SamplingStorage>>,
     pool: P,
@@ -72,7 +72,7 @@ where
     const SERVICE_ID: ServiceId = "mempool-da";
     type Settings = DaMempoolSettings<P::Settings, N::Settings>;
     type State = NoState<Self::Settings>;
-    type StateOperator = NoOperator<Self::State>;
+    type StateOperator = NoOperator<Self::State, Self::Settings>;
     type Message = MempoolMsg<
         <P as MemPool>::BlockId,
         <N as NetworkAdapter>::Payload,
@@ -101,7 +101,7 @@ where
     R: SeedableRng + RngCore,
 {
     fn init(
-        service_state: ServiceStateHandle<Self>,
+        service_state: OpaqueServiceStateHandle<Self>,
         _init_state: Self::State,
     ) -> Result<Self, overwatch_rs::DynError> {
         let network_relay = service_state.overwatch_handle.relay();
@@ -189,7 +189,7 @@ where
         message: MempoolMsg<P::BlockId, N::Payload, P::Item, P::Key>,
         pool: &mut P,
         network_relay: &mut OutboundRelay<NetworkMsg<N::Backend>>,
-        service_state: &mut ServiceStateHandle<Self>,
+        service_state: &mut OpaqueServiceStateHandle<Self>,
     ) {
         match message {
             MempoolMsg::Add {

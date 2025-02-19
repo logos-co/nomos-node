@@ -11,11 +11,10 @@ use crate::adapters::network::DispersalNetworkAdapter;
 use crate::backend::DispersalBackend;
 use nomos_core::da::blob::metadata;
 use nomos_da_network_core::{PeerId, SubnetworkId};
-use overwatch_rs::services::handle::ServiceStateHandle;
 use overwatch_rs::services::relay::{Relay, RelayMessage};
 use overwatch_rs::services::state::{NoOperator, NoState};
 use overwatch_rs::services::{ServiceCore, ServiceData, ServiceId};
-use overwatch_rs::DynError;
+use overwatch_rs::{DynError, OpaqueServiceStateHandle};
 use subnetworks_assignations::MembershipHandler;
 
 pub mod adapters;
@@ -53,7 +52,7 @@ where
     MempoolAdapter: DaMempoolAdapter,
     Metadata: metadata::Metadata + Debug + 'static,
 {
-    service_state: ServiceStateHandle<Self>,
+    service_state: OpaqueServiceStateHandle<Self>,
     network_relay: Relay<NetworkAdapter::NetworkService>,
     mempool_relay: Relay<MempoolAdapter::MempoolService>,
     _backend: PhantomData<Backend>,
@@ -77,7 +76,7 @@ where
     const SERVICE_ID: ServiceId = DA_DISPERSAL_TAG;
     type Settings = DispersalServiceSettings<Backend::Settings>;
     type State = NoState<Self::Settings>;
-    type StateOperator = NoOperator<Self::State>;
+    type StateOperator = NoOperator<Self::State, Self::Settings>;
     type Message = DaDispersalMsg<Metadata>;
 }
 
@@ -99,11 +98,13 @@ where
         + Sync,
     Backend::Settings: Clone + Send + Sync,
     NetworkAdapter: DispersalNetworkAdapter<SubnetworkId = Membership::NetworkId> + Send,
+    <NetworkAdapter::NetworkService as ServiceData>::Message: 'static,
     MempoolAdapter: DaMempoolAdapter,
+    <MempoolAdapter::MempoolService as ServiceData>::Message: 'static,
     Metadata: metadata::Metadata + Debug + Send + 'static,
 {
     fn init(
-        service_state: ServiceStateHandle<Self>,
+        service_state: OpaqueServiceStateHandle<Self>,
         _init_state: Self::State,
     ) -> Result<Self, DynError> {
         let network_relay = service_state.overwatch_handle.relay();

@@ -18,11 +18,10 @@ use nomos_mempool::{backend::MemPool, network::NetworkAdapter as MempoolAdapter}
 use nomos_storage::backends::StorageBackend;
 use nomos_storage::StorageService;
 use nomos_tracing::info_with_id;
-use overwatch_rs::services::handle::ServiceStateHandle;
 use overwatch_rs::services::relay::{Relay, RelayMessage};
 use overwatch_rs::services::state::{NoOperator, NoState};
 use overwatch_rs::services::{ServiceCore, ServiceData, ServiceId};
-use overwatch_rs::DynError;
+use overwatch_rs::{DynError, OpaqueServiceStateHandle};
 use rand::{RngCore, SeedableRng};
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
@@ -112,7 +111,7 @@ pub struct DataIndexerService<
     SamplingNetworkAdapter: nomos_da_sampling::network::NetworkAdapter,
     SamplingStorage: nomos_da_sampling::storage::DaStorageAdapter,
 {
-    service_state: ServiceStateHandle<Self>,
+    service_state: OpaqueServiceStateHandle<Self>,
     storage_relay: Relay<StorageService<DaStorage::Backend>>,
     #[allow(clippy::type_complexity)]
     consensus_relay: ConsensusRelay<
@@ -227,7 +226,7 @@ where
     const SERVICE_ID: ServiceId = DA_INDEXER_TAG;
     type Settings = IndexerSettings<DaStorage::Settings>;
     type State = NoState<Self::Settings>;
-    type StateOperator = NoOperator<Self::State>;
+    type StateOperator = NoOperator<Self::State, Self::Settings>;
     type Message = DaMsg<Blob, DaPool::Item>;
 }
 
@@ -429,7 +428,7 @@ where
     SamplingStorage: nomos_da_sampling::storage::DaStorageAdapter,
 {
     fn init(
-        service_state: ServiceStateHandle<Self>,
+        service_state: OpaqueServiceStateHandle<Self>,
         _init_state: Self::State,
     ) -> Result<Self, DynError> {
         let consensus_relay = service_state.overwatch_handle.relay();

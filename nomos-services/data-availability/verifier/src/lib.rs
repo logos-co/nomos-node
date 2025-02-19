@@ -9,11 +9,10 @@ use std::fmt::{Debug, Formatter};
 use nomos_core::da::blob::Blob;
 use nomos_da_network_service::NetworkService;
 use nomos_storage::StorageService;
-use overwatch_rs::services::handle::ServiceStateHandle;
 use overwatch_rs::services::relay::{Relay, RelayMessage};
 use overwatch_rs::services::state::{NoOperator, NoState};
 use overwatch_rs::services::{ServiceCore, ServiceData, ServiceId};
-use overwatch_rs::DynError;
+use overwatch_rs::{DynError, OpaqueServiceStateHandle};
 use serde::{Deserialize, Serialize};
 use tokio::sync::oneshot::Sender;
 use tokio_stream::StreamExt;
@@ -57,7 +56,7 @@ where
     S: DaStorageAdapter,
 {
     network_relay: Relay<NetworkService<N::Backend>>,
-    service_state: ServiceStateHandle<Self>,
+    service_state: OpaqueServiceStateHandle<Self>,
     storage_relay: Relay<StorageService<S::Backend>>,
     verifier: Backend,
 }
@@ -108,7 +107,7 @@ where
     const SERVICE_ID: ServiceId = DA_VERIFIER_TAG;
     type Settings = DaVerifierServiceSettings<Backend::Settings, N::Settings, S::Settings>;
     type State = NoState<Self::Settings>;
-    type StateOperator = NoOperator<Self::State>;
+    type StateOperator = NoOperator<Self::State, Self::Settings>;
     type Message = DaVerifierMsg<Backend::DaBlob, ()>;
 }
 
@@ -126,7 +125,7 @@ where
     S::Settings: Clone + Send + Sync + 'static,
 {
     fn init(
-        service_state: ServiceStateHandle<Self>,
+        service_state: OpaqueServiceStateHandle<Self>,
         _init_state: Self::State,
     ) -> Result<Self, DynError> {
         let DaVerifierServiceSettings {

@@ -10,7 +10,7 @@ use nomos_api::{ApiService, ApiServiceSettings, Backend};
 use overwatch_derive::Services;
 use overwatch_rs::{
     overwatch::{handle::OverwatchHandle, OverwatchRunner},
-    services::handle::ServiceHandle,
+    OpaqueServiceHandle,
 };
 use utoipa::{
     openapi::security::{ApiKey, ApiKeyValue, SecurityScheme},
@@ -22,7 +22,7 @@ use crate::todo::Store;
 
 #[derive(Services)]
 pub struct NomosApi {
-    http: ServiceHandle<ApiService<WebServer>>,
+    http: OpaqueServiceHandle<ApiService<WebServer>>,
 }
 
 #[derive(OpenApi)]
