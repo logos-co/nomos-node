@@ -1,44 +1,44 @@
 [package]
-name = "nomos-mempool"
-version = "0.1.0"
 edition = "2021"
 license = { workspace = true }
+name    = "nomos-mempool"
+version = "0.1.0"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-async-trait = "0.1"
-futures = "0.3"
-linked-hash-map = { version = "0.5.6", optional = true }
-nomos-network = { path = "../network" }
-nomos-da-network-core = { path = "../../nomos-da/network/core" }
-nomos-da-sampling = { path = "../../nomos-services/data-availability/sampling/" }
-nomos-core = { path = "../../nomos-core/chain-defs" }
-services-utils = { path = "../utils" }
-full-replication = { path = "../../nomos-da/full-replication" }
-kzgrs-backend = { path = "../../nomos-da/kzgrs-backend" }
-overwatch-rs = { git = "https://github.com/logos-co/Overwatch", rev = "f5f7ea0" }
-rand = { version = "0.8" }
-serde = { version = "1.0", features = ["derive"] }
-thiserror = "1.0"
-tracing = "0.1"
-tokio = { version = "1", features = ["sync", "macros"] }
-tokio-stream = "0.1"
-chrono = "0.4"
-utoipa = { version = "4.0", optional = true }
-serde_json = { version = "1", optional = true }
+async-trait           = "0.1"
+chrono                = "0.4"
+full-replication      = { workspace = true }
+futures               = "0.3"
+kzgrs-backend         = { workspace = true }
+linked-hash-map       = { version = "0.5.6", optional = true }
+nomos-core            = { workspace = true }
+nomos-da-network-core = { workspace = true }
+nomos-da-sampling     = { workspace = true }
+nomos-network         = { workspace = true }
+overwatch-rs          = { workspace = true }
+rand                  = { version = "0.8" }
+serde                 = { version = "1.0", features = ["derive"] }
+serde_json            = { version = "1", optional = true }
+services-utils        = { workspace = true }
+thiserror             = "1.0"
+tokio                 = { version = "1", features = ["macros", "sync"] }
+tokio-stream          = "0.1"
+tracing               = "0.1"
+utoipa                = { version = "4.0", optional = true }
 
 [dev-dependencies]
-nomos-tracing-service = { path = "../tracing" }
-overwatch-derive = { git = "https://github.com/logos-co/Overwatch", rev = "f5f7ea0" }
-tokio = { version = "1", features = ["full"] }
-blake2 = "0.10"
+blake2                = "0.10"
+nomos-tracing-service = { workspace = true }
+overwatch-derive      = { workspace = true }
+tokio                 = { version = "1", features = ["full"] }
 
 [features]
-default = []
-mock = ["linked-hash-map", "nomos-network/mock", "nomos-core/mock"]
-libp2p = ["nomos-network/libp2p"]
+default         = []
 instrumentation = []
+libp2p          = ["nomos-network/libp2p"]
+mock            = ["linked-hash-map", "nomos-core/mock", "nomos-network/mock"]
 
 # enable to help generate OpenAPI
 openapi = ["dep:utoipa", "serde_json"]

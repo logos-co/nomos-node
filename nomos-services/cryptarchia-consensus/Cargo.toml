@@ -1,51 +1,50 @@
 [package]
-name = "cryptarchia-consensus"
-version = "0.1.0"
 edition = "2021"
 license = { workspace = true }
+name    = "cryptarchia-consensus"
+version = "0.1.0"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-async-trait = "0.1"
-bytes = "1.3"
-chrono = "0.4"
-cryptarchia-engine = { path = "../../consensus/cryptarchia-engine", features = ["serde"] }
-nomos-ledger = { path = "../../ledger/nomos-ledger", features = ["serde"] }
-nomos_proof_statements = { path = "../../nomos-core/proof_statements" }
-services-utils = { path = "../utils" }
-cl = { path = "../../nomos-core/cl" }
-futures = "0.3"
-nomos-da-sampling = { path = "../data-availability/sampling" }
-nomos-network = { path = "../network" }
-nomos-blend-service = { path = "../blend" }
-nomos-mempool = { path = "../mempool" }
-nomos-core = { path = "../../nomos-core/chain-defs" }
-overwatch-rs = { git = "https://github.com/logos-co/Overwatch", rev = "f5f7ea0" }
-nomos-storage = { path = "../storage" }
-rand_chacha = "0.3"
-rand = "0.8"
-serde = { version = "1", features = ["derive"] }
-thiserror = "1.0"
-tokio = { version = "1", features = ["sync"] }
-tokio-stream = "0.1"
-tokio-util = "0.7"
-tracing = "0.1"
-tracing-futures = "0.2"
-bls-signatures = "0.14"
-serde_with = "3.0.0"
-nomos-libp2p = { path = "../../nomos-libp2p", optional = true }
-blake2 = "0.10"
-time = { version = "0.3", features = ["serde"] }
-risc0-zkvm = "1.1"
-
-utoipa = { version = "4.0", optional = true }
-serde_json = { version = "1", optional = true }
-
-[features]
-default = []
-libp2p = ["nomos-network/libp2p", "nomos-blend-service/libp2p", "nomos-libp2p"]
-openapi = ["dep:utoipa", "serde_json"]
+async-trait            = "0.1"
+blake2                 = "0.10"
+bls-signatures         = "0.14"
+bytes                  = "1.3"
+chrono                 = "0.4"
+cl                     = { workspace = true }
+cryptarchia-engine     = { workspace = true, features = ["serde"] }
+futures                = "0.3"
+nomos-blend-service    = { workspace = true }
+nomos-core             = { workspace = true }
+nomos-da-sampling      = { workspace = true }
+nomos-ledger           = { workspace = true, features = ["serde"] }
+nomos-libp2p           = { workspace = true, optional = true }
+nomos-mempool          = { workspace = true }
+nomos-network          = { workspace = true }
+nomos-storage          = { workspace = true }
+nomos_proof_statements = { workspace = true }
+overwatch-rs           = { workspace = true }
+rand                   = "0.8"
+rand_chacha            = "0.3"
+risc0-zkvm             = "1.1"
+serde                  = { version = "1", features = ["derive"] }
+serde_json             = { version = "1", optional = true }
+serde_with             = "3.0.0"
+services-utils         = { workspace = true }
+thiserror              = "1.0"
+time                   = { version = "0.3", features = ["serde"] }
+tokio                  = { version = "1", features = ["sync"] }
+tokio-stream           = "0.1"
+tokio-util             = "0.7"
+tracing                = "0.1"
+tracing-futures        = "0.2"
+utoipa                 = { version = "4.0", optional = true }
 
 [dev-dependencies]
 serde_json = "1.0.96"
+
+[features]
+default = []
+libp2p  = ["nomos-blend-service/libp2p", "nomos-libp2p", "nomos-network/libp2p"]
+openapi = ["dep:utoipa", "serde_json"]

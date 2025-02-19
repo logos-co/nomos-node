@@ -1,35 +1,35 @@
 [package]
-name = "nomos-da-sampling"
-version = "0.1.0"
 edition = "2021"
 license = { workspace = true }
+name    = "nomos-da-sampling"
+version = "0.1.0"
 
 [dependencies]
-async-trait = "0.1"
-bytes = "1.2"
-futures = "0.3"
-hex = "0.4.3"
-kzgrs-backend = { path = "../../../nomos-da/kzgrs-backend" }
-libp2p-identity = { version = "0.2" }
-nomos-core = { path = "../../../nomos-core/chain-defs" }
-nomos-da-network-core = { path = "../../../nomos-da/network/core" }
-nomos-da-network-service = { path = "../../../nomos-services/data-availability/network" }
-nomos-da-storage = { path = "../../../nomos-da/storage" }
-nomos-storage = { path = "../../../nomos-services/storage" }
-nomos-tracing = { path = "../../../nomos-tracing" }
-services-utils = { path = "../../utils" }
-overwatch-rs = { git = "https://github.com/logos-co/Overwatch", rev = "f5f7ea0" }
-overwatch-derive = { git = "https://github.com/logos-co/Overwatch", rev = "f5f7ea0" }
-serde = { version = "1.0", features = ["derive"] }
-subnetworks-assignations = { path = "../../../nomos-da/network/subnetworks-assignations" }
-tokio = { version = "1", features = ["sync", "macros"] }
-tokio-stream = "0.1.15"
-tracing = "0.1"
-thiserror = "1.0.63"
-rand = "0.8.5"
-rand_chacha = "0.3.1"
+async-trait              = "0.1"
+bytes                    = "1.2"
+futures                  = "0.3"
+hex                      = "0.4.3"
+kzgrs-backend            = { workspace = true }
+libp2p-identity          = { version = "0.2" }
+nomos-core               = { workspace = true }
+nomos-da-network-core    = { workspace = true }
+nomos-da-network-service = { workspace = true }
+nomos-da-storage         = { workspace = true }
+nomos-storage            = { workspace = true }
+nomos-tracing            = { workspace = true }
+overwatch-derive         = { workspace = true }
+overwatch-rs             = { workspace = true }
+rand                     = "0.8.5"
+rand_chacha              = "0.3.1"
+serde                    = { version = "1.0", features = ["derive"] }
+services-utils           = { workspace = true }
+subnetworks-assignations = { workspace = true }
+thiserror                = "1.0.63"
+tokio                    = { version = "1", features = ["macros", "sync"] }
+tokio-stream             = "0.1.15"
+tracing                  = "0.1"
 
 [features]
-default = ["libp2p"]
-libp2p = []
+default         = ["libp2p"]
+libp2p          = []
 rocksdb-backend = ["nomos-storage/rocksdb-backend"]
