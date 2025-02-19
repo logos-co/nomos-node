@@ -62,6 +62,12 @@ where
         }
     }
 
+    fn try_wake(&mut self) {
+        if let Some(waker) = self.waker.take() {
+            waker.wake();
+        }
+    }
+
     /// Block connections to a given peer.
     ///
     /// All active connections to this peer will be closed immediately.
@@ -72,9 +78,7 @@ where
         let inserted = self.malicous_peers.insert(peer);
         if inserted {
             self.close_connections.push_back(peer);
-            if let Some(waker) = self.waker.take() {
-                waker.wake()
-            }
+            self.try_wake();
         }
         inserted
     }
@@ -88,9 +92,7 @@ where
         self.unhealthy_peers.insert(peer, until);
         // Close existing connections
         self.close_connections.push_back(peer);
-        if let Some(waker) = self.waker.take() {
-            waker.wake();
-        }
+        self.try_wake();
     }
 
     /// Unblock connections to a given peer.
@@ -101,9 +103,7 @@ where
         let removed =
             self.malicous_peers.remove(&peer) || self.unhealthy_peers.remove(&peer).is_some();
         if removed {
-            if let Some(waker) = self.waker.take() {
-                waker.wake()
-            }
+            self.try_wake();
         }
         removed
     }
