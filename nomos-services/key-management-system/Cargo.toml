@@ -15,7 +15,7 @@ thiserror = "2"
 zeroize = { version = "1", features = ["zeroize_derive"] }
 ed25519-dalek = { version = "2", features = ["serde", "zeroize"] }
 serde = { version = "1", features = ["derive"] }
-nomos-utils = { path = "../../nomos-utils" }
+services-utils = { path = "../utils" }
 
 [dev-dependencies]
 ed25519-dalek = { version = "2", features = ["rand_core"] }

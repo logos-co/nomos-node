@@ -17,7 +17,7 @@ sled = { version = "0.34", optional = true }
 rocksdb = { version = "0.22", optional = true }
 thiserror = "1.0"
 tracing = "0.1"
-nomos-utils = { path = "../../nomos-utils" }
+services-utils = { path = "../utils" }
 
 [dev-dependencies]
 tokio = { version = "1", features = ["sync", "macros", "time"] }
