@@ -15,8 +15,8 @@ use nomos_da_network_service::backends::libp2p::common::DaNetworkBackendSettings
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 // crates
-use cryptarchia_consensus::TimeConfig;
 use bytes::Bytes;
+use cryptarchia_consensus::TimeConfig;
 use kzgrs_backend::common::blob::DaBlob;
 use kzgrs_backend::dispersal::BlobInfo;
 use kzgrs_backend::encoder::DaEncoder;
