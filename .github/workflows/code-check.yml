@@ -10,31 +10,31 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # formatting:
-  #   name: Check formatting
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #     - name: Checkout repository
-  #       uses: actions/checkout@v4        
-  #     - name: Run cargo fmt
-  #       uses: actions-rs/cargo@v1
-  #       with:
-  #         command: fmt
-  #         args: --all --check
+  formatting:
+    name: Check formatting
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4        
+      - name: Run cargo fmt
+        uses: actions-rs/cargo@v1
+        with:
+          command: fmt
+          args: --all --check
 
-  # cargo-deny:
-  #   name: Check cargo-deny rules
-  #   runs-on: ubuntu-latest
+  cargo-deny:
+    name: Check cargo-deny rules
+    runs-on: ubuntu-latest
 
-  #   steps:
-  #     - name: Checkout repository
-  #       uses: actions/checkout@v4
-  #     - name: Run `cargo deny`
-  #       uses: EmbarkStudios/cargo-deny-action@v2
-  #       with:
-  #         # All is set in the config file
-  #         arguments:
-  #         command-arguments: "--hide-inclusion-graph -c .cargo-deny.toml --show-stats -D warnings"
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Run `cargo deny`
+        uses: EmbarkStudios/cargo-deny-action@v2
+        with:
+          # All is set in the config file
+          arguments:
+          command-arguments: "--hide-inclusion-graph -c .cargo-deny.toml --show-stats -D warnings"
   
   lints:
     name: Check Rust lints
@@ -72,85 +72,86 @@ jobs:
         with:
           key: ${{ github.ref }}->${{ github.workflow }}->${{ github.job }}
  
-  # tests:
-  #   name: Run test suite
-  #   if: ${{ !startsWith(github.event.pull_request.title, '[WIP]') && !contains(github.event.label.name,  'DO NOT MERGE') }}
-  #   strategy:
-  #     fail-fast: false # all OSes should be tested even if one fails (default: true)
-  #     matrix:
-  #       os: [ self-hosted, macos-latest ] # drop windows for now as risc0 does not support it
-  #   runs-on: ${{ matrix.os }}
-  #   steps:
-  #     - name: Checkout repository
-  #       uses: actions/checkout@v4
-  #     - name: Install protoc compiler
-  #       uses: arduino/setup-protoc@v3
-  #       with:
-  #         repo-token: ${{ secrets.GITHUB_TOKEN }}
-  #     - name: Setup Cargo cache
-  #       uses: ./.github/actions/setup-cargo-cache
-  #       with:
-  #         # We use the same cache key for both OSes
-  #         key: ${{ github.ref }}->${{ github.workflow }}->${{ github.job }}
-  #     - name: Install cargo-binstall
-  #       uses: cargo-bins/cargo-binstall@main
-  #       env:
-  #         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-  #     - name: Install risc0
-  #       run: cargo binstall -y cargo-risczero && cargo risczero install
-  #       env:
-  #         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-  #     - name: Cargo build
-  #       uses: actions-rs/cargo@v1
-  #       with:
-  #         command: build
-  #         args: --all --no-default-features --all-features
-  #     - name: Cargo test
-  #       uses: actions-rs/cargo@v1
-  #       env:
-  #         RISC0_DEV_MODE: true
-  #         CONSENSUS_SLOT_TIME: 5
-  #       with:
-  #         command: test
-  #         args: --all --no-default-features --all-features
-  #     - name: Cargo bench (no-run)
-  #       uses: actions-rs/cargo@v1
-  #       env:
-  #         RISC0_DEV_MODE: true
-  #         CONSENSUS_SLOT_TIME: 5
-  #       with:
-  #         command: bench
-  #         args: --no-run
-  #     - name: Update Cargo cache
-  #       if: success() || failure()
-  #       uses: ./.github/actions/update-cargo-cache
-  #       with:
-  #         key: ${{ github.ref }}->${{ github.workflow }}->${{ github.job }}
-  #     - name: Upload integration tests results
-  #       uses: actions/upload-artifact@v4
-  #       if: failure()
-  #       with:
-  #         name: integration-test-artifacts
-  #         path: tests/.tmp*
+  tests:
+    name: Run test suite
+    if: ${{ !startsWith(github.event.pull_request.title, '[WIP]') && !contains(github.event.label.name,  'DO NOT MERGE') }}
+    strategy:
+      fail-fast: false # all OSes should be tested even if one fails (default: true)
+      matrix:
+        os: [ self-hosted, macos-latest ] # drop windows for now as risc0 does not support it
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Install protoc compiler
+        uses: arduino/setup-protoc@v3
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Setup Cargo cache
+        uses: ./.github/actions/setup-cargo-cache
+        with:
+          # We use the same cache key for both OSes
+          key: ${{ github.ref }}->${{ github.workflow }}->${{ github.job }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Install cargo-binstall
+        uses: cargo-bins/cargo-binstall@main
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Install risc0
+        run: cargo binstall -y cargo-risczero && cargo risczero install
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Cargo build
+        uses: actions-rs/cargo@v1
+        with:
+          command: build
+          args: --all --no-default-features --all-features
+      - name: Cargo test
+        uses: actions-rs/cargo@v1
+        env:
+          RISC0_DEV_MODE: true
+          CONSENSUS_SLOT_TIME: 5
+        with:
+          command: test
+          args: --all --no-default-features --all-features
+      - name: Cargo bench (no-run)
+        uses: actions-rs/cargo@v1
+        env:
+          RISC0_DEV_MODE: true
+          CONSENSUS_SLOT_TIME: 5
+        with:
+          command: bench
+          args: --no-run
+      - name: Update Cargo cache
+        if: success() || failure()
+        uses: ./.github/actions/update-cargo-cache
+        with:
+          key: ${{ github.ref }}->${{ github.workflow }}->${{ github.job }}
+      - name: Upload integration tests results
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: integration-test-artifacts
+          path: tests/.tmp*
   
-  # build-docker:
-  #   name: Trigger Docker build
-  #   runs-on: ubuntu-latest
-  #   needs:
-  #     - formatting
-  #     - cargo-deny
-  #     - lints
-  #     - tests
-  #   env:
-  #     DOCKER_BUILD_WORKFLOW_FILE: build-docker.yml # Change this in case of file renamings
-  #   steps:
-  #     - name: Trigger "Docker build" workflow
-  #       uses: actions/github-script@v7
-  #       with:
-  #         script: |
-  #           github.rest.actions.createWorkflowDispatch({
-  #             owner: context.repo.owner,
-  #             repo: context.repo.repo,
-  #             workflow_id: '${{ env.DOCKER_BUILD_WORKFLOW_FILE }}',
-  #             ref: '${{ github.ref }}',
-  #           })
+  build-docker:
+    name: Trigger Docker build
+    runs-on: ubuntu-latest
+    needs:
+      - formatting
+      - cargo-deny
+      - lints
+      - tests
+    env:
+      DOCKER_BUILD_WORKFLOW_FILE: build-docker.yml # Change this in case of file renamings
+    steps:
+      - name: Trigger "Docker build" workflow
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: '${{ env.DOCKER_BUILD_WORKFLOW_FILE }}',
+              ref: '${{ github.ref }}',
+            })

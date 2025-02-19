@@ -22,6 +22,7 @@ runs:
           ~/.cargo/registry/cache/
           ~/.cargo/git/db/
           target/
+        # Must be in sync with the key used in the update-cargo-cache action
         key: ${{ inputs.key }}->#${{ github.run_id }}
         restore-keys: |
           ${{ inputs.key }}
