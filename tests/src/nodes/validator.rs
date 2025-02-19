@@ -347,8 +347,8 @@ pub fn create_validator_config(config: GeneralConfig) -> Config {
         time: TimeServiceSettings {
             backend_settings: SystemTimeBackendSettings {
                 slot_config: SlotConfig {
-                    slot_duration: config.time_config.slot_duration.clone(),
-                    chain_start_time: config.time_config.chain_start_time.clone(),
+                    slot_duration: config.time_config.slot_duration,
+                    chain_start_time: config.time_config.chain_start_time,
                 },
                 epoch_config: config.consensus_config.ledger_config.epoch_config,
                 base_period_length: config.consensus_config.ledger_config.base_period_length(),
