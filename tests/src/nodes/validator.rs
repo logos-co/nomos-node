@@ -275,7 +275,6 @@ pub fn create_validator_config(config: GeneralConfig) -> Config {
             leader_config: config.consensus_config.leader_config,
             config: config.consensus_config.ledger_config,
             genesis_state: config.consensus_config.genesis_state,
-            time: config.consensus_config.time,
             transaction_selector_settings: (),
             blob_selector_settings: (),
             network_adapter_settings:
@@ -341,7 +340,16 @@ pub fn create_validator_config(config: GeneralConfig) -> Config {
             read_only: false,
             column_family: Some("blocks".into()),
         },
-        time: TimeServiceSettings { backend_settings:  },
+        time: TimeServiceSettings {
+            backend_settings: SystemTimeBackendSettings {
+                slot_config: SlotConfig {
+                    slot_duration: config.time_config.slot_duration,
+                    chain_start_time: config.time_config.chain_start_time,
+                },
+                epoch_config: config.consensus_config.ledger_config.epoch_config,
+                base_period_length: config.consensus_config.ledger_config.base_period_length(),
+            },
+        },
         mempool: MempoolConfig {
             recovery_path: "./recovery/mempool.json".into(),
         },
