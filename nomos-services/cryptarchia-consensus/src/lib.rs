@@ -444,7 +444,7 @@ where
         .await;
 
         let CryptarchiaSettings {
-            config,
+            config: ledger_config,
             genesis_state,
             transaction_selector_settings,
             blob_selector_settings,
@@ -456,14 +456,13 @@ where
         } = self.service_state.settings_reader.get_updated_settings();
 
         let genesis_id = HeaderId::from([0; 32]);
-        let mut leader = Leader::new(genesis_id, leader_config, config.clone());
 
-        let mut cryptarchia = Self::build_cryptarchia(
-            &self.initial_state,
+        let (mut cryptarchia, mut leader) = Self::build_cryptarchia(
+            self.initial_state,
             genesis_id,
             genesis_state,
-            &mut leader,
-            config.clone(),
+            ledger_config,
+            leader_config,
             &relays,
             &mut self.block_subscription_sender,
         )
@@ -881,30 +880,6 @@ where
         blocks.collect::<Vec<_>>().await.into_iter().rev().collect()
     }
 
-    /// Sends the `leader` a block range from `from` to `to` from the storage so it can update its
-    ///     state.
-    ///
-    /// # Arguments
-    ///
-    /// * `leader` - The leader instance to be updated. It should be up-to-date with the state of
-    ///    the ledger up to `from`.
-    /// * `from` - The header id from which the leader should be updated.
-    /// * `to` - The header id up to which the leader should be updated.
-    /// * `storage_adapter` - The storage adapter to fetch the blocks from.
-    async fn follow_chain_in_range(
-        leader: &mut Leader,
-        from: HeaderId,
-        to: HeaderId,
-        storage_adapter: &StorageAdapter<Storage, TxS::Tx, BS::BlobId>,
-    ) {
-        // TODO: OPTIMIZE: Fetch only headers
-        let blocks = Self::get_blocks_in_range(from, to, storage_adapter).await;
-
-        for block in blocks {
-            leader.follow_chain_with_header(block.header());
-        }
-    }
-
     /// Builds cryptarchia
     /// The build process is determined by the initial state passed:
     /// - If the initial state doesn't contain any recovery information, cryptarchia is built from
@@ -923,7 +898,7 @@ where
     /// * `relays` - The relays object containing all the necessary relays for the consensus.
     /// * `block_subscription_sender` - The broadcast channel to send the blocks to the services.
     async fn build_cryptarchia(
-        initial_state: &CryptarchiaConsensusState<
+        mut initial_state: CryptarchiaConsensusState<
             TxS::Settings,
             BS::Settings,
             NetAdapter::Settings,
@@ -931,8 +906,8 @@ where
         >,
         genesis_id: HeaderId,
         genesis_state: LedgerState,
-        leader: &mut Leader,
         ledger_config: nomos_ledger::Config,
+        leader_config: LeaderConfig,
         relays: &CryptarchiaConsensusRelays<
             BlendAdapter,
             BS,
@@ -947,54 +922,62 @@ where
             TxS,
         >,
         block_subscription_sender: &mut broadcast::Sender<Block<ClPool::Item, DaPool::Item>>,
-    ) -> Cryptarchia {
+    ) -> (Cryptarchia, Leader) {
         match initial_state.recovery_strategy() {
             CryptarchiaInitialisationStrategy::Genesis => {
                 info!("Building Cryptarchia from genesis...");
-                Cryptarchia::new(genesis_id, genesis_state, ledger_config)
+                let leader = Leader::from_genesis(genesis_id, leader_config, ledger_config.clone());
+                let cryptarchia = Cryptarchia::new(genesis_id, genesis_state, ledger_config);
+
+                (cryptarchia, leader)
             }
             CryptarchiaInitialisationStrategy::RecoveryFromGenesis(GenesisRecoveryStrategy {
                 tip,
             }) => {
-                info!("Recovering Cryptarchia from genesis...");
-                Self::recover_cryptarchia(
+                info!("Recovering Cryptarchia with Genesis strategy.");
+                let mut leader =
+                    Leader::from_genesis(genesis_id, leader_config, ledger_config.clone());
+                let cryptarchia = Self::recover_cryptarchia(
                     genesis_id,
                     genesis_state,
                     tip,
-                    leader,
+                    &mut leader,
+                    ledger_config,
                     relays,
                     block_subscription_sender,
-                    ledger_config,
                 )
-                .await
+                .await;
+
+                (cryptarchia, leader)
             }
             CryptarchiaInitialisationStrategy::RecoveryFromSecurity(strategy) => {
                 let SecurityRecoveryStrategy {
                     tip,
                     security_block_id,
                     security_ledger_state,
+                    security_leader_notes,
                 } = *strategy;
 
-                info!("Recovering Cryptarchia from security...");
-                info!("Leader is out of date, updating from genesis until security block.");
-                Self::follow_chain_in_range(
-                    leader,
-                    genesis_id,
+                info!("Recovering Cryptarchia with Security strategy.");
+                let mut leader = Leader::new(
                     security_block_id,
-                    relays.storage_adapter(),
-                )
-                .await;
+                    security_leader_notes,
+                    leader_config,
+                    ledger_config.clone(),
+                );
 
-                Self::recover_cryptarchia(
+                let cryptarchia = Self::recover_cryptarchia(
                     security_block_id,
                     security_ledger_state,
                     tip,
-                    leader,
+                    &mut leader,
+                    ledger_config,
                     relays,
                     block_subscription_sender,
-                    ledger_config,
                 )
-                .await
+                .await;
+
+                (cryptarchia, leader)
             }
         }
     }
@@ -1018,6 +1001,7 @@ where
         from_ledger_state: LedgerState,
         to_header_id: HeaderId,
         leader: &mut Leader,
+        ledger_config: nomos_ledger::Config,
         relays: &CryptarchiaConsensusRelays<
             BlendAdapter,
             BS,
@@ -1032,7 +1016,6 @@ where
             TxS,
         >,
         block_subscription_sender: &mut broadcast::Sender<Block<ClPool::Item, DaPool::Item>>,
-        ledger_config: nomos_ledger::Config,
     ) -> Cryptarchia {
         let mut cryptarchia = Cryptarchia::new(from_header_id, from_ledger_state, ledger_config);
 
