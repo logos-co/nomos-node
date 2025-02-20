@@ -529,7 +529,7 @@ where
                         )
                         .await;
 
-                        self.service_state.state_updater.update(Self::State::from_cryptarchia(&cryptarchia));
+                        self.service_state.state_updater.update(Self::State::from_cryptarchia(&cryptarchia, &leader));
 
                         tracing::info!(counter.consensus_processed_blocks = 1);
                     }
