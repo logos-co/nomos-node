@@ -6,6 +6,7 @@ use std::time::Duration;
 use std::{net::SocketAddr, process::Child};
 // Crates
 use cryptarchia_consensus::CryptarchiaSettings;
+use cryptarchia_engine::SlotConfig;
 use kzgrs_backend::common::blob::DaBlob;
 use nomos_blend::message_blend::{
     CryptographicProcessorSettings, MessageBlendSettings, TemporalSchedulerSettings,
@@ -31,6 +32,8 @@ use nomos_node::api::paths::{CL_METRICS, DA_GET_RANGE};
 use nomos_node::RocksBackendSettings;
 use nomos_tracing::logging::local::FileConfig;
 use nomos_tracing_service::LoggerLayer;
+use nomos_time::backends::system_time::SystemTimeBackendSettings;
+use nomos_time::TimeServiceSettings;
 use tempfile::NamedTempFile;
 // Internal
 use super::{create_tempdir, persist_tempdir, GetRangeReq, CLIENT};
@@ -251,6 +254,16 @@ pub fn create_executor_config(config: GeneralConfig) -> Config {
                     global_params_path: config.da_config.global_params_path,
                 },
                 dispersal_timeout: Duration::from_secs(u64::MAX),
+            },
+        },
+        time: TimeServiceSettings {
+            backend_settings: SystemTimeBackendSettings {
+                slot_config: SlotConfig {
+                    slot_duration: config.time_config.slot_duration,
+                    chain_start_time: config.time_config.chain_start_time,
+                },
+                epoch_config: config.consensus_config.ledger_config.epoch_config,
+                base_period_length: config.consensus_config.ledger_config.base_period_length(),
             },
         },
     }
