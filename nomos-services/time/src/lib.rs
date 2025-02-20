@@ -2,11 +2,10 @@ use crate::backends::TimeBackend;
 use cryptarchia_engine::{Epoch, Slot};
 use futures::{Stream, StreamExt};
 use log::error;
-use overwatch_rs::services::handle::ServiceStateHandle;
 use overwatch_rs::services::relay::RelayMessage;
 use overwatch_rs::services::state::{NoOperator, NoState};
 use overwatch_rs::services::{ServiceCore, ServiceData, ServiceId};
-use overwatch_rs::DynError;
+use overwatch_rs::{DynError, OpaqueServiceStateHandle};
 use services_utils::overwatch::lifecycle::should_stop_service;
 use std::fmt::{Debug, Formatter};
 use std::pin::Pin;
@@ -52,7 +51,7 @@ where
     Backend: TimeBackend,
     Backend::Settings: Clone,
 {
-    state: ServiceStateHandle<Self>,
+    state: OpaqueServiceStateHandle<Self>,
     backend: Backend,
 }
 
@@ -64,7 +63,7 @@ where
     const SERVICE_ID: ServiceId = TIME_SERVICE_TAG;
     type Settings = TimeServiceSettings<Backend::Settings>;
     type State = NoState<Self::Settings>;
-    type StateOperator = NoOperator<Self::State>;
+    type StateOperator = NoOperator<Self::State, Self::Settings>;
     type Message = TimeServiceMessage;
 }
 
@@ -75,7 +74,7 @@ where
     Backend::Settings: Clone + Send + Sync,
 {
     fn init(
-        service_state: ServiceStateHandle<Self>,
+        service_state: OpaqueServiceStateHandle<Self>,
         _initial_state: Self::State,
     ) -> Result<Self, DynError> {
         let Self::Settings {
