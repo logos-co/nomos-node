@@ -83,9 +83,9 @@ impl From<&SamplingEvent> for MonitorEvent {
 #[derive(Default, Debug)]
 pub struct PeerStats {
     // Calculated using EWMA to give more weight to recent failures while gradually decaying over time.
-    dispersal_failures_rate: U57F7,
-    sampling_failures_rate: U57F7,
-    replication_failures_rate: U57F7,
+    pub dispersal_failures_rate: U57F7,
+    pub sampling_failures_rate: U57F7,
+    pub replication_failures_rate: U57F7,
 
     // Track the time of the last failure for decay calculations.
     last_dispersal_failure: Option<Instant>,
@@ -139,27 +139,70 @@ impl PeerStats {
             factor,
         )
     }
+
+    pub fn get_updated_stats(
+        &self,
+        now: Instant,
+        time_window: Duration,
+        decay_factor: U57F7,
+    ) -> Self {
+        Self {
+            dispersal_failures_rate: self.compute_dispersal_failure_rate(
+                now,
+                time_window,
+                decay_factor,
+            ),
+            sampling_failures_rate: self.compute_sampling_failure_rate(
+                now,
+                time_window,
+                decay_factor,
+            ),
+            replication_failures_rate: self.compute_replication_failure_rate(
+                now,
+                time_window,
+                decay_factor,
+            ),
+            last_dispersal_failure: self.last_dispersal_failure,
+            last_sampling_failure: self.last_sampling_failure,
+            last_replication_failure: self.last_replication_failure,
+        }
+    }
+}
+
+pub trait PeerHealthPolicy {
+    type PeerStats;
+
+    /// Evaluates whether a peer is malicious.
+    ///
+    /// Returns `true` if the peer is deemed malicious, otherwise `false`.
+    fn is_peer_malicious(&self, stats: &Self::PeerStats) -> bool;
+
+    /// Evaluates whether a peer is unhealthy.
+    ///
+    /// Returns `true` if the peer is deemed unhealthy, otherwise `false`.
+    fn is_peer_unhealthy(&self, stats: &Self::PeerStats) -> bool;
 }
 
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct DAConnectionMonitorSettings {
-    pub max_dispersal_failures: usize,
-    pub max_sampling_failures: usize,
-    pub max_replication_failures: usize,
-    pub malicious_threshold: usize,
     pub failure_time_window: Duration,
     pub time_decay_factor: U57F7,
 }
 
-pub struct DAConnectionMonitor {
+pub struct DAConnectionMonitor<Policy> {
     peer_stats: HashMap<PeerId, PeerStats>,
+    policy: Policy,
     settings: DAConnectionMonitorSettings,
 }
 
-impl DAConnectionMonitor {
-    pub fn new(settings: DAConnectionMonitorSettings) -> Self {
+impl<Policy> DAConnectionMonitor<Policy>
+where
+    Policy: PeerHealthPolicy<PeerStats = PeerStats>,
+{
+    pub fn new(settings: DAConnectionMonitorSettings, policy: Policy) -> Self {
         Self {
             peer_stats: HashMap::new(),
+            policy,
             settings,
         }
     }
@@ -168,35 +211,17 @@ impl DAConnectionMonitor {
         if let Some(stats) = self.peer_stats.get(peer_id) {
             // We need to recompute the failure rate upon the evaluation as time has moved on and
             // the failure rate must have decayed.
-            let dispersal_rate = stats.compute_dispersal_failure_rate(
-                now,
-                self.settings.failure_time_window,
-                self.settings.time_decay_factor,
-            );
-            let sampling_rate = stats.compute_sampling_failure_rate(
-                now,
-                self.settings.failure_time_window,
-                self.settings.time_decay_factor,
-            );
-            let replication_rate = stats.compute_replication_failure_rate(
+            let stats = stats.get_updated_stats(
                 now,
                 self.settings.failure_time_window,
                 self.settings.time_decay_factor,
             );
 
-            // TODO: Instead of deciding the peer status here, use ConnectionPolicy once it's
-            // implemented.
-            if dispersal_rate >= self.settings.malicious_threshold
-                || sampling_rate >= self.settings.malicious_threshold
-                || replication_rate >= self.settings.malicious_threshold
-            {
+            if self.policy.is_peer_malicious(&stats) {
                 return PeerStatus::Malicious;
             }
 
-            if dispersal_rate >= self.settings.max_dispersal_failures
-                || sampling_rate >= self.settings.max_sampling_failures
-                || replication_rate >= self.settings.max_replication_failures
-            {
+            if self.policy.is_peer_unhealthy(&stats) {
                 return PeerStatus::Unhealthy;
             }
 
@@ -207,7 +232,10 @@ impl DAConnectionMonitor {
     }
 }
 
-impl ConnectionMonitor for DAConnectionMonitor {
+impl<Policy> ConnectionMonitor for DAConnectionMonitor<Policy>
+where
+    Policy: PeerHealthPolicy<PeerStats = PeerStats>,
+{
     type Event = MonitorEvent;
 
     fn record_event(&mut self, event: Self::Event) -> Option<ConnectionMonitorOutput> {
@@ -278,20 +306,24 @@ fn compute_failure_rate(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use libp2p::PeerId;
     use std::time::Duration;
 
-    fn setup_monitor() -> DAConnectionMonitor {
-        let settings = DAConnectionMonitorSettings {
+    use super::*;
+    use crate::swarm::{common::policy::DAConnectionPolicy, DAConnectionPolicySettings};
+
+    fn setup_monitor() -> DAConnectionMonitor<DAConnectionPolicy> {
+        let monitor_settings = DAConnectionMonitorSettings {
+            failure_time_window: Duration::from_secs(10),
+            time_decay_factor: U57F7::lit("0.8"),
+        };
+        let policy_settings = DAConnectionPolicySettings {
             max_dispersal_failures: 2,
             max_sampling_failures: 2,
             max_replication_failures: 2,
             malicious_threshold: 3,
-            failure_time_window: Duration::from_secs(10),
-            time_decay_factor: U57F7::lit("0.8"),
         };
-        DAConnectionMonitor::new(settings)
+        DAConnectionMonitor::new(monitor_settings, DAConnectionPolicy::new(policy_settings))
     }
 
     #[test]
