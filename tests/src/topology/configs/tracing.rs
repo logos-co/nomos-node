@@ -6,6 +6,8 @@ use nomos_tracing_service::{
 };
 use tracing::Level;
 
+use crate::IS_DEBUG_TRACING;
+
 #[derive(Clone, Default)]
 pub struct GeneralTracingConfig {
     pub tracing_settings: TracingSettings,
@@ -48,13 +50,9 @@ impl GeneralTracingConfig {
 }
 
 pub fn create_tracing_configs(ids: &[[u8; 32]]) -> Vec<GeneralTracingConfig> {
-    #[cfg(feature = "debug")]
-    {
+    if *IS_DEBUG_TRACING {
         create_debug_configs(ids)
-    }
-
-    #[cfg(not(feature = "debug"))]
-    {
+    } else {
         create_default_configs(ids)
     }
 }

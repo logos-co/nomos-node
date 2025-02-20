@@ -14,8 +14,10 @@ use once_cell::sync::Lazy;
 use rand::{thread_rng, Rng};
 
 static NET_PORT: Lazy<Mutex<u16>> = Lazy::new(|| Mutex::new(thread_rng().gen_range(8000..10000)));
+
 static IS_SLOW_TEST_ENV: Lazy<bool> =
     Lazy::new(|| env::var("SLOW_TEST_ENV").is_ok_and(|s| s == "true"));
+
 pub static GLOBAL_PARAMS_PATH: Lazy<String> = Lazy::new(|| {
     let relative_path = "./kzgrs/kzgrs_test_params";
     let current_dir = env::current_dir().expect("Failed to get current directory");
@@ -26,6 +28,11 @@ pub static GLOBAL_PARAMS_PATH: Lazy<String> = Lazy::new(|| {
         .to_string_lossy()
         .to_string()
 });
+
+/// Global flag indicating whether debug tracing configuration is enabled to send traces to local
+/// grafana stack.
+pub static IS_DEBUG_TRACING: Lazy<bool> =
+    Lazy::new(|| env::var("NOMOS_TESTS_TRACING").is_ok_and(|val| val.eq_ignore_ascii_case("true")));
 
 pub fn get_available_port() -> u16 {
     let mut port = NET_PORT.lock().unwrap();

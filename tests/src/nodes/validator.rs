@@ -26,13 +26,15 @@ use nomos_node::api::paths::{
 };
 use nomos_node::{api::backend::AxumBackendSettings, Config, RocksBackendSettings};
 use nomos_node::{BlobInfo, HeaderId, Tx};
+use nomos_tracing::logging::local::FileConfig;
+use nomos_tracing_service::LoggerLayer;
 use reqwest::Url;
 use tempfile::NamedTempFile;
 // Internal
 use super::{create_tempdir, persist_tempdir, GetRangeReq, CLIENT};
-use crate::adjust_timeout;
 use crate::nodes::LOGS_PREFIX;
 use crate::topology::configs::GeneralConfig;
+use crate::{adjust_timeout, IS_DEBUG_TRACING};
 
 const BIN_PATH: &str = "../target/debug/nomos-node";
 
@@ -68,11 +70,7 @@ impl Validator {
         let mut file = NamedTempFile::new().unwrap();
         let config_path = file.path().to_owned();
 
-        #[cfg(not(feature = "debug"))]
-        {
-            use nomos_tracing::logging::local::FileConfig;
-            use nomos_tracing_service::LoggerLayer;
-
+        if !*IS_DEBUG_TRACING {
             // setup logging so that we can intercept it later in testing
             config.tracing.logger = LoggerLayer::File(FileConfig {
                 directory: dir.path().to_owned(),
