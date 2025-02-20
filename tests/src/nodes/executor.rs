@@ -7,7 +7,7 @@ use std::{
 };
 
 use cryptarchia_consensus::CryptarchiaSettings;
-use cryptarchia_engine::time::SlotConfig;
+use cryptarchia_engine::SlotConfig;
 use kzgrs_backend::common::blob::DaBlob;
 use nomos_blend::message_blend::{
     CryptographicProcessorSettings, MessageBlendSettings, TemporalSchedulerSettings,
@@ -46,6 +46,8 @@ use nomos_node::{
 use nomos_time::{backends::system_time::SystemTimeBackendSettings, TimeServiceSettings};
 use nomos_tracing::logging::local::FileConfig;
 use nomos_tracing_service::LoggerLayer;
+use nomos_time::backends::system_time::SystemTimeBackendSettings;
+use nomos_time::TimeServiceSettings;
 use tempfile::NamedTempFile;
 
 use super::{create_tempdir, persist_tempdir, GetRangeReq, CLIENT};
@@ -279,9 +281,6 @@ pub fn create_executor_config(config: GeneralConfig) -> Config {
                 epoch_config: config.consensus_config.ledger_config.epoch_config,
                 base_period_length: config.consensus_config.ledger_config.base_period_length(),
             },
-        },
-        mempool: MempoolConfig {
-            recovery_path: "./recovery/mempool.json".into(),
         },
     }
 }

@@ -8,10 +8,7 @@ use nomos_da_network_service::{
 };
 use nomos_network::backends::libp2p::Libp2p as NetworkBackend;
 use nomos_node::{
-    config::{
-        mempool::MempoolConfig, update_blend, update_cryptarchia_consensus, update_network,
-        BlendArgs,
-    },
+    config::{update_blend, update_cryptarchia_consensus, update_network, BlendArgs},
     CryptarchiaArgs, HttpArgs, LogArgs, NetworkArgs, NetworkService, NomosTimeService, Wire,
 };
 use nomos_storage::backends::rocksdb::RocksBackend;
