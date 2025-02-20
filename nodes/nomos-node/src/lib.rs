@@ -52,6 +52,8 @@ pub use nomos_storage::{
     StorageService,
 };
 pub use nomos_system_sig::SystemSig;
+use nomos_time::backends::system_time::SystemTimeBackend;
+use nomos_time::TimeService;
 #[cfg(feature = "tracing")]
 pub use nomos_tracing_service::Tracing;
 use overwatch_derive::*;
@@ -169,6 +171,8 @@ pub type DaVerifier<VerifierAdapter> =
 
 pub type NodeDaVerifier = DaVerifier<VerifierNetworkAdapter<FillFromNodeList>>;
 
+pub type NomosTimeService = TimeService<SystemTimeBackend>;
+
 #[derive(Services)]
 pub struct Nomos {
     #[cfg(feature = "tracing")]
@@ -182,6 +186,7 @@ pub struct Nomos {
     cl_mempool: OpaqueServiceHandle<TxMempool>,
     da_mempool: OpaqueServiceHandle<DaMempool>,
     cryptarchia: OpaqueServiceHandle<NodeCryptarchia>,
+    time: OpaqueServiceHandle<NomosTimeService>,
     http: OpaqueServiceHandle<NomosApiService>,
     storage: OpaqueServiceHandle<StorageService<RocksBackend<Wire>>>,
     system_sig: OpaqueServiceHandle<SystemSig>,
