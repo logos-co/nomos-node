@@ -1,11 +1,12 @@
 use std::marker::PhantomData;
 
+use cl::NoteWitness;
 use nomos_core::header::HeaderId;
 use nomos_ledger::LedgerState;
 use overwatch::services::state::ServiceState;
 use serde::{Deserialize, Serialize};
 
-use crate::{Cryptarchia, CryptarchiaSettings, Error};
+use crate::{leadership::Leader, Cryptarchia, CryptarchiaSettings, Error};
 
 pub struct GenesisRecoveryStrategy {
     pub tip: HeaderId,
@@ -34,6 +35,7 @@ pub struct CryptarchiaConsensusState<
     tip: Option<HeaderId>,
     security_block: Option<HeaderId>,
     security_ledger_state: Option<LedgerState>,
+    security_leader_notes: Option<Vec<NoteWitness>>,
     _txs: PhantomData<TxS>,
     _bxs: PhantomData<BxS>,
     _network_adapter_settings: PhantomData<NetworkAdapterSettings>,
@@ -54,11 +56,13 @@ impl<TxS, BxS, NetworkAdapterSettings, BlendAdapterSettings, TimeBackendSettings
         tip: Option<HeaderId>,
         security_block: Option<HeaderId>,
         security_ledger_state: Option<LedgerState>,
+        security_leader_notes: Option<Vec<NoteWitness>>,
     ) -> Self {
         Self {
             tip,
             security_block,
             security_ledger_state,
+            security_leader_notes,
             _txs: PhantomData,
             _bxs: PhantomData,
             _network_adapter_settings: PhantomData,
@@ -67,16 +71,20 @@ impl<TxS, BxS, NetworkAdapterSettings, BlendAdapterSettings, TimeBackendSettings
         }
     }
 
-    pub(crate) fn from_cryptarchia(cryptarchia: &Cryptarchia) -> Self {
+    pub(crate) fn from_cryptarchia(cryptarchia: &Cryptarchia, leader: &Leader) -> Self {
         let security_block_header = cryptarchia.consensus.get_security_block_header_id();
         let security_ledger_state = security_block_header
             .and_then(|header| cryptarchia.ledger.state(&header))
+            .cloned();
+        let security_leader_notes = security_block_header
+            .and_then(|header_id| leader.notes(&header_id))
             .cloned();
 
         Self::new(
             Some(cryptarchia.tip()),
             security_block_header,
             security_ledger_state,
+            security_leader_notes,
         )
     }
 
@@ -125,6 +133,6 @@ impl<TxS, BxS, NetworkAdapterSettings, BlendAdapterSettings, TimeBackendSettings
     type Error = Error;
 
     fn from_settings(_settings: &Self::Settings) -> Result<Self, Self::Error> {
-        Ok(Self::new(None, None, None))
+        Ok(Self::new(None, None, None, None))
     }
 }
