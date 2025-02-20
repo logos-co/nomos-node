@@ -58,6 +58,18 @@ da_network:
       12D3KooWA5LkQcuefjUBTktxCXUQ4rx4PcqRY1tgbSpV9eZDHWir: /ip4/127.0.0.1/udp/8717/quic-v1/p2p/12D3KooWA5LkQcuefjUBTktxCXUQ4rx4PcqRY1tgbSpV9eZDHWir
       12D3KooWKD62Q1nAAMHeV2Cx3rNNMzjgHkTT2edFMzHZ5ur7sGnh: /ip4/127.0.0.1/udp/8716/quic-v1/p2p/12D3KooWKD62Q1nAAMHeV2Cx3rNNMzjgHkTT2edFMzHZ5ur7sGnh
     listening_address: /ip4/127.0.0.1/udp/8716/quic-v1
+    monitor_settings:
+      max_dispersal_failures: 3
+      max_sampling_failures: 3
+      max_replication_failures: 3
+      malicious_threshold: 5
+      failure_time_window:
+        secs: 10 
+        nanos: 0
+      time_decay_factor: "0.8"
+    redial_cooldown:
+      secs: 5
+      nanos: 0
 da_indexer:
   storage:
     blob_storage_directory: ./

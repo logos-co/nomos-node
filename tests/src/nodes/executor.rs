@@ -200,6 +200,8 @@ pub fn create_executor_config(config: GeneralConfig) -> Config {
                     membership: config.da_config.membership,
                     addresses: config.da_config.addresses,
                     listening_address: config.da_config.listening_address,
+                    monitor_settings: config.da_config.monitor_settings,
+                    redial_cooldown: config.da_config.redial_cooldown,
                 },
                 num_subnets: config.da_config.num_subnets,
             },

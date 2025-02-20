@@ -187,13 +187,17 @@ impl ConnectionHandler for ReplicationHandler {
     type ToBehaviour = HandlerEventToBehaviour;
     type InboundProtocol = ReadyUpgrade<StreamProtocol>;
     type OutboundProtocol = ReadyUpgrade<StreamProtocol>;
+    #[allow(deprecated)]
     type InboundOpenInfo = ();
+    #[allow(deprecated)]
     type OutboundOpenInfo = ();
 
+    #[allow(deprecated)]
     fn listen_protocol(&self) -> SubstreamProtocol<Self::InboundProtocol, Self::InboundOpenInfo> {
         SubstreamProtocol::new(ReadyUpgrade::new(REPLICATION_PROTOCOL), ())
     }
 
+    #[allow(deprecated)]
     fn poll(
         &mut self,
         cx: &mut Context<'_>,
@@ -240,12 +244,7 @@ impl ConnectionHandler for ReplicationHandler {
 
     fn on_connection_event(
         &mut self,
-        event: ConnectionEvent<
-            Self::InboundProtocol,
-            Self::OutboundProtocol,
-            Self::InboundOpenInfo,
-            Self::OutboundOpenInfo,
-        >,
+        event: ConnectionEvent<Self::InboundProtocol, Self::OutboundProtocol>,
     ) {
         let is_outbound = event.is_outbound();
         match event {
