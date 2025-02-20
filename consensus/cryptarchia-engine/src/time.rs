@@ -131,15 +131,15 @@ impl SlotTimer {
         SlotTimer { config }
     }
 
-    pub fn current_slot(&self) -> Slot {
-        Slot::current_from_offset_and_config(OffsetDateTime::now_utc(), self.config)
+    pub fn current_slot(&self, now: OffsetDateTime) -> Slot {
+        Slot::current_from_offset_and_config(now, self.config)
     }
 
     /// Ticks at the start of each slot, starting from the next slot
     pub fn slot_interval(&self, now: OffsetDateTime) -> Interval {
         let slot_duration = self.config.slot_duration;
         let next_slot_start = self.config.chain_start_time
-            + slot_duration * u64::from(self.current_slot() + 1) as u32;
+            + slot_duration * u64::from(self.current_slot(now) + 1) as u32;
         let delay = next_slot_start - now;
         let mut interval = tokio::time::interval_at(
             tokio::time::Instant::now()
