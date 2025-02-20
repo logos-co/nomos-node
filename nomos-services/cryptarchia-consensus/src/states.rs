@@ -16,6 +16,7 @@ pub struct SecurityRecoveryStrategy {
     pub tip: HeaderId,
     pub security_block_id: HeaderId,
     pub security_ledger_state: LedgerState,
+    pub security_leader_notes: Vec<NoteWitness>,
 }
 
 pub enum CryptarchiaInitialisationStrategy {
@@ -95,18 +96,30 @@ impl<TxS, BxS, NetworkAdapterSettings, BlendAdapterSettings, TimeBackendSettings
     }
 
     const fn can_recover_from_security(&self) -> bool {
-        self.can_recover() && self.security_block.is_some() && self.security_ledger_state.is_some()
+        // TODO: Check if one or more (but not all) the security attrs are missing.
+        // That's a bug.
+        self.can_recover()
+            && self.security_block.is_some()
+            && self.security_ledger_state.is_some()
+            && self.security_leader_notes.is_some()
     }
 
-    pub fn recovery_strategy(&self) -> CryptarchiaInitialisationStrategy {
+    pub fn recovery_strategy(&mut self) -> CryptarchiaInitialisationStrategy {
         if self.can_recover_from_security() {
             let strategy = SecurityRecoveryStrategy {
-                tip: self.tip.expect("tip not available"),
-                security_block_id: self.security_block.expect("security block not available"),
+                tip: self.tip.take().expect("tip not available"),
+                security_block_id: self
+                    .security_block
+                    .take()
+                    .expect("security block not available"),
                 security_ledger_state: self
                     .security_ledger_state
-                    .clone()
+                    .take()
                     .expect("security ledger state not available"),
+                security_leader_notes: self
+                    .security_leader_notes
+                    .take()
+                    .expect("security leader notes not available"),
             };
             CryptarchiaInitialisationStrategy::RecoveryFromSecurity(Box::new(strategy))
         } else if self.can_recover() {
