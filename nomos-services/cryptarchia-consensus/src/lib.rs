@@ -455,7 +455,7 @@ where
         } = self.service_state.settings_reader.get_updated_settings();
 
         let genesis_id = HeaderId::from([0; 32]);
-        let mut leader = leadership::Leader::new(genesis_id, leader_config, config.clone());
+        let mut leader = Leader::new(genesis_id, leader_config, config.clone());
 
         let mut cryptarchia = Self::build_cryptarchia(
             &self.initial_state,
@@ -497,7 +497,7 @@ where
                         )
                         .await;
 
-                        self.service_state.state_updater.update(Self::State::from_cryptarchia(&cryptarchia));
+                        self.service_state.state_updater.update(Self::State::from_cryptarchia(&cryptarchia, &leader));
 
                         tracing::info!(counter.consensus_processed_blocks = 1);
                     }
