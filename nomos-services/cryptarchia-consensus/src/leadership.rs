@@ -18,7 +18,7 @@ pub struct Leader {
     // for each block, the indexes in the note tree of the notes we control
     notes: HashMap<HeaderId, Vec<NoteWitness>>,
     nf_sk: NullifierSecret,
-    config: nomos_ledger::Config,
+    config: Config,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -32,7 +32,7 @@ impl Leader {
     pub fn new(
         header_id: HeaderId,
         header_notes: Vec<NoteWitness>,
-        LeaderConfig { nf_sk, .. }: LeaderConfig,
+        nf_sk: NullifierSecret,
         config: Config,
     ) -> Self {
         Leader {
@@ -47,11 +47,7 @@ impl Leader {
         LeaderConfig { notes, nf_sk }: LeaderConfig,
         config: Config,
     ) -> Self {
-        Leader {
-            notes: HashMap::from([(genesis, notes)]),
-            nf_sk,
-            config,
-        }
+        Leader::new(genesis, notes, nf_sk, config)
     }
 
     // Signal that the chain extended with a new header, possibly evolving a leader notes in the process
