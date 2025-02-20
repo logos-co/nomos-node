@@ -43,10 +43,10 @@ use nomos_node::{
     config::mempool::MempoolConfig,
     RocksBackendSettings,
 };
-use nomos_tracing::logging::local::FileConfig;
-use nomos_tracing_service::LoggerLayer;
 use nomos_time::backends::system_time::SystemTimeBackendSettings;
 use nomos_time::TimeServiceSettings;
+use nomos_tracing::logging::local::FileConfig;
+use nomos_tracing_service::LoggerLayer;
 use tempfile::NamedTempFile;
 
 use super::{create_tempdir, persist_tempdir, GetRangeReq, CLIENT};
