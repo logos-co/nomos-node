@@ -27,10 +27,10 @@ use nomos_node::api::paths::{
 };
 use nomos_node::{api::backend::AxumBackendSettings, Config, RocksBackendSettings};
 use nomos_node::{BlobInfo, HeaderId, Tx};
-use nomos_tracing::logging::local::FileConfig;
-use nomos_tracing_service::LoggerLayer;
 use nomos_time::backends::system_time::SystemTimeBackendSettings;
 use nomos_time::TimeServiceSettings;
+use nomos_tracing::logging::local::FileConfig;
+use nomos_tracing_service::LoggerLayer;
 use reqwest::Url;
 use tempfile::NamedTempFile;
 // Internal
