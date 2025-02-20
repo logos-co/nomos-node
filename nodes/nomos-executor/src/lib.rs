@@ -21,7 +21,6 @@ use nomos_da_sampling::storage::adapters::rocksdb::RocksAdapter as SamplingStora
 use nomos_da_verifier::backend::kzgrs::KzgrsDaVerifier;
 use nomos_da_verifier::network::adapters::executor::Libp2pAdapter as VerifierNetworkAdapter;
 use nomos_mempool::backend::mockpool::MockPool;
-use nomos_node::DispersedBlobInfo;
 use nomos_node::HeaderId;
 use nomos_node::MempoolNetworkAdapter;
 use nomos_node::NetworkBackend;
@@ -30,6 +29,7 @@ use nomos_node::{
     NetworkService, NomosDaMembership, RocksBackend, StorageService, SystemSig, Tx, TxMempool,
     Wire, MB16,
 };
+use nomos_node::{DispersedBlobInfo, NomosTimeService};
 use overwatch_derive::Services;
 use overwatch_rs::OpaqueServiceHandle;
 
@@ -98,6 +98,7 @@ pub struct NomosExecutor {
     cl_mempool: OpaqueServiceHandle<TxMempool>,
     da_mempool: OpaqueServiceHandle<DaMempool>,
     cryptarchia: OpaqueServiceHandle<ExecutorCryptarchia>,
+    time: OpaqueServiceHandle<NomosTimeService>,
     http: OpaqueServiceHandle<ExecutorApiService>,
     storage: OpaqueServiceHandle<StorageService<RocksBackend<Wire>>>,
     system_sig: OpaqueServiceHandle<SystemSig>,
