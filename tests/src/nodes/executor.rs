@@ -29,11 +29,14 @@ use nomos_executor::config::Config;
 use nomos_network::{backends::libp2p::Libp2pConfig, NetworkConfig};
 use nomos_node::api::paths::{CL_METRICS, DA_GET_RANGE};
 use nomos_node::RocksBackendSettings;
+use nomos_tracing::logging::local::FileConfig;
+use nomos_tracing_service::LoggerLayer;
 use tempfile::NamedTempFile;
 // Internal
 use super::{create_tempdir, persist_tempdir, GetRangeReq, CLIENT};
-use crate::adjust_timeout;
+use crate::nodes::LOGS_PREFIX;
 use crate::topology::configs::GeneralConfig;
+use crate::{adjust_timeout, IS_DEBUG_TRACING};
 
 const BIN_PATH: &str = "../target/debug/nomos-executor";
 
@@ -64,12 +67,7 @@ impl Executor {
         let mut file = NamedTempFile::new().unwrap();
         let config_path = file.path().to_owned();
 
-        #[cfg(not(feature = "debug"))]
-        {
-            use crate::nodes::LOGS_PREFIX;
-            use nomos_tracing::logging::local::FileConfig;
-            use nomos_tracing_service::LoggerLayer;
-
+        if !*IS_DEBUG_TRACING {
             // setup logging so that we can intercept it later in testing
             config.tracing.logger = LoggerLayer::File(FileConfig {
                 directory: dir.path().to_owned(),
