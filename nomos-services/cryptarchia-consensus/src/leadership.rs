@@ -29,7 +29,7 @@ impl Leader {
     pub fn new(
         header_id: HeaderId,
         header_notes: Vec<NoteWitness>,
-        LeaderConfig { nf_sk, .. }: LeaderConfig,
+        nf_sk: NullifierSecret,
         config: nomos_ledger::Config,
     ) -> Self {
         Self {
@@ -44,11 +44,7 @@ impl Leader {
         LeaderConfig { notes, nf_sk }: LeaderConfig,
         config: nomos_ledger::Config,
     ) -> Self {
-        Self {
-            notes: HashMap::from([(genesis, notes)]),
-            nf_sk,
-            config,
-        }
+        Self::new(genesis, notes, nf_sk, config)
     }
 
     // Signal that the chain extended with a new header, possibly evolving a leader
