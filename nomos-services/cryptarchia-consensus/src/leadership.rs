@@ -134,6 +134,10 @@ impl Leader {
 
         None
     }
+
+    pub(crate) fn notes(&self, header_id: &HeaderId) -> Option<&Vec<NoteWitness>> {
+        self.notes.get(header_id)
+    }
 }
 
 fn evolve(note: &NoteWitness, nf_sk: NullifierSecret) -> NoteWitness {
