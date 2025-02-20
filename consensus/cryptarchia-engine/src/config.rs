@@ -1,5 +1,5 @@
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Config {
     // The k parameter in the Common Prefix property.
     // Blocks deeper than k are generally considered stable and forks deeper than that

@@ -8,6 +8,7 @@ use configs::{
 };
 use rand::{thread_rng, Rng};
 
+use crate::topology::configs::time::default_time_config;
 use crate::{
     nodes::{
         executor::{create_executor_config, Executor},
@@ -80,6 +81,7 @@ impl Topology {
         let blend_configs = create_blend_configs(&ids);
         let api_configs = create_api_configs(&ids);
         let tracing_configs = create_tracing_configs(&ids);
+        let time_config = default_time_config();
 
         let mut validators = Vec::new();
         for i in 0..config.n_validators {
@@ -90,6 +92,7 @@ impl Topology {
                 blend_config: blend_configs[i].to_owned(),
                 api_config: api_configs[i].to_owned(),
                 tracing_config: tracing_configs[i].to_owned(),
+                time_config: time_config.clone(),
             });
             validators.push(Validator::spawn(config).await)
         }
@@ -103,6 +106,7 @@ impl Topology {
                 blend_config: blend_configs[i].to_owned(),
                 api_config: api_configs[i].to_owned(),
                 tracing_config: tracing_configs[i].to_owned(),
+                time_config: time_config.clone(),
             });
             executors.push(Executor::spawn(config).await)
         }
