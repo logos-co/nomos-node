@@ -52,7 +52,8 @@ pub use nomos_storage::{
     StorageService,
 };
 pub use nomos_system_sig::SystemSig;
-use nomos_time::{backends::system_time::SystemTimeBackend, TimeService};
+use nomos_time::backends::system_time::SystemTimeBackend;
+use nomos_time::TimeService;
 #[cfg(feature = "tracing")]
 pub use nomos_tracing_service::Tracing;
 use overwatch_derive::*;
