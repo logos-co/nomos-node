@@ -1089,7 +1089,7 @@ where
                 let mut leader = Leader::new(
                     security_block_id,
                     security_leader_notes,
-                    leader_config,
+                    leader_config.nf_sk,
                     ledger_config,
                 );
 
