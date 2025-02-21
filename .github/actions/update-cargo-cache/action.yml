@@ -14,7 +14,6 @@ runs:
       uses: actions/cache/save@v4
       with:
         path: |
-          ~/.cargo/bin/
           ~/.cargo/registry/index/
           ~/.cargo/registry/cache/
           ~/.cargo/git/db/

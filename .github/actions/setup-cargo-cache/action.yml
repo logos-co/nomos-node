@@ -17,7 +17,6 @@ runs:
       uses: actions/cache/restore@v4
       with:
         path: |
-          ~/.cargo/bin/
           ~/.cargo/registry/index/
           ~/.cargo/registry/cache/
           ~/.cargo/git/db/
