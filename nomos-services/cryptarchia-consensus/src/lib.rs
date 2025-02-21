@@ -462,13 +462,9 @@ where
         let mut cryptarchia = Cryptarchia {
             consensus: <cryptarchia_engine::Cryptarchia<_>>::from_genesis(
                 genesis_id,
-                config.consensus_config.clone(),
+                config.consensus_config,
             ),
-            ledger: <nomos_ledger::Ledger<_>>::from_genesis(
-                genesis_id,
-                genesis_state,
-                config.clone(),
-            ),
+            ledger: <nomos_ledger::Ledger<_>>::from_genesis(genesis_id, genesis_state, config),
         };
 
         let network_adapter =
