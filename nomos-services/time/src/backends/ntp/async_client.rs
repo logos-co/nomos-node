@@ -21,7 +21,9 @@ pub enum Error {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Copy, Clone)]
 pub struct NTPClientSettings {
+    /// NTP server requests timeout duration
     timeout: Duration,
+    /// NTP server socket address
     address: SocketAddr,
 }
 #[derive(Clone)]
@@ -39,6 +41,7 @@ impl AsyncNTPClient {
         }
     }
 
+    /// Request a timestamp from an NTP server
     pub async fn request_timestamp<T: ToSocketAddrs>(&self, pool: T) -> Result<NtpResult, Error> {
         let socket = &UdpSocket::bind(self.settings.address)
             .await

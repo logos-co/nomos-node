@@ -105,6 +105,7 @@ where
                             let channel_stream = BroadcastStream::new(broadcast_receiver.resubscribe()).filter_map(|r| Box::pin(async {match r {
                                 Ok(tick) => Some(tick),
                                 Err(e) => {
+                                    // log lagging errors, services should always aim to be ready for next slot
                                     error!("Lagging behind slot ticks: {e:?}");
                                     None
                                 }
