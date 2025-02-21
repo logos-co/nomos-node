@@ -1,8 +1,6 @@
 // std
 use core::fmt;
-use std::collections::HashSet;
 // crates
-use blst::min_sig::SecretKey;
 use kzgrs_backend::{
     common::blob::DaBlob, global::global_parameters_from_file,
     verifier::DaVerifier as NomosKzgrsVerifier,
@@ -35,13 +33,10 @@ impl VerifierBackend for KzgrsDaVerifier {
     type Settings = KzgrsDaVerifierSettings;
 
     fn new(settings: Self::Settings) -> Self {
-        let bytes = hex::decode(settings.sk).expect("Secret key string should decode to bytes");
-        let secret_key =
-            SecretKey::from_bytes(&bytes).expect("Secret key should be reconstructed from bytes");
         let global_params = global_parameters_from_file(&settings.global_params_path)
             .expect("Global parameters has to be loaded from file");
 
-        let verifier = NomosKzgrsVerifier::new(secret_key, settings.index, global_params);
+        let verifier = NomosKzgrsVerifier::new(global_params);
         Self { verifier }
     }
 }
@@ -62,10 +57,7 @@ impl DaVerifier for KzgrsDaVerifier {
     }
 }
 
-// TODO: `sk` and `nodes_public_keys` need to be fetched from the params provider service.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct KzgrsDaVerifierSettings {
-    pub sk: String,
-    pub index: HashSet<u16>,
     pub global_params_path: String,
 }

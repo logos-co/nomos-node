@@ -214,8 +214,6 @@ pub fn create_executor_config(config: GeneralConfig) -> Config {
         },
         da_verifier: DaVerifierServiceSettings {
             verifier_settings: KzgrsDaVerifierSettings {
-                sk: config.da_config.verifier_sk,
-                index: config.da_config.verifier_index,
                 global_params_path: config.da_config.global_params_path.clone(),
             },
             network_adapter_settings: (),

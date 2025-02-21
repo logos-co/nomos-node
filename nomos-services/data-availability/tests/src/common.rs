@@ -67,7 +67,7 @@ use once_cell::sync::Lazy;
 use overwatch_derive::*;
 use overwatch_rs::overwatch::{Overwatch, OverwatchRunner};
 use overwatch_rs::OpaqueServiceHandle;
-use rand::{Rng, RngCore};
+use rand::RngCore;
 use subnetworks_assignations::versions::v1::FillFromNodeList;
 // internal
 use crate::rng::TestRng;
@@ -399,15 +399,6 @@ pub fn new_client(db_path: PathBuf) -> Overwatch {
 
 pub fn node_address(config: &SwarmConfig) -> Multiaddr {
     Swarm::multiaddr(std::net::Ipv4Addr::new(127, 0, 0, 1), config.port)
-}
-
-pub fn generate_blst_hex_keys() -> (String, String) {
-    let mut rng = rand::thread_rng();
-    let sk_bytes: [u8; 32] = rng.gen();
-    let sk = blst::min_sig::SecretKey::key_gen(&sk_bytes, &[]).unwrap();
-
-    let pk = sk.sk_to_pk();
-    (hex::encode(sk.to_bytes()), hex::encode(pk.to_bytes()))
 }
 
 pub fn create_ed25519_sk_peerid(key: &str) -> (ed25519::SecretKey, PeerId) {

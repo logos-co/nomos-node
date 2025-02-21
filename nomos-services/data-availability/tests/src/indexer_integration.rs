@@ -99,9 +99,6 @@ fn test_indexer() {
 
     let blobs_dir = TempDir::new().unwrap().path().to_path_buf();
 
-    let (node1_sk, _) = generate_blst_hex_keys();
-    let (node2_sk, _) = generate_blst_hex_keys();
-
     let (peer_sk_1, peer_id_1) = create_ed25519_sk_peerid(SK1);
     let (peer_sk_2, peer_id_2) = create_ed25519_sk_peerid(SK2);
 
@@ -128,8 +125,6 @@ fn test_indexer() {
         &blobs_dir,
         vec![node_address(&swarm_config2)],
         KzgrsDaVerifierSettings {
-            sk: node1_sk.clone(),
-            index: [0].into(),
             global_params_path: GLOBAL_PARAMS_PATH.into(),
         },
         TestDaNetworkSettings {
@@ -156,8 +151,6 @@ fn test_indexer() {
         &blobs_dir,
         vec![node_address(&swarm_config1)],
         KzgrsDaVerifierSettings {
-            sk: node2_sk.clone(),
-            index: [1].into(),
             global_params_path: GLOBAL_PARAMS_PATH.into(),
         },
         TestDaNetworkSettings {

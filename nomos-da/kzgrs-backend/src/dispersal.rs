@@ -103,9 +103,7 @@ impl AsRef<[u8]> for Index {
 
 #[cfg(test)]
 mod tests {
-    use blst::min_sig::SecretKey;
     use nomos_core::da::DaEncoder as _;
-    use rand::{thread_rng, RngCore};
 
     use crate::{
         common::blob::DaBlob,
@@ -146,23 +144,8 @@ mod tests {
     fn test_encoded_data_verification() {
         let encoder = &ENCODER;
         let data = rand_data(8);
-        let mut rng = thread_rng();
-
-        let sks: Vec<SecretKey> = (0..16)
-            .map(|_| {
-                let mut buff = [0u8; 32];
-                rng.fill_bytes(&mut buff);
-                SecretKey::key_gen(&buff, &[]).unwrap()
-            })
-            .collect();
-
-        let verifiers: Vec<DaVerifier> = sks
-            .clone()
-            .into_iter()
-            .enumerate()
-            .map(|(index, sk)| {
-                DaVerifier::new(sk, [index as u16].into(), GLOBAL_PARAMETERS.clone())
-            })
+        let verifiers: Vec<DaVerifier> = (0..16)
+            .map(|_| DaVerifier::new(GLOBAL_PARAMETERS.clone()))
             .collect();
 
         let encoded_data = encoder.encode(&data).unwrap();

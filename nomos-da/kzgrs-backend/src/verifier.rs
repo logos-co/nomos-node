@@ -1,8 +1,6 @@
 // std
-use std::collections::HashSet;
 // crates
 use ark_poly::EvaluationDomain;
-use blst::min_sig::SecretKey;
 use itertools::{izip, Itertools};
 use kzgrs::common::field_element_from_bytes_le;
 use kzgrs::{
@@ -16,19 +14,12 @@ use crate::common::{hash_commitment, Chunk, Column};
 use crate::encoder::DaEncoderParams;
 
 pub struct DaVerifier {
-    // TODO: substitute this for an abstraction to sign things over
-    pub sk: SecretKey,
-    pub index: HashSet<u16>,
     global_parameters: GlobalParameters,
 }
 
 impl DaVerifier {
-    pub fn new(sk: SecretKey, index: HashSet<u16>, global_parameters: GlobalParameters) -> Self {
-        Self {
-            sk,
-            index,
-            global_parameters,
-        }
+    pub fn new(global_parameters: GlobalParameters) -> Self {
+        Self { global_parameters }
     }
 
     fn verify_column(
@@ -119,7 +110,7 @@ impl DaVerifier {
         let rows_domain = PolynomialEvaluationDomain::new(rows_domain_size)
             .expect("Domain should be able to build");
         let blob_col_idx = &u16::from_be_bytes(blob.column_idx());
-        let index = self.index.get(blob_col_idx).unwrap();
+        let index = blob_col_idx;
 
         let is_column_verified = DaVerifier::verify_column(
             &self.global_parameters,
@@ -159,7 +150,6 @@ mod test {
     use crate::verifier::DaVerifier;
     use ark_bls12_381::Fr;
     use ark_poly::{EvaluationDomain, GeneralEvaluationDomain};
-    use blst::min_sig::SecretKey;
     use kzgrs::{
         bytes_to_polynomial, commit_polynomial, generate_element_proof,
         global_parameters_from_randomness, Commitment, GlobalParameters,
@@ -167,7 +157,6 @@ mod test {
     };
     use nomos_core::da::DaEncoder;
     use once_cell::sync::Lazy;
-    use rand::{thread_rng, RngCore};
 
     pub struct ColumnVerifyData {
         pub column: Column,
@@ -366,20 +355,8 @@ mod test {
         let encoder = &ENCODER;
         let data = rand_data(32);
         let domain_size = 16usize;
-        let mut rng = thread_rng();
-        let sks: Vec<SecretKey> = (0..16)
-            .map(|_| {
-                let mut buff = [0u8; 32];
-                rng.fill_bytes(&mut buff);
-                SecretKey::key_gen(&buff, &[]).unwrap()
-            })
-            .collect();
-        let verifiers: Vec<DaVerifier> = sks
-            .into_iter()
-            .enumerate()
-            .map(|(index, sk)| {
-                DaVerifier::new(sk, [index as u16].into(), GLOBAL_PARAMETERS.clone())
-            })
+        let verifiers: Vec<DaVerifier> = (0..16)
+            .map(|_| DaVerifier::new(GLOBAL_PARAMETERS.clone()))
             .collect();
         let encoded_data = encoder.encode(&data).unwrap();
         for (i, column) in encoded_data.extended_data.columns().enumerate() {
