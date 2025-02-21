@@ -21,3 +21,4 @@ runs:
           target/
         # Must be in sync with the key used in the setup-cargo-cache action
         key: ${{ inputs.key }}->#${{ github.run_id }}
+      continue-on-error: true
