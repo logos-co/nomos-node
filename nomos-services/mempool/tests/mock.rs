@@ -22,7 +22,7 @@ struct MockPoolNode {
     logging: OpaqueServiceHandle<Tracing>,
     network: OpaqueServiceHandle<NetworkService<Mock>>,
     mockpool: OpaqueServiceHandle<
-        TxMempoolService<MockAdapter, MockPool<HeaderId, MockTransaction<MockMessage>, MockTxId>>,
+        TxMempoolService<MockPool<HeaderId, MockTransaction<MockMessage>, MockTxId>, MockAdapter>,
     >,
 }
 
@@ -63,8 +63,8 @@ fn test_mockmempool() {
                 },
             },
             mockpool: TxMempoolSettings {
-                backend: (),
-                network: (),
+                pool: (),
+                network_adapter: (),
             },
             logging: TracingSettings::default(),
         },
@@ -76,8 +76,8 @@ fn test_mockmempool() {
     let network = app.handle().relay::<NetworkService<Mock>>();
     let mempool =
         app.handle().relay::<TxMempoolService<
-            MockAdapter,
             MockPool<HeaderId, MockTransaction<MockMessage>, MockTxId>,
+            MockAdapter,
         >>();
 
     app.spawn(async move {
