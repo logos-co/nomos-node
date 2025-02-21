@@ -78,7 +78,6 @@ jobs:
     strategy:
       fail-fast: false # all OSes should be tested even if one fails (default: true)
       matrix:
-        feature: [ libp2p ]
         os: [ self-hosted, macos-latest ] # drop windows for now as risc0 does not support it
     runs-on: ${{ matrix.os }}
     steps:
@@ -102,18 +101,6 @@ jobs:
         run: cargo binstall -y cargo-risczero && cargo risczero install
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      # TODO: Investigate how to get rid of this seemingly necessary build step before running the tests
-      - name: Cargo build
-        uses: actions-rs/cargo@v1
-        with:
-          command: build
-          args: --all --all-targets --no-default-features --features ${{ matrix.feature }}
-      # We store the result of `cargo build` in the cache, that is then re-used in the next run, and can be picked up by the next `cargo test` step.
-      - name: Update Cargo cache
-        if: success() || failure()
-        uses: ./.github/actions/update-cargo-cache
-        with:
-          key: ${{ github.ref }}->${{ github.workflow }}->${{ github.job }}          
       - name: Cargo test
         uses: actions-rs/cargo@v1
         env:
@@ -121,15 +108,13 @@ jobs:
           CONSENSUS_SLOT_TIME: 5
         with:
           command: test
-          args: --all --no-default-features --features ${{ matrix.feature }}
-      - name: Cargo bench (no-run)
-        uses: actions-rs/cargo@v1
-        env:
-          RISC0_DEV_MODE: true
-          CONSENSUS_SLOT_TIME: 5
+          # We don't test benches as they take 6h+, leading to a timeout
+          args: --all --lib --bins --tests --examples --all-features
+      - name: Update Cargo cache
+        if: success() || failure()
+        uses: ./.github/actions/update-cargo-cache
         with:
-          command: bench
-          args: --no-run
+          key: ${{ github.ref }}->${{ github.workflow }}->${{ github.job }}
       - name: Upload integration tests results
         uses: actions/upload-artifact@v4
         if: failure()
