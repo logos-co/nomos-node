@@ -30,11 +30,11 @@ jobs:
         run: cargo binstall -y cargo-risczero && cargo risczero install
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - name: Cargo build
+      - name: Build required binaries
         uses: actions-rs/cargo@v1
         with:
           command: build
-          args: --all --all-features
+          args: --all-features -p nomos-node -p nomos-executor
       - name: Run tests
         uses: actions-rs/cargo@v1
         env:
