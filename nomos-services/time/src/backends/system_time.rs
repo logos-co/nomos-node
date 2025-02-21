@@ -48,7 +48,7 @@ mod test {
     #[tokio::test]
     async fn test_stream() {
         const SAMPLE_SIZE: u64 = 5;
-        let expected: Vec<_> = (0..SAMPLE_SIZE).map(|i| Slot::from(i)).collect();
+        let expected: Vec<_> = (0..SAMPLE_SIZE).map(Slot::from).collect();
         let settings = SystemTimeBackendSettings {
             slot_config: SlotConfig {
                 slot_duration: Duration::from_secs(1),

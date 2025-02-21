@@ -117,7 +117,6 @@ where
             .states
             .get(&parent_id)
             .ok_or(LedgerError::ParentNotFound(parent_id))?;
-        let config = self.config.clone();
 
         // TODO: remove this extra logic, we can simply check the proof is valid and the
         // root is a valid one just like we do anyway
@@ -143,7 +142,10 @@ where
 
         states.insert(id, new_state);
 
-        Ok(Self { states, config })
+        Ok(Self {
+            states,
+            config: self.config,
+        })
     }
 
     pub fn state(&self, id: &Id) -> Option<&LedgerState> {
