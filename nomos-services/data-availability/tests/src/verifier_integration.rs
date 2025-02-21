@@ -64,7 +64,7 @@ fn test_verifier() {
             active_slot_coeff: 0.9,
         },
     };
-    let time_config = TimeConfig {
+    let time_config = SlotConfig {
         slot_duration: Duration::from_secs(1),
         chain_start_time: OffsetDateTime::now_utc(),
     };
