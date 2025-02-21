@@ -81,7 +81,7 @@ pub fn create_consensus_configs(
                 notes: vec![note],
                 nf_sk,
             },
-            ledger_config: ledger_config.clone(),
+            ledger_config,
             genesis_state: genesis_state.clone(),
         })
         .collect()

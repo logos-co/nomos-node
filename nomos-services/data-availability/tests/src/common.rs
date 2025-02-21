@@ -303,7 +303,7 @@ pub fn new_node(
             cryptarchia: cryptarchia_consensus::CryptarchiaSettings {
                 transaction_selector_settings: (),
                 blob_selector_settings: (),
-                config: ledger_config.clone(),
+                config: *ledger_config,
                 genesis_state: genesis_state.clone(),
                 leader_config: leader_config.clone(),
                 network_adapter_settings:
@@ -343,7 +343,7 @@ pub fn new_node(
             time: TimeServiceSettings {
                 backend_settings: SystemTimeBackendSettings {
                     slot_config: *slot_config,
-                    epoch_config: ledger_config.epoch_config.clone(),
+                    epoch_config: ledger_config.epoch_config,
                     base_period_length: ledger_config.consensus_config.base_period_length(),
                 },
             },
