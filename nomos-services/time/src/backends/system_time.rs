@@ -55,9 +55,9 @@ mod test {
                 chain_start_time: OffsetDateTime::now_utc(),
             },
             epoch_config: EpochConfig {
-                epoch_stake_distribution_stabilization: 0,
-                epoch_period_nonce_buffer: 0,
-                epoch_period_nonce_stabilization: 0,
+                epoch_stake_distribution_stabilization: 3,
+                epoch_period_nonce_buffer: 3,
+                epoch_period_nonce_stabilization: 4,
             },
             base_period_length: 10,
         };
