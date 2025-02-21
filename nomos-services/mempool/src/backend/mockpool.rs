@@ -5,7 +5,7 @@ use std::time::SystemTime;
 use std::{collections::BTreeMap, time::UNIX_EPOCH};
 // crates
 // internal
-use crate::backend::{MemPool, MempoolError};
+use crate::backend::{MemPool, MempoolError, RecoverableMempool};
 
 use super::Status;
 
@@ -31,9 +31,25 @@ where
     }
 }
 
-impl<BlockId, Item, Key> MockPool<BlockId, Item, Key>
+impl<BlockId, Item, Key> Clone for MockPool<BlockId, Item, Key>
 where
     Key: Hash + Eq + Clone,
+    Item: Clone,
+    BlockId: Clone,
+{
+    fn clone(&self) -> Self {
+        Self {
+            pending_items: self.pending_items.clone(),
+            in_block_items: self.in_block_items.clone(),
+            in_block_items_by_id: self.in_block_items_by_id.clone(),
+            last_item_timestamp: self.last_item_timestamp,
+        }
+    }
+}
+
+impl<BlockId, Item, Key> MockPool<BlockId, Item, Key>
+where
+    Key: Hash + Eq,
 {
     #[must_use]
     pub fn new() -> Self {
@@ -43,9 +59,9 @@ where
 
 impl<BlockId, Item, Key> MemPool for MockPool<BlockId, Item, Key>
 where
-    Item: Clone + Send + Sync + 'static + Hash,
-    Key: Clone + Ord + Hash,
-    BlockId: Copy + Ord,
+    Key: Hash + Eq + Ord + Clone + Send,
+    Item: Clone + Send + 'static,
+    BlockId: Ord + Copy,
 {
     type Settings = ();
     type Item = Item;
@@ -129,5 +145,22 @@ where
                 }
             })
             .collect()
+    }
+}
+
+impl<BlockId, Item, Key> RecoverableMempool for MockPool<BlockId, Item, Key>
+where
+    Key: Hash + Eq + Ord + Clone + Send,
+    Item: Clone + Send + 'static,
+    BlockId: Ord + Copy,
+{
+    type RecoveryState = Self;
+
+    fn recover(_settings: Self::Settings, state: Self::RecoveryState) -> Self {
+        state
+    }
+
+    fn save(&self) -> Self::RecoveryState {
+        self.clone()
     }
 }

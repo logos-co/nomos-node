@@ -12,7 +12,7 @@ pub enum MempoolError {
 }
 
 pub trait MemPool {
-    type Settings: Clone;
+    type Settings;
     type Item;
     type Key;
     type BlockId;
