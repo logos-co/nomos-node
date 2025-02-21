@@ -1,6 +1,7 @@
 use std::ops::Add;
 use std::time::Duration;
 use time::OffsetDateTime;
+#[cfg(feature = "tokio")]
 use tokio::time::{Interval, MissedTickBehavior};
 
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -99,7 +100,7 @@ impl EpochConfig {
     }
 
     pub fn epoch(&self, slot: Slot, base_period_length: u64) -> Epoch {
-        ((u64::from(slot) / base_period_length) as u32).into()
+        ((u64::from(slot) / self.epoch_length(base_period_length)) as u32).into()
     }
 }
 
