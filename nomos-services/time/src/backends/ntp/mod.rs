@@ -16,14 +16,18 @@ use tokio_stream::wrappers::IntervalStream;
 
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct NtpSettings {
+    /// Ntp server address
     pub ntp_server: String,
-    pub timeout: Duration,
-    pub update_interval: Duration,
-    pub connect_timeout: Duration,
-    pub slot_config: SlotConfig,
-    pub epoch_config: EpochConfig,
-    pub base_period_length: u64,
+    /// Ntp server settings
     pub ntpclient_settings: NTPClientSettings,
+    /// Interval for the backend to contact the ntp server and update its time
+    pub update_interval: Duration,
+    /// Slot settings in order to compute proper slot times
+    pub slot_config: SlotConfig,
+    /// Epoch settings in order to compute proper epoch times
+    pub epoch_config: EpochConfig,
+    /// Base period length related to epochs, used to compute epochs as well
+    pub base_period_length: u64,
 }
 pub struct Ntp {
     settings: NtpSettings,
@@ -41,7 +45,9 @@ impl TimeBackend for Ntp {
     fn tick_stream(self) -> EpochSlotTickStream {
         let Self { settings, client } = self;
         let mut update_interval = interval(settings.update_interval);
+        // if we miss a tick just try next one
         update_interval.set_missed_tick_behavior(MissedTickBehavior::Skip);
+        // contact the ntp server for first time sync right now
         let ntp_server = settings.ntp_server.clone();
         let interval: NtpResultStream = Pin::new(Box::new(
             IntervalStream::new(update_interval)
@@ -50,6 +56,7 @@ impl TimeBackend for Ntp {
                     Box::pin(async move { client.request_timestamp(ntp_server).await.ok() })
                 }),
         ));
+        // compute the initial slot ticking stream
         let local_date = OffsetDateTime::now_utc();
         let slot_timer = slot_timer(
             settings.slot_config,
@@ -70,17 +77,24 @@ impl TimeBackend for Ntp {
 
 type NtpResultStream = Pin<Box<dyn Stream<Item = NtpResult> + Send + Sync + Unpin>>;
 
+/// Stream that updates itself every `interval` from an NTP server.
 pub struct NtpStream {
+    /// Update interval stream
     interval: NtpResultStream,
+    /// Slot settings in order to compute proper slot times
     slot_config: SlotConfig,
+    /// Epoch settings in order to compute proper epoch times
     epoch_config: EpochConfig,
+    /// Base period length related to epochs, used to compute epochs as well
     base_period_length: u64,
+    /// `SlotTick` interval stream. This stream is replaced when an internal clock update happens.
     slot_timer: EpochSlotTickStream,
 }
 impl Stream for NtpStream {
     type Item = SlotTick;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        // try update time
         if let Poll::Ready(Some(timestamp)) = self.interval.poll_next_unpin(cx) {
             let seconds = Duration::from_secs(timestamp.sec() as u64);
             let nanos_fraction =
@@ -102,6 +116,7 @@ impl Stream for NtpStream {
                 base_period_length,
             );
         }
+        // poll from internal last updated `SlotTick` stream
         self.slot_timer.poll_next_unpin(cx)
     }
 }
