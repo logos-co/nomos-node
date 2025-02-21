@@ -7,6 +7,24 @@ mod states;
 pub mod storage;
 mod time;
 
+// std
+use core::fmt::Debug;
+use futures::StreamExt;
+use std::collections::BTreeSet;
+use std::hash::Hash;
+use std::path::PathBuf;
+// Crates
+use rand::{RngCore, SeedableRng};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde_with::serde_as;
+use thiserror::Error;
+pub use time::Config as TimeConfig;
+use tokio::sync::oneshot::Sender;
+use tokio::sync::{broadcast, oneshot};
+use tokio_stream::wrappers::IntervalStream;
+use tracing::{error, info, instrument, span, Level};
+use tracing_futures::Instrument;
+// Internal
 use crate::leadership::Leader;
 use crate::relays::CryptarchiaConsensusRelays;
 use crate::states::{
@@ -15,9 +33,7 @@ use crate::states::{
 };
 use crate::storage::adapters::StorageAdapter;
 use crate::storage::StorageAdapter as _;
-use core::fmt::Debug;
 use cryptarchia_engine::Slot;
-use futures::StreamExt;
 pub use leadership::LeaderConfig;
 use network::NetworkAdapter;
 use nomos_core::da::blob::{
@@ -41,22 +57,9 @@ use nomos_storage::{backends::StorageBackend, StorageMsg, StorageService};
 use overwatch_rs::services::relay::{OutboundRelay, Relay, RelayMessage};
 use overwatch_rs::services::{ServiceCore, ServiceData, ServiceId};
 use overwatch_rs::{DynError, OpaqueServiceStateHandle};
-use rand::{RngCore, SeedableRng};
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use serde_with::serde_as;
 use services_utils::overwatch::lifecycle;
 use services_utils::overwatch::recovery::backends::FileBackendSettings;
 use services_utils::overwatch::{JsonFileBackend, RecoveryOperator};
-use std::collections::BTreeSet;
-use std::hash::Hash;
-use std::path::PathBuf;
-use thiserror::Error;
-pub use time::Config as TimeConfig;
-use tokio::sync::oneshot::Sender;
-use tokio::sync::{broadcast, oneshot};
-use tokio_stream::wrappers::IntervalStream;
-use tracing::{error, info, instrument, span, Level};
-use tracing_futures::Instrument;
 
 type MempoolRelay<Payload, Item, Key> = OutboundRelay<MempoolMsg<HeaderId, Payload, Item, Key>>;
 type SamplingRelay<BlobId> = OutboundRelay<DaSamplingServiceMsg<BlobId>>;
@@ -853,13 +856,30 @@ where
     }
 
     /// Retrieves the blocks in the range from `from` to `to` from the storage.
-    /// Both `from` and `to` are included in the range and must be valid headers.
+    /// Both `from` and `to` are included in the range.
+    /// This is implemented here, and not as a method of `StorageAdapter`, to simplify the panic
+    /// and error message handling.
+    ///
+    /// # Panics
+    ///
+    /// Panics if any of the blocks in the range are not found in the storage.
+    ///
+    /// # Parameters
+    ///
+    /// * `from` - The header id of the first block in the range. Must be a valid header.
+    /// * `to` - The header id of the last block in the range. Must be a valid header.
+    ///
+    /// # Returns
+    ///
+    /// A vector of blocks in the range from `from` to `to`.
+    /// If no blocks are found, returns an empty vector.
+    /// If any of the HeaderId are invalid, returns an error with the first invalid header id.
     async fn get_blocks_in_range(
         from: HeaderId,
         to: HeaderId,
         storage_adapter: &StorageAdapter<Storage, TxS::Tx, BS::BlobId>,
     ) -> Vec<Block<ClPool::Item, DaPool::Item>> {
-        // `blocks` is in `to..from` order
+        // Due to the blocks traversal order, this yields `to..from` order
         let blocks = futures::stream::unfold(to, |header_id| async move {
             if header_id == from {
                 None
@@ -875,7 +895,7 @@ where
             }
         });
 
-        // To avoid confusion, the order is reversed so it fits in the natural `from..to` order
+        // To avoid confusion, the order is reversed so it fits the natural `from..to` order
         blocks.collect::<Vec<_>>().await.into_iter().rev().collect()
     }
 
