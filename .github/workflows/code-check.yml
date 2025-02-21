@@ -101,6 +101,11 @@ jobs:
           # We use the same cache key for both OSes
           key: ${{ github.ref }}->${{ github.workflow }}->${{ github.job }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build required binaries
+        uses: actions-rs/cargo@v1
+        with:
+          command: build
+          args: --all-features -p nomos-node -p nomos-executor
       - name: Cargo test
         uses: actions-rs/cargo@v1
         env:
