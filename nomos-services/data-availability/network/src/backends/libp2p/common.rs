@@ -10,7 +10,7 @@ use nomos_da_network_core::protocols::sampling::behaviour::{
     BehaviourSampleReq, BehaviourSampleRes, SamplingError,
 };
 use nomos_da_network_core::swarm::validator::ValidatorEventsStream;
-use nomos_da_network_core::swarm::DAConnectionMonitorSettings;
+use nomos_da_network_core::swarm::{DAConnectionMonitorSettings, DAConnectionPolicySettings};
 use nomos_da_network_core::SubnetworkId;
 use nomos_libp2p::secret_key_serde;
 use nomos_libp2p::{ed25519, Multiaddr, PeerId};
@@ -34,6 +34,7 @@ pub struct DaNetworkBackendSettings<Membership> {
     pub membership: Membership,
     pub addresses: HashMap<PeerId, Multiaddr>,
     pub listening_address: Multiaddr,
+    pub policy_settings: DAConnectionPolicySettings,
     pub monitor_settings: DAConnectionMonitorSettings,
     pub redial_cooldown: Duration,
 }

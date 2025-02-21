@@ -117,6 +117,7 @@ where
                 .clone()
                 .into_iter()
                 .collect(),
+            config.validator_settings.policy_settings.clone(),
             config.validator_settings.monitor_settings.clone(),
             config.validator_settings.redial_cooldown,
         );

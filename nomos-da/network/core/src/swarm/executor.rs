@@ -22,21 +22,19 @@ use crate::protocols::{
     replication::behaviour::ReplicationEvent,
     sampling::behaviour::SamplingEvent,
 };
+use crate::swarm::common::monitor::MonitorEvent;
+use crate::swarm::common::policy::DAConnectionPolicy;
+use crate::swarm::DAConnectionMonitorSettings;
+use crate::swarm::DAConnectionPolicySettings;
 use crate::swarm::{
-    common::{
-        handlers::{
-            handle_replication_event, handle_sampling_event, handle_validator_dispersal_event,
-            monitor_event,
-        },
-        monitor::DAConnectionMonitor,
+    common::handlers::{
+        handle_replication_event, handle_sampling_event, handle_validator_dispersal_event,
+        monitor_event,
     },
     validator::ValidatorEventsStream,
 };
-use crate::SubnetworkId;
+use crate::{swarm::ConnectionMonitor, SubnetworkId};
 use subnetworks_assignations::MembershipHandler;
-
-use super::common::monitor::MonitorEvent;
-use super::DAConnectionMonitorSettings;
 
 // Metrics
 const EVENT_SAMPLING: &str = "sampling";
@@ -52,7 +50,7 @@ pub struct ExecutorEventsStream {
 pub struct ExecutorSwarm<
     Membership: MembershipHandler<NetworkId = SubnetworkId, Id = PeerId> + 'static,
 > {
-    swarm: Swarm<ExecutorBehaviour<DAConnectionMonitor, Membership>>,
+    swarm: Swarm<ExecutorBehaviour<ConnectionMonitor, Membership>>,
     sampling_events_sender: UnboundedSender<SamplingEvent>,
     validation_events_sender: UnboundedSender<DaBlob>,
     dispersal_events_sender: UnboundedSender<DispersalExecutorEvent>,
@@ -66,6 +64,7 @@ where
         key: Keypair,
         membership: Membership,
         addresses: AddressBook,
+        policy_settings: DAConnectionPolicySettings,
         monitor_settings: DAConnectionMonitorSettings,
         redial_cooldown: Duration,
     ) -> (Self, ExecutorEventsStream) {
@@ -75,7 +74,8 @@ where
         let sampling_events_receiver = UnboundedReceiverStream::new(sampling_events_receiver);
         let validation_events_receiver = UnboundedReceiverStream::new(validation_events_receiver);
         let dispersal_events_receiver = UnboundedReceiverStream::new(dispersal_events_receiver);
-        let monitor = DAConnectionMonitor::new(monitor_settings);
+        let policy = DAConnectionPolicy::new(policy_settings);
+        let monitor = ConnectionMonitor::new(monitor_settings, policy);
 
         (
             Self {
@@ -97,9 +97,9 @@ where
         key: Keypair,
         membership: Membership,
         addresses: AddressBook,
-        monitor: DAConnectionMonitor,
+        monitor: ConnectionMonitor,
         redial_cooldown: Duration,
-    ) -> Swarm<ExecutorBehaviour<DAConnectionMonitor, Membership>> {
+    ) -> Swarm<ExecutorBehaviour<ConnectionMonitor, Membership>> {
         SwarmBuilder::with_existing_identity(key)
             .with_tokio()
             .with_quic()
@@ -150,13 +150,13 @@ where
         self.swarm.local_peer_id()
     }
 
-    pub fn protocol_swarm(&self) -> &Swarm<ExecutorBehaviour<DAConnectionMonitor, Membership>> {
+    pub fn protocol_swarm(&self) -> &Swarm<ExecutorBehaviour<ConnectionMonitor, Membership>> {
         &self.swarm
     }
 
     pub fn protocol_swarm_mut(
         &mut self,
-    ) -> &mut Swarm<ExecutorBehaviour<DAConnectionMonitor, Membership>> {
+    ) -> &mut Swarm<ExecutorBehaviour<ConnectionMonitor, Membership>> {
         &mut self.swarm
     }
 
@@ -201,7 +201,7 @@ where
 
     async fn handle_behaviour_event(
         &mut self,
-        event: ExecutorBehaviourEvent<DAConnectionMonitor, Membership>,
+        event: ExecutorBehaviourEvent<ConnectionMonitor, Membership>,
     ) {
         match event {
             ExecutorBehaviourEvent::Sampling(event) => {

@@ -85,6 +85,7 @@ where
             keypair,
             config.membership.clone(),
             config.addresses.clone().into_iter().collect(),
+            config.policy_settings,
             config.monitor_settings,
             config.redial_cooldown,
         );
