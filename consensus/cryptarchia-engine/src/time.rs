@@ -21,7 +21,7 @@ impl Slot {
         Self(0)
     }
 
-    pub fn current_from_offset_and_config(
+    pub fn from_offset_and_config(
         offset_date_time: OffsetDateTime,
         slot_config: SlotConfig,
     ) -> Self {
@@ -125,7 +125,7 @@ impl SlotTimer {
     }
 
     pub fn current_slot(&self, now: OffsetDateTime) -> Slot {
-        Slot::current_from_offset_and_config(now, self.config)
+        Slot::from_offset_and_config(now, self.config)
     }
 
     /// Ticks at the start of each slot, starting from the next slot

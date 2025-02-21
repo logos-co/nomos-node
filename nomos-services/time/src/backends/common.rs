@@ -8,13 +8,13 @@ use tokio_stream::wrappers::IntervalStream;
 
 pub(crate) fn slot_timer(
     slot_config: SlotConfig,
-    date: OffsetDateTime,
+    datetime: OffsetDateTime,
     current_slot: Slot,
     epoch_config: EpochConfig,
     base_period_length: u64,
 ) -> EpochSlotTickStream {
     Pin::new(Box::new(
-        IntervalStream::new(SlotTimer::new(slot_config).slot_interval(date))
+        IntervalStream::new(SlotTimer::new(slot_config).slot_interval(datetime))
             .zip(futures::stream::iter(std::iter::successors(
                 Some(current_slot),
                 |&slot| Some(slot + 1),

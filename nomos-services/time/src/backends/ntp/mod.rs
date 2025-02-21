@@ -61,7 +61,7 @@ impl TimeBackend for Ntp {
         let slot_timer = slot_timer(
             settings.slot_config,
             local_date,
-            Slot::current_from_offset_and_config(local_date, settings.slot_config),
+            Slot::from_offset_and_config(local_date, settings.slot_config),
             settings.epoch_config,
             settings.base_period_length,
         );
@@ -105,7 +105,7 @@ impl Stream for NtpStream {
                 (seconds + nanos_fraction + roundtrip).as_nanos() as i128,
             )
             .expect("Datetime synchronization failed");
-            let current_slot = Slot::current_from_offset_and_config(date, self.slot_config);
+            let current_slot = Slot::from_offset_and_config(date, self.slot_config);
             let epoch_config = self.epoch_config;
             let base_period_length = self.base_period_length;
             self.slot_timer = slot_timer(

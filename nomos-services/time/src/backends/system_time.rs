@@ -29,7 +29,7 @@ impl TimeBackend for SystemTimeBackend {
         slot_timer(
             settings.slot_config,
             local_date,
-            Slot::current_from_offset_and_config(local_date, settings.slot_config),
+            Slot::from_offset_and_config(local_date, settings.slot_config),
             settings.epoch_config,
             settings.base_period_length,
         )
