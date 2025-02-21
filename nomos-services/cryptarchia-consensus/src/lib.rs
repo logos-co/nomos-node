@@ -976,14 +976,30 @@ where
     }
 
     /// Retrieves the blocks in the range from `from` to `to` from the storage.
-    /// Both `from` and `to` are included in the range and must be valid
-    /// headers.
+    /// Both `from` and `to` are included in the range.
+    /// This is implemented here, and not as a method of `StorageAdapter`, to simplify the panic
+    /// and error message handling.
+    ///
+    /// # Panics
+    ///
+    /// Panics if any of the blocks in the range are not found in the storage.
+    ///
+    /// # Parameters
+    ///
+    /// * `from` - The header id of the first block in the range. Must be a valid header.
+    /// * `to` - The header id of the last block in the range. Must be a valid header.
+    ///
+    /// # Returns
+    ///
+    /// A vector of blocks in the range from `from` to `to`.
+    /// If no blocks are found, returns an empty vector.
+    /// If any of the HeaderId are invalid, returns an error with the first invalid header id.
     async fn get_blocks_in_range(
         from: HeaderId,
         to: HeaderId,
         storage_adapter: &StorageAdapter<Storage, TxS::Tx, BS::BlobId>,
     ) -> Vec<Block<ClPool::Item, DaPool::Item>> {
-        // `blocks` is in `to..from` order
+        // Due to the blocks traversal order, this yields `to..from` order
         let blocks = futures::stream::unfold(to, |header_id| async move {
             if header_id == from {
                 None
@@ -999,8 +1015,7 @@ where
             }
         });
 
-        // To avoid confusion, the order is reversed so it fits in the natural
-        // `from..to` order
+        // To avoid confusion, the order is reversed so it fits the natural `from..to` order
         blocks.collect::<Vec<_>>().await.into_iter().rev().collect()
     }
 
