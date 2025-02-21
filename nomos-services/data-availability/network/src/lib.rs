@@ -8,11 +8,11 @@ use async_trait::async_trait;
 use backends::NetworkBackend;
 use futures::{Stream, StreamExt};
 use overwatch_rs::services::{
-    handle::ServiceStateHandle,
     relay::RelayMessage,
     state::{NoOperator, ServiceState},
     ServiceCore, ServiceData, ServiceId,
 };
+use overwatch_rs::OpaqueServiceStateHandle;
 use serde::{Deserialize, Serialize};
 use tokio::sync::oneshot;
 
@@ -55,7 +55,7 @@ impl<B: NetworkBackend> Debug for NetworkConfig<B> {
 
 pub struct NetworkService<B: NetworkBackend + Send + 'static> {
     backend: B,
-    service_state: ServiceStateHandle<Self>,
+    service_state: OpaqueServiceStateHandle<Self>,
 }
 
 pub struct NetworkState<B: NetworkBackend> {
@@ -66,7 +66,7 @@ impl<B: NetworkBackend + 'static + Send> ServiceData for NetworkService<B> {
     const SERVICE_ID: ServiceId = DA_NETWORK_TAG;
     type Settings = NetworkConfig<B>;
     type State = NetworkState<B>;
-    type StateOperator = NoOperator<Self::State>;
+    type StateOperator = NoOperator<Self::State, Self::Settings>;
     type Message = DaNetworkMsg<B>;
 }
 
@@ -77,7 +77,7 @@ where
     B::State: Send + Sync,
 {
     fn init(
-        service_state: ServiceStateHandle<Self>,
+        service_state: OpaqueServiceStateHandle<Self>,
         _init_state: Self::State,
     ) -> Result<Self, overwatch_rs::DynError> {
         Ok(Self {
@@ -92,7 +92,7 @@ where
     async fn run(mut self) -> Result<(), overwatch_rs::DynError> {
         let Self {
             service_state:
-                ServiceStateHandle {
+                OpaqueServiceStateHandle::<Self> {
                     mut inbound_relay,
                     lifecycle_handle,
                     ..

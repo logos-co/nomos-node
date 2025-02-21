@@ -18,11 +18,10 @@ mod tests {
     use async_trait::async_trait;
     use overwatch_derive::Services;
     use overwatch_rs::overwatch::OverwatchRunner;
-    use overwatch_rs::services::handle::{ServiceHandle, ServiceStateHandle};
     use overwatch_rs::services::relay::RelayMessage;
     use overwatch_rs::services::state::ServiceState;
     use overwatch_rs::services::{ServiceCore, ServiceData, ServiceId};
-    use overwatch_rs::DynError;
+    use overwatch_rs::{DynError, OpaqueServiceHandle, OpaqueServiceStateHandle};
     use serde::{Deserialize, Serialize};
     use std::env::temp_dir;
     use std::path::PathBuf;
@@ -58,7 +57,7 @@ mod tests {
     }
 
     struct Recovery {
-        service_state_handle: ServiceStateHandle<Self>,
+        service_state_handle: OpaqueServiceStateHandle<Self>,
     }
 
     impl ServiceData for Recovery {
@@ -72,7 +71,7 @@ mod tests {
     #[async_trait]
     impl ServiceCore for Recovery {
         fn init(
-            service_state: ServiceStateHandle<Self>,
+            service_state: OpaqueServiceStateHandle<Self>,
             initial_state: Self::State,
         ) -> Result<Self, DynError> {
             assert_eq!(initial_state.value, "");
@@ -97,7 +96,7 @@ mod tests {
 
     #[derive(Services)]
     pub struct RecoveryTest {
-        recovery: ServiceHandle<Recovery>,
+        recovery: OpaqueServiceHandle<Recovery>,
     }
 
     #[test]

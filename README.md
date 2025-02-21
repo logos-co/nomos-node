@@ -33,11 +33,11 @@ For example:
 ...
 #[derive(Services)]
 struct MockPoolNode {
-    logging: ServiceHandle<Logger>,
-    network: ServiceHandle<NetworkService<Waku>>,
-    mockpool: ServiceHandle<MempoolService<WakuAdapter<Tx>, MockPool<TxId, Tx>>>,
-    http: ServiceHandle<HttpService<AxumBackend>>,
-    bridges: ServiceHandle<HttpBridgeService>,
+    logging: OpaqueServiceHandle<Logger>,
+    network: OpaqueServiceHandle<NetworkService<Waku>>,
+    mockpool: OpaqueServiceHandle<MempoolService<WakuAdapter<Tx>, MockPool<TxId, Tx>>>,
+    http: OpaqueServiceHandle<HttpService<AxumBackend>>,
+    bridges: OpaqueServiceHandle<HttpBridgeService>,
 }
 ```
 

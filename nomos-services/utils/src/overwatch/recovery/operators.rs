@@ -41,6 +41,7 @@ where
     Backend::State: Serialize + DeserializeOwned + Send,
 {
     type StateInput = Backend::State;
+    type Settings = Backend::Settings;
     type LoadError = RecoveryError;
 
     fn try_load(
