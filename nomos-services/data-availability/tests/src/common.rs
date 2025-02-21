@@ -357,7 +357,7 @@ pub fn new_node(
             time: TimeServiceSettings {
                 backend_settings: SystemTimeBackendSettings {
                     slot_config: *slot_config,
-                    epoch_config: ledger_config.epoch_config.clone(),
+                    epoch_config: ledger_config.epoch_config,
                     base_period_length: ledger_config.consensus_config.base_period_length(),
                 },
             },
