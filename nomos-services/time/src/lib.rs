@@ -9,8 +9,8 @@ use overwatch_rs::{DynError, OpaqueServiceStateHandle};
 use services_utils::overwatch::lifecycle::should_stop_service;
 use std::fmt::{Debug, Formatter};
 use std::pin::Pin;
-use tokio::sync::{oneshot, watch};
-use tokio_stream::wrappers::WatchStream;
+use tokio::sync::{broadcast, oneshot};
+use tokio_stream::wrappers::BroadcastStream;
 
 pub mod backends;
 
@@ -93,26 +93,31 @@ where
         let mut lifecycle_relay = state.lifecycle_handle.message_stream();
         let mut tick_stream = backend.tick_stream();
 
-        let (watch_sender, watch_receiver) = watch::channel(
-            tick_stream
-                .next()
-                .await
-                .expect("A slot tick should be available"),
-        );
+        // 3 slots buffer should be enough
+        const SLOTS_BUFFER: usize = 3;
+        let (broadcast_sender, broadcast_receiver) = broadcast::channel(SLOTS_BUFFER);
 
         loop {
             tokio::select! {
                 Some(service_message) = inbound_relay.recv() => {
                     match service_message {
                         TimeServiceMessage::Subscribe { sender} => {
-                            if let Err(_e) = sender.send(Pin::new(Box::new(WatchStream::from_changes(watch_receiver.clone())))) {
+                            let channel_stream = BroadcastStream::new(broadcast_receiver.resubscribe()).filter_map(|r| Box::pin(async {match r {
+                                Ok(tick) => Some(tick),
+                                Err(e) => {
+                                    error!("Lagging behind slot ticks: {e:?}");
+                                    None
+                                }
+                            }}));
+                            let stream = Pin::new(Box::new(channel_stream));
+                            if let Err(_e) = sender.send(stream) {
                                 error!("Error subscribing to time event: Couldn't send back a response");
                             };
                         }
                     }
                 }
                 Some(slot_tick) = tick_stream.next() => {
-                    if let Err(e) = watch_sender.send(slot_tick) {
+                    if let Err(e) = broadcast_sender.send(slot_tick) {
                         error!("Error updating slot tick: {e}");
                     }
 
