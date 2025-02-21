@@ -17,6 +17,7 @@ nomos-core            = { workspace = true }
 nomos-da-network-core = { workspace = true }
 nomos-da-sampling     = { workspace = true }
 nomos-network         = { workspace = true }
+nomos-utils           = { workspace = true }
 overwatch-rs          = { workspace = true }
 rand                  = { version = "0.8" }
 serde                 = { version = "1.0", features = ["derive"] }
@@ -30,6 +31,7 @@ utoipa                = { version = "4.0", optional = true }
 
 [dev-dependencies]
 blake2                = "0.10"
+nomos-mempool         = { path = ".", features = ["mock"] }
 nomos-tracing-service = { workspace = true }
 overwatch-derive      = { workspace = true }
 tokio                 = { version = "1", features = ["full"] }
@@ -38,7 +40,7 @@ tokio                 = { version = "1", features = ["full"] }
 default         = []
 instrumentation = []
 libp2p          = ["nomos-network/libp2p"]
-mock            = ["linked-hash-map", "nomos-core/mock", "nomos-network/mock"]
+mock            = ["linked-hash-map/serde_impl", "nomos-core/mock", "nomos-network/mock"]
 
 # enable to help generate OpenAPI
 openapi = ["dep:utoipa", "serde_json"]

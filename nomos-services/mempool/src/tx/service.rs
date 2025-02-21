@@ -90,7 +90,7 @@ where
             ..
         } = self;
 
-        let mut network_relay: OutboundRelay<_> = network_relay
+        let network_relay: OutboundRelay<_> = network_relay
             .connect()
             .await
             .expect("Relay connection with NetworkService should succeed");
@@ -107,11 +107,11 @@ where
         loop {
             tokio::select! {
                 Some(msg) = service_state.inbound_relay.recv() => {
-                    Self::handle_mempool_message(msg, &mut pool, &mut network_relay, &mut service_state).await;
+                    Self::handle_mempool_message(msg, &mut pool, &network_relay, &service_state);
                 }
                 Some((key, item )) = network_items.next() => {
                     pool.add_item(key, item).unwrap_or_else(|e| {
-                        tracing::debug!("could not add item to the pool due to: {}", e)
+                        tracing::debug!("could not add item to the pool due to: {e}");
                     });
                     tracing::info!(counter.tx_mempool_pending_items = pool.pending_item_count());
                 }
@@ -136,11 +136,11 @@ where
     P::BlockId: Debug + Send + 'static,
     N: NetworkAdapter<Payload = P::Item, Key = P::Key> + Send + Sync + 'static,
 {
-    async fn handle_mempool_message(
+    fn handle_mempool_message(
         message: MempoolMsg<P::BlockId, P::Item, P::Item, P::Key>,
         pool: &mut P,
-        network_relay: &mut OutboundRelay<NetworkMsg<N::Backend>>,
-        service_state: &mut OpaqueServiceStateHandle<Self>,
+        network_relay: &OutboundRelay<NetworkMsg<N::Backend>>,
+        service_state: &OpaqueServiceStateHandle<Self>,
     ) {
         match message {
             MempoolMsg::Add {

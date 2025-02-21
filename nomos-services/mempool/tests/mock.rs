@@ -70,7 +70,7 @@ fn test_mockmempool() {
         },
         None,
     )
-    .map_err(|e| eprintln!("Error encountered: {}", e))
+    .map_err(|e| eprintln!("Error encountered: {e}"))
     .unwrap();
 
     let network = app.handle().relay::<NetworkService<Mock>>();

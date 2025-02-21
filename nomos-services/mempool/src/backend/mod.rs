@@ -56,6 +56,13 @@ pub trait MemPool {
     fn status(&self, items: &[Self::Key]) -> Vec<Status<Self::BlockId>>;
 }
 
+pub trait RecoverableMempool: MemPool {
+    type RecoveryState;
+
+    fn recover(settings: Self::Settings, state: Self::RecoveryState) -> Self;
+    fn save(&self) -> Self::RecoveryState;
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub enum Status<BlockId> {

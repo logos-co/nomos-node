@@ -35,8 +35,9 @@ impl<BlockId, Item, Key> MockPool<BlockId, Item, Key>
 where
     Key: Hash + Eq + Clone,
 {
+    #[must_use]
     pub fn new() -> Self {
-        Default::default()
+        Self::default()
     }
 }
 
@@ -67,7 +68,9 @@ where
         self.last_item_timestamp = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap()
-            .as_millis() as u64;
+            .as_millis()
+            .try_into()
+            .unwrap();
 
         Ok(())
     }
