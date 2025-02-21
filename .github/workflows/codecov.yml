@@ -14,25 +14,23 @@ jobs:
       LLVM_PROFILE_FILE: "nomos-node-%p-%m.profraw"
     runs-on: self-hosted
     steps:
-      - uses: actions/checkout@v4
-        with:
-          submodules: true
-      - uses: arduino/setup-protoc@v3
-        with:
-          repo-token: ${{ secrets.GITHUB_TOKEN }}
-      - run: rustup component add llvm-tools-preview
-      - uses: cargo-bins/cargo-binstall@main
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Add llvm-tools-preview component
+        run: rustup component add llvm-tools-preview
+      - name: Install cargo-binstall
+        uses: cargo-bins/cargo-binstall@main
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Install risc0
         run: cargo binstall -y cargo-risczero && cargo risczero install
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - name: Cargo build
+      - name: Build required binaries
         uses: actions-rs/cargo@v1
         with:
           command: build
-          args: --all --no-default-features --features libp2p
+          args: --all-features -p nomos-node -p nomos-executor
       - name: Run tests
         uses: actions-rs/cargo@v1
         env:
@@ -40,19 +38,21 @@ jobs:
           CONSENSUS_SLOT_TIME: 5
         with:
           command: test
-          args: --all --no-default-features --features libp2p
+          args: --all --all-features
       - name: Run Grcov
         run: |
           rm -rf /tmp/coverage 
           cargo binstall -y grcov;
           mkdir /tmp/coverage;
           grcov . --binary-path ./target/debug -s . -t lcov --branch --ignore-not-existing --ignore '../*' --ignore "/*" -o /tmp/coverage/tests.lcov;
-      - uses: actions/upload-artifact@v4
+      - name: Upload integration tests results
+        uses: actions/upload-artifact@v4
         if: failure()
         with:
           name: integration-test-artifacts
           path: tests/.tmp*
-      - uses: codecov/codecov-action@v3
+      - name: Run codecov analysis
+        uses: codecov/codecov-action@v3
         with:
           directory: /tmp/coverage/
           name: nomos-node-codecov
