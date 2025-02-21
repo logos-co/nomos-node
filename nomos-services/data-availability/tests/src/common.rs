@@ -15,6 +15,7 @@ use nomos_da_network_service::backends::libp2p::common::DaNetworkBackendSettings
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 // crates
+use cryptarchia_engine::SlotConfig;
 use kzgrs_backend::common::blob::DaBlob;
 use kzgrs_backend::dispersal::BlobInfo;
 use kzgrs_backend::encoder::DaEncoder;
@@ -81,11 +82,10 @@ use nomos_network::{
     NetworkConfig, NetworkService,
 };
 use nomos_node::{Tx, Wire};
-use nomos_storage::{backends::rocksdb::RocksBackend, StorageService};
-use nomos_time::{
-    backends::system_time::{SystemTimeBackend, SystemTimeBackendSettings},
-    TimeService, TimeServiceSettings,
-};
+use nomos_storage::backends::rocksdb::RocksBackend;
+use nomos_storage::StorageService;
+use nomos_time::backends::system_time::{SystemTimeBackend, SystemTimeBackendSettings};
+use nomos_time::{TimeService, TimeServiceSettings};
 use once_cell::sync::Lazy;
 use overwatch_derive::*;
 use overwatch_rs::{
@@ -132,7 +132,7 @@ pub(crate) type Cryptarchia = cryptarchia_consensus::CryptarchiaConsensus<
     SamplingLibp2pAdapter<NomosDaMembership>,
     IntegrationRng,
     SamplingStorageAdapter<DaBlob, Wire>,
-    nomos_time::backends::system_time::SystemTimeBackend,
+    SystemTimeBackend,
 >;
 
 pub type DaSampling = DaSamplingService<
@@ -165,7 +165,7 @@ pub(crate) type DaIndexer = DataIndexerService<
     SamplingLibp2pAdapter<NomosDaMembership>,
     IntegrationRng,
     SamplingStorageAdapter<DaBlob, Wire>,
-    nomos_time::backends::system_time::SystemTimeBackend,
+    SystemTimeBackend,
 >;
 
 pub(crate) type TxMempool = TxMempoolService<
@@ -233,6 +233,7 @@ pub fn new_node(
     leader_config: &LeaderConfig,
     ledger_config: &nomos_ledger::Config,
     genesis_state: &LedgerState,
+    slot_config: &SlotConfig,
     swarm_config: &SwarmConfig,
     blend_config: &TestBlendSettings,
     db_path: PathBuf,
@@ -356,7 +357,7 @@ pub fn new_node(
             time: TimeServiceSettings {
                 backend_settings: SystemTimeBackendSettings {
                     slot_config: *slot_config,
-                    epoch_config: ledger_config.epoch_config,
+                    epoch_config: ledger_config.epoch_config.clone(),
                     base_period_length: ledger_config.consensus_config.base_period_length(),
                 },
             },
