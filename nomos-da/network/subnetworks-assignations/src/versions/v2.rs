@@ -96,6 +96,10 @@ impl MembershipHandler for FillWithOriginalReplication {
     fn members(&self) -> HashSet<Self::Id> {
         self.assignations.iter().flatten().copied().collect()
     }
+
+    fn last_subnetwork_id(&self) -> Self::NetworkId {
+        self.subnetwork_size as u16
+    }
 }
 
 #[cfg(test)]

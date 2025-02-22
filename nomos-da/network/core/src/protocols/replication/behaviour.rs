@@ -312,6 +312,10 @@ mod tests {
         fn members(&self) -> HashSet<Self::Id> {
             unimplemented!()
         }
+
+        fn last_subnetwork_id(&self) -> Self::NetworkId {
+            unimplemented!()
+        }
     }
 
     struct TestWaker;

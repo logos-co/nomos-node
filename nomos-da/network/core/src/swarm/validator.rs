@@ -44,7 +44,7 @@ pub struct ValidatorEventsStream {
 pub struct ValidatorSwarm<
     Membership: MembershipHandler<NetworkId = SubnetworkId, Id = PeerId> + 'static,
 > {
-    swarm: Swarm<ValidatorBehaviour<ConnectionMonitor, Membership>>,
+    swarm: Swarm<ValidatorBehaviour<ConnectionMonitor<Membership>, Membership>>,
     sampling_events_sender: UnboundedSender<SamplingEvent>,
     validation_events_sender: UnboundedSender<DaBlob>,
 }
@@ -67,7 +67,11 @@ where
         let sampling_events_receiver = UnboundedReceiverStream::new(sampling_events_receiver);
         let validation_events_receiver = UnboundedReceiverStream::new(validation_events_receiver);
 
-        let policy = DAConnectionPolicy::new(policy_settings);
+        let policy = DAConnectionPolicy::new(
+            policy_settings,
+            membership.clone(),
+            PeerId::from_public_key(&key.public()),
+        );
         let monitor = ConnectionMonitor::new(monitor_settings, policy);
 
         (
@@ -86,9 +90,9 @@ where
         key: Keypair,
         membership: Membership,
         addresses: AddressBook,
-        monitor: ConnectionMonitor,
+        monitor: ConnectionMonitor<Membership>,
         redial_cooldown: Duration,
-    ) -> Swarm<ValidatorBehaviour<ConnectionMonitor, Membership>> {
+    ) -> Swarm<ValidatorBehaviour<ConnectionMonitor<Membership>, Membership>> {
         SwarmBuilder::with_existing_identity(key)
             .with_tokio()
             .with_quic()
@@ -125,13 +129,15 @@ where
         self.swarm.local_peer_id()
     }
 
-    pub fn protocol_swarm(&self) -> &Swarm<ValidatorBehaviour<ConnectionMonitor, Membership>> {
+    pub fn protocol_swarm(
+        &self,
+    ) -> &Swarm<ValidatorBehaviour<ConnectionMonitor<Membership>, Membership>> {
         &self.swarm
     }
 
     pub fn protocol_swarm_mut(
         &mut self,
-    ) -> &mut Swarm<ValidatorBehaviour<ConnectionMonitor, Membership>> {
+    ) -> &mut Swarm<ValidatorBehaviour<ConnectionMonitor<Membership>, Membership>> {
         &mut self.swarm
     }
 
@@ -166,7 +172,7 @@ where
 
     async fn handle_behaviour_event(
         &mut self,
-        event: ValidatorBehaviourEvent<ConnectionMonitor, Membership>,
+        event: ValidatorBehaviourEvent<ConnectionMonitor<Membership>, Membership>,
     ) {
         match event {
             ValidatorBehaviourEvent::Sampling(event) => {

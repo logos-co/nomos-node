@@ -308,11 +308,12 @@ fn compute_failure_rate(
 mod tests {
     use libp2p::PeerId;
     use std::time::Duration;
+    use subnetworks_assignations::versions::v1::FillFromNodeList;
 
     use super::*;
     use crate::swarm::{common::policy::DAConnectionPolicy, DAConnectionPolicySettings};
 
-    fn setup_monitor() -> DAConnectionMonitor<DAConnectionPolicy> {
+    fn setup_monitor(peer_id: PeerId) -> DAConnectionMonitor<DAConnectionPolicy<FillFromNodeList>> {
         let monitor_settings = DAConnectionMonitorSettings {
             failure_time_window: Duration::from_secs(10),
             time_decay_factor: U57F7::lit("0.8"),
@@ -322,14 +323,23 @@ mod tests {
             max_sampling_failures: 2,
             max_replication_failures: 2,
             malicious_threshold: 3,
+            min_dispersal_peers: 0,
+            min_replication_peers: 0,
         };
-        DAConnectionMonitor::new(monitor_settings, DAConnectionPolicy::new(policy_settings))
+        DAConnectionMonitor::new(
+            monitor_settings,
+            DAConnectionPolicy::new(
+                policy_settings,
+                FillFromNodeList::new(&[PeerId::random()], 0, 0),
+                peer_id,
+            ),
+        )
     }
 
     #[test]
     fn test_peer_starts_healthy() {
-        let monitor = setup_monitor();
         let peer_id = PeerId::random();
+        let monitor = setup_monitor(peer_id);
 
         assert_eq!(
             monitor.evaluate_peer(Instant::now(), &peer_id),
@@ -339,8 +349,8 @@ mod tests {
 
     #[test]
     fn test_peer_becomes_unhealthy() {
-        let mut monitor = setup_monitor();
         let peer_id = PeerId::random();
+        let mut monitor = setup_monitor(peer_id);
 
         for _ in 0..4 {
             monitor.record_event(MonitorEvent::Sampling(SamplingError::Io {
@@ -357,8 +367,8 @@ mod tests {
 
     #[test]
     fn test_peer_becomes_malicious() {
-        let mut monitor = setup_monitor();
         let peer_id = PeerId::random();
+        let mut monitor = setup_monitor(peer_id);
 
         for _ in 0..100 {
             monitor.record_event(MonitorEvent::Sampling(SamplingError::Io {
@@ -375,8 +385,8 @@ mod tests {
 
     #[test]
     fn test_failure_decay_over_time() {
-        let mut monitor = setup_monitor();
         let peer_id = PeerId::random();
+        let mut monitor = setup_monitor(peer_id);
 
         for _ in 0..4 {
             monitor.record_event(MonitorEvent::Sampling(SamplingError::Io {
@@ -398,8 +408,8 @@ mod tests {
 
     #[test]
     fn test_peer_reset() {
-        let mut monitor = setup_monitor();
         let peer_id = PeerId::random();
+        let mut monitor = setup_monitor(peer_id);
 
         for _ in 0..4 {
             monitor.record_event(MonitorEvent::Sampling(SamplingError::Io {
