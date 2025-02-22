@@ -6,7 +6,11 @@ use std::{
 };
 // crates
 use libp2p::{
-    core::{transport::PortUse, Endpoint},
+    core::{
+        transport::PortUse,
+        ConnectedPoint::{Dialer, Listener},
+        Endpoint,
+    },
     swarm::{
         dial_opts::DialOpts, dummy, ConnectionClosed, ConnectionDenied, ConnectionId, FromSwarm,
         NetworkBehaviour, THandlerInEvent, THandlerOutEvent, ToSwarm,
@@ -17,9 +21,10 @@ use libp2p::{
 use crate::address_book::AddressBook;
 
 pub enum ConnectionEvent {
-    Inbound(PeerId),
-    Outbound(PeerId),
-    Close(PeerId),
+    OpenInbound(PeerId),
+    OpenOutbound(PeerId),
+    CloseInbound(PeerId),
+    CloseOutbound(PeerId),
 }
 
 pub trait ConnectionBalancer {
@@ -30,6 +35,7 @@ pub trait ConnectionBalancer {
 pub struct ConnectionBalancerBehaviour<Balancer> {
     addresses: AddressBook,
     balancer: Balancer,
+    peers_to_dial: VecDeque<PeerId>,
 }
 
 impl<Balancer> ConnectionBalancerBehaviour<Balancer> {
@@ -37,6 +43,7 @@ impl<Balancer> ConnectionBalancerBehaviour<Balancer> {
         Self {
             addresses,
             balancer,
+            peers_to_dial: VecDeque::new(),
         }
     }
 
@@ -59,7 +66,8 @@ where
         _: &Multiaddr,
         _: &Multiaddr,
     ) -> Result<Self::ConnectionHandler, ConnectionDenied> {
-        self.balancer.record_event(ConnectionEvent::Inbound(peer));
+        self.balancer
+            .record_event(ConnectionEvent::OpenInbound(peer));
         Ok(dummy::ConnectionHandler)
     }
 
@@ -71,13 +79,26 @@ where
         _: Endpoint,
         _: PortUse,
     ) -> Result<Self::ConnectionHandler, ConnectionDenied> {
-        self.balancer.record_event(ConnectionEvent::Outbound(peer));
+        self.balancer
+            .record_event(ConnectionEvent::OpenOutbound(peer));
         Ok(dummy::ConnectionHandler)
     }
 
     fn on_swarm_event(&mut self, event: FromSwarm) {
-        if let FromSwarm::ConnectionClosed(ConnectionClosed { peer_id, .. }) = event {
-            self.balancer.record_event(ConnectionEvent::Close(peer_id));
+        if let FromSwarm::ConnectionClosed(ConnectionClosed {
+            peer_id, endpoint, ..
+        }) = event
+        {
+            match endpoint {
+                Dialer { .. } => {
+                    self.balancer
+                        .record_event(ConnectionEvent::CloseInbound(peer_id));
+                }
+                Listener { .. } => {
+                    self.balancer
+                        .record_event(ConnectionEvent::CloseOutbound(peer_id));
+                }
+            }
         }
     }
 
@@ -94,15 +115,19 @@ where
         &mut self,
         cx: &mut Context<'_>,
     ) -> Poll<ToSwarm<Self::ToSwarm, THandlerInEvent<Self>>> {
-        if let Poll::Ready(mut peers) = self.balancer.poll(cx) {
-            while let Some(peer) = peers.pop_front() {
-                if let Some(addr) = self.addresses.get_address(&peer) {
-                    return Poll::Ready(ToSwarm::Dial {
-                        opts: DialOpts::peer_id(peer)
-                            .addresses(vec![addr.clone()])
-                            .build(),
-                    });
-                }
+        if self.peers_to_dial.is_empty() {
+            if let Poll::Ready(peers) = self.balancer.poll(cx) {
+                self.peers_to_dial = peers;
+            }
+        }
+
+        if let Some(peer) = self.peers_to_dial.pop_front() {
+            if let Some(addr) = self.addresses.get_address(&peer) {
+                return Poll::Ready(ToSwarm::Dial {
+                    opts: DialOpts::peer_id(peer)
+                        .addresses(vec![addr.clone()])
+                        .build(),
+                });
             }
         }
 
@@ -139,10 +164,10 @@ mod tests {
     impl ConnectionBalancer for MockBalancer {
         fn record_event(&mut self, event: ConnectionEvent) {
             match event {
-                ConnectionEvent::Inbound(peer) | ConnectionEvent::Outbound(peer) => {
+                ConnectionEvent::OpenInbound(peer) | ConnectionEvent::OpenOutbound(peer) => {
                     self.connected_peers.insert(peer);
                 }
-                ConnectionEvent::Close(peer) => {
+                ConnectionEvent::CloseInbound(peer) | ConnectionEvent::CloseOutbound(peer) => {
                     self.connected_peers.remove(&peer);
                 }
             }
@@ -218,5 +243,61 @@ mod tests {
 
         assert!(listener_addresses.contains(&dialer_peer));
         assert!(dialer_addresses.contains(&listener_peer));
+    }
+
+    #[tokio::test]
+    async fn test_balancer_dials_all_peers_from_poll() {
+        let mut dialer = Swarm::new_ephemeral(|_| {
+            ConnectionBalancerBehaviour::new(AddressBook::empty(), MockBalancer::default())
+        });
+
+        let peer1 = PeerId::random();
+        let peer2 = PeerId::random();
+        let peer3 = PeerId::random();
+
+        let address_book = AddressBook::from_iter(vec![
+            (peer1, "/ip4/127.0.0.1/tcp/4001".parse().unwrap()),
+            (peer2, "/ip4/127.0.0.1/tcp/4002".parse().unwrap()),
+            (peer3, "/ip4/127.0.0.1/tcp/4003".parse().unwrap()),
+        ]);
+
+        dialer.behaviour_mut().update_addresses(address_book);
+
+        dialer.behaviour_mut().balancer.peer_to_connect(peer1);
+        dialer.behaviour_mut().balancer.peer_to_connect(peer2);
+        dialer.behaviour_mut().balancer.peer_to_connect(peer3);
+
+        let mut dial_requests = Vec::new();
+
+        let mut cx = Context::from_waker(futures::task::noop_waker_ref());
+
+        // Call poll repeatedly and collect all dial requests
+        while let Poll::Ready(to_swarm) = dialer.behaviour_mut().poll(&mut cx) {
+            if let ToSwarm::Dial { opts } = to_swarm {
+                dial_requests.push(opts);
+            }
+        }
+
+        let dialed_peers: HashSet<_> = dial_requests
+            .iter()
+            .map(|opts| opts.get_peer_id().unwrap())
+            .collect();
+
+        assert_eq!(dialed_peers.len(), 3, "Expected 3 ToSwarm::Dial requests");
+        assert!(
+            dialed_peers.contains(&peer1),
+            "Expected dial request for peer1"
+        );
+        assert!(
+            dialed_peers.contains(&peer2),
+            "Expected dial request for peer2"
+        );
+        assert!(
+            dialed_peers.contains(&peer3),
+            "Expected dial request for peer3"
+        );
+
+        // Ensure that the balancer queue is now empty
+        assert!(dialer.behaviour_mut().balancer.peers_to_connect.is_empty());
     }
 }
