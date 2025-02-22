@@ -20,18 +20,23 @@ pub struct SubnetworkStats {
 }
 
 pub enum ConnectionDeviation {
+    // Since DA protocol at the moment expects any number of nodes to be able to sample at any
+    // time, are only checking for insufficient number of connections.
     Missing(usize),
-    TooMany(usize),
 }
 
 pub struct SubnetworkDeviation {
-    pub inbound: ConnectionDeviation,
+    // Missing inbound is for now ignored as we have no way to request peers to connect
+    // to us.
     pub outbound: ConnectionDeviation,
 }
 
 pub trait SubnetworkConnectionPolicy {
-    fn connection_number_deviation(&self, stats: &SubnetworkStats) -> SubnetworkDeviation;
-    fn subnetwork_number(&self) -> SubnetworkId;
+    fn connection_number_deviation(
+        &self,
+        subnetwork_id: &SubnetworkId,
+        stats: &SubnetworkStats,
+    ) -> SubnetworkDeviation;
 }
 
 pub struct DAConnectionBalancer<Membership, Policy> {
@@ -134,7 +139,7 @@ where
         if self.interval.as_mut().poll_next(cx).is_ready() {
             let mut peers_to_connect = VecDeque::new();
 
-            for subnetwork_id in 0..self.policy.subnetwork_number() {
+            for subnetwork_id in 0..self.membership.last_subnetwork_id() {
                 let stats = self
                     .subnetwork_stats
                     .get(&subnetwork_id)
@@ -142,17 +147,16 @@ where
                         inbound: 0,
                         outbound: 0,
                     });
-                let deviation = self.policy.connection_number_deviation(stats);
+                let deviation = self
+                    .policy
+                    .connection_number_deviation(&subnetwork_id, stats);
 
-                if let ConnectionDeviation::Missing(missing_count) = deviation.outbound {
-                    peers_to_connect
-                        .extend(self.select_missing_peers(&subnetwork_id, missing_count));
-                }
-
-                if let ConnectionDeviation::Missing(missing_count) = deviation.inbound {
-                    peers_to_connect
-                        .extend(self.select_missing_peers(&subnetwork_id, missing_count));
-                }
+                // In DA balancer implementation we are only concerned about missing peer
+                // connections. Sampling protocol requires to allow any number of peers to request
+                // for a sample, which requires to allow any number of peers to connect at any
+                // given time.
+                let ConnectionDeviation::Missing(missing_count) = deviation.outbound;
+                peers_to_connect.extend(self.select_missing_peers(&subnetwork_id, missing_count));
             }
 
             if peers_to_connect.is_empty() {
@@ -179,25 +183,24 @@ mod tests {
 
     struct MockPolicy {
         missing: usize,
-        subnets: SubnetworkId,
     }
 
     impl SubnetworkConnectionPolicy for MockPolicy {
-        fn connection_number_deviation(&self, _stats: &SubnetworkStats) -> SubnetworkDeviation {
+        fn connection_number_deviation(
+            &self,
+            _id: &SubnetworkId,
+            _stats: &SubnetworkStats,
+        ) -> SubnetworkDeviation {
             SubnetworkDeviation {
-                inbound: ConnectionDeviation::Missing(0),
                 outbound: ConnectionDeviation::Missing(self.missing),
             }
-        }
-
-        fn subnetwork_number(&self) -> SubnetworkId {
-            self.subnets
         }
     }
 
     struct MockMembership {
         subnetwork: SubnetworkId,
         members: HashSet<PeerId>,
+        subnets: usize,
     }
 
     impl MembershipHandler for MockMembership {
@@ -227,6 +230,10 @@ mod tests {
         fn members(&self) -> HashSet<Self::Id> {
             self.members.clone()
         }
+
+        fn last_subnetwork_id(&self) -> Self::NetworkId {
+            self.subnets as u16
+        }
     }
 
     #[tokio::test]
@@ -237,12 +244,10 @@ mod tests {
         let membership = MockMembership {
             subnetwork: subnetwork_id,
             members: HashSet::from([peer1]),
-        };
-
-        let policy = MockPolicy {
-            missing: 1,
             subnets: 1,
         };
+
+        let policy = MockPolicy { missing: 1 };
 
         let interval = stream::once(async {}).chain(stream::pending());
         let mut balancer = DAConnectionBalancer::new(membership, policy, interval);
@@ -271,12 +276,10 @@ mod tests {
         let membership = MockMembership {
             subnetwork: subnetwork_id,
             members: HashSet::from([peer1, peer2, peer3]),
-        };
-
-        let policy = MockPolicy {
-            missing: 2,
             subnets: 1,
         };
+
+        let policy = MockPolicy { missing: 2 };
 
         let interval = stream::once(async {}).chain(stream::pending());
         let mut balancer = DAConnectionBalancer::new(membership, policy, interval);
@@ -303,12 +306,10 @@ mod tests {
         let membership = MockMembership {
             subnetwork: subnetwork_id,
             members: HashSet::from([peer1]),
-        };
-
-        let policy = MockPolicy {
-            missing: 0,
             subnets: 1,
         };
+
+        let policy = MockPolicy { missing: 0 };
 
         let interval = stream::once(async {}).chain(stream::pending());
         let mut balancer = DAConnectionBalancer::new(membership, policy, interval);

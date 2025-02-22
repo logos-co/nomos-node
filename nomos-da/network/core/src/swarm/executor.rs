@@ -50,7 +50,7 @@ pub struct ExecutorEventsStream {
 pub struct ExecutorSwarm<
     Membership: MembershipHandler<NetworkId = SubnetworkId, Id = PeerId> + 'static,
 > {
-    swarm: Swarm<ExecutorBehaviour<ConnectionMonitor, Membership>>,
+    swarm: Swarm<ExecutorBehaviour<ConnectionMonitor<Membership>, Membership>>,
     sampling_events_sender: UnboundedSender<SamplingEvent>,
     validation_events_sender: UnboundedSender<DaBlob>,
     dispersal_events_sender: UnboundedSender<DispersalExecutorEvent>,
@@ -74,7 +74,11 @@ where
         let sampling_events_receiver = UnboundedReceiverStream::new(sampling_events_receiver);
         let validation_events_receiver = UnboundedReceiverStream::new(validation_events_receiver);
         let dispersal_events_receiver = UnboundedReceiverStream::new(dispersal_events_receiver);
-        let policy = DAConnectionPolicy::new(policy_settings);
+        let policy = DAConnectionPolicy::new(
+            policy_settings,
+            membership.clone(),
+            PeerId::from_public_key(&key.public()),
+        );
         let monitor = ConnectionMonitor::new(monitor_settings, policy);
 
         (
@@ -97,9 +101,9 @@ where
         key: Keypair,
         membership: Membership,
         addresses: AddressBook,
-        monitor: ConnectionMonitor,
+        monitor: ConnectionMonitor<Membership>,
         redial_cooldown: Duration,
-    ) -> Swarm<ExecutorBehaviour<ConnectionMonitor, Membership>> {
+    ) -> Swarm<ExecutorBehaviour<ConnectionMonitor<Membership>, Membership>> {
         SwarmBuilder::with_existing_identity(key)
             .with_tokio()
             .with_quic()
@@ -150,13 +154,15 @@ where
         self.swarm.local_peer_id()
     }
 
-    pub fn protocol_swarm(&self) -> &Swarm<ExecutorBehaviour<ConnectionMonitor, Membership>> {
+    pub fn protocol_swarm(
+        &self,
+    ) -> &Swarm<ExecutorBehaviour<ConnectionMonitor<Membership>, Membership>> {
         &self.swarm
     }
 
     pub fn protocol_swarm_mut(
         &mut self,
-    ) -> &mut Swarm<ExecutorBehaviour<ConnectionMonitor, Membership>> {
+    ) -> &mut Swarm<ExecutorBehaviour<ConnectionMonitor<Membership>, Membership>> {
         &mut self.swarm
     }
 
@@ -201,7 +207,7 @@ where
 
     async fn handle_behaviour_event(
         &mut self,
-        event: ExecutorBehaviourEvent<ConnectionMonitor, Membership>,
+        event: ExecutorBehaviourEvent<ConnectionMonitor<Membership>, Membership>,
     ) {
         match event {
             ExecutorBehaviourEvent::Sampling(event) => {

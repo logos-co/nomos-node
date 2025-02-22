@@ -25,4 +25,6 @@ pub trait MembershipHandler {
 
     /// Returns the set of all members
     fn members(&self) -> HashSet<Self::Id>;
+
+    fn last_subnetwork_id(&self) -> Self::NetworkId;
 }
