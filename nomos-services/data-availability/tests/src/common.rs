@@ -31,6 +31,7 @@ use nomos_da_indexer::storage::adapters::rocksdb::RocksAdapter as IndexerStorage
 use nomos_da_indexer::storage::adapters::rocksdb::RocksAdapterSettings as IndexerStorageSettings;
 use nomos_da_indexer::DataIndexerService;
 use nomos_da_indexer::IndexerSettings;
+use nomos_da_network_core::swarm::DAConnectionPolicySettings;
 use nomos_da_network_service::backends::libp2p::validator::DaNetworkValidatorBackend;
 use nomos_da_network_service::NetworkConfig as DaNetworkConfig;
 use nomos_da_network_service::NetworkService as DaNetworkService;
@@ -255,9 +256,16 @@ pub fn new_node(
                     ),
                     addresses: da_network_settings.peer_addresses.into_iter().collect(),
                     listening_address: da_network_settings.listening_address,
-                    policy_settings: Default::default(),
+                    policy_settings: DAConnectionPolicySettings {
+                        min_dispersal_peers: 1,
+                        min_replication_peers: 1,
+                        max_dispersal_failures: 0,
+                        max_sampling_failures: 0,
+                        max_replication_failures: 0,
+                        malicious_threshold: 0,
+                    },
                     monitor_settings: Default::default(),
-                    balancer_interval: Duration::ZERO,
+                    balancer_interval: Duration::from_secs(3),
                     redial_cooldown: Duration::ZERO,
                 },
             },
