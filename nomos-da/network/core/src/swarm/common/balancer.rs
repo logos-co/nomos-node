@@ -40,6 +40,7 @@ pub trait SubnetworkConnectionPolicy {
 }
 
 pub struct DAConnectionBalancer<Membership, Policy> {
+    local_peer_id: PeerId,
     membership: Membership,
     policy: Policy,
     interval: Pin<Box<dyn futures::Stream<Item = ()> + Send>>,
@@ -53,11 +54,13 @@ where
     Policy: SubnetworkConnectionPolicy,
 {
     pub fn new(
+        local_peer_id: PeerId,
         membership: Membership,
         policy: Policy,
         interval: impl futures::Stream<Item = ()> + Send + 'static,
     ) -> Self {
         Self {
+            local_peer_id,
             membership,
             policy,
             interval: Box::pin(interval),
@@ -92,7 +95,7 @@ where
         let candidates = self.membership.members_of(subnetwork_id);
         let available_peers: Vec<_> = candidates
             .into_iter()
-            .filter(|peer| !self.connected_peers.contains(peer))
+            .filter(|peer| !self.connected_peers.contains(peer) && *peer != self.local_peer_id)
             .collect();
 
         available_peers
@@ -240,17 +243,18 @@ mod tests {
     async fn test_balancer_returns_one_peer() {
         let subnetwork_id = SubnetworkId::default();
         let peer1 = PeerId::random();
+        let peer2 = PeerId::random();
 
         let membership = MockMembership {
             subnetwork: subnetwork_id,
-            members: HashSet::from([peer1]),
+            members: HashSet::from([peer1, peer2]),
             subnets: 1,
         };
 
         let policy = MockPolicy { missing: 1 };
 
         let interval = stream::once(async {}).chain(stream::pending());
-        let mut balancer = DAConnectionBalancer::new(membership, policy, interval);
+        let mut balancer = DAConnectionBalancer::new(peer1, membership, policy, interval);
 
         let mut cx = Context::from_waker(futures::task::noop_waker_ref());
         let poll_result = balancer.poll(&mut cx);
@@ -262,7 +266,7 @@ mod tests {
         };
 
         assert_eq!(peers.len(), 1);
-        assert!(peers.contains(&peer1));
+        assert!(peers.contains(&peer2));
     }
 
     #[tokio::test]
@@ -271,17 +275,18 @@ mod tests {
         let peer1 = PeerId::random();
         let peer2 = PeerId::random();
         let peer3 = PeerId::random();
+        let peer4 = PeerId::random();
 
         let membership = MockMembership {
             subnetwork: subnetwork_id,
-            members: HashSet::from([peer1, peer2, peer3]),
+            members: HashSet::from([peer1, peer2, peer3, peer4]),
             subnets: 1,
         };
 
         let policy = MockPolicy { missing: 2 };
 
         let interval = stream::once(async {}).chain(stream::pending());
-        let mut balancer = DAConnectionBalancer::new(membership, policy, interval);
+        let mut balancer = DAConnectionBalancer::new(peer1, membership, policy, interval);
 
         let mut cx = Context::from_waker(futures::task::noop_waker_ref());
         let poll_result = balancer.poll(&mut cx);
@@ -293,24 +298,25 @@ mod tests {
         };
 
         assert_eq!(peers.len(), 2);
-        assert!(peers.contains(&peer1) || peers.contains(&peer2) || peers.contains(&peer3));
+        assert!(peers.contains(&peer2) || peers.contains(&peer3) || peers.contains(&peer4));
     }
 
     #[tokio::test]
     async fn test_balancer_returns_pending_if_no_peers_needed() {
         let subnetwork_id = SubnetworkId::default();
         let peer1 = PeerId::random();
+        let peer2 = PeerId::random();
 
         let membership = MockMembership {
             subnetwork: subnetwork_id,
-            members: HashSet::from([peer1]),
+            members: HashSet::from([peer1, peer2]),
             subnets: 1,
         };
 
         let policy = MockPolicy { missing: 0 };
 
         let interval = stream::once(async {}).chain(stream::pending());
-        let mut balancer = DAConnectionBalancer::new(membership, policy, interval);
+        let mut balancer = DAConnectionBalancer::new(peer1, membership, policy, interval);
 
         let mut cx = Context::from_waker(futures::task::noop_waker_ref());
         let poll_result = balancer.poll(&mut cx);

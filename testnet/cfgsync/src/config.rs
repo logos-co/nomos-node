@@ -271,6 +271,7 @@ mod cfgsync_tests {
                 global_params_path: "".into(),
                 policy_settings: Default::default(),
                 monitor_settings: Default::default(),
+                balancer_interval: Duration::ZERO,
                 redial_cooldown: Duration::ZERO,
             },
             TracingSettings {

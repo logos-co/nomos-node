@@ -89,8 +89,8 @@ where
             self.settings.min_dispersal_peers
         };
 
-        let total_missing = required_connections.saturating_sub(stats.inbound)
-            + required_connections.saturating_sub(stats.outbound);
+        // Current implementation doesn't differenciate and combine inbound and outbound stats.
+        let total_missing = required_connections.saturating_sub(stats.inbound + stats.outbound);
 
         SubnetworkDeviation {
             // All missing are counted as outbound.

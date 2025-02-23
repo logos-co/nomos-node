@@ -77,6 +77,7 @@ impl CfgSyncConfig {
             global_params_path: self.global_params_path.clone(),
             policy_settings: default.policy_settings,
             monitor_settings: default.monitor_settings,
+            balancer_interval: default.balancer_interval,
             redial_cooldown: default.redial_cooldown,
         }
     }

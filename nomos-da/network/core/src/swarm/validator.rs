@@ -2,7 +2,7 @@
 use std::io;
 use std::time::Duration;
 // crates
-use futures::StreamExt;
+use futures::{stream, StreamExt};
 use kzgrs_backend::common::blob::DaBlob;
 use libp2p::core::transport::ListenerId;
 use libp2p::identity::Keypair;
@@ -75,16 +75,23 @@ where
 
         let sampling_events_receiver = UnboundedReceiverStream::new(sampling_events_receiver);
         let validation_events_receiver = UnboundedReceiverStream::new(validation_events_receiver);
+        let local_peer_id = PeerId::from_public_key(&key.public());
 
-        let policy = DAConnectionPolicy::new(
-            policy_settings,
-            membership.clone(),
-            PeerId::from_public_key(&key.public()),
-        );
+        let policy = DAConnectionPolicy::new(policy_settings, membership.clone(), local_peer_id);
         let monitor = ConnectionMonitor::new(monitor_settings, policy.clone());
-        let balancer_interval_stream = IntervalStream::new(interval(balancer_interval)).map(|_| ());
-        let balancer =
-            ConnectionBalancer::new(membership.clone(), policy, balancer_interval_stream);
+        let balancer_interval_stream = if balancer_interval.is_zero() {
+            stream::pending().boxed() // Stream that never produces items
+        } else {
+            IntervalStream::new(interval(balancer_interval))
+                .map(|_| ())
+                .boxed()
+        };
+        let balancer = ConnectionBalancer::new(
+            local_peer_id,
+            membership.clone(),
+            policy,
+            balancer_interval_stream,
+        );
 
         (
             Self {

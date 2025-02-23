@@ -87,6 +87,7 @@ where
             config.addresses.clone().into_iter().collect(),
             config.policy_settings,
             config.monitor_settings,
+            config.balancer_interval,
             config.redial_cooldown,
         );
         let address = config.listening_address;
