@@ -36,6 +36,7 @@ pub struct DaNetworkBackendSettings<Membership> {
     pub listening_address: Multiaddr,
     pub policy_settings: DAConnectionPolicySettings,
     pub monitor_settings: DAConnectionMonitorSettings,
+    pub balancer_interval: Duration,
     pub redial_cooldown: Duration,
 }
 

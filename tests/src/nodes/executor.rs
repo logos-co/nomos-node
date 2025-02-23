@@ -202,6 +202,7 @@ pub fn create_executor_config(config: GeneralConfig) -> Config {
                     listening_address: config.da_config.listening_address,
                     policy_settings: config.da_config.policy_settings,
                     monitor_settings: config.da_config.monitor_settings,
+                    balancer_interval: config.da_config.balancer_interval,
                     redial_cooldown: config.da_config.redial_cooldown,
                 },
                 num_subnets: config.da_config.num_subnets,
