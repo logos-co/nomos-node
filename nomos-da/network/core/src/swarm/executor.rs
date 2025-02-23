@@ -11,7 +11,8 @@ use libp2p::{Multiaddr, PeerId, Swarm, SwarmBuilder, TransportError};
 use log::debug;
 use nomos_core::da::BlobId;
 use tokio::sync::mpsc::{unbounded_channel, UnboundedSender};
-use tokio_stream::wrappers::UnboundedReceiverStream;
+use tokio::time::interval;
+use tokio_stream::wrappers::{IntervalStream, UnboundedReceiverStream};
 // internal
 use crate::address_book::AddressBook;
 use crate::behaviour::executor::{ExecutorBehaviour, ExecutorBehaviourEvent};
@@ -36,6 +37,8 @@ use crate::swarm::{
 use crate::{swarm::ConnectionMonitor, SubnetworkId};
 use subnetworks_assignations::MembershipHandler;
 
+use super::ConnectionBalancer;
+
 // Metrics
 const EVENT_SAMPLING: &str = "sampling";
 const EVENT_DISPERSAL_EXECUTOR_DISPERSAL: &str = "dispersal_executor_event";
@@ -48,9 +51,15 @@ pub struct ExecutorEventsStream {
 }
 
 pub struct ExecutorSwarm<
-    Membership: MembershipHandler<NetworkId = SubnetworkId, Id = PeerId> + 'static,
+    Membership: MembershipHandler<NetworkId = SubnetworkId, Id = PeerId> + Clone + 'static,
 > {
-    swarm: Swarm<ExecutorBehaviour<ConnectionMonitor<Membership>, Membership>>,
+    swarm: Swarm<
+        ExecutorBehaviour<
+            ConnectionBalancer<Membership>,
+            ConnectionMonitor<Membership>,
+            Membership,
+        >,
+    >,
     sampling_events_sender: UnboundedSender<SamplingEvent>,
     validation_events_sender: UnboundedSender<DaBlob>,
     dispersal_events_sender: UnboundedSender<DispersalExecutorEvent>,
@@ -66,6 +75,7 @@ where
         addresses: AddressBook,
         policy_settings: DAConnectionPolicySettings,
         monitor_settings: DAConnectionMonitorSettings,
+        balancer_interval: Duration,
         redial_cooldown: Duration,
     ) -> (Self, ExecutorEventsStream) {
         let (sampling_events_sender, sampling_events_receiver) = unbounded_channel();
@@ -79,11 +89,21 @@ where
             membership.clone(),
             PeerId::from_public_key(&key.public()),
         );
-        let monitor = ConnectionMonitor::new(monitor_settings, policy);
+        let monitor = ConnectionMonitor::new(monitor_settings, policy.clone());
+        let balancer_interval_stream = IntervalStream::new(interval(balancer_interval)).map(|_| ());
+        let balancer =
+            ConnectionBalancer::new(membership.clone(), policy, balancer_interval_stream);
 
         (
             Self {
-                swarm: Self::build_swarm(key, membership, addresses, monitor, redial_cooldown),
+                swarm: Self::build_swarm(
+                    key,
+                    membership,
+                    addresses,
+                    balancer,
+                    monitor,
+                    redial_cooldown,
+                ),
                 sampling_events_sender,
                 validation_events_sender,
                 dispersal_events_sender,
@@ -101,14 +121,28 @@ where
         key: Keypair,
         membership: Membership,
         addresses: AddressBook,
+        balancer: ConnectionBalancer<Membership>,
         monitor: ConnectionMonitor<Membership>,
         redial_cooldown: Duration,
-    ) -> Swarm<ExecutorBehaviour<ConnectionMonitor<Membership>, Membership>> {
+    ) -> Swarm<
+        ExecutorBehaviour<
+            ConnectionBalancer<Membership>,
+            ConnectionMonitor<Membership>,
+            Membership,
+        >,
+    > {
         SwarmBuilder::with_existing_identity(key)
             .with_tokio()
             .with_quic()
             .with_behaviour(|key| {
-                ExecutorBehaviour::new(key, membership, addresses, monitor, redial_cooldown)
+                ExecutorBehaviour::new(
+                    key,
+                    membership,
+                    addresses,
+                    balancer,
+                    monitor,
+                    redial_cooldown,
+                )
             })
             .expect("Validator behaviour should build")
             .with_swarm_config(|cfg| {
@@ -156,13 +190,25 @@ where
 
     pub fn protocol_swarm(
         &self,
-    ) -> &Swarm<ExecutorBehaviour<ConnectionMonitor<Membership>, Membership>> {
+    ) -> &Swarm<
+        ExecutorBehaviour<
+            ConnectionBalancer<Membership>,
+            ConnectionMonitor<Membership>,
+            Membership,
+        >,
+    > {
         &self.swarm
     }
 
     pub fn protocol_swarm_mut(
         &mut self,
-    ) -> &mut Swarm<ExecutorBehaviour<ConnectionMonitor<Membership>, Membership>> {
+    ) -> &mut Swarm<
+        ExecutorBehaviour<
+            ConnectionBalancer<Membership>,
+            ConnectionMonitor<Membership>,
+            Membership,
+        >,
+    > {
         &mut self.swarm
     }
 
@@ -207,7 +253,11 @@ where
 
     async fn handle_behaviour_event(
         &mut self,
-        event: ExecutorBehaviourEvent<ConnectionMonitor<Membership>, Membership>,
+        event: ExecutorBehaviourEvent<
+            ConnectionBalancer<Membership>,
+            ConnectionMonitor<Membership>,
+            Membership,
+        >,
     ) {
         match event {
             ExecutorBehaviourEvent::Sampling(event) => {

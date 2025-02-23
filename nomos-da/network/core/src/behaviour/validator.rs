@@ -8,6 +8,7 @@ use libp2p::PeerId;
 use libp2p::swarm::NetworkBehaviour;
 // internal
 use crate::address_book::AddressBook;
+use crate::maintenance::balancer::{ConnectionBalancer, ConnectionBalancerBehaviour};
 use crate::maintenance::monitor::{ConnectionMonitor, ConnectionMonitorBehaviour};
 use crate::{
     protocols::dispersal::validator::behaviour::DispersalValidatorBehaviour,
@@ -26,19 +27,22 @@ use subnetworks_assignations::MembershipHandler;
 /// 2) Dispersal so we do not bottleneck executors.
 /// 3) Replication is the least important (and probably the least used), it is also dependant of dispersal.
 #[derive(NetworkBehaviour)]
-pub struct ValidatorBehaviour<Monitor, Membership>
+pub struct ValidatorBehaviour<Balancer, Monitor, Membership>
 where
+    Balancer: ConnectionBalancer,
     Monitor: ConnectionMonitor,
     Membership: MembershipHandler,
 {
     sampling: SamplingBehaviour<Membership>,
     dispersal: DispersalValidatorBehaviour<Membership>,
     replication: ReplicationBehaviour<Membership>,
+    balancer: ConnectionBalancerBehaviour<Balancer>,
     monitor: ConnectionMonitorBehaviour<Monitor>,
 }
 
-impl<Monitor, Membership> ValidatorBehaviour<Monitor, Membership>
+impl<Balancer, Monitor, Membership> ValidatorBehaviour<Balancer, Monitor, Membership>
 where
+    Balancer: ConnectionBalancer,
     Monitor: ConnectionMonitor,
     Membership: MembershipHandler + Clone + Send + 'static,
     <Membership as MembershipHandler>::NetworkId: Send,
@@ -47,14 +51,16 @@ where
         key: &Keypair,
         membership: Membership,
         addresses: AddressBook,
+        balancer: Balancer,
         monitor: Monitor,
         redial_cooldown: Duration,
     ) -> Self {
         let peer_id = PeerId::from_public_key(&key.public());
         Self {
-            sampling: SamplingBehaviour::new(peer_id, membership.clone(), addresses),
+            sampling: SamplingBehaviour::new(peer_id, membership.clone(), addresses.clone()),
             dispersal: DispersalValidatorBehaviour::new(membership.clone()),
             replication: ReplicationBehaviour::new(peer_id, membership),
+            balancer: ConnectionBalancerBehaviour::new(addresses, balancer),
             monitor: ConnectionMonitorBehaviour::new(monitor, redial_cooldown),
         }
     }
@@ -92,5 +98,9 @@ where
 
     pub fn monitor_behaviour_mut(&mut self) -> &mut ConnectionMonitorBehaviour<Monitor> {
         &mut self.monitor
+    }
+
+    pub fn balancer_behaviour_mut(&mut self) -> &mut ConnectionBalancerBehaviour<Balancer> {
+        &mut self.balancer
     }
 }
