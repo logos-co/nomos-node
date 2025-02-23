@@ -22,13 +22,20 @@ pub struct DAConnectionPolicySettings {
     pub malicious_threshold: usize,
 }
 
-pub struct DAConnectionPolicy<Membership> {
+#[derive(Clone)]
+pub struct DAConnectionPolicy<Membership>
+where
+    Membership: Clone,
+{
     settings: DAConnectionPolicySettings,
     membership: Membership,
     local_peer_id: PeerId,
 }
 
-impl<Membership> DAConnectionPolicy<Membership> {
+impl<Membership> DAConnectionPolicy<Membership>
+where
+    Membership: Clone,
+{
     pub fn new(
         settings: DAConnectionPolicySettings,
         membership: Membership,
@@ -42,7 +49,10 @@ impl<Membership> DAConnectionPolicy<Membership> {
     }
 }
 
-impl<Membership> PeerHealthPolicy for DAConnectionPolicy<Membership> {
+impl<Membership> PeerHealthPolicy for DAConnectionPolicy<Membership>
+where
+    Membership: Clone,
+{
     type PeerStats = PeerStats;
 
     fn is_peer_malicious(&self, stats: &Self::PeerStats) -> bool {
@@ -60,7 +70,7 @@ impl<Membership> PeerHealthPolicy for DAConnectionPolicy<Membership> {
 
 impl<Membership> SubnetworkConnectionPolicy for DAConnectionPolicy<Membership>
 where
-    Membership: MembershipHandler<NetworkId = SubnetworkId, Id = PeerId>,
+    Membership: MembershipHandler<NetworkId = SubnetworkId, Id = PeerId> + Clone,
 {
     fn connection_number_deviation(
         &self,
@@ -83,7 +93,8 @@ where
             + required_connections.saturating_sub(stats.outbound);
 
         SubnetworkDeviation {
-            outbound: ConnectionDeviation::Missing(total_missing), // All missing are counted as outbound.
+            // All missing are counted as outbound.
+            outbound: ConnectionDeviation::Missing(total_missing),
         }
     }
 }

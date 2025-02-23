@@ -253,7 +253,6 @@ mod tests {
         let mut balancer = DAConnectionBalancer::new(membership, policy, interval);
 
         let mut cx = Context::from_waker(futures::task::noop_waker_ref());
-
         let poll_result = balancer.poll(&mut cx);
 
         assert!(matches!(poll_result, Poll::Ready(ref peers) if peers.len() == 1));
@@ -285,7 +284,6 @@ mod tests {
         let mut balancer = DAConnectionBalancer::new(membership, policy, interval);
 
         let mut cx = Context::from_waker(futures::task::noop_waker_ref());
-
         let poll_result = balancer.poll(&mut cx);
 
         assert!(matches!(poll_result, Poll::Ready(ref peers) if peers.len() == 2));
@@ -315,7 +313,6 @@ mod tests {
         let mut balancer = DAConnectionBalancer::new(membership, policy, interval);
 
         let mut cx = Context::from_waker(futures::task::noop_waker_ref());
-
         let poll_result = balancer.poll(&mut cx);
 
         assert!(matches!(poll_result, Poll::Pending));
