@@ -15,13 +15,12 @@ pub trait DaStorageAdapter {
     type Attestation: Clone;
 
     async fn new(
-        settings: Self::Settings,
         storage_relay: OutboundRelay<<StorageService<Self::Backend> as ServiceData>::Message>,
     ) -> Self;
 
     async fn add_blob(
         &self,
-        blob: &Self::Blob,
+        blob: Self::Blob,
         attestation: &Self::Attestation,
     ) -> Result<(), DynError>;
 

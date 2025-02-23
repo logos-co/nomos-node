@@ -4,14 +4,17 @@ use std::{marker::PhantomData, ops::Range};
 // crates
 use bytes::Bytes;
 use futures::{stream::FuturesUnordered, Stream};
-use kzgrs_backend::common::blob::DaBlob;
+use kzgrs_backend::common::blob::{DaBlob, DaBlobSharedCommitments, DaLightBlob};
 use nomos_core::da::blob::{
     info::DispersedBlobInfo,
     metadata::{Metadata, Next},
+    Blob,
 };
 use nomos_core::da::BlobId;
-use nomos_da_storage::fs::load_blobs;
-use nomos_da_storage::rocksdb::{key_bytes, DA_VERIFIED_KEY_PREFIX, DA_VID_KEY_PREFIX};
+use nomos_da_storage::rocksdb::{
+    key_bytes, DA_ATTESTATION_PATH, DA_BLOB_PATH, DA_SHARED_COMMITMENTS_PATH,
+    DA_VERIFIED_KEY_PREFIX, DA_VID_KEY_PREFIX,
+};
 use nomos_storage::{
     backends::{rocksdb::RocksBackend, StorageSerde},
     StorageMsg, StorageService,
@@ -29,7 +32,6 @@ where
     S: StorageSerde + Send + Sync + 'static,
     B: DispersedBlobInfo + Metadata + Send + Sync,
 {
-    settings: RocksAdapterSettings,
     storage_relay: OutboundRelay<StorageMsg<RocksBackend<S>>>,
     _vid: PhantomData<B>,
 }
@@ -48,11 +50,9 @@ where
     type Settings = RocksAdapterSettings;
 
     async fn new(
-        settings: Self::Settings,
         storage_relay: OutboundRelay<<StorageService<Self::Backend> as ServiceData>::Message>,
     ) -> Self {
         Self {
-            settings,
             storage_relay,
             _vid: PhantomData,
         }
@@ -62,7 +62,9 @@ where
         let (app_id, idx) = info.metadata();
 
         // Check if Info in a block is something that the node've seen before.
-        let attested_key = key_bytes(DA_VERIFIED_KEY_PREFIX, info.blob_id());
+        let attestation_prefix = format!("{}{}", DA_VERIFIED_KEY_PREFIX, DA_ATTESTATION_PATH);
+        let attested_key = key_bytes(&attestation_prefix, info.blob_id());
+
         let (reply_tx, reply_rx) = tokio::sync::oneshot::channel();
 
         self.storage_relay
@@ -112,7 +114,6 @@ where
         while current_index <= index_range.end {
             let idx = current_index.clone();
             let app_id = app_id.clone();
-            let settings = self.settings.clone();
 
             let (reply_tx, reply_rx) = tokio::sync::oneshot::channel();
             let key = key_bytes(
@@ -128,19 +129,69 @@ where
                 .await
                 .expect("Failed to send load request to storage relay");
 
+            let storage_relay = self.storage_relay.clone();
             futures.push(async move {
                 let Some(id) = reply_rx.await.ok().flatten() else {
                     tracing::error!("Failed to receive storage response");
                     return (idx, Vec::new());
                 };
 
-                let blobs = load_blobs(settings.blob_storage_directory, &id).await;
+                let blobs_prefix = format!("{}{}", DA_VERIFIED_KEY_PREFIX, DA_BLOB_PATH);
+                let blobs_prefix_key = key_bytes(&blobs_prefix, id.as_ref());
+                let (blob_reply_tx, blob_reply_rx) = tokio::sync::oneshot::channel();
+                storage_relay
+                    .send(StorageMsg::LoadPrefix {
+                        prefix: blobs_prefix_key,
+                        reply_channel: blob_reply_tx,
+                    })
+                    .await
+                    .expect("Failed to send load request to storage relay");
+
+                let Some(blobs) = blob_reply_rx.await.ok() else {
+                    tracing::error!("Failed to receive storage response");
+                    return (idx, Vec::new());
+                };
+
+                let shared_commitments_prefix =
+                    format!("{}{}", DA_VERIFIED_KEY_PREFIX, DA_SHARED_COMMITMENTS_PATH);
+                let shared_commitments_key = key_bytes(&shared_commitments_prefix, id.as_ref());
+
+                let (shared_commitments_reply_tx, shared_commitments_reply_rx) =
+                    tokio::sync::oneshot::channel();
+                storage_relay
+                    .send(StorageMsg::Load {
+                        key: shared_commitments_key,
+                        reply_channel: shared_commitments_reply_tx,
+                    })
+                    .await
+                    .expect("Failed to send load request to storage relay");
+
                 let deserialized_blobs: Vec<_> = blobs
                     .into_iter()
-                    .filter_map(|bytes| S::deserialize::<DaBlob>(bytes).ok())
+                    .filter_map(|bytes| S::deserialize::<DaLightBlob>(bytes).ok())
                     .collect();
 
-                (idx, deserialized_blobs)
+                let Some(shared_commitments) = shared_commitments_reply_rx.await.ok().flatten()
+                else {
+                    tracing::error!("Failed to receive storage response");
+                    return (idx, Vec::new());
+                };
+
+                let deserialized_shared_commitments =
+                    S::deserialize::<DaBlobSharedCommitments>(shared_commitments)
+                        .expect("Failed to deserialize shared commitments");
+
+                let da_blobs: Vec<_> = deserialized_blobs
+                    .into_iter()
+                    .map(|blob| {
+                        DaBlob::from_blob_and_shared_commitments(
+                            blob,
+                            deserialized_shared_commitments.clone(),
+                        )
+                    })
+                    .collect();
+
+                (idx, da_blobs)
             });
 
             current_index = current_index.next();

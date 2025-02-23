@@ -220,11 +220,6 @@ where
             mut sampler,
         } = self;
 
-        let DaSamplingServiceSettings {
-            storage_adapter_settings,
-            ..
-        } = service_state.settings_reader.get_updated_settings();
-
         let network_relay = network_relay.connect().await?;
         let mut network_adapter = DaNetwork::new(network_relay).await;
 
@@ -232,7 +227,7 @@ where
         let mut next_prune_tick = sampler.prune_interval();
 
         let storage_relay = storage_relay.connect().await?;
-        let storage_adapter = DaStorage::new(storage_adapter_settings, storage_relay).await;
+        let storage_adapter = DaStorage::new(storage_relay).await;
 
         let mut lifecycle_stream = service_state.lifecycle_handle.message_stream();
         loop {

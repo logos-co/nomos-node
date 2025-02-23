@@ -1,11 +1,10 @@
-// std
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use std::{marker::PhantomData, path::PathBuf};
+// internal
+use crate::storage::DaStorageAdapter;
 // crates
 use nomos_core::da::blob::Blob;
-use nomos_da_storage::{
-    fs::write_blob,
-    rocksdb::{key_bytes, DA_VERIFIED_KEY_PREFIX},
+use nomos_da_storage::rocksdb::{
+    key_bytes, DA_ATTESTATION_PATH, DA_BLOB_PATH, DA_SHARED_COMMITMENTS_PATH,
+    DA_VERIFIED_KEY_PREFIX,
 };
 use nomos_storage::{
     backends::{rocksdb::RocksBackend, StorageSerde},
@@ -15,14 +14,15 @@ use overwatch_rs::{
     services::{relay::OutboundRelay, ServiceData},
     DynError,
 };
-// internal
-use crate::storage::DaStorageAdapter;
+// std
+use kzgrs_backend::common::blob::create_blob_idx;
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use std::{marker::PhantomData, path::PathBuf};
 
 pub struct RocksAdapter<A, B, S>
 where
     S: StorageSerde + Send + Sync + 'static,
 {
-    settings: RocksAdapterSettings,
     storage_relay: OutboundRelay<StorageMsg<RocksBackend<S>>>,
     _blob: PhantomData<B>,
     _attestation: PhantomData<A>,
@@ -35,6 +35,8 @@ where
     B: Blob + Serialize + Clone + Send + Sync + 'static,
     B::BlobId: AsRef<[u8]> + Send + Sync + 'static,
     B::ColumnIndex: AsRef<[u8]> + Send + Sync + 'static,
+    B::LightBlob: Serialize + DeserializeOwned + Clone + Send + Sync + 'static,
+    B::SharedCommitments: Serialize + DeserializeOwned + Clone + Send + Sync + 'static,
     S: StorageSerde + Send + Sync + 'static,
 {
     type Backend = RocksBackend<S>;
@@ -43,11 +45,9 @@ where
     type Settings = RocksAdapterSettings;
 
     async fn new(
-        settings: Self::Settings,
         storage_relay: OutboundRelay<<StorageService<Self::Backend> as ServiceData>::Message>,
     ) -> Self {
         Self {
-            settings,
             storage_relay,
             _blob: PhantomData,
             _attestation: PhantomData,
@@ -56,25 +56,45 @@ where
 
     async fn add_blob(
         &self,
-        blob: &Self::Blob,
+        blob: Self::Blob,
         attestation: &Self::Attestation,
     ) -> Result<(), DynError> {
-        let blob_bytes = S::serialize(blob);
-        let blob_idx = create_blob_idx(blob.id().as_ref(), blob.column_idx().as_ref());
+        let blob_id = blob.id();
+        let column_idx = blob.column_idx();
+        let (light_blob, shared_commitments) = blob.into_blob_and_shared_commitments();
 
-        write_blob(
-            self.settings.blob_storage_directory.clone(),
-            blob.id().as_ref(),
-            blob.column_idx().as_ref(),
-            &blob_bytes,
-        )
-        .await?;
+        let blob_idx = create_blob_idx(blob_id.as_ref(), column_idx.as_ref());
 
-        // Mark blob as attested for lateer use in Indexer and attestation cache.
-        let blob_key = key_bytes(DA_VERIFIED_KEY_PREFIX, blob_idx);
+        // Store the blob in the storage backend.
+        let blob_prefix = format!("{}{}", DA_VERIFIED_KEY_PREFIX, DA_BLOB_PATH);
+        let blob_key = key_bytes(&blob_prefix, blob_idx);
+
         self.storage_relay
             .send(StorageMsg::Store {
                 key: blob_key,
+                value: S::serialize(light_blob),
+            })
+            .await
+            .unwrap();
+
+        // Store the shared commitments in the storage backend.
+        let shared_commitments_prefix =
+            format!("{}{}", DA_VERIFIED_KEY_PREFIX, DA_SHARED_COMMITMENTS_PATH);
+        let shared_commitments_key = key_bytes(&shared_commitments_prefix, &blob_id);
+        self.storage_relay
+            .send(StorageMsg::Store {
+                key: shared_commitments_key,
+                value: S::serialize(shared_commitments),
+            })
+            .await
+            .unwrap();
+
+        // Store the attestation in the storage backend.
+        let attestation_prefix = format!("{}{}", DA_VERIFIED_KEY_PREFIX, DA_ATTESTATION_PATH);
+        let attestation_key = key_bytes(&attestation_prefix, blob_id);
+        self.storage_relay
+            .send(StorageMsg::Store {
+                key: attestation_key,
                 value: S::serialize(attestation),
             })
             .await
@@ -84,13 +104,16 @@ where
     async fn get_blob(
         &self,
         blob_id: <Self::Blob as Blob>::BlobId,
-        column_idx: <Self::Blob as Blob>::ColumnIndex,
+        _column_idx: <Self::Blob as Blob>::ColumnIndex,
     ) -> Result<Option<Self::Attestation>, DynError> {
-        let blob_idx = create_blob_idx(blob_id.as_ref(), column_idx.as_ref());
-        let key = key_bytes(DA_VERIFIED_KEY_PREFIX, blob_idx);
+        let attestation_prefix = format!("{}{}", DA_VERIFIED_KEY_PREFIX, DA_ATTESTATION_PATH);
+        let attestation_key = key_bytes(&attestation_prefix, blob_id);
         let (reply_channel, reply_rx) = tokio::sync::oneshot::channel();
         self.storage_relay
-            .send(StorageMsg::Load { key, reply_channel })
+            .send(StorageMsg::Load {
+                key: attestation_key,
+                reply_channel,
+            })
             .await
             .expect("Failed to send load request to storage relay");
 
@@ -107,16 +130,6 @@ where
             })
             .map_err(|_| "".into())
     }
-}
-
-// Combines a 32-byte blob ID (`[u8; 32]`) with a 2-byte column index
-// (`u16` represented as `[u8; 2]`).
-fn create_blob_idx(blob_id: &[u8], column_idx: &[u8]) -> [u8; 34] {
-    let mut blob_idx = [0u8; 34];
-    blob_idx[..blob_id.len()].copy_from_slice(blob_id);
-    blob_idx[blob_id.len()..].copy_from_slice(column_idx);
-
-    blob_idx
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

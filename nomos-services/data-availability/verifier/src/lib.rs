@@ -76,7 +76,7 @@ where
     async fn handle_new_blob(
         verifier: &Backend,
         storage_adapter: &S,
-        blob: &Backend::DaBlob,
+        blob: Backend::DaBlob,
     ) -> Result<(), DynError> {
         if storage_adapter
             .get_blob(blob.id(), blob.column_idx())
@@ -87,7 +87,7 @@ where
             Ok(())
         } else {
             info_with_id!(blob.id().as_ref(), "VerifierAddBlob");
-            verifier.verify(blob)?;
+            verifier.verify(&blob)?;
             storage_adapter.add_blob(blob, &()).await?;
             Ok(())
         }
@@ -118,7 +118,7 @@ where
     Backend::Settings: Clone + Send + Sync + 'static,
     Backend::DaBlob: Debug + Send + Sync + 'static,
     Backend::Error: Error + Send + Sync + 'static,
-    <Backend::DaBlob as Blob>::BlobId: AsRef<[u8]>,
+    <Backend::DaBlob as Blob>::BlobId: AsRef<[u8]> + Debug + Send + Sync + 'static,
     N: NetworkAdapter<Blob = Backend::DaBlob> + Send + Sync + 'static,
     N::Settings: Clone + Send + Sync + 'static,
     S: DaStorageAdapter<Blob = Backend::DaBlob, Attestation = ()> + Send + Sync + 'static,
@@ -155,7 +155,6 @@ where
 
         let DaVerifierServiceSettings {
             network_adapter_settings,
-            storage_adapter_settings,
             ..
         } = service_state.settings_reader.get_updated_settings();
 
@@ -164,26 +163,28 @@ where
         let mut blob_stream = network_adapter.blob_stream().await;
 
         let storage_relay = storage_relay.connect().await?;
-        let storage_adapter = S::new(storage_adapter_settings, storage_relay).await;
+        let storage_adapter = S::new(storage_relay).await;
 
         let mut lifecycle_stream = service_state.lifecycle_handle.message_stream();
         loop {
             tokio::select! {
                 Some(blob) = blob_stream.next() => {
-                    if let Err(err) =  Self::handle_new_blob(&verifier,&storage_adapter, &blob).await {
-                        error!("Error handling blob {blob:?} due to {err:?}");
+                    let blob_id = blob.id();
+                    if let Err(err) =  Self::handle_new_blob(&verifier,&storage_adapter, blob).await {
+                        error!("Error handling blob {blob_id:?} due to {err:?}");
                     }
                 }
                 Some(msg) = service_state.inbound_relay.recv() => {
                     let DaVerifierMsg::AddBlob { blob, reply_channel } = msg;
-                    match Self::handle_new_blob(&verifier, &storage_adapter, &blob).await {
+                    let blob_id = blob.id();
+                    match Self::handle_new_blob(&verifier, &storage_adapter, blob).await {
                         Ok(attestation) => {
                             if let Err(err) = reply_channel.send(Some(attestation)) {
                                 error!("Error replying attestation {err:?}");
                             }
                         },
                         Err(err) => {
-                            error!("Error handling blob {blob:?} due to {err:?}");
+                            error!("Error handling blob {blob_id:?} due to {err:?}");
                             if let Err(err) = reply_channel.send(None) {
                                 error!("Error replying attestation {err:?}");
                             }

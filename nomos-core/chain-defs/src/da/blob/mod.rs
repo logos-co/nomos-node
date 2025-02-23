@@ -5,9 +5,17 @@ pub mod select;
 pub trait Blob {
     type BlobId;
     type ColumnIndex;
+    type LightBlob;
+    type SharedCommitments;
 
     fn id(&self) -> Self::BlobId;
     fn column_idx(&self) -> Self::ColumnIndex;
+    fn into_blob_and_shared_commitments(self) -> (Self::LightBlob, Self::SharedCommitments);
+
+    fn from_blob_and_shared_commitments(
+        light_blob: Self::LightBlob,
+        shared_commitments: Self::SharedCommitments,
+    ) -> Self;
 }
 
 pub trait BlobSelect {

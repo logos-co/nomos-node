@@ -141,6 +141,9 @@ where
     DaBlob: Blob + Serialize + DeserializeOwned + Clone + Send + Sync + 'static,
     <DaBlob as Blob>::BlobId: AsRef<[u8]> + Send + Sync + 'static,
     <DaBlob as Blob>::ColumnIndex: AsRef<[u8]> + Send + Sync + 'static,
+    <DaBlob as Blob>::LightBlob: Serialize + DeserializeOwned + Clone + Send + Sync + 'static,
+    <DaBlob as Blob>::SharedCommitments:
+        Serialize + DeserializeOwned + Clone + Send + Sync + 'static,
     DaBlobInfo: DispersedBlobInfo<BlobId = [u8; 32]>
         + Clone
         + Debug

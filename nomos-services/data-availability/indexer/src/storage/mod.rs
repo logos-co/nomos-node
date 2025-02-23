@@ -19,7 +19,6 @@ pub trait DaStorageAdapter {
     type Info: DispersedBlobInfo;
 
     async fn new(
-        config: Self::Settings,
         storage_relay: OutboundRelay<<StorageService<Self::Backend> as ServiceData>::Message>,
     ) -> Self;
 

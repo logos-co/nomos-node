@@ -15,7 +15,6 @@ pub trait DaStorageAdapter {
     type Blob: Blob + Clone;
 
     async fn new(
-        settings: Self::Settings,
         storage_relay: OutboundRelay<<StorageService<Self::Backend> as ServiceData>::Message>,
     ) -> Self;
 
