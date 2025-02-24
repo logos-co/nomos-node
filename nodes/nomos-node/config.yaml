@@ -59,6 +59,8 @@ da_network:
       12D3KooWKD62Q1nAAMHeV2Cx3rNNMzjgHkTT2edFMzHZ5ur7sGnh: /ip4/127.0.0.1/udp/8716/quic-v1/p2p/12D3KooWKD62Q1nAAMHeV2Cx3rNNMzjgHkTT2edFMzHZ5ur7sGnh
     listening_address: /ip4/127.0.0.1/udp/8716/quic-v1
     policy_settings:
+      min_dispersal_peers: 1
+      min_replication_peers: 1
       max_dispersal_failures: 3
       max_sampling_failures: 3
       max_replication_failures: 3
@@ -68,6 +70,9 @@ da_network:
         secs: 10 
         nanos: 0
       time_decay_factor: "0.8"
+    balancer_interval:
+      secs: 5
+      nanos: 0
     redial_cooldown:
       secs: 5
       nanos: 0
