@@ -5,7 +5,6 @@ pub mod openapi {
 }
 
 // std
-use std::fmt::Debug;
 use std::marker::PhantomData;
 
 // crates
@@ -14,11 +13,11 @@ use overwatch_rs::services::handle::ServiceStateHandle;
 use overwatch_rs::services::state::ServiceState;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
-use services_utils::overwatch::recovery::backends::FileBackendSettings;
 use services_utils::overwatch::recovery::JsonRecoverySerializer;
 // internal
 use crate::backend::RecoverableMempool;
 use crate::network::NetworkAdapter as NetworkAdapterTrait;
+use crate::tx::settings::TxMempoolSettings;
 use crate::{MempoolMetrics, MempoolMsg};
 use nomos_network::{NetworkMsg, NetworkService};
 use overwatch_rs::services::{relay::OutboundRelay, ServiceCore, ServiceData, ServiceId};
@@ -215,21 +214,5 @@ where
                     .unwrap_or_else(|_| tracing::debug!("could not send back mempool status"));
             }
         }
-    }
-}
-
-#[derive(Clone, Debug)]
-pub struct TxMempoolSettings<PoolSettings, NetworkAdapterSettings> {
-    pub pool: PoolSettings,
-    pub network_adapter: NetworkAdapterSettings,
-}
-
-impl<PoolSettings, NetworkAdapterSettings> FileBackendSettings
-    for TxMempoolSettings<PoolSettings, NetworkAdapterSettings>
-where
-    PoolSettings: FileBackendSettings,
-{
-    fn recovery_file(&self) -> &std::path::PathBuf {
-        self.pool.recovery_file()
     }
 }

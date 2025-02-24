@@ -10,7 +10,7 @@ use std::fmt::{Debug, Error, Formatter};
 use tokio::sync::oneshot::Sender;
 
 pub use da::service::{DaMempoolService, DaMempoolSettings};
-pub use tx::service::{TxMempoolService, TxMempoolSettings};
+pub use tx::{service::TxMempoolService, settings::TxMempoolSettings};
 
 pub enum MempoolMsg<BlockId, Payload, Item, Key> {
     Add {
