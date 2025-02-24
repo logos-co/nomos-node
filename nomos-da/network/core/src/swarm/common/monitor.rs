@@ -24,6 +24,7 @@ use crate::{
     },
 };
 
+#[derive(Debug)]
 pub enum MonitorEvent {
     ExecutorDispersal(ExecutorDispersalError),
     ValidatorDispersal(ValidatorDispersalError),
@@ -245,6 +246,7 @@ where
 
     fn record_event(&mut self, event: Self::Event) -> Option<ConnectionMonitorOutput> {
         if let Some(peer_id) = event.peer_id() {
+            tracing::info!("MONITOR EVENT: {event:?}");
             let stats = self.peer_stats.entry(*peer_id).or_default();
             let now = Instant::now();
             match event {
