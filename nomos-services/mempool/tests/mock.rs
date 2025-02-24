@@ -2,18 +2,25 @@ use nomos_core::{
     header::HeaderId,
     tx::mock::{MockTransaction, MockTxId},
 };
+use nomos_mempool::{
+    backend::mockpool::{MockPool, MockSettings},
+    network::adapters::mock::{MockAdapter, MOCK_TX_CONTENT_TOPIC},
+    MempoolMsg, TxMempoolService, TxMempoolSettings,
+};
 use nomos_network::{
     backends::mock::{Mock, MockBackendMessage, MockConfig, MockMessage},
     NetworkConfig, NetworkMsg, NetworkService,
 };
 use nomos_tracing_service::{Tracing, TracingSettings};
 use overwatch_derive::*;
-use overwatch_rs::{overwatch::OverwatchRunner, OpaqueServiceHandle};
-
-use nomos_mempool::{
-    backend::mockpool::{MockPool, MockSettings},
-    network::adapters::mock::{MockAdapter, MOCK_TX_CONTENT_TOPIC},
-    MempoolMsg, TxMempoolService, TxMempoolSettings,
+use overwatch_rs::services::ServiceData;
+use overwatch_rs::{
+    overwatch::{
+        commands::{OverwatchCommand, ServiceLifeCycleCommand},
+        OverwatchRunner,
+    },
+    services::life_cycle::LifecycleMessage,
+    OpaqueServiceHandle,
 };
 use services_utils::{
     overwatch::{
@@ -46,9 +53,10 @@ impl RecoveryBackend for MockRecoveryBackend {
     }
 }
 
+// Delete the recovery file when not needed anymore.
 impl Drop for MockRecoveryBackend {
     fn drop(&mut self) {
-        std::fs::remove_file(self.1.recovery_file()).unwrap();
+        let _ = std::fs::remove_file(self.1.recovery_file());
     }
 }
 
@@ -63,18 +71,17 @@ impl FromSettings for MockRecoveryBackend {
     }
 }
 
-#[allow(clippy::type_complexity)]
+type MockMempoolService = TxMempoolService<
+    MockPool<HeaderId, MockTransaction<MockMessage>, MockTxId>,
+    MockAdapter,
+    MockRecoveryBackend,
+>;
+
 #[derive(Services)]
 struct MockPoolNode {
     logging: OpaqueServiceHandle<Tracing>,
     network: OpaqueServiceHandle<NetworkService<Mock>>,
-    mockpool: OpaqueServiceHandle<
-        TxMempoolService<
-            MockPool<HeaderId, MockTransaction<MockMessage>, MockTxId>,
-            MockAdapter,
-            MockRecoveryBackend,
-        >,
-    >,
+    mockpool: OpaqueServiceHandle<MockMempoolService>,
 }
 
 #[test]
@@ -125,11 +132,7 @@ fn test_mockmempool() {
     .unwrap();
 
     let network = app.handle().relay::<NetworkService<Mock>>();
-    let mempool = app.handle().relay::<TxMempoolService<
-        MockPool<HeaderId, MockTransaction<MockMessage>, MockTxId>,
-        MockAdapter,
-        MockRecoveryBackend,
-    >>();
+    let mempool = app.handle().relay::<MockMempoolService>();
 
     app.spawn(async move {
         let network_outbound = network.connect().await.unwrap();
