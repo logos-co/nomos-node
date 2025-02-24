@@ -36,7 +36,7 @@ struct MockPoolNode {
     mockpool: OpaqueServiceHandle<MockMempoolService>,
 }
 
-// Run the provided closure, and then removes any file-based recovery mechanism that was wun.
+// Run the provided closure, and then removes any file-based recovery mechanism that was run.
 fn run_with_recovery_teardown(run: impl Fn()) {
     run();
     let _ = std::fs::remove_file(RECOVERY_FILE_PATH);

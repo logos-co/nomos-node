@@ -21,7 +21,7 @@ mod serde;
 /// A mock mempool implementation that stores all transactions in memory in the order received.
 #[derive(Serialize, Deserialize)]
 #[serde(
-    bound = "BlockId: Serialize + DeserializeOwned + Ord, Key: Serialize + DeserializeOwned + Ord + Eq + Hash + AsRef<[u8]> + TryFrom<Vec<u8>>, Item: Clone + Serialize + DeserializeOwned"
+    bound = "Key: Eq + Ord + Hash + AsRef<[u8]> + TryFrom<Vec<u8>> + Serialize + DeserializeOwned, Item: Clone + Serialize + DeserializeOwned, BlockId: Ord + Serialize + DeserializeOwned"
 )]
 pub struct MockPool<BlockId, Item, Key> {
     #[serde(
