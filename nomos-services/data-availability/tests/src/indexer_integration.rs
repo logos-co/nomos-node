@@ -240,7 +240,6 @@ fn test_indexer() {
 
     node2.spawn(async move {
         let storage_outbound = node2_storage.connect().await.unwrap();
-
         store_blobs_in_db(blobs_node_2, storage_outbound).await;
     });
 
@@ -384,7 +383,7 @@ async fn store_blobs_in_db(
         let (light_blob, shared_commitments) = blob.into_blob_and_shared_commitments();
 
         let blob_prefix = format!("{}{}", DA_VERIFIED_KEY_PREFIX, DA_BLOB_PATH);
-        let blob_key = key_bytes(&blob_prefix, &idx);
+        let blob_key = key_bytes(&blob_prefix, idx);
         storage_outbound
             .send(StorageMsg::Store {
                 key: blob_key,

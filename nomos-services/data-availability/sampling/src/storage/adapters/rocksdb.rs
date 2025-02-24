@@ -57,7 +57,6 @@ where
 
         let blob_prefix = format!("{}{}", DA_VERIFIED_KEY_PREFIX, DA_BLOB_PATH);
         let blob_key = key_bytes(&blob_prefix, blob_idx);
-
         let (blob_reply_tx, blob_reply_rx) = tokio::sync::oneshot::channel();
         self.storage_relay
             .send(StorageMsg::Load {
@@ -70,9 +69,7 @@ where
         let shared_commitments_prefix =
             format!("{}{}", DA_VERIFIED_KEY_PREFIX, DA_SHARED_COMMITMENTS_PATH);
         let shared_commitments_key = key_bytes(&shared_commitments_prefix, blob_id);
-
         let (sc_reply_tx, sc_reply_rx) = tokio::sync::oneshot::channel();
-
         self.storage_relay
             .send(StorageMsg::Load {
                 key: shared_commitments_key,
