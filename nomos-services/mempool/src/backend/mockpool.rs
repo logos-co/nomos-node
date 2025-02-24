@@ -1,11 +1,14 @@
 // std
 use linked_hash_map::LinkedHashMap;
+use overwatch_rs::services::state::ServiceState;
 use std::hash::Hash;
 use std::time::SystemTime;
 use std::{collections::BTreeMap, time::UNIX_EPOCH};
+use thiserror::Error;
 // crates
 // internal
 use crate::backend::{MemPool, MempoolError, RecoverableMempool};
+use crate::TxMempoolSettings;
 
 use super::Status;
 
@@ -162,5 +165,22 @@ where
 
     fn save(&self) -> Self::RecoveryState {
         self.clone()
+    }
+}
+
+#[derive(Error, Debug)]
+pub enum Error {}
+
+impl<BlockId, Item, Key> ServiceState for MockPool<BlockId, Item, Key>
+where
+    Key: Hash + Eq + Ord + Clone + Send,
+    Item: Clone + Send + 'static,
+    BlockId: Ord + Copy,
+{
+    type Error = Error;
+    type Settings = TxMempoolSettings<(), ()>;
+
+    fn from_settings(_settings: &Self::Settings) -> Result<Self, Self::Error> {
+        Ok(<Self as MemPool>::new(()))
     }
 }

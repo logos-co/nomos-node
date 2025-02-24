@@ -12,14 +12,12 @@ use std::marker::PhantomData;
 use futures::StreamExt;
 use overwatch_rs::services::handle::ServiceStateHandle;
 // internal
-use crate::backend::MemPool;
+use crate::backend::RecoverableMempool;
 use crate::network::NetworkAdapter as NetworkAdapterTrait;
 use crate::{MempoolMetrics, MempoolMsg};
 use nomos_network::{NetworkMsg, NetworkService};
 use overwatch_rs::services::{
-    relay::OutboundRelay,
-    state::{NoOperator, NoState},
-    ServiceCore, ServiceData, ServiceId,
+    relay::OutboundRelay, state::NoOperator, ServiceCore, ServiceData, ServiceId,
 };
 use overwatch_rs::OpaqueServiceStateHandle;
 use services_utils::overwatch::lifecycle;
@@ -48,12 +46,12 @@ where
 
 impl<Pool, NetworkAdapter> ServiceData for TxMempoolService<Pool, NetworkAdapter>
 where
-    Pool: MemPool,
+    Pool: RecoverableMempool,
     NetworkAdapter: NetworkAdapterTrait,
 {
     const SERVICE_ID: ServiceId = "mempool-cl";
     type Settings = TxMempoolSettings<Pool::Settings, NetworkAdapter::Settings>;
-    type State = NoState<Self::Settings>;
+    type State = Pool::RecoveryState;
     type StateOperator = NoOperator<Self::State, Self::Settings>;
     type Message = MempoolMsg<Pool::BlockId, Pool::Item, Pool::Item, Pool::Key>;
 }
@@ -61,7 +59,8 @@ where
 #[async_trait::async_trait]
 impl<Pool, NetworkAdapter> ServiceCore for TxMempoolService<Pool, NetworkAdapter>
 where
-    Pool: MemPool + Send,
+    Pool: RecoverableMempool + Send,
+    Pool::RecoveryState: Send + Sync,
     Pool::Settings: Clone + Send + Sync,
     Pool::BlockId: Send + 'static,
     Pool::Key: Send,
@@ -71,11 +70,12 @@ where
 {
     fn init(
         service_state: ServiceStateHandle<Self::Message, Self::Settings, Self::State>,
-        _init_state: Self::State,
+        init_state: Self::State,
     ) -> Result<Self, overwatch_rs::DynError> {
         let settings = service_state.settings_reader.get_updated_settings();
+        let recovered_pool = Pool::recover(settings.pool, init_state);
 
-        Ok(Self::new(Pool::new(settings.pool), service_state))
+        Ok(Self::new(recovered_pool, service_state))
     }
 
     async fn run(mut self) -> Result<(), overwatch_rs::DynError> {
@@ -126,7 +126,7 @@ where
 
 impl<Pool, NetworkAdapter> TxMempoolService<Pool, NetworkAdapter>
 where
-    Pool: MemPool + Send,
+    Pool: RecoverableMempool + Send,
     Pool::Item: Clone + Send + 'static,
     Pool::Key: Send,
     Pool::BlockId: Send,
