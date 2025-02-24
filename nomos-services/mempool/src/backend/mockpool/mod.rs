@@ -1,8 +1,9 @@
 // std
+use ::serde::{de::DeserializeOwned, Deserialize, Serialize};
 use linked_hash_map::LinkedHashMap;
 use overwatch_rs::services::state::ServiceState;
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use services_utils::overwatch::recovery::backends::FileBackendSettings;
+use std::fmt::Debug;
 use std::hash::Hash;
 use std::path::PathBuf;
 use std::time::SystemTime;
@@ -15,16 +16,39 @@ use crate::TxMempoolSettings;
 
 use super::Status;
 
+mod serde;
+
 /// A mock mempool implementation that stores all transactions in memory in the order received.
 #[derive(Serialize, Deserialize)]
 #[serde(
-    bound = "BlockId: Serialize + DeserializeOwned + Ord, Key: Serialize + DeserializeOwned + Hash + Eq + Ord, Item: Serialize + DeserializeOwned"
+    bound = "BlockId: Serialize + DeserializeOwned + Ord, Key: Serialize + DeserializeOwned + Ord + Eq + Hash + AsRef<[u8]> + TryFrom<Vec<u8>>, Item: Clone + Serialize + DeserializeOwned"
 )]
 pub struct MockPool<BlockId, Item, Key> {
+    #[serde(
+        serialize_with = "serde::serialize_pending_items",
+        deserialize_with = "serde::deserialize_pending_items"
+    )]
     pending_items: LinkedHashMap<Key, Item>,
     in_block_items: BTreeMap<BlockId, Vec<Item>>,
     in_block_items_by_id: BTreeMap<Key, BlockId>,
     last_item_timestamp: u64,
+}
+
+impl<BlockId, Item, Key> MockPool<BlockId, Item, Key> {
+    #[must_use]
+    pub const fn pending_items(&self) -> &LinkedHashMap<Key, Item> {
+        &self.pending_items
+    }
+
+    #[must_use]
+    pub const fn in_block_items(&self) -> &BTreeMap<BlockId, Vec<Item>> {
+        &self.in_block_items
+    }
+
+    #[must_use]
+    pub const fn last_item_timestamp(&self) -> u64 {
+        self.last_item_timestamp
+    }
 }
 
 impl<BlockId, Item, Key> Default for MockPool<BlockId, Item, Key>
@@ -70,10 +94,12 @@ where
 #[derive(Clone, Debug)]
 pub struct MockSettings(PathBuf);
 
+pub const RECOVERY_FILE_PATH: &str = "mock_recovery.json";
+
 impl MockSettings {
     #[must_use]
     pub fn new() -> Self {
-        Self("mock_recovery.json".to_string().into())
+        Self(RECOVERY_FILE_PATH.to_string().into())
     }
 }
 

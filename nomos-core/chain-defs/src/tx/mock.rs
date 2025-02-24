@@ -64,6 +64,15 @@ impl From<[u8; 32]> for MockTxId {
     }
 }
 
+impl TryFrom<Vec<u8>> for MockTxId {
+    type Error = &'static str;
+
+    fn try_from(value: Vec<u8>) -> Result<Self, Self::Error> {
+        let inner: [u8; 32] = value.try_into().map_err(|_| "Input value too long.")?;
+        Ok(Self(inner))
+    }
+}
+
 impl core::ops::Deref for MockTxId {
     type Target = [u8; 32];
 
