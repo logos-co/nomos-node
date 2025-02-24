@@ -11,7 +11,7 @@ use overwatch_derive::*;
 use overwatch_rs::{overwatch::OverwatchRunner, OpaqueServiceHandle};
 
 use nomos_mempool::{
-    backend::mockpool::MockPool,
+    backend::mockpool::{MockPool, MockSettings},
     network::adapters::mock::{MockAdapter, MOCK_TX_CONTENT_TOPIC},
     MempoolMsg, TxMempoolService, TxMempoolSettings,
 };
@@ -63,7 +63,7 @@ fn test_mockmempool() {
                 },
             },
             mockpool: TxMempoolSettings {
-                pool: (),
+                pool: MockSettings::default(),
                 network_adapter: (),
             },
             logging: TracingSettings::default(),

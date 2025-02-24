@@ -11,16 +11,19 @@ use std::marker::PhantomData;
 // crates
 use futures::StreamExt;
 use overwatch_rs::services::handle::ServiceStateHandle;
+use overwatch_rs::services::state::ServiceState;
+use serde::de::DeserializeOwned;
+use serde::Serialize;
+use services_utils::overwatch::recovery::backends::FileBackendSettings;
+use services_utils::overwatch::recovery::JsonRecoverySerializer;
 // internal
 use crate::backend::RecoverableMempool;
 use crate::network::NetworkAdapter as NetworkAdapterTrait;
 use crate::{MempoolMetrics, MempoolMsg};
 use nomos_network::{NetworkMsg, NetworkService};
-use overwatch_rs::services::{
-    relay::OutboundRelay, state::NoOperator, ServiceCore, ServiceData, ServiceId,
-};
+use overwatch_rs::services::{relay::OutboundRelay, ServiceCore, ServiceData, ServiceId};
 use overwatch_rs::OpaqueServiceStateHandle;
-use services_utils::overwatch::lifecycle;
+use services_utils::overwatch::{lifecycle, FileBackend, RecoveryOperator};
 
 pub struct TxMempoolService<Pool, NetworkAdapter>
 where
@@ -47,12 +50,15 @@ where
 impl<Pool, NetworkAdapter> ServiceData for TxMempoolService<Pool, NetworkAdapter>
 where
     Pool: RecoverableMempool,
+    Pool::RecoveryState: ServiceState + Serialize + DeserializeOwned,
     NetworkAdapter: NetworkAdapterTrait,
 {
     const SERVICE_ID: ServiceId = "mempool-cl";
     type Settings = TxMempoolSettings<Pool::Settings, NetworkAdapter::Settings>;
     type State = Pool::RecoveryState;
-    type StateOperator = NoOperator<Self::State, Self::Settings>;
+    type StateOperator = RecoveryOperator<
+        FileBackend<Self::State, Self::Settings, JsonRecoverySerializer<Self::State>>,
+    >;
     type Message = MempoolMsg<Pool::BlockId, Pool::Item, Pool::Item, Pool::Key>;
 }
 
@@ -60,7 +66,7 @@ where
 impl<Pool, NetworkAdapter> ServiceCore for TxMempoolService<Pool, NetworkAdapter>
 where
     Pool: RecoverableMempool + Send,
-    Pool::RecoveryState: Send + Sync,
+    Pool::RecoveryState: ServiceState + Serialize + DeserializeOwned + Send + Sync,
     Pool::Settings: Clone + Send + Sync,
     Pool::BlockId: Send + 'static,
     Pool::Key: Send,
@@ -127,6 +133,7 @@ where
 impl<Pool, NetworkAdapter> TxMempoolService<Pool, NetworkAdapter>
 where
     Pool: RecoverableMempool + Send,
+    Pool::RecoveryState: ServiceState + Serialize + DeserializeOwned + Send + Sync,
     Pool::Item: Clone + Send + 'static,
     Pool::Key: Send,
     Pool::BlockId: Send,
@@ -215,4 +222,14 @@ where
 pub struct TxMempoolSettings<PoolSettings, NetworkAdapterSettings> {
     pub pool: PoolSettings,
     pub network_adapter: NetworkAdapterSettings,
+}
+
+impl<PoolSettings, NetworkAdapterSettings> FileBackendSettings
+    for TxMempoolSettings<PoolSettings, NetworkAdapterSettings>
+where
+    PoolSettings: FileBackendSettings,
+{
+    fn recovery_file(&self) -> &std::path::PathBuf {
+        self.pool.recovery_file()
+    }
 }

@@ -1,7 +1,10 @@
 // std
 use linked_hash_map::LinkedHashMap;
 use overwatch_rs::services::state::ServiceState;
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use services_utils::overwatch::recovery::backends::FileBackendSettings;
 use std::hash::Hash;
+use std::path::PathBuf;
 use std::time::SystemTime;
 use std::{collections::BTreeMap, time::UNIX_EPOCH};
 use thiserror::Error;
@@ -13,6 +16,10 @@ use crate::TxMempoolSettings;
 use super::Status;
 
 /// A mock mempool implementation that stores all transactions in memory in the order received.
+#[derive(Serialize, Deserialize)]
+#[serde(
+    bound = "BlockId: Serialize + DeserializeOwned + Ord, Key: Serialize + DeserializeOwned + Hash + Eq + Ord, Item: Serialize + DeserializeOwned"
+)]
 pub struct MockPool<BlockId, Item, Key> {
     pending_items: LinkedHashMap<Key, Item>,
     in_block_items: BTreeMap<BlockId, Vec<Item>>,
@@ -60,13 +67,35 @@ where
     }
 }
 
+#[derive(Clone, Debug)]
+pub struct MockSettings(PathBuf);
+
+impl MockSettings {
+    #[must_use]
+    pub fn new() -> Self {
+        Self("mock_recovery.json".to_string().into())
+    }
+}
+
+impl Default for MockSettings {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl FileBackendSettings for MockSettings {
+    fn recovery_file(&self) -> &PathBuf {
+        &self.0
+    }
+}
+
 impl<BlockId, Item, Key> MemPool for MockPool<BlockId, Item, Key>
 where
     Key: Hash + Eq + Ord + Clone + Send,
     Item: Clone + Send + 'static,
     BlockId: Ord + Copy,
 {
-    type Settings = ();
+    type Settings = MockSettings;
     type Item = Item;
     type Key = Key;
     type BlockId = BlockId;
@@ -178,9 +207,9 @@ where
     BlockId: Ord + Copy,
 {
     type Error = Error;
-    type Settings = TxMempoolSettings<(), ()>;
+    type Settings = TxMempoolSettings<MockSettings, ()>;
 
     fn from_settings(_settings: &Self::Settings) -> Result<Self, Self::Error> {
-        Ok(<Self as MemPool>::new(()))
+        Ok(<Self as MemPool>::new(MockSettings::default()))
     }
 }
