@@ -143,5 +143,7 @@ fn test_mockmempool() {
             .load_state()
             .expect("Should not fail to load the state.");
         assert_eq!(recovered_state.pending_items().len(), 2);
+        assert_eq!(recovered_state.in_block_items().len(), 0);
+        assert!(recovered_state.last_item_timestamp() > 0);
     });
 }
