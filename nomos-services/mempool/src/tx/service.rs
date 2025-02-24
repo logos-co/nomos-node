@@ -79,31 +79,33 @@ where
     }
 
     async fn run(mut self) -> Result<(), overwatch_rs::DynError> {
-        let network_relay = self
+        let network_service_relay = self
             .service_state_handle
             .overwatch_handle
-            .relay::<NetworkService<NetworkAdapter::Backend>>()
+            .relay::<NetworkService<_>>()
             .connect()
             .await
             .expect("Relay connection with NetworkService should succeed");
 
-        let network_adapter = NetworkAdapter::new(
+        // Queue for network messages
+        let mut network_items = NetworkAdapter::new(
             self.service_state_handle
                 .settings_reader
                 .get_updated_settings()
                 .network_adapter,
-            network_relay.clone(),
+            network_service_relay.clone(),
         )
+        .await
+        .payload_stream()
         .await;
-        // Queue for messages from the network
-        let mut network_items = network_adapter.payload_stream().await;
         // Queue for lifecycle messages
         let mut lifecycle_stream = self.service_state_handle.lifecycle_handle.message_stream();
 
         loop {
             tokio::select! {
+                // Queue for relay messages
                 Some(relay_msg) = self.service_state_handle.inbound_relay.recv() => {
-                    self.handle_mempool_message(relay_msg, network_relay.clone());
+                    self.handle_mempool_message(relay_msg, network_service_relay.clone());
                 }
                 Some((key, item )) = network_items.next() => {
                     self.pool.add_item(key, item).unwrap_or_else(|e| {
