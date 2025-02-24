@@ -617,8 +617,16 @@ impl<M: MembershipHandler<Id = PeerId, NetworkId = SubnetworkId> + 'static> Netw
                         sample_response,
                         peer_id,
                     ) {
+                        tracing::info!(">>>>> sampling return event: {event:?}");
                         return event;
                     }
+                }
+                // Ignore `UnexpectedEof` errors and continue polling, stream is closeed by the
+                // sender after the message is sent.
+                Err(SamplingError::Io { error, .. })
+                    if error.kind() == std::io::ErrorKind::UnexpectedEof =>
+                {
+                    return Poll::Pending;
                 }
                 // Something went up on our side of the wire, bubble it up
                 Err(error) => {
@@ -633,6 +641,7 @@ impl<M: MembershipHandler<Id = PeerId, NetworkId = SubnetworkId> + 'static> Netw
             let sample_stream = SampleStream { stream, peer_id };
             let (request_receiver, response_sender) =
                 Self::schedule_incoming_stream_task(incoming_tasks, sample_stream);
+            cx.waker().wake_by_ref();
             return Poll::Ready(ToSwarm::GenerateEvent(SamplingEvent::IncomingSample {
                 request_receiver,
                 response_sender,
@@ -644,10 +653,18 @@ impl<M: MembershipHandler<Id = PeerId, NetworkId = SubnetworkId> + 'static> Netw
                 Ok(sample_stream) => {
                     let (request_receiver, response_sender) =
                         Self::schedule_incoming_stream_task(incoming_tasks, sample_stream);
+                    cx.waker().wake_by_ref();
                     return Poll::Ready(ToSwarm::GenerateEvent(SamplingEvent::IncomingSample {
                         request_receiver,
                         response_sender,
                     }));
+                }
+                // Ignore `UnexpectedEof` errors and continue polling, stream is closeed by the
+                // sender after the message is sent.
+                Err(SamplingError::Io { error, .. })
+                    if error.kind() == std::io::ErrorKind::UnexpectedEof =>
+                {
+                    return Poll::Pending;
                 }
                 Err(error) => {
                     return Poll::Ready(ToSwarm::GenerateEvent(SamplingEvent::SamplingError {
