@@ -39,11 +39,7 @@ pub mod test {
         };
 
         let mut executor = Swarm::new_ephemeral(|_| {
-            DispersalExecutorBehaviour::new(
-                PeerId::from_public_key(&k1.public()),
-                neighbours.clone(),
-                AddressBook::empty(),
-            )
+            DispersalExecutorBehaviour::new(neighbours.clone(), AddressBook::empty())
         });
         let mut validator = Swarm::new_ephemeral(|_| DispersalValidatorBehaviour::new(neighbours));
 
