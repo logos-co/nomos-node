@@ -6,6 +6,7 @@ use either::Either;
 use futures::future::BoxFuture;
 use futures::stream::{BoxStream, FuturesUnordered};
 use futures::{AsyncWriteExt, FutureExt, StreamExt, TryFutureExt};
+use libp2p::core::transport::PortUse;
 use libp2p::core::Endpoint;
 use libp2p::swarm::behaviour::{ConnectionClosed, ConnectionEstablished};
 use libp2p::swarm::dial_opts::DialOpts;
@@ -511,9 +512,16 @@ impl<M: MembershipHandler<Id = PeerId, NetworkId = SubnetworkId> + 'static> Netw
         peer: PeerId,
         addr: &Multiaddr,
         role_override: Endpoint,
+        port_use: PortUse,
     ) -> Result<THandler<Self>, ConnectionDenied> {
         self.stream_behaviour
-            .handle_established_outbound_connection(connection_id, peer, addr, role_override)
+            .handle_established_outbound_connection(
+                connection_id,
+                peer,
+                addr,
+                role_override,
+                port_use,
+            )
             .map(Either::Left)
     }
 

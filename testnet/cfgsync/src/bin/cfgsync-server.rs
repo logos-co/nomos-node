@@ -66,6 +66,7 @@ impl CfgSyncConfig {
     }
 
     fn to_da_params(&self) -> DaParams {
+        let default = DaParams::default();
         DaParams {
             subnetwork_size: self.subnetwork_size,
             dispersal_factor: self.dispersal_factor,
@@ -74,6 +75,9 @@ impl CfgSyncConfig {
             old_blobs_check_interval: Duration::from_secs(self.old_blobs_check_interval_secs),
             blobs_validity_duration: Duration::from_secs(self.blobs_validity_duration_secs),
             global_params_path: self.global_params_path.clone(),
+            policy_settings: default.policy_settings,
+            monitor_settings: default.monitor_settings,
+            redial_cooldown: default.redial_cooldown,
         }
     }
 

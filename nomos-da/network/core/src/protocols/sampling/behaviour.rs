@@ -10,6 +10,7 @@ use futures::stream::{BoxStream, FuturesUnordered};
 use futures::{AsyncWriteExt, FutureExt, StreamExt, TryFutureExt};
 use kzgrs_backend::common::blob::DaBlob;
 use kzgrs_backend::common::ColumnIndex;
+use libp2p::core::transport::PortUse;
 use libp2p::core::Endpoint;
 use libp2p::swarm::dial_opts::DialOpts;
 use libp2p::swarm::{
@@ -557,12 +558,19 @@ impl<M: MembershipHandler<Id = PeerId, NetworkId = SubnetworkId> + 'static> Netw
         peer: PeerId,
         addr: &Multiaddr,
         role_override: Endpoint,
+        port_use: PortUse,
     ) -> Result<THandler<Self>, ConnectionDenied> {
         if !self.membership.is_allowed(&peer) {
             return Ok(Either::Right(libp2p::swarm::dummy::ConnectionHandler));
         }
         self.stream_behaviour
-            .handle_established_outbound_connection(connection_id, peer, addr, role_override)
+            .handle_established_outbound_connection(
+                connection_id,
+                peer,
+                addr,
+                role_override,
+                port_use,
+            )
             .map(Either::Left)
     }
 

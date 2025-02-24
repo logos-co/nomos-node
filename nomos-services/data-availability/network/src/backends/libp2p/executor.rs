@@ -117,6 +117,9 @@ where
                 .clone()
                 .into_iter()
                 .collect(),
+            config.validator_settings.policy_settings.clone(),
+            config.validator_settings.monitor_settings.clone(),
+            config.validator_settings.redial_cooldown,
         );
         let address = config.validator_settings.listening_address.clone();
         // put swarm to listen at the specified configuration address

@@ -255,6 +255,9 @@ pub fn new_node(
                     ),
                     addresses: da_network_settings.peer_addresses.into_iter().collect(),
                     listening_address: da_network_settings.listening_address,
+                    policy_settings: Default::default(),
+                    monitor_settings: Default::default(),
+                    redial_cooldown: Duration::ZERO,
                 },
             },
             cl_mempool: TxMempoolSettings {
