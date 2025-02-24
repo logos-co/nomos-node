@@ -13,7 +13,7 @@ use overwatch_rs::services::handle::ServiceStateHandle;
 use overwatch_rs::services::state::ServiceState;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
-use services_utils::overwatch::recovery::JsonRecoverySerializer;
+use services_utils::overwatch::recovery::operators::RecoveryBackend as RecoveryBackendTrait;
 // internal
 use crate::backend::RecoverableMempool;
 use crate::network::NetworkAdapter as NetworkAdapterTrait;
@@ -22,18 +22,18 @@ use crate::{MempoolMetrics, MempoolMsg};
 use nomos_network::{NetworkMsg, NetworkService};
 use overwatch_rs::services::{relay::OutboundRelay, ServiceCore, ServiceData, ServiceId};
 use overwatch_rs::OpaqueServiceStateHandle;
-use services_utils::overwatch::{lifecycle, FileBackend, RecoveryOperator};
+use services_utils::overwatch::{lifecycle, RecoveryOperator};
 
-pub struct TxMempoolService<Pool, NetworkAdapter>
+pub struct TxMempoolService<Pool, NetworkAdapter, RecoveryBackend>
 where
     Self: ServiceData,
 {
     pool: Pool,
     service_state_handle: OpaqueServiceStateHandle<Self>,
-    _phantom: PhantomData<NetworkAdapter>,
+    _phantom: PhantomData<(NetworkAdapter, RecoveryBackend)>,
 }
 
-impl<Pool, NetworkAdapter> TxMempoolService<Pool, NetworkAdapter>
+impl<Pool, NetworkAdapter, RecoveryBackend> TxMempoolService<Pool, NetworkAdapter, RecoveryBackend>
 where
     Self: ServiceData,
 {
@@ -46,23 +46,24 @@ where
     }
 }
 
-impl<Pool, NetworkAdapter> ServiceData for TxMempoolService<Pool, NetworkAdapter>
+impl<Pool, NetworkAdapter, RecoveryBackend> ServiceData
+    for TxMempoolService<Pool, NetworkAdapter, RecoveryBackend>
 where
     Pool: RecoverableMempool,
     Pool::RecoveryState: ServiceState + Serialize + DeserializeOwned,
     NetworkAdapter: NetworkAdapterTrait,
+    RecoveryBackend: RecoveryBackendTrait,
 {
     const SERVICE_ID: ServiceId = "mempool-cl";
     type Settings = TxMempoolSettings<Pool::Settings, NetworkAdapter::Settings>;
     type State = Pool::RecoveryState;
-    type StateOperator = RecoveryOperator<
-        FileBackend<Self::State, Self::Settings, JsonRecoverySerializer<Self::State>>,
-    >;
+    type StateOperator = RecoveryOperator<RecoveryBackend>;
     type Message = MempoolMsg<Pool::BlockId, Pool::Item, Pool::Item, Pool::Key>;
 }
 
 #[async_trait::async_trait]
-impl<Pool, NetworkAdapter> ServiceCore for TxMempoolService<Pool, NetworkAdapter>
+impl<Pool, NetworkAdapter, RecoveryBackend> ServiceCore
+    for TxMempoolService<Pool, NetworkAdapter, RecoveryBackend>
 where
     Pool: RecoverableMempool + Send,
     Pool::RecoveryState: ServiceState + Serialize + DeserializeOwned + Send + Sync,
@@ -72,6 +73,7 @@ where
     Pool::Item: Clone + Send + 'static,
     NetworkAdapter: NetworkAdapterTrait<Payload = Pool::Item, Key = Pool::Key> + Send,
     NetworkAdapter::Settings: Clone + Send + Sync + 'static,
+    RecoveryBackend: RecoveryBackendTrait + Send,
 {
     fn init(
         service_state: ServiceStateHandle<Self::Message, Self::Settings, Self::State>,
@@ -117,6 +119,7 @@ where
                         tracing::debug!("could not add item to the pool due to: {e}");
                     });
                     tracing::info!(counter.tx_mempool_pending_items = self.pool.pending_item_count());
+                    self.service_state_handle.state_updater.update(self.pool.save());
                 }
                 Some(lifecycle_msg) = lifecycle_stream.next() =>  {
                     if lifecycle::should_stop_service::<Self>(&lifecycle_msg).await {
@@ -129,7 +132,7 @@ where
     }
 }
 
-impl<Pool, NetworkAdapter> TxMempoolService<Pool, NetworkAdapter>
+impl<Pool, NetworkAdapter, RecoveryBackend> TxMempoolService<Pool, NetworkAdapter, RecoveryBackend>
 where
     Pool: RecoverableMempool + Send,
     Pool::RecoveryState: ServiceState + Serialize + DeserializeOwned + Send + Sync,
@@ -139,6 +142,7 @@ where
     Pool::Settings: Clone + Send + Sync,
     NetworkAdapter: NetworkAdapterTrait<Payload = Pool::Item> + Send,
     NetworkAdapter::Settings: Clone + Send + Sync + 'static,
+    RecoveryBackend: RecoveryBackendTrait,
 {
     fn handle_mempool_message(
         &mut self,
@@ -159,6 +163,9 @@ where
                             .settings_reader
                             .get_updated_settings()
                             .network_adapter;
+                        self.service_state_handle
+                            .state_updater
+                            .update(self.pool.save());
                         // move sending to a new task so local operations can complete in the meantime
                         tokio::spawn(async {
                             let adapter = NetworkAdapter::new(settings, network_relay).await;
