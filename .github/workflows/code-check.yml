@@ -44,6 +44,11 @@ jobs:
         uses: actions/checkout@v4
       - name: Install risc0 dependencies
         uses: ./.github/actions/install-risc0
+      - name: Set up Cargo cache
+        uses: ./.github/actions/setup-cargo-cache
+        with:
+          key: ${{ github.ref }}->${{ github.workflow }}->${{ github.job }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}        
       - name: Run cargo clippy
         uses: actions-rs/cargo@v1
         env:
@@ -51,6 +56,11 @@ jobs:
         with:
           command: clippy
           args: --all --all-targets --all-features -- -D warnings
+      - name: Update Cargo cache
+        if: success() || failure()
+        uses: ./.github/actions/update-cargo-cache
+        with:
+          key: ${{ github.ref }}->${{ github.workflow }}->${{ github.job }}
  
   tests:
     name: Run test suite
@@ -65,6 +75,12 @@ jobs:
         uses: actions/checkout@v4
       - name: Install risc0 dependencies
         uses: ./.github/actions/install-risc0
+      - name: Setup Cargo cache
+        uses: ./.github/actions/setup-cargo-cache
+        with:
+          # We use the same cache key for both OSes
+          key: ${{ github.ref }}->${{ github.workflow }}->${{ github.job }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}        
       - name: Build required binaries
         uses: actions-rs/cargo@v1
         with:
@@ -79,6 +95,11 @@ jobs:
           command: test
           # We don't test benches as they take 6h+, leading to a timeout
           args: --all --lib --bins --tests --examples --all-features
+      - name: Update Cargo cache
+        if: success() || failure()
+        uses: ./.github/actions/update-cargo-cache
+        with:
+          key: ${{ github.ref }}->${{ github.workflow }}->${{ github.job }}
       - name: Upload integration tests results
         uses: actions/upload-artifact@v4
         if: failure()
