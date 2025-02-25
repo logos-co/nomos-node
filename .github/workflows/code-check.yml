@@ -82,8 +82,7 @@ jobs:
       - name: Setup Cargo cache
         uses: ./.github/actions/setup-cargo-cache
         with:
-          # We use the same cache key for both OSes
-          key: ${{ github.ref }}->${{ github.workflow }}->${{ github.job }}
+          key: ${{ github.ref }}->${{ github.workflow }}->${{ github.job }}->${{ matrix.os }}
           github-token: ${{ secrets.GITHUB_TOKEN }}        
       - name: Build required binaries
         uses: actions-rs/cargo@v1
@@ -103,7 +102,7 @@ jobs:
         if: success() || failure()
         uses: ./.github/actions/update-cargo-cache
         with:
-          key: ${{ github.ref }}->${{ github.workflow }}->${{ github.job }}
+          key: ${{ github.ref }}->${{ github.workflow }}->${{ github.job }}->${{ matrix.os }}
       - name: Upload integration tests results
         uses: actions/upload-artifact@v4
         if: failure()
