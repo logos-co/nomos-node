@@ -58,10 +58,6 @@ impl DaBlob {
     pub fn column_len(&self) -> usize {
         self.column.as_bytes().len()
     }
-
-    pub fn idx(&self) -> [u8; 34] {
-        create_blob_idx(&self.id(), &self.column_idx.to_be_bytes())
-    }
 }
 
 impl blob::Blob for DaBlob {
@@ -143,14 +139,4 @@ pub struct DaBlobSharedCommitments {
         deserialize_with = "deserialize_vec_canonical"
     )]
     pub rows_commitments: Vec<Commitment>,
-}
-
-// Combines a 32-byte blob ID (`[u8; 32]`) with a 2-byte column index
-// (`u16` represented as `[u8; 2]`).
-pub fn create_blob_idx(blob_id: &[u8], column_idx: &[u8]) -> [u8; 34] {
-    let mut blob_idx = [0u8; 34];
-    blob_idx[..blob_id.len()].copy_from_slice(blob_id);
-    blob_idx[blob_id.len()..].copy_from_slice(column_idx);
-
-    blob_idx
 }

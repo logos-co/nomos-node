@@ -17,7 +17,7 @@ use kzgrs_backend::{
 use nomos_core::da::blob::Blob;
 use nomos_core::da::DaEncoder as _;
 use nomos_core::{da::blob::metadata::Metadata as _, staking::NMO_UNIT};
-use nomos_da_storage::rocksdb::key_bytes;
+use nomos_da_storage::rocksdb::{create_blob_idx, key_bytes};
 use nomos_da_storage::rocksdb::{DA_BLOB_PATH, DA_SHARED_COMMITMENTS_PATH, DA_VERIFIED_KEY_PREFIX};
 use nomos_da_verifier::backend::kzgrs::KzgrsDaVerifierSettings;
 use nomos_ledger::LedgerState;
@@ -380,7 +380,7 @@ async fn store_blobs_in_db(
     // Also all blobs in RocksDb
     for blob in blobs {
         let id = blob.id();
-        let idx = blob.idx();
+        let idx = create_blob_idx(id.as_ref(), blob.column_idx().as_ref());
 
         let (light_blob, shared_commitments) = blob.into_blob_and_shared_commitments();
 

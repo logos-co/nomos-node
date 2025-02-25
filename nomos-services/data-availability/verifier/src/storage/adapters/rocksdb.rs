@@ -2,9 +2,8 @@
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::{marker::PhantomData, path::PathBuf};
 // crates
-use kzgrs_backend::common::blob::create_blob_idx;
 use nomos_core::da::blob::Blob;
-use nomos_da_storage::rocksdb::{key_bytes, DA_VERIFIED_KEY_PREFIX};
+use nomos_da_storage::rocksdb::{create_blob_idx, key_bytes, DA_VERIFIED_KEY_PREFIX};
 use nomos_da_storage::rocksdb::{DA_BLOB_PATH, DA_SHARED_COMMITMENTS_PATH};
 use nomos_storage::{
     backends::{rocksdb::RocksBackend, StorageSerde},
