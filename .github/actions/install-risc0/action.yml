@@ -8,5 +8,5 @@ runs:
     - name: Install cargo-binstall
       uses: cargo-bins/cargo-binstall@v1.11.1
     - name: Install risc0 using cargo-binstall
-      run: cargo binstall -y cargo-risczero@v1.2.4 && cargo risczero install
+      run: cargo binstall -y cargo-risczero@1.2.4 && cargo risczero install
       shell: bash
