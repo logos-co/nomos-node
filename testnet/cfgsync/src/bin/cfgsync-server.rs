@@ -44,6 +44,7 @@ struct CfgSyncConfig {
     old_blobs_check_interval_secs: u64,
     blobs_validity_duration_secs: u64,
     global_params_path: String,
+    balancer_interval_secs: u64,
 
     // Tracing params
     tracing_settings: TracingSettings,
@@ -75,9 +76,16 @@ impl CfgSyncConfig {
             old_blobs_check_interval: Duration::from_secs(self.old_blobs_check_interval_secs),
             blobs_validity_duration: Duration::from_secs(self.blobs_validity_duration_secs),
             global_params_path: self.global_params_path.clone(),
-            policy_settings: default.policy_settings,
+            policy_settings: DAConnectionPolicySettings {
+                min_dispersal_peers: self.num_subnets,
+                min_replication_peers: self.dispersal_factor,
+                max_dispersal_failures: 0,
+                max_sampling_failures: 0,
+                max_replication_failures: 0,
+                malicious_threshold: 0,
+            },
             monitor_settings: default.monitor_settings,
-            balancer_interval: default.balancer_interval,
+            balancer_interval: Duration::from_secs(self.balancer_interval_secs),
             redial_cooldown: default.redial_cooldown,
         }
     }
