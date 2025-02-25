@@ -4,6 +4,7 @@ pub mod openapi {
     pub use crate::backend::Status;
 }
 
+use std::fmt::Debug;
 // std
 use std::marker::PhantomData;
 
@@ -66,7 +67,7 @@ impl<Pool, NetworkAdapter, RecoveryBackend> ServiceCore
     for TxMempoolService<Pool, NetworkAdapter, RecoveryBackend>
 where
     Pool: RecoverableMempool + Send,
-    Pool::RecoveryState: ServiceState + Serialize + DeserializeOwned + Send + Sync,
+    Pool::RecoveryState: ServiceState + Debug + Serialize + DeserializeOwned + Send + Sync,
     Pool::Settings: Clone + Send + Sync,
     Pool::BlockId: Send + 'static,
     Pool::Key: Send,
@@ -79,6 +80,10 @@ where
         service_state: ServiceStateHandle<Self::Message, Self::Settings, Self::State>,
         init_state: Self::State,
     ) -> Result<Self, overwatch_rs::DynError> {
+        tracing::trace!(
+            "Initializing TxMempoolService with initial state {:#?}",
+            init_state
+        );
         let settings = service_state.settings_reader.get_updated_settings();
         let recovered_pool = Pool::recover(settings.pool, init_state);
 

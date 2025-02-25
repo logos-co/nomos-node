@@ -51,6 +51,22 @@ impl<BlockId, Item, Key> MockPool<BlockId, Item, Key> {
     }
 }
 
+impl<BlockId, Item, Key> Debug for MockPool<BlockId, Item, Key>
+where
+    BlockId: Debug,
+    Item: Debug,
+    Key: Debug + Hash + Eq,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("MockPool")
+            .field("pending_items", &self.pending_items)
+            .field("in_block_items", &self.in_block_items)
+            .field("in_block_items_by_id", &self.in_block_items_by_id)
+            .field("last_item_timestamp", &self.last_item_timestamp)
+            .finish()
+    }
+}
+
 impl<BlockId, Item, Key> Default for MockPool<BlockId, Item, Key>
 where
     Key: Hash + Eq,
