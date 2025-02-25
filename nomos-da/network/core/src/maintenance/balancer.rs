@@ -43,6 +43,7 @@ where
     Balancer: ConnectionBalancer,
 {
     pub fn new(addresses: AddressBook, balancer: Balancer) -> Self {
+        tracing::info!("Balancer address book: {addresses:?}");
         Self {
             addresses,
             balancer,
@@ -130,11 +131,11 @@ where
 
         if let Some(peer) = self.peers_to_dial.pop_front() {
             if let Some(addr) = self.addresses.get_address(&peer) {
-                return Poll::Ready(ToSwarm::Dial {
-                    opts: DialOpts::peer_id(peer)
-                        .addresses(vec![addr.clone()])
-                        .build(),
-                });
+                let opts = DialOpts::peer_id(peer)
+                    .addresses(vec![addr.clone()])
+                    .extend_addresses_through_behaviour()
+                    .build();
+                return Poll::Ready(ToSwarm::Dial { opts });
             }
         }
 
