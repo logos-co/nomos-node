@@ -49,15 +49,12 @@ impl Default for DaParams {
             num_samples: 1,
             num_subnets: 2,
             old_blobs_check_interval: Duration::from_secs(5),
-            blobs_validity_duration: Duration::from_secs(u64::MAX),
+            blobs_validity_duration: Duration::from_secs(60),
             global_params_path: GLOBAL_PARAMS_PATH.to_string(),
             policy_settings: DAConnectionPolicySettings::default(),
-            monitor_settings: DAConnectionMonitorSettings {
-                failure_time_window: Duration::from_secs(1),
-                time_decay_factor: U57F7::ZERO,
-            },
+            monitor_settings: DAConnectionMonitorSettings::default(),
             balancer_interval: Duration::from_secs(5),
-            redial_cooldown: Duration::from_secs(5),
+            redial_cooldown: Duration::ZERO,
         }
     }
 }

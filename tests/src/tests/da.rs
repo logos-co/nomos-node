@@ -106,7 +106,7 @@ async fn disseminate_retrieve_reconstruct() {
 #[ignore = "for local debugging"]
 #[tokio::test]
 async fn local_testnet() {
-    let topology = Topology::spawn(TopologyConfig::validator_and_executor()).await;
+    let topology = Topology::spawn(TopologyConfig::validators_and_executor(3, 2)).await;
     let executor = &topology.executors()[0];
     let app_id = hex::decode(APP_ID).expect("Invalid APP_ID");
 
@@ -120,7 +120,7 @@ async fn local_testnet() {
         .await;
 
         index += 1;
-        tokio::time::sleep(Duration::from_secs(10)).await;
+        tokio::time::sleep(Duration::from_secs(30)).await;
     }
 }
 

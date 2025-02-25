@@ -241,8 +241,9 @@ struct ResponseChannel {
 }
 
 type StreamHandlerFutureSuccess = (BlobId, SubnetworkId, sampling::SampleResponse, SampleStream);
+type StreamHandlerFutureError = (SamplingError, Option<SampleStream>);
 type OutgoingStreamHandlerFuture =
-    BoxFuture<'static, Result<StreamHandlerFutureSuccess, SamplingError>>;
+    BoxFuture<'static, Result<StreamHandlerFutureSuccess, StreamHandlerFutureError>>;
 type IncomingStreamHandlerFuture = BoxFuture<'static, Result<SampleStream, SamplingError>>;
 /// Executor sampling protocol
 /// Takes care of sending and replying sampling requests
@@ -338,20 +339,40 @@ where
         message: sampling::SampleRequest,
         subnetwork_id: SubnetworkId,
         blob_id: BlobId,
-    ) -> Result<StreamHandlerFutureSuccess, SamplingError> {
-        let into_sampling_error = |error: std::io::Error| -> SamplingError {
-            SamplingError::Io {
-                peer_id: stream.peer_id,
-                error,
+    ) -> Result<StreamHandlerFutureSuccess, StreamHandlerFutureError> {
+        if let Err(error) = pack_to_writer(&message, &mut stream.stream).await {
+            return Err((
+                SamplingError::Io {
+                    peer_id: stream.peer_id,
+                    error,
+                },
+                Some(stream),
+            ));
+        }
+
+        if let Err(error) = stream.stream.flush().await {
+            return Err((
+                SamplingError::Io {
+                    peer_id: stream.peer_id,
+                    error,
+                },
+                Some(stream),
+            ));
+        }
+
+        let response = match unpack_from_reader(&mut stream.stream).await {
+            Ok(response) => response,
+            Err(error) => {
+                return Err((
+                    SamplingError::Io {
+                        peer_id: stream.peer_id,
+                        error,
+                    },
+                    Some(stream),
+                ));
             }
         };
-        pack_to_writer(&message, &mut stream.stream)
-            .map_err(into_sampling_error)
-            .await?;
-        stream.stream.flush().await.map_err(into_sampling_error)?;
-        let response: sampling::SampleResponse = unpack_from_reader(&mut stream.stream)
-            .await
-            .map_err(into_sampling_error)?;
+
         // Safety: blob_id should always be a 32bytes hash
         Ok((blob_id, subnetwork_id, response, stream))
     }
@@ -487,7 +508,9 @@ impl<Membership: MembershipHandler<Id = PeerId, NetworkId = SubnetworkId> + 'sta
         let control = control.clone();
         let sample_request = sampling::SampleRequest::new(blob_id, subnetwork_id);
         let with_dial_task: OutgoingStreamHandlerFuture = async move {
-            let stream = Self::open_stream(peer, control).await?;
+            let stream = Self::open_stream(peer, control)
+                .await
+                .map_err(|err| (err, None))?;
             Self::stream_sample(stream, sample_request, subnetwork_id, blob_id).await
         }
         .boxed();
@@ -629,7 +652,11 @@ impl<M: MembershipHandler<Id = PeerId, NetworkId = SubnetworkId> + 'static> Netw
                         return event;
                     }
                 }
-                Err(error) => {
+                Err((error, stream)) => {
+                    if let Some(stream) = stream {
+                        to_close.push_back(stream);
+                        cx.waker().wake_by_ref();
+                    }
                     return Poll::Ready(ToSwarm::GenerateEvent(SamplingEvent::SamplingError {
                         error,
                     }));

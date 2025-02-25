@@ -1,6 +1,6 @@
 pub mod configs;
 
-use std::time::Duration;
+use std::{ops::Add, time::Duration};
 
 use configs::{
     da::{create_da_configs, DaParams},
@@ -55,6 +55,31 @@ impl TopologyConfig {
                 policy_settings: DAConnectionPolicySettings {
                     min_dispersal_peers: 1,
                     min_replication_peers: 1,
+                    max_dispersal_failures: 0,
+                    max_sampling_failures: 0,
+                    max_replication_failures: 0,
+                    malicious_threshold: 0,
+                },
+                balancer_interval: Duration::from_secs(5),
+                ..Default::default()
+            },
+            network_params: Default::default(),
+        }
+    }
+
+    pub fn validators_and_executor(num_validators: usize, num_subnets: usize) -> TopologyConfig {
+        let dispersal_factor = num_validators.add(1).saturating_div(num_subnets);
+        TopologyConfig {
+            n_validators: num_validators,
+            n_executors: 1,
+            consensus_params: ConsensusParams::default_for_participants(num_validators + 1),
+            da_params: DaParams {
+                dispersal_factor,
+                subnetwork_size: num_subnets,
+                num_subnets: num_subnets as u16,
+                policy_settings: DAConnectionPolicySettings {
+                    min_dispersal_peers: num_subnets,
+                    min_replication_peers: dispersal_factor,
                     max_dispersal_failures: 0,
                     max_sampling_failures: 0,
                     max_replication_failures: 0,
