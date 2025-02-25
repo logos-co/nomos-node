@@ -2,11 +2,20 @@ name: "Install Risc0"
 
 description: "Install the Risc0 toolchain. Requires the Rust toolchain to be installed."
 
+inputs:
+  github_token:
+    description: "The GitHub token to use for rate limiting."
+    required: true
+
 runs:
   using: "composite"
   steps:
     - name: Install cargo-binstall
       uses: cargo-bins/cargo-binstall@v1.11.1
+      env:
+        GITHUB_TOKEN: ${{ inputs.github_token }}
     - name: Install risc0 using cargo-binstall
       run: cargo binstall -y cargo-risczero@1.2.4 && cargo risczero install
       shell: bash
+      env:
+        GITHUB_TOKEN: ${{ inputs.github_token }}

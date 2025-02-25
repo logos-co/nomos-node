@@ -20,6 +20,8 @@ jobs:
         run: rustup component add llvm-tools-preview
       - name: Install risc0 dependencies
         uses: ./.github/actions/install-risc0
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
       - name: Build required binaries
         uses: actions-rs/cargo@v1
         with:
