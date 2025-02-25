@@ -43,7 +43,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
       - name: Install risc0 dependencies
-        uses: ./github/actions/install-risc0
+        uses: ./.github/actions/install-risc0
       - name: Run cargo clippy
         uses: actions-rs/cargo@v1
         env:
@@ -64,7 +64,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
       - name: Install risc0 dependencies
-        uses: ./github/actions/install-risc0
+        uses: ./.github/actions/install-risc0
       - name: Build required binaries
         uses: actions-rs/cargo@v1
         with:
