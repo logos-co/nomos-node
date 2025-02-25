@@ -70,6 +70,16 @@ impl<SerdeOp: StorageSerde + Send + Sync + 'static> StorageBackend for SledBacke
         Ok(())
     }
 
+    async fn store_batch(&mut self, keys_values: Vec<(Bytes, Bytes)>) -> Result<(), Self::Error> {
+        self.sled.transaction(|tx| {
+            for (key, value) in &keys_values {
+                tx.insert(key.to_vec(), value.to_vec())?;
+            }
+            Ok(())
+        })?;
+        Ok(())
+    }
+
     async fn load(&mut self, key: &[u8]) -> Result<Option<Bytes>, Self::Error> {
         Ok(self.sled.get(key)?.map(|ivec| ivec.to_vec().into()))
     }
@@ -114,6 +124,30 @@ mod test {
         assert_eq!(load_value, Some(value.as_bytes().into()));
         let removed_value = sled_db.remove(key.as_bytes()).await?;
         assert_eq!(removed_value, Some(value.as_bytes().into()));
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_store_batch() -> Result<(), <SledBackend<NoStorageSerde> as StorageBackend>::Error>
+    {
+        let temp_path = TempDir::new().unwrap();
+        let sled_settings = SledBackendSettings {
+            db_path: temp_path.path().to_path_buf(),
+        };
+        let key1 = "foo1";
+        let value1 = "bar1";
+
+        let key2 = "foo2";
+        let value2 = "bar2";
+
+        let mut sled_db: SledBackend<NoStorageSerde> = SledBackend::new(sled_settings)?;
+        sled_db
+            .store_batch(vec![
+                (key1.as_bytes().into(), value1.as_bytes().into()),
+                (key2.as_bytes().into(), value2.as_bytes().into()),
+            ])
+            .await?;
 
         Ok(())
     }
