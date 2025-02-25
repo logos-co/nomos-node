@@ -112,9 +112,9 @@ jobs:
     runs-on: ubuntu-latest
     needs:
       - formatting
-      - cargo-deny
-      - lints
-      - tests
+      # - cargo-deny
+      # - lints
+      # - tests
     env:
       DOCKER_BUILD_WORKFLOW_FILE: build-docker.yml # Change this in case of file renamings
     steps:
@@ -126,5 +126,5 @@ jobs:
               owner: context.repo.owner,
               repo: context.repo.repo,
               workflow_id: '${{ env.DOCKER_BUILD_WORKFLOW_FILE }}',
-              ref: '${{ github.ref }}',
+              ref: '${{ github.head_ref || github.ref }}',
             })
