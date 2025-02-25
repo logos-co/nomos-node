@@ -11,6 +11,7 @@ use axum::{http::StatusCode, response::IntoResponse, routing::post, Router};
 use cfgsync::config::Host;
 use cfgsync::repo::{ConfigRepo, RepoResponse};
 use clap::Parser;
+use nomos_da_network_core::swarm::{DAConnectionMonitorSettings, DAConnectionPolicySettings};
 use nomos_tracing_service::TracingSettings;
 use serde::{Deserialize, Serialize};
 use tests::nodes::executor::create_executor_config;
@@ -67,7 +68,6 @@ impl CfgSyncConfig {
     }
 
     fn to_da_params(&self) -> DaParams {
-        let default = DaParams::default();
         DaParams {
             subnetwork_size: self.subnetwork_size,
             dispersal_factor: self.dispersal_factor,
@@ -77,16 +77,16 @@ impl CfgSyncConfig {
             blobs_validity_duration: Duration::from_secs(self.blobs_validity_duration_secs),
             global_params_path: self.global_params_path.clone(),
             policy_settings: DAConnectionPolicySettings {
-                min_dispersal_peers: self.num_subnets,
+                min_dispersal_peers: self.num_subnets as usize,
                 min_replication_peers: self.dispersal_factor,
                 max_dispersal_failures: 0,
                 max_sampling_failures: 0,
                 max_replication_failures: 0,
                 malicious_threshold: 0,
             },
-            monitor_settings: default.monitor_settings,
+            monitor_settings: DAConnectionMonitorSettings::default(),
             balancer_interval: Duration::from_secs(self.balancer_interval_secs),
-            redial_cooldown: default.redial_cooldown,
+            redial_cooldown: Duration::ZERO,
         }
     }
 
