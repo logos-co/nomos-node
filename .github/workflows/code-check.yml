@@ -42,14 +42,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-      - name: Install cargo-binstall
-        uses: cargo-bins/cargo-binstall@v1.11.0
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - name: Install risc0
-        run: cargo binstall -y cargo-risczero && cargo risczero install
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Install risc0 dependencies
+        uses: ./github/actions/install-risc0
       - name: Run cargo clippy
         uses: actions-rs/cargo@v1
         env:
@@ -69,14 +63,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-      - name: Install cargo-binstall
-        uses: cargo-bins/cargo-binstall@v1.11.0
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - name: Install risc0
-        run: cargo binstall -y cargo-risczero && cargo risczero install
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Install risc0 dependencies
+        uses: ./github/actions/install-risc0
       - name: Build required binaries
         uses: actions-rs/cargo@v1
         with:
