@@ -16,16 +16,22 @@ use serde::de::DeserializeOwned;
 use serde::Serialize;
 use services_utils::overwatch::recovery::operators::RecoveryBackend as RecoveryBackendTrait;
 // internal
-use crate::backend::RecoverableMempool;
+use crate::backend::{MemPool, RecoverableMempool};
 use crate::network::NetworkAdapter as NetworkAdapterTrait;
 use crate::tx::settings::TxMempoolSettings;
 use crate::{MempoolMetrics, MempoolMsg};
 use nomos_network::{NetworkMsg, NetworkService};
 use overwatch_rs::services::{relay::OutboundRelay, ServiceCore, ServiceData, ServiceId};
 use overwatch_rs::OpaqueServiceStateHandle;
-use services_utils::overwatch::{lifecycle, RecoveryOperator};
+use services_utils::overwatch::{lifecycle, JsonFileBackend, RecoveryOperator};
 
-pub struct TxMempoolService<Pool, NetworkAdapter, RecoveryBackend>
+pub type TxMempoolService<Pool, NetworkAdapter> = GenericTxMempoolService<
+    Pool,
+    NetworkAdapter,
+    JsonFileBackend<<Pool as RecoverableMempool>::RecoveryState, <Pool as MemPool>::Settings>,
+>;
+
+pub struct GenericTxMempoolService<Pool, NetworkAdapter, RecoveryBackend>
 where
     Self: ServiceData,
 {
@@ -34,7 +40,8 @@ where
     _phantom: PhantomData<(NetworkAdapter, RecoveryBackend)>,
 }
 
-impl<Pool, NetworkAdapter, RecoveryBackend> TxMempoolService<Pool, NetworkAdapter, RecoveryBackend>
+impl<Pool, NetworkAdapter, RecoveryBackend>
+    GenericTxMempoolService<Pool, NetworkAdapter, RecoveryBackend>
 where
     Self: ServiceData,
 {
@@ -48,7 +55,7 @@ where
 }
 
 impl<Pool, NetworkAdapter, RecoveryBackend> ServiceData
-    for TxMempoolService<Pool, NetworkAdapter, RecoveryBackend>
+    for GenericTxMempoolService<Pool, NetworkAdapter, RecoveryBackend>
 where
     Pool: RecoverableMempool,
     Pool::RecoveryState: ServiceState + Serialize + DeserializeOwned,
@@ -64,7 +71,7 @@ where
 
 #[async_trait::async_trait]
 impl<Pool, NetworkAdapter, RecoveryBackend> ServiceCore
-    for TxMempoolService<Pool, NetworkAdapter, RecoveryBackend>
+    for GenericTxMempoolService<Pool, NetworkAdapter, RecoveryBackend>
 where
     Pool: RecoverableMempool + Send,
     Pool::RecoveryState: ServiceState + Debug + Serialize + DeserializeOwned + Send + Sync,
@@ -137,7 +144,8 @@ where
     }
 }
 
-impl<Pool, NetworkAdapter, RecoveryBackend> TxMempoolService<Pool, NetworkAdapter, RecoveryBackend>
+impl<Pool, NetworkAdapter, RecoveryBackend>
+    GenericTxMempoolService<Pool, NetworkAdapter, RecoveryBackend>
 where
     Pool: RecoverableMempool + Send,
     Pool::RecoveryState: ServiceState + Serialize + DeserializeOwned + Send + Sync,

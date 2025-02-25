@@ -5,7 +5,8 @@ use nomos_core::{
 use nomos_mempool::{
     backend::mockpool::{MockPool, MockSettings, RECOVERY_FILE_PATH},
     network::adapters::mock::{MockAdapter, MOCK_TX_CONTENT_TOPIC},
-    MempoolMsg, TxMempoolService, TxMempoolSettings,
+    tx::service::GenericTxMempoolService,
+    MempoolMsg, TxMempoolSettings,
 };
 use nomos_network::{
     backends::mock::{Mock, MockBackendMessage, MockConfig, MockMessage},
@@ -23,7 +24,7 @@ type MockRecoveryBackend = JsonFileBackend<
     MockPool<HeaderId, MockTransaction<MockMessage>, MockTxId>,
     TxMempoolSettings<MockSettings, ()>,
 >;
-type MockMempoolService = TxMempoolService<
+type MockMempoolService = GenericTxMempoolService<
     MockPool<HeaderId, MockTransaction<MockMessage>, MockTxId>,
     MockAdapter,
     MockRecoveryBackend,
