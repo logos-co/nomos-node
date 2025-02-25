@@ -2,7 +2,6 @@
 exclude = ["nomos-core/risc0_proofs"]
 members = [
   "clients/executor-http-client",
-  "consensus/carnot-engine",
   "consensus/cryptarchia-engine",
   "ledger/nomos-ledger",
   "nodes/nomos-executor",
@@ -49,7 +48,6 @@ resolver = "2"
 [workspace.dependencies]
 # Internal
 bundler                  = { path = "./nomos-bundler" }
-carnot-engine            = { path = "./consensus/carnot-engine" }
 cfgsync                  = { path = "./testnet/cfgsync" }
 cl                       = { path = "./nomos-core/cl" }
 cryptarchia-consensus    = { path = "./nomos-services/cryptarchia-consensus" }
