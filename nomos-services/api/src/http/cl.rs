@@ -1,5 +1,6 @@
 use core::{fmt::Debug, hash::Hash};
 
+use const_hex::{FromHex, ToHexExt};
 use nomos_core::header::HeaderId;
 use nomos_core::tx::Transaction;
 use nomos_mempool::{
@@ -28,8 +29,8 @@ where
         + Sync
         + 'static,
     <T as nomos_core::tx::Transaction>::Hash: std::cmp::Ord
-        + TryFrom<Vec<u8>>
-        + AsRef<[u8]>
+        + FromHex
+        + ToHexExt
         + Debug
         + Send
         + Sync
@@ -64,8 +65,8 @@ where
         + Sync
         + 'static,
     <T as nomos_core::tx::Transaction>::Hash: std::cmp::Ord
-        + TryFrom<Vec<u8>>
-        + AsRef<[u8]>
+        + FromHex
+        + ToHexExt
         + Debug
         + Send
         + Sync

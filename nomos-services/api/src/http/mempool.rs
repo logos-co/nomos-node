@@ -1,3 +1,4 @@
+use const_hex::{FromHex, ToHexExt};
 use core::{fmt::Debug, hash::Hash};
 use nomos_core::{da::blob::info::DispersedBlobInfo, header::HeaderId};
 use nomos_da_sampling::{
@@ -28,10 +29,10 @@ where
         + Hash
         + Send
         + Sync
-        + AsRef<[u8]>
         + Serialize
         + DeserializeOwned
-        + TryFrom<Vec<u8>>
+        + FromHex
+        + ToHexExt
         + 'static,
 {
     let relay = handle

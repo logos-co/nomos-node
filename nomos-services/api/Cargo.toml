@@ -12,6 +12,7 @@ instrumentation = []
 [dependencies]
 async-trait              = "0.1"
 bytes                    = "1.2"
+const-hex                = { version = "1.14" }
 cryptarchia-consensus    = { workspace = true, features = ["libp2p"] }
 full-replication         = { workspace = true }
 kzgrs-backend            = { workspace = true }

@@ -1,3 +1,4 @@
+use const_hex::{FromHex, ToHexExt};
 use core::ops::Range;
 use kzgrs_backend::common::blob::DaBlob;
 use nomos_blend_service::network::libp2p::Libp2pAdapter as BlendNetworkAdapter;
@@ -141,8 +142,8 @@ where
         + Sync
         + 'static,
     <Tx as Transaction>::Hash: std::cmp::Ord
-        + TryFrom<Vec<u8>>
-        + AsRef<[u8]>
+        + FromHex
+        + ToHexExt
         + Debug
         + Send
         + Sync

@@ -1,5 +1,6 @@
 use std::{fmt::Debug, hash::Hash};
 
+use const_hex::{FromHex, ToHexExt};
 use overwatch_rs::overwatch::handle::OverwatchHandle;
 use rand::{RngCore, SeedableRng};
 use serde::{de::DeserializeOwned, Serialize};
@@ -74,8 +75,8 @@ where
         + Sync
         + 'static,
     <Tx as Transaction>::Hash: std::cmp::Ord
-        + TryFrom<Vec<u8>>
-        + AsRef<[u8]>
+        + FromHex
+        + ToHexExt
         + Debug
         + Send
         + Sync
@@ -137,8 +138,8 @@ where
         + Sync
         + 'static,
     <Tx as Transaction>::Hash: std::cmp::Ord
-        + TryFrom<Vec<u8>>
-        + AsRef<[u8]>
+        + FromHex
+        + ToHexExt
         + Debug
         + Send
         + Sync
