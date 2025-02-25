@@ -68,12 +68,11 @@ pub type DaIndexer<
     SamplingStorage,
 >;
 
-pub type DaVerifier<Attestation, Blob, Membership, VerifierBackend, StorageSerializer> =
-    DaVerifierService<
-        VerifierBackend,
-        Libp2pAdapter<Membership>,
-        VerifierStorageAdapter<Attestation, Blob, StorageSerializer>,
-    >;
+pub type DaVerifier<Blob, Membership, VerifierBackend, StorageSerializer> = DaVerifierService<
+    VerifierBackend,
+    Libp2pAdapter<Membership>,
+    VerifierStorageAdapter<Blob, StorageSerializer>,
+>;
 
 pub type DaDispersal<Backend, NetworkAdapter, MempoolAdapter, Membership, Metadata> =
     DispersalService<Backend, NetworkAdapter, MempoolAdapter, Membership, Metadata>;
@@ -100,10 +99,7 @@ where
     <VB as CoreDaVerifier>::Error: Error,
     SS: StorageSerde + Send + Sync + 'static,
 {
-    let relay = handle
-        .relay::<DaVerifier<A, B, M, VB, SS>>()
-        .connect()
-        .await?;
+    let relay = handle.relay::<DaVerifier<B, M, VB, SS>>().connect().await?;
     let (sender, receiver) = oneshot::channel();
     relay
         .send(DaVerifierMsg::AddBlob {

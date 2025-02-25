@@ -158,7 +158,7 @@ pub type DaMempool = DaMempoolService<
 pub(crate) type DaVerifier = DaVerifierService<
     KzgrsDaVerifier,
     Libp2pAdapter<NomosDaMembership>,
-    VerifierStorageAdapter<(), DaBlob, Wire>,
+    VerifierStorageAdapter<DaBlob, Wire>,
 >;
 
 pub(crate) const MB16: usize = 1024 * 1024 * 16;

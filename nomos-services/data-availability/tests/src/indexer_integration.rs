@@ -1,3 +1,13 @@
+// std
+use std::{
+    str::FromStr,
+    sync::{
+        atomic::{AtomicBool, Ordering::SeqCst},
+        Arc,
+    },
+    time::Duration,
+};
+// crates
 use cl::{NoteWitness, NullifierSecret};
 use cryptarchia_consensus::{ConsensusMsg, LeaderConfig, TimeConfig};
 use kzgrs_backend::{
@@ -19,14 +29,6 @@ use nomos_storage::{
 };
 use overwatch_rs::services::relay::OutboundRelay;
 use rand::{thread_rng, Rng};
-use std::{
-    str::FromStr,
-    sync::{
-        atomic::{AtomicBool, Ordering::SeqCst},
-        Arc,
-    },
-    time::Duration,
-};
 use tempfile::{NamedTempFile, TempDir};
 use time::OffsetDateTime;
 use tokio_stream::wrappers::BroadcastStream;

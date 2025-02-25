@@ -1,7 +1,9 @@
-// internal
-use crate::storage::DaStorageAdapter;
-use kzgrs_backend::common::ColumnIndex;
+// std
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use std::{marker::PhantomData, path::PathBuf};
 // crates
+use kzgrs_backend::common::blob::create_blob_idx;
+use kzgrs_backend::common::ColumnIndex;
 use nomos_core::da::blob::Blob;
 use nomos_da_storage::rocksdb::{key_bytes, DA_VERIFIED_KEY_PREFIX};
 use nomos_da_storage::rocksdb::{DA_BLOB_PATH, DA_SHARED_COMMITMENTS_PATH};
@@ -13,10 +15,8 @@ use overwatch_rs::{
     services::{relay::OutboundRelay, ServiceData},
     DynError,
 };
-// std
-use kzgrs_backend::common::blob::create_blob_idx;
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use std::{marker::PhantomData, path::PathBuf};
+// internal
+use crate::storage::DaStorageAdapter;
 
 pub struct RocksAdapter<B, S>
 where

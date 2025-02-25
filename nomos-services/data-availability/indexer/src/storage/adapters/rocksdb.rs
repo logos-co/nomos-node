@@ -12,8 +12,7 @@ use nomos_core::da::blob::{
 };
 use nomos_core::da::BlobId;
 use nomos_da_storage::rocksdb::{
-    key_bytes, DA_ATTESTATION_PATH, DA_BLOB_PATH, DA_SHARED_COMMITMENTS_PATH,
-    DA_VERIFIED_KEY_PREFIX, DA_VID_KEY_PREFIX,
+    key_bytes, DA_BLOB_PATH, DA_SHARED_COMMITMENTS_PATH, DA_VERIFIED_KEY_PREFIX, DA_VID_KEY_PREFIX,
 };
 use nomos_storage::{
     backends::{rocksdb::RocksBackend, StorageSerde},
@@ -59,17 +58,15 @@ where
     }
 
     async fn add_index(&self, info: &Self::Info) -> Result<(), DynError> {
-        let (app_id, idx) = info.metadata();
-
         // Check if Info in a block is something that the node've seen before.
-        let attestation_prefix = format!("{}{}", DA_VERIFIED_KEY_PREFIX, DA_ATTESTATION_PATH);
-        let attested_key = key_bytes(&attestation_prefix, info.blob_id());
+        let blob_prefix = format!("{}{}", DA_VERIFIED_KEY_PREFIX, DA_BLOB_PATH);
+        let blob_key = key_bytes(&blob_prefix, info.blob_id().as_ref());
 
         let (reply_tx, reply_rx) = tokio::sync::oneshot::channel();
 
         self.storage_relay
             .send(StorageMsg::LoadPrefix {
-                prefix: attested_key,
+                prefix: blob_key,
                 reply_channel: reply_tx,
             })
             .await
@@ -80,6 +77,7 @@ where
             return Ok(());
         }
 
+        let (app_id, idx) = info.metadata();
         let vid_key = key_bytes(
             DA_VID_KEY_PREFIX,
             [app_id.clone().as_ref(), idx.as_ref()].concat(),

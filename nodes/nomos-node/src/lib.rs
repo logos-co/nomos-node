@@ -159,7 +159,7 @@ pub type DaSampling<SamplingAdapter> = DaSamplingService<
 pub type NodeDaSampling = DaSampling<SamplingLibp2pAdapter<NomosDaMembership>>;
 
 pub type DaVerifier<VerifierAdapter> =
-    DaVerifierService<KzgrsDaVerifier, VerifierAdapter, VerifierStorageAdapter<(), DaBlob, Wire>>;
+    DaVerifierService<KzgrsDaVerifier, VerifierAdapter, VerifierStorageAdapter<DaBlob, Wire>>;
 
 pub type NodeDaVerifier = DaVerifier<VerifierNetworkAdapter<FillFromNodeList>>;
 
