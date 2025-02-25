@@ -42,19 +42,13 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-      - name: Install cargo-binstall
-        uses: cargo-bins/cargo-binstall@main
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - name: Install risc0
-        run: cargo binstall -y cargo-risczero && cargo risczero install
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Install risc0 dependencies
+        uses: ./.github/actions/install-risc0
       - name: Set up Cargo cache
         uses: ./.github/actions/setup-cargo-cache
         with:
           key: ${{ github.ref }}->${{ github.workflow }}->${{ github.job }}
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}        
       - name: Run cargo clippy
         uses: actions-rs/cargo@v1
         env:
@@ -79,20 +73,14 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-      - name: Install cargo-binstall
-        uses: cargo-bins/cargo-binstall@main
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - name: Install risc0
-        run: cargo binstall -y cargo-risczero && cargo risczero install
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Install risc0 dependencies
+        uses: ./.github/actions/install-risc0
       - name: Setup Cargo cache
         uses: ./.github/actions/setup-cargo-cache
         with:
           # We use the same cache key for both OSes
           key: ${{ github.ref }}->${{ github.workflow }}->${{ github.job }}
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}        
       - name: Build required binaries
         uses: actions-rs/cargo@v1
         with:
