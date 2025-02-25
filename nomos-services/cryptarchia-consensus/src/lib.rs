@@ -24,6 +24,7 @@ use nomos_core::{
 use nomos_da_sampling::backend::DaSamplingServiceBackend;
 use nomos_da_sampling::{DaSamplingService, DaSamplingServiceMsg};
 use nomos_ledger::{leader_proof::LeaderProof, LedgerState};
+use nomos_mempool::backend::RecoverableMempool;
 use nomos_mempool::{
     backend::MemPool, network::NetworkAdapter as MempoolAdapter, DaMempoolService, MempoolMsg,
     TxMempoolService,
@@ -165,12 +166,14 @@ pub struct CryptarchiaConsensus<
     NetAdapter::Settings: Send,
     BlendAdapter: blend::BlendAdapter,
     BlendAdapter::Settings: Send,
-    ClPool: MemPool<BlockId = HeaderId>,
+    ClPool: RecoverableMempool<BlockId = HeaderId>,
+    ClPool::RecoveryState: ServiceState + Serialize + DeserializeOwned + Send + Sync,
     ClPool::Item: Clone + Eq + Hash + Debug + 'static,
     ClPool::Key: Debug + 'static,
     ClPoolAdapter: MempoolAdapter<Payload = ClPool::Item, Key = ClPool::Key>,
     DaPool: MemPool<BlockId = HeaderId>,
     DaPool::Item: Clone + Eq + Hash + Debug + 'static,
+    DaPool::Settings: Clone,
     DaPool::Key: Debug + 'static,
     DaPoolAdapter: MempoolAdapter<Key = DaPool::Key>,
     DaPoolAdapter::Payload: DispersedBlobInfo + Into<DaPool::Item> + Debug,
@@ -193,7 +196,7 @@ pub struct CryptarchiaConsensus<
     network_relay: Relay<NetworkService<NetAdapter::Backend>>,
     blend_relay:
         Relay<nomos_blend_service::BlendService<BlendAdapter::Backend, BlendAdapter::Network>>,
-    cl_mempool_relay: Relay<TxMempoolService<ClPoolAdapter, ClPool>>,
+    cl_mempool_relay: Relay<TxMempoolService<ClPool, ClPoolAdapter>>,
     da_mempool_relay: Relay<
         DaMempoolService<
             DaPoolAdapter,
@@ -246,12 +249,14 @@ where
     NetAdapter::Settings: Send,
     BlendAdapter: blend::BlendAdapter,
     BlendAdapter::Settings: Send,
-    ClPool: MemPool<BlockId = HeaderId>,
+    ClPool: RecoverableMempool<BlockId = HeaderId>,
+    ClPool::RecoveryState: ServiceState + Serialize + DeserializeOwned + Send + Sync,
     ClPool::Item: Clone + Eq + Hash + Debug,
     ClPool::Key: Debug,
     ClPoolAdapter: MempoolAdapter<Payload = ClPool::Item, Key = ClPool::Key>,
     DaPool: MemPool<BlockId = HeaderId>,
     DaPool::Item: Clone + Eq + Hash + Debug,
+    DaPool::Settings: Clone,
     DaPool::Key: Debug,
     DaPoolAdapter: MempoolAdapter<Key = DaPool::Key>,
     DaPoolAdapter::Payload: DispersedBlobInfo + Into<DaPool::Item> + Debug,
@@ -329,7 +334,8 @@ where
         + Sync
         + 'static,
     BlendAdapter::Settings: Send + Sync + 'static,
-    ClPool: MemPool<BlockId = HeaderId> + Send + Sync + 'static,
+    ClPool: RecoverableMempool<BlockId = HeaderId> + Send + Sync + 'static,
+    ClPool::RecoveryState: ServiceState + Serialize + DeserializeOwned + Send + Sync,
     ClPool::Settings: Send + Sync + 'static,
     DaPool: MemPool<BlockId = HeaderId, Key = SamplingBackend::BlobId> + Send + Sync + 'static,
     DaPool::Settings: Send + Sync + 'static,
@@ -355,6 +361,7 @@ where
         + Send
         + Sync
         + 'static,
+    DaPool::Settings: Clone,
     ClPool::Key: Debug + Send + Sync,
     ClPoolAdapter:
         MempoolAdapter<Payload = ClPool::Item, Key = ClPool::Key> + Send + Sync + 'static,
@@ -603,7 +610,8 @@ where
     A::Settings: Send,
     BlendAdapter: blend::BlendAdapter + Clone + Send + Sync + 'static,
     BlendAdapter::Settings: Send,
-    ClPool: MemPool<BlockId = HeaderId> + Send + Sync + 'static,
+    ClPool: RecoverableMempool<BlockId = HeaderId> + Send + Sync + 'static,
+    ClPool::RecoveryState: ServiceState + Serialize + DeserializeOwned + Send + Sync,
     ClPool::Settings: Send + Sync + 'static,
     ClPool::Item: Transaction<Hash = ClPool::Key>
         + Debug
@@ -627,7 +635,7 @@ where
         + Sync
         + 'static,
     DaPool: MemPool<BlockId = HeaderId, Key = SamplingBackend::BlobId> + Send + Sync + 'static,
-    DaPool::Settings: Send + Sync + 'static,
+    DaPool::Settings: Clone + Send + Sync + 'static,
     TxS: TxSelect<Tx = ClPool::Item> + Clone + Send + Sync + 'static,
     TxS::Settings: Send,
     BS: BlobSelect<BlobId = DaPool::Item> + Clone + Send + Sync + 'static,

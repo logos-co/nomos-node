@@ -108,8 +108,8 @@ pub type NodeCryptarchia =
     Cryptarchia<nomos_da_sampling::network::adapters::validator::Libp2pAdapter<NomosDaMembership>>;
 
 pub type TxMempool = TxMempoolService<
-    MempoolNetworkAdapter<Tx, <Tx as Transaction>::Hash>,
     MockPool<HeaderId, Tx, <Tx as Transaction>::Hash>,
+    MempoolNetworkAdapter<Tx, <Tx as Transaction>::Hash>,
 >;
 
 pub type DaMempool = DaMempoolService<

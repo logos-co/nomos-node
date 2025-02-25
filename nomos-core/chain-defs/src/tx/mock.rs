@@ -6,6 +6,7 @@ use blake2::{
     Blake2bVar,
 };
 use bytes::{Bytes, BytesMut};
+use const_hex::FromHex;
 use serde::Serialize;
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, serde::Serialize, serde::Deserialize)]
@@ -64,11 +65,14 @@ impl From<[u8; 32]> for MockTxId {
     }
 }
 
-impl TryFrom<Vec<u8>> for MockTxId {
+impl FromHex for MockTxId {
     type Error = &'static str;
 
-    fn try_from(value: Vec<u8>) -> Result<Self, Self::Error> {
-        let inner: [u8; 32] = value.try_into().map_err(|_| "Input value too long.")?;
+    fn from_hex<T: AsRef<[u8]>>(hex: T) -> Result<Self, Self::Error> {
+        let inner: [u8; 32] = hex
+            .as_ref()
+            .try_into()
+            .map_err(|_| "Input value too long.")?;
         Ok(Self(inner))
     }
 }

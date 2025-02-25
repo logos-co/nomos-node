@@ -73,7 +73,15 @@ where
         + Send
         + Sync
         + 'static,
-    <Tx as Transaction>::Hash: std::cmp::Ord + Debug + Send + Sync + 'static,
+    <Tx as Transaction>::Hash: std::cmp::Ord
+        + TryFrom<Vec<u8>>
+        + AsRef<[u8]>
+        + Debug
+        + Send
+        + Sync
+        + Serialize
+        + DeserializeOwned
+        + 'static,
     SS: StorageSerde + Send + Sync + 'static,
     SamplingRng: SeedableRng + RngCore,
     SamplingBackend: DaSamplingServiceBackend<SamplingRng, BlobId = BlobId> + Send,
@@ -128,7 +136,15 @@ where
         + Send
         + Sync
         + 'static,
-    <Tx as Transaction>::Hash: std::cmp::Ord + Debug + Send + Sync + 'static,
+    <Tx as Transaction>::Hash: std::cmp::Ord
+        + TryFrom<Vec<u8>>
+        + AsRef<[u8]>
+        + Debug
+        + Send
+        + Sync
+        + Serialize
+        + DeserializeOwned
+        + 'static,
     SS: StorageSerde + Send + Sync + 'static,
     SamplingRng: SeedableRng + RngCore,
     SamplingBackend: DaSamplingServiceBackend<SamplingRng, BlobId = BlobId> + Send,

@@ -14,12 +14,13 @@ use nomos_core::da::blob::{info::DispersedBlobInfo, metadata::Metadata, BlobSele
 use nomos_core::header::HeaderId;
 use nomos_core::tx::{Transaction, TxSelect};
 use nomos_da_sampling::backend::DaSamplingServiceBackend;
+use nomos_mempool::backend::RecoverableMempool;
 use nomos_mempool::{backend::MemPool, network::NetworkAdapter as MempoolAdapter};
 use nomos_storage::backends::StorageBackend;
 use nomos_storage::StorageService;
 use nomos_tracing::info_with_id;
 use overwatch_rs::services::relay::{Relay, RelayMessage};
-use overwatch_rs::services::state::{NoOperator, NoState};
+use overwatch_rs::services::state::{NoOperator, NoState, ServiceState};
 use overwatch_rs::services::{ServiceCore, ServiceData, ServiceId};
 use overwatch_rs::{DynError, OpaqueServiceStateHandle};
 use rand::{RngCore, SeedableRng};
@@ -88,7 +89,8 @@ pub struct DataIndexerService<
     BlendAdapter: cryptarchia_consensus::blend::BlendAdapter,
     BlendAdapter::Settings: Send,
     ClPoolAdapter: MempoolAdapter<Payload = ClPool::Item, Key = ClPool::Key>,
-    ClPool: MemPool<BlockId = HeaderId>,
+    ClPool: RecoverableMempool<BlockId = HeaderId>,
+    ClPool::RecoveryState: ServiceState + Serialize + DeserializeOwned + Send + Sync,
     DaPool: MemPool<BlockId = HeaderId>,
     DaPoolAdapter: MempoolAdapter<Key = DaPool::Key>,
     DaPoolAdapter::Payload: DispersedBlobInfo + Into<DaPool::Item> + Debug,
@@ -96,6 +98,7 @@ pub struct DataIndexerService<
     ClPool::Key: Debug + 'static,
     DaPool::Item: Metadata + Clone + Eq + Hash + Debug + 'static,
     DaPool::Key: Debug + 'static,
+    DaPool::Settings: Clone,
     NetAdapter::Backend: 'static,
     TxS: TxSelect<Tx = ClPool::Item>,
     TxS::Settings: Send,
@@ -200,7 +203,8 @@ where
     BlendAdapter: cryptarchia_consensus::blend::BlendAdapter,
     BlendAdapter::Settings: Send,
     ClPoolAdapter: MempoolAdapter<Payload = ClPool::Item, Key = ClPool::Key>,
-    ClPool: MemPool<BlockId = HeaderId>,
+    ClPool: RecoverableMempool<BlockId = HeaderId>,
+    ClPool::RecoveryState: ServiceState + Serialize + DeserializeOwned + Send + Sync,
     DaPool: MemPool<BlockId = HeaderId>,
     DaPoolAdapter: MempoolAdapter<Key = DaPool::Key>,
     DaPoolAdapter::Payload: DispersedBlobInfo + Into<DaPool::Item> + Debug,
@@ -208,6 +212,7 @@ where
     ClPool::Key: Debug + 'static,
     DaPool::Item: Metadata + Clone + Eq + Hash + Debug + 'static,
     DaPool::Key: Debug + 'static,
+    DaPool::Settings: Clone,
     NetAdapter::Backend: 'static,
     TxS: TxSelect<Tx = ClPool::Item>,
     TxS::Settings: Send,
@@ -273,7 +278,8 @@ where
     BlendAdapter: cryptarchia_consensus::blend::BlendAdapter,
     BlendAdapter::Settings: Send,
     ClPoolAdapter: MempoolAdapter<Payload = ClPool::Item, Key = ClPool::Key>,
-    ClPool: MemPool<BlockId = HeaderId>,
+    ClPool: RecoverableMempool<BlockId = HeaderId>,
+    ClPool::RecoveryState: ServiceState + Serialize + DeserializeOwned + Send + Sync,
     DaPool: MemPool<BlockId = HeaderId>,
     DaPoolAdapter: MempoolAdapter<Key = DaPool::Key>,
     DaPoolAdapter::Payload: DispersedBlobInfo + Into<DaPool::Item> + Debug,
@@ -283,6 +289,7 @@ where
     <DaPool::Item as DispersedBlobInfo>::BlobId: AsRef<[u8]>,
     DaPool::Key: Debug + 'static,
     <DaPool::Item as Metadata>::Index: Send + Sync,
+    DaPool::Settings: Clone,
     NetAdapter::Backend: 'static,
     TxS: TxSelect<Tx = ClPool::Item>,
     TxS::Settings: Send,
@@ -380,12 +387,14 @@ where
     BlendAdapter: cryptarchia_consensus::blend::BlendAdapter,
     BlendAdapter::Settings: Send,
     ClPoolAdapter: MempoolAdapter<Payload = ClPool::Item, Key = ClPool::Key>,
-    ClPool: MemPool<BlockId = HeaderId>,
+    ClPool: RecoverableMempool<BlockId = HeaderId>,
+    ClPool::RecoveryState: ServiceState + Serialize + DeserializeOwned + Send + Sync,
     DaPool: MemPool<BlockId = HeaderId>,
     DaPoolAdapter: MempoolAdapter<Key = DaPool::Key>,
     DaPoolAdapter::Payload: DispersedBlobInfo + Into<DaPool::Item> + Debug,
     ClPool::Key: Debug + 'static,
     DaPool::Key: Debug + 'static,
+    DaPool::Settings: Clone,
     ClPool::Item: Transaction<Hash = ClPool::Key>
         + Debug
         + Clone

@@ -25,8 +25,8 @@ pub struct MockPool<BlockId, Item, Key> {
         serialize_with = "serde::serialize_pending_items",
         deserialize_with = "serde::deserialize_pending_items",
         bound(
-            serialize = "Key: Eq + Hash + AsRef<[u8]>, Item: Serialize + Clone",
-            deserialize = "Key: Eq + Hash + TryFrom<Vec<u8>>, Item: DeserializeOwned"
+            serialize = "Key: Eq + Hash + const_hex::ToHexExt, Item: Serialize + Clone",
+            deserialize = "Key: Eq + Hash + const_hex::FromHex, Item: DeserializeOwned"
         )
     )]
     pending_items: LinkedHashMap<Key, Item>,

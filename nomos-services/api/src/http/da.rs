@@ -140,7 +140,15 @@ where
         + Send
         + Sync
         + 'static,
-    <Tx as Transaction>::Hash: std::cmp::Ord + Debug + Send + Sync + 'static,
+    <Tx as Transaction>::Hash: std::cmp::Ord
+        + TryFrom<Vec<u8>>
+        + AsRef<[u8]>
+        + Debug
+        + Send
+        + Sync
+        + Serialize
+        + DeserializeOwned
+        + 'static,
     C: DispersedBlobInfo<BlobId = [u8; 32]>
         + Clone
         + Debug

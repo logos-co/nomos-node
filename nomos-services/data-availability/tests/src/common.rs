@@ -142,8 +142,8 @@ pub(crate) type DaIndexer = DataIndexerService<
 >;
 
 pub(crate) type TxMempool = TxMempoolService<
-    MempoolNetworkAdapter<Tx, <Tx as Transaction>::Hash>,
     MockPool<HeaderId, Tx, <Tx as Transaction>::Hash>,
+    MempoolNetworkAdapter<Tx, <Tx as Transaction>::Hash>,
 >;
 
 pub type DaMempool = DaMempoolService<

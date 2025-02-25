@@ -6,12 +6,12 @@ use nomos_mempool::{
     backend::mockpool::MockPool, network::adapters::libp2p::Libp2pAdapter as MempoolNetworkAdapter,
     tx::service::openapi::Status, MempoolMetrics, MempoolMsg, TxMempoolService,
 };
-use serde::{Deserialize, Serialize};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use tokio::sync::oneshot;
 
 type ClMempoolService<T> = TxMempoolService<
-    MempoolNetworkAdapter<T, <T as Transaction>::Hash>,
     MockPool<HeaderId, T, <T as Transaction>::Hash>,
+    MempoolNetworkAdapter<T, <T as Transaction>::Hash>,
 >;
 
 pub async fn cl_mempool_metrics<T>(
@@ -27,7 +27,15 @@ where
         + Send
         + Sync
         + 'static,
-    <T as nomos_core::tx::Transaction>::Hash: std::cmp::Ord + Debug + Send + Sync + 'static,
+    <T as nomos_core::tx::Transaction>::Hash: std::cmp::Ord
+        + TryFrom<Vec<u8>>
+        + AsRef<[u8]>
+        + Debug
+        + Send
+        + Sync
+        + Serialize
+        + DeserializeOwned
+        + 'static,
 {
     let relay = handle.relay::<ClMempoolService<T>>().connect().await?;
     let (sender, receiver) = oneshot::channel();
@@ -55,7 +63,15 @@ where
         + Send
         + Sync
         + 'static,
-    <T as nomos_core::tx::Transaction>::Hash: std::cmp::Ord + Debug + Send + Sync + 'static,
+    <T as nomos_core::tx::Transaction>::Hash: std::cmp::Ord
+        + TryFrom<Vec<u8>>
+        + AsRef<[u8]>
+        + Debug
+        + Send
+        + Sync
+        + Serialize
+        + DeserializeOwned
+        + 'static,
 {
     let relay = handle.relay::<ClMempoolService<T>>().connect().await?;
     let (sender, receiver) = oneshot::channel();

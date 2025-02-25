@@ -1,5 +1,8 @@
 use std::hash::Hash;
 // std
+use nomos_mempool::backend::RecoverableMempool;
+use overwatch_rs::services::state::ServiceState;
+use serde::Serialize;
 use std::fmt::Debug;
 // Crates
 use overwatch_rs::services::relay::{OutboundRelay, Relay};
@@ -54,9 +57,11 @@ pub struct CryptarchiaConsensusRelays<
 > where
     BlendAdapter: blend::BlendAdapter<Network: BlendNetworkAdapter>,
     BS: BlobSelect,
-    ClPool: MemPool,
+    ClPool: RecoverableMempool,
+    ClPool::RecoveryState: ServiceState + Serialize + DeserializeOwned,
     ClPoolAdapter: MempoolAdapter,
     DaPool: MemPool,
+    DaPool::Settings: Clone,
     DaPoolAdapter: MempoolAdapter,
     NetworkAdapter: network::NetworkAdapter,
     Storage: StorageBackend + Send + Sync,
@@ -103,15 +108,17 @@ impl<
 where
     BlendAdapter: blend::BlendAdapter<Network: BlendNetworkAdapter>,
     BS: BlobSelect<BlobId = DaPool::Item> + Clone,
-    ClPool: MemPool<BlockId = HeaderId>,
+    ClPool: RecoverableMempool<BlockId = HeaderId>,
+    ClPool::RecoveryState: ServiceState + Serialize + DeserializeOwned,
     ClPool::BlockId: Debug,
-    ClPool::Item: Debug + DeserializeOwned + Eq + Hash + Clone + Send + Sync,
-    ClPool::Key: Debug,
+    ClPool::Item: Debug + DeserializeOwned + Eq + Hash + Clone + Send + Sync + 'static,
+    ClPool::Key: Debug + 'static,
     ClPoolAdapter: MempoolAdapter<Payload = ClPool::Item, Key = ClPool::Key>,
     DaPool: MemPool<BlockId = HeaderId>,
     DaPool::BlockId: Debug,
     DaPool::Item: Debug + DeserializeOwned + Eq + Hash + Clone + Send + Sync,
     DaPool::Key: Debug,
+    DaPool::Settings: Clone,
     DaPoolAdapter: MempoolAdapter<Key = DaPool::Key>,
     DaPoolAdapter::Payload: DispersedBlobInfo + Into<DaPool::Item> + Debug,
     NetworkAdapter: network::NetworkAdapter,
@@ -150,7 +157,7 @@ where
         blend_relay: Relay<
             nomos_blend_service::BlendService<BlendAdapter::Backend, BlendAdapter::Network>,
         >,
-        cl_mempool_relay: Relay<TxMempoolService<ClPoolAdapter, ClPool>>,
+        cl_mempool_relay: Relay<TxMempoolService<ClPool, ClPoolAdapter>>,
         da_mempool_relay: Relay<
             DaMempoolService<
                 DaPoolAdapter,
