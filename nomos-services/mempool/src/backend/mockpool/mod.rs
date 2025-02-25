@@ -20,16 +20,19 @@ mod serde;
 
 /// A mock mempool implementation that stores all transactions in memory in the order received.
 #[derive(Serialize, Deserialize)]
-#[serde(
-    bound = "Key: Eq + Ord + Hash + AsRef<[u8]> + TryFrom<Vec<u8>> + Serialize + DeserializeOwned, Item: Clone + Serialize + DeserializeOwned, BlockId: Ord + Serialize + DeserializeOwned"
-)]
 pub struct MockPool<BlockId, Item, Key> {
     #[serde(
         serialize_with = "serde::serialize_pending_items",
-        deserialize_with = "serde::deserialize_pending_items"
+        deserialize_with = "serde::deserialize_pending_items",
+        bound(
+            serialize = "Key: Eq + Hash + AsRef<[u8]>, Item: Serialize + Clone",
+            deserialize = "Key: Eq + Hash + TryFrom<Vec<u8>>, Item: DeserializeOwned"
+        )
     )]
     pending_items: LinkedHashMap<Key, Item>,
+    #[serde(bound(deserialize = "BlockId: Ord + DeserializeOwned"))]
     in_block_items: BTreeMap<BlockId, Vec<Item>>,
+    #[serde(bound(deserialize = "Key: Ord + DeserializeOwned"))]
     in_block_items_by_id: BTreeMap<Key, BlockId>,
     last_item_timestamp: u64,
 }
