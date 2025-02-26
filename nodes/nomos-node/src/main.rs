@@ -64,7 +64,7 @@ fn main() -> Result<()> {
                     topic: String::from(nomos_node::CL_TOPIC),
                     id: <Tx as Transaction>::hash,
                 },
-                recovery_path: "test".into(),
+                recovery_path: unimplemented!("Must be fetched from the config store."),
             },
             da_mempool: nomos_mempool::DaMempoolSettings {
                 backend: (),

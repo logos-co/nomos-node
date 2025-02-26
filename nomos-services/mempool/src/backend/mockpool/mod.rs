@@ -137,7 +137,7 @@ where
             .unwrap()
             .as_millis()
             .try_into()
-            .unwrap();
+            .expect("Failed to convert timestamp to u64.");
 
         Ok(())
     }
