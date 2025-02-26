@@ -54,7 +54,7 @@ docker run -v "/path/to/config.yml" -v "/path/to/global_params:global/params/pat
 
 ```
 
-To use example configuration located at `nodes/nomos-node/config.yaml`, first run the test that generates the random kzgrs file and then run the docker container with the appropriate config and global params:
+To use an example configuration located at `nodes/nomos-node/config.yaml`, first run the test that generates the random kzgrs file and then run the docker container with the appropriate config and global params:
 
 ```bash
 cargo test --package kzgrs-backend write_random_kzgrs_params_to_file -- --ignored
