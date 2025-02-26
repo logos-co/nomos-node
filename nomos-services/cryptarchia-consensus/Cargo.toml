@@ -23,6 +23,7 @@ nomos-libp2p           = { workspace = true, optional = true }
 nomos-mempool          = { workspace = true }
 nomos-network          = { workspace = true }
 nomos-storage          = { workspace = true }
+nomos-time             = { workspace = true }
 nomos_proof_statements = { workspace = true }
 overwatch-rs           = { workspace = true }
 rand                   = "0.8"

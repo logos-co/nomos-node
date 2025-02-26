@@ -10,7 +10,8 @@ use std::{
 // crates
 use bytes::Bytes;
 use cl::{NoteWitness, NullifierSecret};
-use cryptarchia_consensus::{ConsensusMsg, LeaderConfig, TimeConfig};
+use cryptarchia_consensus::{ConsensusMsg, LeaderConfig};
+use cryptarchia_engine::{EpochConfig, SlotConfig};
 use kzgrs_backend::{
     common::blob::DaBlob,
     dispersal::{BlobInfo, Metadata},
@@ -71,15 +72,17 @@ fn test_indexer() {
 
     let genesis_state = LedgerState::from_commitments(commitments, (ids.len() as u32).into());
     let ledger_config = nomos_ledger::Config {
-        epoch_stake_distribution_stabilization: 3,
-        epoch_period_nonce_buffer: 3,
-        epoch_period_nonce_stabilization: 4,
+        epoch_config: EpochConfig {
+            epoch_stake_distribution_stabilization: 3,
+            epoch_period_nonce_buffer: 3,
+            epoch_period_nonce_stabilization: 4,
+        },
         consensus_config: cryptarchia_engine::Config {
             security_param: 10,
             active_slot_coeff: 0.9,
         },
     };
-    let time_config = TimeConfig {
+    let time_config = SlotConfig {
         slot_duration: Duration::from_secs(1),
         chain_start_time: OffsetDateTime::now_utc(),
     };

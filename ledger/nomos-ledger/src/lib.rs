@@ -116,7 +116,6 @@ where
             .states
             .get(&parent_id)
             .ok_or(LedgerError::ParentNotFound(parent_id))?;
-        let config = self.config.clone();
 
         // TODO: remove this extra logic, we can simply check the proof is valid and the root is a valid one
         // just like we do anyway
@@ -141,7 +140,10 @@ where
 
         states.insert(id, new_state);
 
-        Ok(Self { states, config })
+        Ok(Self {
+            states,
+            config: self.config,
+        })
     }
 
     pub fn state(&self, id: &Id) -> Option<&LedgerState> {
@@ -421,7 +423,7 @@ pub mod tests {
     use crate::{crypto::Blake2b, leader_proof::LeaderProof, Config, LedgerError};
     use blake2::Digest;
     use cl::{note::NoteWitness as Note, NullifierSecret};
-    use cryptarchia_engine::Slot;
+    use cryptarchia_engine::{EpochConfig, Slot};
     use rand::thread_rng;
 
     type HeaderId = [u8; 32];
@@ -559,9 +561,11 @@ pub mod tests {
 
     pub fn config() -> Config {
         Config {
-            epoch_stake_distribution_stabilization: 4,
-            epoch_period_nonce_buffer: 3,
-            epoch_period_nonce_stabilization: 3,
+            epoch_config: EpochConfig {
+                epoch_stake_distribution_stabilization: 4,
+                epoch_period_nonce_buffer: 3,
+                epoch_period_nonce_stabilization: 3,
+            },
             consensus_config: cryptarchia_engine::Config {
                 security_param: 1,
                 active_slot_coeff: 1.0,

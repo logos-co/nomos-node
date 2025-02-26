@@ -24,6 +24,7 @@ nomos-mempool            = { workspace = true, features = ["libp2p", "mock"] }
 nomos-network            = { workspace = true, features = ["libp2p"] }
 nomos-node               = { workspace = true }
 nomos-storage            = { workspace = true, features = ["rocksdb"] }
+nomos-time               = { workspace = true }
 overwatch-derive         = { workspace = true }
 overwatch-rs             = { workspace = true }
 rand                     = "0.8"
