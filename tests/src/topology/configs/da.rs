@@ -37,6 +37,7 @@ pub struct DaParams {
     pub global_params_path: String,
     pub policy_settings: DAConnectionPolicySettings,
     pub monitor_settings: DAConnectionMonitorSettings,
+    pub balancer_interval: Duration,
     pub redial_cooldown: Duration,
 }
 
@@ -55,6 +56,7 @@ impl Default for DaParams {
                 failure_time_window: Duration::from_secs(1),
                 time_decay_factor: U57F7::ZERO,
             },
+            balancer_interval: Duration::from_secs(5),
             redial_cooldown: Duration::from_secs(5),
         }
     }
@@ -77,6 +79,7 @@ pub struct GeneralDaConfig {
     pub blobs_validity_duration: Duration,
     pub policy_settings: DAConnectionPolicySettings,
     pub monitor_settings: DAConnectionMonitorSettings,
+    pub balancer_interval: Duration,
     pub redial_cooldown: Duration,
 }
 
@@ -137,6 +140,7 @@ pub fn create_da_configs(ids: &[[u8; 32]], da_params: DaParams) -> Vec<GeneralDa
                 blobs_validity_duration: da_params.blobs_validity_duration,
                 policy_settings: da_params.policy_settings.clone(),
                 monitor_settings: da_params.monitor_settings.clone(),
+                balancer_interval: da_params.balancer_interval,
                 redial_cooldown: da_params.redial_cooldown,
             }
         })

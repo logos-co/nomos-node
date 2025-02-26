@@ -119,6 +119,7 @@ where
                 .collect(),
             config.validator_settings.policy_settings.clone(),
             config.validator_settings.monitor_settings.clone(),
+            config.validator_settings.balancer_interval,
             config.validator_settings.redial_cooldown,
         );
         let address = config.validator_settings.listening_address.clone();
