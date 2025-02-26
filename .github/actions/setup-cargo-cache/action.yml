@@ -13,6 +13,8 @@ description: Set up cache read operations for Cargo artifacts
 runs:
   using: composite
   steps:
+    - name: Force toolchain update
+      uses: actions-rs/toolchain@v1
     - name: Set up Cargo cache
       uses: actions/cache/restore@v4
       with:
