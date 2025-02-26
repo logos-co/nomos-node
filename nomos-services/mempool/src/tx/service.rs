@@ -13,7 +13,6 @@ use crate::network::NetworkAdapter as NetworkAdapterTrait;
 use crate::tx::state::TxMempoolState;
 use futures::StreamExt;
 use overwatch_rs::services::handle::ServiceStateHandle;
-use serde::{Deserialize, Serialize};
 use services_utils::overwatch::recovery::operators::RecoveryBackend as RecoveryBackendTrait;
 // internal
 use crate::backend::{MemPool, RecoverableMempool};
@@ -42,7 +41,11 @@ pub type TxMempoolService<NetworkAdapter, Pool> = GenericTxMempoolService<
 
 pub struct GenericTxMempoolService<Pool, NetworkAdapter, RecoveryBackend>
 where
-    Self: ServiceData,
+    Pool: RecoverableMempool,
+    Pool::Settings: Clone,
+    NetworkAdapter: NetworkAdapterTrait,
+    NetworkAdapter::Settings: Clone,
+    RecoveryBackend: RecoveryBackendTrait,
 {
     pool: Pool,
     service_state_handle: OpaqueServiceStateHandle<Self>,
@@ -52,7 +55,11 @@ where
 impl<Pool, NetworkAdapter, RecoveryBackend>
     GenericTxMempoolService<Pool, NetworkAdapter, RecoveryBackend>
 where
-    Self: ServiceData,
+    Pool: RecoverableMempool,
+    Pool::Settings: Clone,
+    NetworkAdapter: NetworkAdapterTrait,
+    NetworkAdapter::Settings: Clone,
+    RecoveryBackend: RecoveryBackendTrait,
 {
     pub const fn new(pool: Pool, service_state_handle: OpaqueServiceStateHandle<Self>) -> Self {
         Self {
@@ -67,8 +74,9 @@ impl<Pool, NetworkAdapter, RecoveryBackend> ServiceData
     for GenericTxMempoolService<Pool, NetworkAdapter, RecoveryBackend>
 where
     Pool: RecoverableMempool,
-    // Pool::RecoveryState: Serialize + for<'de> Deserialize<'de>,
+    Pool::Settings: Clone,
     NetworkAdapter: NetworkAdapterTrait,
+    NetworkAdapter::Settings: Clone,
     RecoveryBackend: RecoveryBackendTrait,
 {
     const SERVICE_ID: ServiceId = "mempool-cl";
@@ -83,11 +91,11 @@ impl<Pool, NetworkAdapter, RecoveryBackend> ServiceCore
     for GenericTxMempoolService<Pool, NetworkAdapter, RecoveryBackend>
 where
     Pool: RecoverableMempool + Send,
-    Pool::RecoveryState: Debug + Serialize + for<'de> Deserialize<'de> + Send + Sync,
-    Pool::Settings: Clone + Send + Sync,
-    Pool::BlockId: Send + 'static,
+    Pool::RecoveryState: Debug + Send + Sync,
     Pool::Key: Send,
     Pool::Item: Clone + Send + 'static,
+    Pool::BlockId: Send,
+    Pool::Settings: Clone + Sync + Send,
     NetworkAdapter: NetworkAdapterTrait<Payload = Pool::Item, Key = Pool::Key> + Send,
     NetworkAdapter::Settings: Clone + Send + Sync + 'static,
     RecoveryBackend: RecoveryBackendTrait + Send,
@@ -159,14 +167,11 @@ where
 impl<Pool, NetworkAdapter, RecoveryBackend>
     GenericTxMempoolService<Pool, NetworkAdapter, RecoveryBackend>
 where
-    Pool: RecoverableMempool + Send,
-    Pool::RecoveryState: Serialize + for<'de> Deserialize<'de> + Send + Sync,
+    Pool: RecoverableMempool,
     Pool::Item: Clone + Send + 'static,
-    Pool::Key: Send,
-    Pool::BlockId: Send,
-    Pool::Settings: Clone + Send + Sync,
+    Pool::Settings: Clone,
     NetworkAdapter: NetworkAdapterTrait<Payload = Pool::Item> + Send,
-    NetworkAdapter::Settings: Clone + Send + Sync + 'static,
+    NetworkAdapter::Settings: Clone + Send + 'static,
     RecoveryBackend: RecoveryBackendTrait,
 {
     fn handle_mempool_message(
