@@ -17,17 +17,13 @@ RUN apt-get update && apt-get install -yq \
 
 RUN cargo install cargo-binstall
 
-# Versions of risczero > 1.2.0 use rzup install instead
+# Versions of cargo-risczero > 1.2.0 use rzup install instead
 RUN cargo binstall cargo-risczero@1.2.0 --no-confirm
 RUN cargo risczero install
 
 RUN cargo build --release -p nomos-node
 
-FROM rust:1.84.0-slim-bookworm AS final
-
-WORKDIR /app
-
-COPY --from=builder /nomos/target/release/nomos-node /usr/bin/nomos-node
+RUN cp /nomos/target/release/nomos-node /usr/bin/nomos-node
 
 # Expose default ports
 EXPOSE 3000 8080 9000 60000
