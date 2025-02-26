@@ -1,7 +1,7 @@
 // std
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::{marker::PhantomData, path::PathBuf};
 // crates
+use futures::try_join;
 use nomos_core::da::blob::Blob;
 use nomos_da_storage::rocksdb::{create_blob_idx, key_bytes, DA_VERIFIED_KEY_PREFIX};
 use nomos_da_storage::rocksdb::{DA_BLOB_PATH, DA_SHARED_COMMITMENTS_PATH};
@@ -13,6 +13,7 @@ use overwatch_rs::{
     services::{relay::OutboundRelay, ServiceData},
     DynError,
 };
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 // internal
 use crate::storage::DaStorageAdapter;
 
@@ -52,31 +53,29 @@ where
         let column_idx = blob.column_idx();
         let (light_blob, shared_commitments) = blob.into_blob_and_shared_commitments();
 
-        let blob_idx = create_blob_idx(blob_id.as_ref(), column_idx.as_ref());
-
-        // Store the blob in the storage backend.
-        let blob_prefix = format!("{}{}", DA_VERIFIED_KEY_PREFIX, DA_BLOB_PATH);
-        let blob_key = key_bytes(&blob_prefix, blob_idx);
-
-        self.storage_relay
-            .send(StorageMsg::Store {
-                key: blob_key,
-                value: S::serialize(light_blob),
-            })
-            .await
-            .unwrap();
-
-        // Store the shared commitments in the storage backend.
-        let shared_commitments_prefix =
-            format!("{}{}", DA_VERIFIED_KEY_PREFIX, DA_SHARED_COMMITMENTS_PATH);
-        let shared_commitments_key = key_bytes(&shared_commitments_prefix, &blob_id);
-        self.storage_relay
-            .send(StorageMsg::Store {
-                key: shared_commitments_key,
-                value: S::serialize(shared_commitments),
-            })
-            .await
-            .map_err(|(e, _)| e.into())
+        try_join!(
+            {
+                // Store the blob in the storage backend.
+                let blob_prefix = format!("{}{}", DA_VERIFIED_KEY_PREFIX, DA_BLOB_PATH);
+                let blob_idx = create_blob_idx(blob_id.as_ref(), column_idx.as_ref());
+                let blob_key = key_bytes(&blob_prefix, blob_idx);
+                self.storage_relay.send(StorageMsg::Store {
+                    key: blob_key,
+                    value: S::serialize(light_blob),
+                })
+            },
+            {
+                let shared_commitments_prefix =
+                    format!("{}{}", DA_VERIFIED_KEY_PREFIX, DA_SHARED_COMMITMENTS_PATH);
+                let shared_commitments_key = key_bytes(&shared_commitments_prefix, &blob_id);
+                self.storage_relay.send(StorageMsg::Store {
+                    key: shared_commitments_key,
+                    value: S::serialize(shared_commitments),
+                })
+            }
+        )
+        .map(|_| ())
+        .map_err(|e| format!("Failed to store blob in storage adapter: {e:?}").into())
     }
 
     async fn get_blob(
