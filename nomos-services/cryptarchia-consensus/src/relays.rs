@@ -1,5 +1,7 @@
 use std::hash::Hash;
 // std
+use nomos_mempool::backend::RecoverableMempool;
+use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
 // Crates
 use overwatch_rs::services::relay::{OutboundRelay, Relay};
@@ -103,15 +105,18 @@ impl<
 where
     BlendAdapter: blend::BlendAdapter<Network: BlendNetworkAdapter>,
     BS: BlobSelect<BlobId = DaPool::Item> + Clone,
-    ClPool: MemPool<BlockId = HeaderId>,
+    ClPool: RecoverableMempool<BlockId = HeaderId>,
+    ClPool::RecoveryState: Serialize + for<'de> Deserialize<'de>,
     ClPool::BlockId: Debug,
-    ClPool::Item: Debug + DeserializeOwned + Eq + Hash + Clone + Send + Sync,
-    ClPool::Key: Debug,
+    ClPool::Item: Debug + DeserializeOwned + Eq + Hash + Clone + Send + Sync + 'static,
+    ClPool::Key: Debug + 'static,
+    ClPool::Settings: Clone,
     ClPoolAdapter: MempoolAdapter<Payload = ClPool::Item, Key = ClPool::Key>,
     DaPool: MemPool<BlockId = HeaderId>,
     DaPool::BlockId: Debug,
     DaPool::Item: Debug + DeserializeOwned + Eq + Hash + Clone + Send + Sync,
     DaPool::Key: Debug,
+    DaPool::Settings: Clone,
     DaPoolAdapter: MempoolAdapter<Key = DaPool::Key>,
     DaPoolAdapter::Payload: DispersedBlobInfo + Into<DaPool::Item> + Debug,
     NetworkAdapter: network::NetworkAdapter,

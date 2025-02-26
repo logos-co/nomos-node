@@ -16,7 +16,9 @@ use overwatch_rs::services::ServiceData;
 use serde::{Deserialize, Serialize};
 use subnetworks_assignations::versions::v1::FillFromNodeList;
 // internal
-use crate::ExecutorApiService;
+use crate::{config::mempool::MempoolConfig, ExecutorApiService};
+
+pub mod mempool;
 
 #[derive(Deserialize, Debug, Clone, Serialize)]
 pub struct Config {
@@ -33,6 +35,7 @@ pub struct Config {
     pub http: <ExecutorApiService as ServiceData>::Settings,
     pub cryptarchia: <crate::ExecutorCryptarchia as ServiceData>::Settings,
     pub storage: <crate::StorageService<RocksBackend<Wire>> as ServiceData>::Settings,
+    pub mempool: MempoolConfig,
 }
 
 impl Config {

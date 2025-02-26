@@ -67,6 +67,7 @@ where
     DaPoolAdapter::Payload: DispersedBlobInfo + Into<DaPool::Item> + Debug + Send,
     DaPool::Item: Clone + Eq + Hash + Debug + Send + 'static,
     DaPool::Key: Debug + Send + 'static,
+    DaPool::Settings: Clone,
     SamplingRng: SeedableRng + RngCore + Sync,
     SamplingBackend: DaSamplingServiceBackend<SamplingRng, BlobId = DaPool::Key> + Send + Sync,
     SamplingBackend::Settings: Clone,

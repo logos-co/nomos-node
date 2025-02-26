@@ -12,7 +12,7 @@ use nomos_tracing::logging::{gelf::GelfConfig, local::FileConfig};
 use serde::{Deserialize, Serialize};
 use tracing::Level;
 // internal
-use crate::{NomosApiService, NomosDaMembership, Wire};
+use crate::{config::mempool::MempoolConfig, NomosApiService, NomosDaMembership, Wire};
 use nomos_blend_service::backends::libp2p::Libp2pBlendBackend as BlendBackend;
 use nomos_blend_service::network::libp2p::Libp2pAdapter as BlendNetworkAdapter;
 use nomos_blend_service::BlendService;
@@ -26,6 +26,8 @@ use nomos_storage::backends::rocksdb::RocksBackend;
 use nomos_tracing_service::{LoggerLayer, Tracing};
 use overwatch_rs::services::ServiceData;
 use subnetworks_assignations::versions::v1::FillFromNodeList;
+
+pub mod mempool;
 
 #[derive(ValueEnum, Clone, Debug, Default)]
 pub enum LoggerLayerType {
@@ -141,6 +143,7 @@ pub struct Config {
         nomos_da_sampling::network::adapters::validator::Libp2pAdapter<NomosDaMembership>,
     > as ServiceData>::Settings,
     pub storage: <crate::StorageService<RocksBackend<Wire>> as ServiceData>::Settings,
+    pub mempool: MempoolConfig,
 }
 
 impl Config {
