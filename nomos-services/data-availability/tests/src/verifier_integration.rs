@@ -91,10 +91,6 @@ fn test_verifier() {
 
     let blobs_dir = TempDir::new().unwrap().path().to_path_buf();
 
-    let (node1_sk, _) = generate_blst_hex_keys();
-    let (node2_sk, _) = generate_blst_hex_keys();
-    let (node3_sk, _) = generate_blst_hex_keys();
-
     let client_zone = new_client(NamedTempFile::new().unwrap().path().to_path_buf());
 
     let (peer_sk_1, peer_id_1) = generate_ed25519_sk_peerid();
@@ -129,8 +125,6 @@ fn test_verifier() {
         &blobs_dir,
         vec![node_address(&swarm_config2)],
         KzgrsDaVerifierSettings {
-            sk: node1_sk.clone(),
-            index: [0].into(),
             global_params_path: GLOBAL_PARAMS_PATH.into(),
         },
         TestDaNetworkSettings {
@@ -157,8 +151,6 @@ fn test_verifier() {
         &blobs_dir,
         vec![node_address(&swarm_config1)],
         KzgrsDaVerifierSettings {
-            sk: node2_sk,
-            index: [1].into(),
             global_params_path: GLOBAL_PARAMS_PATH.into(),
         },
         TestDaNetworkSettings {
@@ -185,8 +177,6 @@ fn test_verifier() {
         &blobs_dir,
         vec![node_address(&swarm_config2)],
         KzgrsDaVerifierSettings {
-            sk: node3_sk,
-            index: [2].into(),
             global_params_path: GLOBAL_PARAMS_PATH.into(),
         },
         TestDaNetworkSettings {
