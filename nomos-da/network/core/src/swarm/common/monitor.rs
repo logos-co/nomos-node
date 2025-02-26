@@ -16,6 +16,7 @@ use crate::protocols::dispersal::validator::behaviour::{
 use crate::protocols::replication::behaviour::{ReplicationError, ReplicationEvent};
 use crate::protocols::sampling::behaviour::{SamplingError, SamplingEvent};
 
+#[derive(Debug)]
 pub enum MonitorEvent {
     ExecutorDispersal(ExecutorDispersalError),
     ValidatorDispersal(ValidatorDispersalError),
@@ -40,9 +41,14 @@ impl From<&DispersalExecutorEvent> for MonitorEvent {
     fn from(event: &DispersalExecutorEvent) -> Self {
         match event {
             DispersalExecutorEvent::DispersalSuccess { .. } => MonitorEvent::Noop,
-            DispersalExecutorEvent::DispersalError { error } => {
-                MonitorEvent::ExecutorDispersal(error.clone())
-            }
+            DispersalExecutorEvent::DispersalError { error } => match error {
+                // Only map Io or OpenStreamError to MonitorEvent
+                &ExecutorDispersalError::Io { .. }
+                | &ExecutorDispersalError::OpenStreamError { .. } => {
+                    MonitorEvent::ExecutorDispersal(error.clone())
+                }
+                _ => MonitorEvent::Noop, // All other cases return Noop
+            },
         }
     }
 }
@@ -74,7 +80,13 @@ impl From<&SamplingEvent> for MonitorEvent {
         match event {
             SamplingEvent::SamplingSuccess { .. } => MonitorEvent::Noop,
             SamplingEvent::IncomingSample { .. } => MonitorEvent::Noop,
-            SamplingEvent::SamplingError { error } => MonitorEvent::Sampling(error.clone()),
+            SamplingEvent::SamplingError { error } => match error {
+                // Only map Io or OpenStreamError to MonitorEvent
+                &SamplingError::Io { .. } | &SamplingError::OpenStream { .. } => {
+                    MonitorEvent::Sampling(error.clone())
+                }
+                _ => MonitorEvent::Noop, // All other cases return Noop
+            },
         }
     }
 }
@@ -240,6 +252,7 @@ where
 
     fn record_event(&mut self, event: Self::Event) -> Option<ConnectionMonitorOutput> {
         if let Some(peer_id) = event.peer_id() {
+            tracing::info!("MONITOR EVENT: {event:?}");
             let stats = self.peer_stats.entry(*peer_id).or_default();
             let now = Instant::now();
             match event {

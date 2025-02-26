@@ -1,14 +1,17 @@
 use executor_http_client::ExecutorHttpClient;
 
+use kzgrs_backend::common::blob::DaBlob;
 use kzgrs_backend::reconstruction::reconstruct_without_missing_data;
 use reqwest::ClientBuilder;
 use reqwest::Url;
 use std::time::Duration;
+use tests::adjust_timeout;
 use tests::nodes::executor::Executor;
 use tests::topology::Topology;
 use tests::topology::TopologyConfig;
 
 const APP_ID: &str = "fd3384e132ad02a56c78f45547ee40038dc79002b90d29ed90e08eee762ae715";
+const DA_TESTS_TIMEOUT: u64 = 120;
 
 async fn disseminate_with_metadata(
     executor: &Executor,
@@ -28,7 +31,7 @@ async fn disseminate_with_metadata(
     client.publish_blob(data.to_vec(), metadata).await.unwrap();
 }
 
-#[ignore = "todo: reenable after blendnet is tested"]
+#[ignore = "for manual usage, disseminate_retrieve_reconstruct is preferred for ci"]
 #[tokio::test]
 async fn disseminate_and_retrieve() {
     let topology = Topology::spawn(TopologyConfig::validator_and_executor()).await;
@@ -71,28 +74,41 @@ async fn disseminate_and_retrieve() {
     assert!(validator_idx_0_blobs.len() == 2);
 }
 
-#[ignore = "todo: make work in parallel to other tests"]
 #[tokio::test]
 async fn disseminate_retrieve_reconstruct() {
     let topology = Topology::spawn(TopologyConfig::validator_and_executor()).await;
     let executor = &topology.executors()[0];
+    let num_subnets = executor.config().da_network.backend.num_subnets as usize;
 
     let data = [1u8; 31];
     let app_id = hex::decode(APP_ID).unwrap();
-    let metadata =
-        kzgrs_backend::dispersal::Metadata::new(app_id.clone().try_into().unwrap(), 0u64.into());
+    let app_id: [u8; 32] = app_id.clone().try_into().unwrap();
+    let metadata = kzgrs_backend::dispersal::Metadata::new(app_id, 0u64.into());
 
-    tokio::time::sleep(Duration::from_secs(15)).await;
     disseminate_with_metadata(executor, &data, metadata).await;
-    tokio::time::sleep(Duration::from_secs(20)).await;
 
     let from = 0u64.to_be_bytes();
     let to = 1u64.to_be_bytes();
 
-    let executor_blobs = executor
-        .get_indexer_range(app_id.clone().try_into().unwrap(), from..to)
-        .await;
+    let blobs_fut = async {
+        let mut num_blobs = 0;
+        while num_blobs < num_subnets {
+            let executor_blobs = executor.get_indexer_range(app_id, from..to).await;
+            num_blobs = executor_blobs
+                .into_iter()
+                .filter(|(i, _)| i == &from)
+                .flat_map(|(_, blobs)| blobs)
+                .collect::<Vec<DaBlob>>()
+                .len();
+        }
+    };
 
+    let timeout = adjust_timeout(Duration::from_secs(DA_TESTS_TIMEOUT));
+    if (tokio::time::timeout(timeout, blobs_fut).await).is_err() {
+        panic!("timed out waiting for indexed blob");
+    }
+
+    let executor_blobs = executor.get_indexer_range(app_id, from..to).await;
     let executor_idx_0_blobs: Vec<_> = executor_blobs
         .iter()
         .filter(|(i, _)| i == &from)
@@ -108,7 +124,7 @@ async fn disseminate_retrieve_reconstruct() {
 #[ignore = "for local debugging"]
 #[tokio::test]
 async fn local_testnet() {
-    let topology = Topology::spawn(TopologyConfig::validator_and_executor()).await;
+    let topology = Topology::spawn(TopologyConfig::validators_and_executor(3, 2)).await;
     let executor = &topology.executors()[0];
     let app_id = hex::decode(APP_ID).expect("Invalid APP_ID");
 
@@ -122,7 +138,7 @@ async fn local_testnet() {
         .await;
 
         index += 1;
-        tokio::time::sleep(Duration::from_secs(10)).await;
+        tokio::time::sleep(Duration::from_secs(30)).await;
     }
 }
 
