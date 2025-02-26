@@ -6,117 +6,140 @@ pub mod openapi {
 
 // std
 use std::fmt::Debug;
+use std::marker::PhantomData;
 
 // crates
+use crate::network::NetworkAdapter as NetworkAdapterTrait;
 use futures::StreamExt;
+use overwatch_rs::services::handle::ServiceStateHandle;
+use overwatch_rs::services::state::ServiceState;
+use serde::{Deserialize, Serialize};
+use services_utils::overwatch::recovery::operators::RecoveryBackend as RecoveryBackendTrait;
 // internal
-use crate::backend::MemPool;
-use crate::network::NetworkAdapter;
+use crate::backend::{MemPool, RecoverableMempool};
+use crate::tx::settings::TxMempoolSettings;
 use crate::{MempoolMetrics, MempoolMsg};
 use nomos_network::{NetworkMsg, NetworkService};
-use overwatch_rs::services::{
-    relay::{OutboundRelay, Relay},
-    state::{NoOperator, NoState},
-    ServiceCore, ServiceData, ServiceId,
-};
+use overwatch_rs::services::{relay::OutboundRelay, ServiceCore, ServiceData, ServiceId};
 use overwatch_rs::OpaqueServiceStateHandle;
-use services_utils::overwatch::lifecycle;
+use services_utils::overwatch::{lifecycle, JsonFileBackend, RecoveryOperator};
 
-pub struct TxMempoolService<N, P>
+pub type TxMempoolService<NetworkAdapter, Pool> = GenericTxMempoolService<
+    Pool,
+    NetworkAdapter,
+    JsonFileBackend<
+        <Pool as RecoverableMempool>::RecoveryState,
+        TxMempoolSettings<
+            <Pool as MemPool>::Settings,
+            <NetworkAdapter as NetworkAdapterTrait>::Settings,
+        >,
+    >,
+>;
+
+pub struct GenericTxMempoolService<Pool, NetworkAdapter, RecoveryBackend>
 where
-    N: NetworkAdapter<Payload = P::Item, Key = P::Key>,
-    P: MemPool,
-    P::Settings: Clone,
-    P::Item: Debug + 'static,
-    P::Key: Debug + 'static,
-    P::BlockId: Debug + 'static,
+    Self: ServiceData,
 {
-    service_state: OpaqueServiceStateHandle<Self>,
-    network_relay: Relay<NetworkService<N::Backend>>,
-    pool: P,
+    pool: Pool,
+    service_state_handle: OpaqueServiceStateHandle<Self>,
+    _phantom: PhantomData<(NetworkAdapter, RecoveryBackend)>,
 }
 
-impl<N, P> ServiceData for TxMempoolService<N, P>
+impl<Pool, NetworkAdapter, RecoveryBackend>
+    GenericTxMempoolService<Pool, NetworkAdapter, RecoveryBackend>
 where
-    N: NetworkAdapter<Payload = P::Item, Key = P::Key>,
-    P: MemPool,
-    P::Settings: Clone,
-    P::Item: Debug + 'static,
-    P::Key: Debug + 'static,
-    P::BlockId: Debug + 'static,
+    Self: ServiceData,
+{
+    pub const fn new(pool: Pool, service_state_handle: OpaqueServiceStateHandle<Self>) -> Self {
+        Self {
+            pool,
+            service_state_handle,
+            _phantom: PhantomData,
+        }
+    }
+}
+
+impl<Pool, NetworkAdapter, RecoveryBackend> ServiceData
+    for GenericTxMempoolService<Pool, NetworkAdapter, RecoveryBackend>
+where
+    Pool: RecoverableMempool,
+    Pool::RecoveryState: ServiceState + Serialize + for<'de> Deserialize<'de>,
+    NetworkAdapter: NetworkAdapterTrait,
+    RecoveryBackend: RecoveryBackendTrait,
 {
     const SERVICE_ID: ServiceId = "mempool-cl";
-    type Settings = TxMempoolSettings<P::Settings, N::Settings>;
-    type State = NoState<Self::Settings>;
-    type StateOperator = NoOperator<Self::State, Self::Settings>;
-    type Message = MempoolMsg<
-        <P as MemPool>::BlockId,
-        <P as MemPool>::Item,
-        <P as MemPool>::Item,
-        <P as MemPool>::Key,
-    >;
+    type Settings = TxMempoolSettings<Pool::Settings, NetworkAdapter::Settings>;
+    type State = Pool::RecoveryState;
+    type StateOperator = RecoveryOperator<RecoveryBackend>;
+    type Message = MempoolMsg<Pool::BlockId, Pool::Item, Pool::Item, Pool::Key>;
 }
 
 #[async_trait::async_trait]
-impl<N, P> ServiceCore for TxMempoolService<N, P>
+impl<Pool, NetworkAdapter, RecoveryBackend> ServiceCore
+    for GenericTxMempoolService<Pool, NetworkAdapter, RecoveryBackend>
 where
-    P: MemPool + Send + 'static,
-    P::Settings: Clone + Send + Sync + 'static,
-    N::Settings: Clone + Send + Sync + 'static,
-    P::Item: Clone + Debug + Send + Sync + 'static,
-    P::Key: Debug + Send + Sync + 'static,
-    P::BlockId: Send + Debug + 'static,
-    N: NetworkAdapter<Payload = P::Item, Key = P::Key> + Send + Sync + 'static,
+    Pool: RecoverableMempool + Send,
+    Pool::RecoveryState: ServiceState + Debug + Serialize + for<'de> Deserialize<'de> + Send + Sync,
+    Pool::Settings: Clone + Send + Sync,
+    Pool::BlockId: Send + 'static,
+    Pool::Key: Send,
+    Pool::Item: Clone + Send + 'static,
+    NetworkAdapter: NetworkAdapterTrait<Payload = Pool::Item, Key = Pool::Key> + Send,
+    NetworkAdapter::Settings: Clone + Send + Sync + 'static,
+    RecoveryBackend: RecoveryBackendTrait + Send,
 {
     fn init(
-        service_state: OpaqueServiceStateHandle<Self>,
-        _init_state: Self::State,
+        service_state: ServiceStateHandle<Self::Message, Self::Settings, Self::State>,
+        init_state: Self::State,
     ) -> Result<Self, overwatch_rs::DynError> {
-        let network_relay = service_state.overwatch_handle.relay();
+        tracing::trace!(
+            "Initializing TxMempoolService with initial state {:#?}",
+            init_state
+        );
         let settings = service_state.settings_reader.get_updated_settings();
+        let recovered_pool = Pool::recover(settings.pool, init_state);
 
-        Ok(Self {
-            service_state,
-            network_relay,
-            pool: P::new(settings.backend),
-        })
+        Ok(Self::new(recovered_pool, service_state))
     }
 
     async fn run(mut self) -> Result<(), overwatch_rs::DynError> {
-        let Self {
-            mut service_state,
-            network_relay,
-            mut pool,
-            ..
-        } = self;
-
-        let mut network_relay: OutboundRelay<_> = network_relay
+        let network_service_relay = self
+            .service_state_handle
+            .overwatch_handle
+            .relay::<NetworkService<_>>()
             .connect()
             .await
             .expect("Relay connection with NetworkService should succeed");
 
-        let adapter = N::new(
-            service_state.settings_reader.get_updated_settings().network,
-            network_relay.clone(),
-        );
-        let adapter = adapter.await;
-
-        let mut network_items = adapter.payload_stream().await;
-        let mut lifecycle_stream = service_state.lifecycle_handle.message_stream();
+        // Queue for network messages
+        let mut network_items = NetworkAdapter::new(
+            self.service_state_handle
+                .settings_reader
+                .get_updated_settings()
+                .network_adapter,
+            network_service_relay.clone(),
+        )
+        .await
+        .payload_stream()
+        .await;
+        // Queue for lifecycle messages
+        let mut lifecycle_stream = self.service_state_handle.lifecycle_handle.message_stream();
 
         loop {
             tokio::select! {
-                Some(msg) = service_state.inbound_relay.recv() => {
-                    Self::handle_mempool_message(msg, &mut pool, &mut network_relay, &mut service_state).await;
+                // Queue for relay messages
+                Some(relay_msg) = self.service_state_handle.inbound_relay.recv() => {
+                    self.handle_mempool_message(relay_msg, network_service_relay.clone());
                 }
                 Some((key, item )) = network_items.next() => {
-                    pool.add_item(key, item).unwrap_or_else(|e| {
-                        tracing::debug!("could not add item to the pool due to: {}", e)
+                    self.pool.add_item(key, item).unwrap_or_else(|e| {
+                        tracing::debug!("could not add item to the pool due to: {e}");
                     });
-                    tracing::info!(counter.tx_mempool_pending_items = pool.pending_item_count());
+                    tracing::info!(counter.tx_mempool_pending_items = self.pool.pending_item_count());
+                    self.service_state_handle.state_updater.update(self.pool.save());
                 }
-                Some(msg) = lifecycle_stream.next() =>  {
-                    if lifecycle::should_stop_service::<Self>(&msg).await {
+                Some(lifecycle_msg) = lifecycle_stream.next() =>  {
+                    if lifecycle::should_stop_service::<Self>(&lifecycle_msg).await {
                         break;
                     }
                 }
@@ -126,21 +149,23 @@ where
     }
 }
 
-impl<N, P> TxMempoolService<N, P>
+impl<Pool, NetworkAdapter, RecoveryBackend>
+    GenericTxMempoolService<Pool, NetworkAdapter, RecoveryBackend>
 where
-    P: MemPool + Send + 'static,
-    P::Settings: Clone + Send + Sync + 'static,
-    N::Settings: Clone + Send + Sync + 'static,
-    P::Item: Clone + Debug + Send + Sync + 'static,
-    P::Key: Debug + Send + Sync + 'static,
-    P::BlockId: Debug + Send + 'static,
-    N: NetworkAdapter<Payload = P::Item, Key = P::Key> + Send + Sync + 'static,
+    Pool: RecoverableMempool + Send,
+    Pool::RecoveryState: ServiceState + Serialize + for<'de> Deserialize<'de> + Send + Sync,
+    Pool::Item: Clone + Send + 'static,
+    Pool::Key: Send,
+    Pool::BlockId: Send,
+    Pool::Settings: Clone + Send + Sync,
+    NetworkAdapter: NetworkAdapterTrait<Payload = Pool::Item> + Send,
+    NetworkAdapter::Settings: Clone + Send + Sync + 'static,
+    RecoveryBackend: RecoveryBackendTrait,
 {
-    async fn handle_mempool_message(
-        message: MempoolMsg<P::BlockId, P::Item, P::Item, P::Key>,
-        pool: &mut P,
-        network_relay: &mut OutboundRelay<NetworkMsg<N::Backend>>,
-        service_state: &mut OpaqueServiceStateHandle<Self>,
+    fn handle_mempool_message(
+        &mut self,
+        message: MempoolMsg<Pool::BlockId, Pool::Item, Pool::Item, Pool::Key>,
+        network_relay: OutboundRelay<NetworkMsg<NetworkAdapter::Backend>>,
     ) {
         match message {
             MempoolMsg::Add {
@@ -148,14 +173,20 @@ where
                 key,
                 reply_channel,
             } => {
-                match pool.add_item(key, item.clone()) {
+                match self.pool.add_item(key, item.clone()) {
                     Ok(_id) => {
                         // Broadcast the item to the network
-                        let net = network_relay.clone();
-                        let settings = service_state.settings_reader.get_updated_settings().network;
+                        let settings = self
+                            .service_state_handle
+                            .settings_reader
+                            .get_updated_settings()
+                            .network_adapter;
+                        self.service_state_handle
+                            .state_updater
+                            .update(self.pool.save());
                         // move sending to a new task so local operations can complete in the meantime
-                        tokio::spawn(async move {
-                            let adapter = N::new(settings, net).await;
+                        tokio::spawn(async {
+                            let adapter = NetworkAdapter::new(settings, network_relay).await;
                             adapter.send(item).await;
                         });
                         if let Err(e) = reply_channel.send(Ok(())) {
@@ -172,11 +203,11 @@ where
                 reply_channel,
             } => {
                 reply_channel
-                    .send(pool.view(ancestor_hint))
+                    .send(self.pool.view(ancestor_hint))
                     .unwrap_or_else(|_| tracing::debug!("could not send back pool view"));
             }
             MempoolMsg::MarkInBlock { ids, block } => {
-                pool.mark_in_block(&ids, block);
+                self.pool.mark_in_block(&ids, block);
             }
             #[cfg(test)]
             MempoolMsg::BlockItems {
@@ -184,16 +215,16 @@ where
                 reply_channel,
             } => {
                 reply_channel
-                    .send(pool.block_items(block))
+                    .send(self.pool.block_items(block))
                     .unwrap_or_else(|_| tracing::debug!("could not send back block items"));
             }
             MempoolMsg::Prune { ids } => {
-                pool.prune(&ids);
+                self.pool.prune(&ids);
             }
             MempoolMsg::Metrics { reply_channel } => {
                 let metrics = MempoolMetrics {
-                    pending_items: pool.pending_item_count(),
-                    last_item_timestamp: pool.last_item_timestamp(),
+                    pending_items: self.pool.pending_item_count(),
+                    last_item_timestamp: self.pool.last_item_timestamp(),
                 };
                 reply_channel
                     .send(metrics)
@@ -204,15 +235,9 @@ where
                 reply_channel,
             } => {
                 reply_channel
-                    .send(pool.status(&items))
+                    .send(self.pool.status(&items))
                     .unwrap_or_else(|_| tracing::debug!("could not send back mempool status"));
             }
         }
     }
-}
-
-#[derive(Clone, Debug)]
-pub struct TxMempoolSettings<B, N> {
-    pub backend: B,
-    pub network: N,
 }

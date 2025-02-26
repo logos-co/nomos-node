@@ -1,20 +1,71 @@
+use overwatch_rs::services::state::ServiceState;
 // std
+use ::serde::{Deserialize, Serialize};
 use linked_hash_map::LinkedHashMap;
+use std::fmt::Debug;
 use std::hash::Hash;
 use std::time::SystemTime;
 use std::{collections::BTreeMap, time::UNIX_EPOCH};
+use thiserror::Error;
 // crates
 // internal
-use crate::backend::{MemPool, MempoolError};
+use crate::backend::{MemPool, MempoolError, RecoverableMempool};
+use crate::TxMempoolSettings;
 
 use super::Status;
 
+mod serde;
+
 /// A mock mempool implementation that stores all transactions in memory in the order received.
+#[derive(Serialize, Deserialize)]
 pub struct MockPool<BlockId, Item, Key> {
+    #[serde(
+        serialize_with = "serde::serialize_pending_items",
+        deserialize_with = "serde::deserialize_pending_items",
+        bound(
+            serialize = "Key: Eq + Hash + Serialize, Item: Serialize",
+            deserialize = "Key: Deserialize<'de> + Eq + Hash, Item: Deserialize<'de>"
+        )
+    )]
     pending_items: LinkedHashMap<Key, Item>,
+    #[serde(bound(deserialize = "BlockId: Ord + Deserialize<'de>"))]
     in_block_items: BTreeMap<BlockId, Vec<Item>>,
+    #[serde(bound(deserialize = "Key: Ord + Deserialize<'de>"))]
     in_block_items_by_id: BTreeMap<Key, BlockId>,
     last_item_timestamp: u64,
+}
+
+impl<BlockId, Item, Key> MockPool<BlockId, Item, Key> {
+    #[must_use]
+    pub const fn pending_items(&self) -> &LinkedHashMap<Key, Item> {
+        &self.pending_items
+    }
+
+    #[must_use]
+    pub const fn in_block_items(&self) -> &BTreeMap<BlockId, Vec<Item>> {
+        &self.in_block_items
+    }
+
+    #[must_use]
+    pub const fn last_item_timestamp(&self) -> u64 {
+        self.last_item_timestamp
+    }
+}
+
+impl<BlockId, Item, Key> Debug for MockPool<BlockId, Item, Key>
+where
+    BlockId: Debug,
+    Item: Debug,
+    Key: Debug + Hash + Eq,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("MockPool")
+            .field("pending_items", &self.pending_items)
+            .field("in_block_items", &self.in_block_items)
+            .field("in_block_items_by_id", &self.in_block_items_by_id)
+            .field("last_item_timestamp", &self.last_item_timestamp)
+            .finish()
+    }
 }
 
 impl<BlockId, Item, Key> Default for MockPool<BlockId, Item, Key>
@@ -31,20 +82,37 @@ where
     }
 }
 
+impl<BlockId, Item, Key> Clone for MockPool<BlockId, Item, Key>
+where
+    Key: Hash + Eq + Clone,
+    Item: Clone,
+    BlockId: Clone,
+{
+    fn clone(&self) -> Self {
+        Self {
+            pending_items: self.pending_items.clone(),
+            in_block_items: self.in_block_items.clone(),
+            in_block_items_by_id: self.in_block_items_by_id.clone(),
+            last_item_timestamp: self.last_item_timestamp,
+        }
+    }
+}
+
 impl<BlockId, Item, Key> MockPool<BlockId, Item, Key>
 where
     Key: Hash + Eq + Clone,
 {
+    #[must_use]
     pub fn new() -> Self {
-        Default::default()
+        Self::default()
     }
 }
 
 impl<BlockId, Item, Key> MemPool for MockPool<BlockId, Item, Key>
 where
-    Item: Clone + Send + Sync + 'static + Hash,
-    Key: Clone + Ord + Hash,
-    BlockId: Copy + Ord,
+    Key: Hash + Eq + Ord + Clone + Send,
+    Item: Clone + Send + 'static,
+    BlockId: Ord + Copy,
 {
     type Settings = ();
     type Item = Item;
@@ -67,7 +135,9 @@ where
         self.last_item_timestamp = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap()
-            .as_millis() as u64;
+            .as_millis()
+            .try_into()
+            .unwrap();
 
         Ok(())
     }
@@ -126,5 +196,39 @@ where
                 }
             })
             .collect()
+    }
+}
+
+impl<BlockId, Item, Key> RecoverableMempool for MockPool<BlockId, Item, Key>
+where
+    Key: Hash + Eq + Ord + Clone + Send,
+    Item: Clone + Send + 'static,
+    BlockId: Ord + Copy,
+{
+    type RecoveryState = Self;
+
+    fn recover(_settings: Self::Settings, state: Self::RecoveryState) -> Self {
+        state
+    }
+
+    fn save(&self) -> Self::RecoveryState {
+        self.clone()
+    }
+}
+
+#[derive(Error, Debug)]
+pub enum Error {}
+
+impl<BlockId, Item, Key> ServiceState for MockPool<BlockId, Item, Key>
+where
+    Key: Hash + Eq + Ord + Clone + Send,
+    Item: Clone + Send + 'static,
+    BlockId: Ord + Copy,
+{
+    type Error = Error;
+    type Settings = TxMempoolSettings<(), ()>;
+
+    fn from_settings(_settings: &Self::Settings) -> Result<Self, Self::Error> {
+        Ok(<Self as MemPool>::new(()))
     }
 }
