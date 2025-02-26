@@ -113,6 +113,15 @@ impl<SerdeOp: StorageSerde + Send + Sync + 'static> StorageBackend for RocksBack
         self.rocks.put(key, value)
     }
 
+    async fn store_batch(&mut self, keys_values: Vec<(Bytes, Bytes)>) -> Result<(), Self::Error> {
+        let mut batch = rocksdb::WriteBatch::default();
+        for (key, value) in keys_values {
+            batch.put(key, value);
+        }
+        self.rocks.write(batch)?;
+        Ok(())
+    }
+
     async fn load(&mut self, key: &[u8]) -> Result<Option<Bytes>, Self::Error> {
         self.rocks.get(key).map(|opt| opt.map(|ivec| ivec.into()))
     }
@@ -176,6 +185,36 @@ mod test {
         assert_eq!(load_value, Some(value.as_bytes().into()));
         let removed_value = db.remove(key.as_bytes()).await?;
         assert_eq!(removed_value, Some(value.as_bytes().into()));
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_store_batch(
+    ) -> Result<(), <RocksBackend<NoStorageSerde> as StorageBackend>::Error> {
+        let temp_path = TempDir::new().unwrap();
+        let rocks_settings = RocksBackendSettings {
+            db_path: temp_path.path().to_path_buf(),
+            read_only: false,
+            column_family: None,
+        };
+        let key1 = "foo1";
+        let value1 = "bar1";
+
+        let key2 = "foo2";
+        let value2 = "bar2";
+
+        let mut db: RocksBackend<NoStorageSerde> = RocksBackend::new(rocks_settings)?;
+        db.store_batch(vec![
+            (key1.as_bytes().into(), value1.as_bytes().into()),
+            (key2.as_bytes().into(), value2.as_bytes().into()),
+        ])
+        .await?;
+
+        let load_value1 = db.load(key1.as_bytes()).await?;
+        assert_eq!(load_value1, Some(value1.as_bytes().into()));
+        let load_value2 = db.load(key2.as_bytes()).await?;
+        assert_eq!(load_value2, Some(value2.as_bytes().into()));
 
         Ok(())
     }

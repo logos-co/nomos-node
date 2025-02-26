@@ -50,6 +50,13 @@ impl<SerdeOp: StorageSerde + Send + Sync + 'static> StorageBackend for MockStora
         Ok(())
     }
 
+    async fn store_batch(&mut self, keys_values: Vec<(Bytes, Bytes)>) -> Result<(), Self::Error> {
+        for (key, value) in keys_values {
+            let _ = self.inner.insert(key, value);
+        }
+        Ok(())
+    }
+
     async fn load(&mut self, key: &[u8]) -> Result<Option<Bytes>, Self::Error> {
         Ok(self.inner.get(key).cloned())
     }

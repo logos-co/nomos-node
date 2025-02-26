@@ -44,6 +44,8 @@ pub trait StorageBackend: Sized {
     type SerdeOperator: StorageSerde + Send + Sync + 'static;
     fn new(config: Self::Settings) -> Result<Self, Self::Error>;
     async fn store(&mut self, key: Bytes, value: Bytes) -> Result<(), Self::Error>;
+    /// Store batch of key/value pairs in one transaction
+    async fn store_batch(&mut self, keys_values: Vec<(Bytes, Bytes)>) -> Result<(), Self::Error>;
     async fn load(&mut self, key: &[u8]) -> Result<Option<Bytes>, Self::Error>;
     /// Loads all values whose keys start with the given prefix.
     async fn load_prefix(&mut self, prefix: &[u8]) -> Result<Vec<Bytes>, Self::Error>;

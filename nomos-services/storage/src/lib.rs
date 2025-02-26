@@ -33,6 +33,9 @@ pub enum StorageMsg<Backend: StorageBackend> {
         key: Bytes,
         value: Bytes,
     },
+    StoreBatch {
+        keys_values: Vec<(Bytes, Bytes)>,
+    },
     Remove {
         key: Bytes,
         reply_channel: tokio::sync::oneshot::Sender<Option<Bytes>>,
@@ -149,6 +152,9 @@ impl<Backend: StorageBackend> Debug for StorageMsg<Backend> {
             StorageMsg::Store { key, value } => {
                 write!(f, "Store {{ {key:?}, {value:?}}}")
             }
+            StorageMsg::StoreBatch { keys_values } => {
+                write!(f, "StoreBatch {{ {keys_values:?} }}")
+            }
             StorageMsg::Remove { key, .. } => {
                 write!(f, "Remove {{ {key:?} }}")
             }
@@ -186,6 +192,9 @@ impl<Backend: StorageBackend + Send + Sync + 'static> StorageService<Backend> {
                 reply_channel,
             } => Self::handle_load_prefix(backend, prefix, reply_channel).await,
             StorageMsg::Store { key, value } => Self::handle_store(backend, key, value).await,
+            StorageMsg::StoreBatch { keys_values } => {
+                Self::handle_store_batch(backend, keys_values).await
+            }
             StorageMsg::Remove { key, reply_channel } => {
                 Self::handle_remove(backend, key, reply_channel).await
             }
@@ -282,6 +291,17 @@ impl<Backend: StorageBackend + Send + Sync + 'static> StorageService<Backend> {
                 operation: "Execute".to_string(),
                 key: Bytes::new(),
             })
+    }
+
+    /// Handle store batch message
+    async fn handle_store_batch(
+        backend: &mut Backend,
+        keys_values: Vec<(Bytes, Bytes)>,
+    ) -> Result<(), StorageServiceError<Backend>> {
+        backend
+            .store_batch(keys_values)
+            .await
+            .map_err(StorageServiceError::BackendError)
     }
 }
 
