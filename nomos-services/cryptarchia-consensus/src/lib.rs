@@ -3,13 +3,37 @@ mod leadership;
 mod messages;
 pub mod network;
 mod relays;
+mod states;
 pub mod storage;
 mod time;
 
-use crate::relays::CryptarchiaConsensusRelays;
+// std
 use core::fmt::Debug;
-use cryptarchia_engine::Slot;
 use futures::StreamExt;
+use std::collections::BTreeSet;
+use std::hash::Hash;
+use std::path::PathBuf;
+// Crates
+use rand::{RngCore, SeedableRng};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde_with::serde_as;
+use thiserror::Error;
+pub use time::Config as TimeConfig;
+use tokio::sync::oneshot::Sender;
+use tokio::sync::{broadcast, oneshot};
+use tokio_stream::wrappers::IntervalStream;
+use tracing::{error, info, instrument, span, Level};
+use tracing_futures::Instrument;
+// Internal
+use crate::leadership::Leader;
+use crate::relays::CryptarchiaConsensusRelays;
+use crate::states::{
+    CryptarchiaConsensusState, CryptarchiaInitialisationStrategy, GenesisRecoveryStrategy,
+    SecurityRecoveryStrategy,
+};
+use crate::storage::adapters::StorageAdapter;
+use crate::storage::StorageAdapter as _;
+use cryptarchia_engine::Slot;
 pub use leadership::LeaderConfig;
 use network::NetworkAdapter;
 use nomos_core::da::blob::{
@@ -31,26 +55,11 @@ use nomos_mempool::{
 use nomos_network::NetworkService;
 use nomos_storage::{backends::StorageBackend, StorageMsg, StorageService};
 use overwatch_rs::services::relay::{OutboundRelay, Relay, RelayMessage};
-use overwatch_rs::services::state::ServiceState;
 use overwatch_rs::services::{ServiceCore, ServiceData, ServiceId};
 use overwatch_rs::{DynError, OpaqueServiceStateHandle};
-use rand::{RngCore, SeedableRng};
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use serde_with::serde_as;
 use services_utils::overwatch::lifecycle;
 use services_utils::overwatch::recovery::backends::FileBackendSettings;
 use services_utils::overwatch::{JsonFileBackend, RecoveryOperator};
-use std::collections::BTreeSet;
-use std::hash::Hash;
-use std::marker::PhantomData;
-use std::path::PathBuf;
-use thiserror::Error;
-pub use time::Config as TimeConfig;
-use tokio::sync::oneshot::Sender;
-use tokio::sync::{broadcast, oneshot};
-use tokio_stream::wrappers::IntervalStream;
-use tracing::{error, instrument, span, Level};
-use tracing_futures::Instrument;
 
 type MempoolRelay<Payload, Item, Key> = OutboundRelay<MempoolMsg<HeaderId, Payload, Item, Key>>;
 type SamplingRelay<BlobId> = OutboundRelay<DaSamplingServiceMsg<BlobId>>;
@@ -73,6 +82,20 @@ struct Cryptarchia {
 }
 
 impl Cryptarchia {
+    pub fn new(
+        header_id: HeaderId,
+        ledger_state: LedgerState,
+        ledger_config: nomos_ledger::Config,
+    ) -> Self {
+        Self {
+            consensus: <cryptarchia_engine::Cryptarchia<_>>::new(
+                header_id,
+                ledger_config.consensus_config.clone(),
+            ),
+            ledger: <nomos_ledger::Ledger<_>>::new(header_id, ledger_state, ledger_config),
+        }
+    }
+
     fn tip(&self) -> HeaderId {
         self.consensus.tip()
     }
@@ -209,6 +232,7 @@ pub struct CryptarchiaConsensus<
     >,
     block_subscription_sender: broadcast::Sender<Block<ClPool::Item, DaPool::Item>>,
     storage_relay: Relay<StorageService<Storage>>,
+    initial_state: <Self as ServiceData>::State,
 }
 
 impl<
@@ -287,7 +311,7 @@ where
 
 #[async_trait::async_trait]
 impl<
-        A,
+        NetAdapter,
         BlendAdapter,
         ClPool,
         ClPoolAdapter,
@@ -302,7 +326,7 @@ impl<
         SamplingStorage,
     > ServiceCore
     for CryptarchiaConsensus<
-        A,
+        NetAdapter,
         BlendAdapter,
         ClPool,
         ClPoolAdapter,
@@ -317,12 +341,12 @@ impl<
         SamplingStorage,
     >
 where
-    A: NetworkAdapter<Tx = ClPool::Item, BlobCertificate = DaPool::Item>
+    NetAdapter: NetworkAdapter<Tx = ClPool::Item, BlobCertificate = DaPool::Item>
         + Clone
         + Send
         + Sync
         + 'static,
-    A::Settings: Send + Sync + 'static,
+    NetAdapter::Settings: Send + Sync + 'static,
     BlendAdapter: blend::BlendAdapter<Tx = ClPool::Item, BlobCertificate = DaPool::Item>
         + Clone
         + Send
@@ -331,8 +355,6 @@ where
     BlendAdapter::Settings: Send + Sync + 'static,
     ClPool: MemPool<BlockId = HeaderId> + Send + Sync + 'static,
     ClPool::Settings: Send + Sync + 'static,
-    DaPool: MemPool<BlockId = HeaderId, Key = SamplingBackend::BlobId> + Send + Sync + 'static,
-    DaPool::Settings: Send + Sync + 'static,
     ClPool::Item: Transaction<Hash = ClPool::Key>
         + Debug
         + Clone
@@ -343,6 +365,11 @@ where
         + Send
         + Sync
         + 'static,
+    ClPool::Key: Debug + Send + Sync,
+    ClPoolAdapter:
+        MempoolAdapter<Payload = ClPool::Item, Key = ClPool::Key> + Send + Sync + 'static,
+    DaPool: MemPool<BlockId = HeaderId, Key = SamplingBackend::BlobId> + Send + Sync + 'static,
+    DaPool::Settings: Send + Sync + 'static,
     // TODO: Change to specific certificate bounds here
     DaPool::Item: DispersedBlobInfo<BlobId = DaPool::Key>
         + BlobMetadata
@@ -355,9 +382,6 @@ where
         + Send
         + Sync
         + 'static,
-    ClPool::Key: Debug + Send + Sync,
-    ClPoolAdapter:
-        MempoolAdapter<Payload = ClPool::Item, Key = ClPool::Key> + Send + Sync + 'static,
     DaPoolAdapter: MempoolAdapter<Key = DaPool::Key> + Send + Sync + 'static,
     DaPoolAdapter::Payload: DispersedBlobInfo + Into<DaPool::Item> + Debug,
     TxS: TxSelect<Tx = ClPool::Item> + Clone + Send + Sync + 'static,
@@ -365,18 +389,17 @@ where
     BS: BlobSelect<BlobId = DaPool::Item> + Clone + Send + Sync + 'static,
     BS::Settings: Send + Sync + 'static,
     Storage: StorageBackend + Send + Sync + 'static,
-    SamplingRng: SeedableRng + RngCore,
     SamplingBackend: DaSamplingServiceBackend<SamplingRng> + Send,
     SamplingBackend::Settings: Clone,
     SamplingBackend::Blob: Debug + Send + 'static,
     SamplingBackend::BlobId: Debug + Ord + Send + Sync + 'static,
-
     SamplingNetworkAdapter: nomos_da_sampling::network::NetworkAdapter,
+    SamplingRng: SeedableRng + RngCore,
     SamplingStorage: nomos_da_sampling::storage::DaStorageAdapter,
 {
     fn init(
         service_state: OpaqueServiceStateHandle<Self>,
-        _initial_state: Self::State,
+        initial_state: Self::State,
     ) -> Result<Self, overwatch_rs::DynError> {
         let network_relay = service_state.overwatch_handle.relay();
         let blend_relay = service_state.overwatch_handle.relay();
@@ -395,6 +418,7 @@ where
             block_subscription_sender,
             storage_relay,
             sampling_relay,
+            initial_state,
         })
     }
 
@@ -406,7 +430,7 @@ where
             ClPoolAdapter,
             DaPool,
             DaPoolAdapter,
-            A,
+            NetAdapter,
             SamplingBackend,
             SamplingRng,
             Storage,
@@ -422,7 +446,7 @@ where
         .await;
 
         let CryptarchiaSettings {
-            config,
+            config: ledger_config,
             genesis_state,
             transaction_selector_settings,
             blob_selector_settings,
@@ -434,25 +458,24 @@ where
         } = self.service_state.settings_reader.get_updated_settings();
 
         let genesis_id = HeaderId::from([0; 32]);
-        let mut cryptarchia = Cryptarchia {
-            consensus: <cryptarchia_engine::Cryptarchia<_>>::from_genesis(
-                genesis_id,
-                config.consensus_config.clone(),
-            ),
-            ledger: <nomos_ledger::Ledger<_>>::from_genesis(
-                genesis_id,
-                genesis_state,
-                config.clone(),
-            ),
-        };
+
+        let (mut cryptarchia, mut leader) = Self::build_cryptarchia(
+            self.initial_state,
+            genesis_id,
+            genesis_state,
+            ledger_config,
+            leader_config,
+            &relays,
+            &mut self.block_subscription_sender,
+        )
+        .await;
 
         let network_adapter =
-            A::new(network_adapter_settings, relays.network_relay().clone()).await;
+            NetAdapter::new(network_adapter_settings, relays.network_relay().clone()).await;
         let tx_selector = TxS::new(transaction_selector_settings);
         let blob_selector = BS::new(blob_selector_settings);
 
         let mut incoming_blocks = network_adapter.blocks_stream().await?;
-        let mut leader = leadership::Leader::new(genesis_id, leader_config, config);
         let timer = time::Timer::new(time);
 
         let mut slot_timer = IntervalStream::new(timer.slot_interval());
@@ -472,16 +495,11 @@ where
                             &mut leader,
                             block,
                             &relays,
-                            &mut self.block_subscription_sender
+                            &mut self.block_subscription_sender,
                         )
                         .await;
 
-                        self.service_state.state_updater.update({
-                            Self::State::new(
-                                Some(cryptarchia.tip()),
-                                cryptarchia.consensus.get_security_block_header_id()
-                            )
-                        });
+                        self.service_state.state_updater.update(Self::State::from_cryptarchia(&cryptarchia, &leader));
 
                         tracing::info!(counter.consensus_processed_blocks = 1);
                     }
@@ -532,44 +550,8 @@ where
     }
 }
 
-#[derive(Clone, Serialize, Deserialize)]
-pub struct CryptarchiaConsensusState<TxS, BxS, NetworkAdapterSettings, BlendAdapterSettings> {
-    tip: Option<HeaderId>,
-    security_block: Option<HeaderId>,
-    _txs: PhantomData<TxS>,
-    _bxs: PhantomData<BxS>,
-    _network_adapter_settings: PhantomData<NetworkAdapterSettings>,
-    _blend_adapter_settings: PhantomData<BlendAdapterSettings>,
-}
-
-impl<TxS, BxS, NetworkAdapterSettings, BlendAdapterSettings>
-    CryptarchiaConsensusState<TxS, BxS, NetworkAdapterSettings, BlendAdapterSettings>
-{
-    pub fn new(tip: Option<HeaderId>, security_block: Option<HeaderId>) -> Self {
-        Self {
-            tip,
-            security_block,
-            _txs: Default::default(),
-            _bxs: Default::default(),
-            _network_adapter_settings: Default::default(),
-            _blend_adapter_settings: Default::default(),
-        }
-    }
-}
-
-impl<TxS, BxS, NetworkAdapterSettings, BlendAdapterSettings> ServiceState
-    for CryptarchiaConsensusState<TxS, BxS, NetworkAdapterSettings, BlendAdapterSettings>
-{
-    type Settings = CryptarchiaSettings<TxS, BxS, NetworkAdapterSettings, BlendAdapterSettings>;
-    type Error = Error;
-
-    fn from_settings(_settings: &Self::Settings) -> Result<Self, Self::Error> {
-        Ok(Self::new(None, None))
-    }
-}
-
 impl<
-        A,
+        NetAdapter,
         BlendAdapter,
         ClPool,
         ClPoolAdapter,
@@ -584,7 +566,7 @@ impl<
         SamplingStorage,
     >
     CryptarchiaConsensus<
-        A,
+        NetAdapter,
         BlendAdapter,
         ClPool,
         ClPoolAdapter,
@@ -599,8 +581,8 @@ impl<
         SamplingStorage,
     >
 where
-    A: NetworkAdapter + Clone + Send + Sync + 'static,
-    A::Settings: Send,
+    NetAdapter: NetworkAdapter + Clone + Send + Sync + 'static,
+    NetAdapter::Settings: Send,
     BlendAdapter: blend::BlendAdapter + Clone + Send + Sync + 'static,
     BlendAdapter::Settings: Send,
     ClPool: MemPool<BlockId = HeaderId> + Send + Sync + 'static,
@@ -615,6 +597,9 @@ where
         + Send
         + Sync
         + 'static,
+    ClPool::Key: Debug + Send + Sync,
+    ClPoolAdapter:
+        MempoolAdapter<Payload = ClPool::Item, Key = ClPool::Key> + Send + Sync + 'static,
     DaPool::Item: DispersedBlobInfo<BlobId = DaPool::Key>
         + BlobMetadata
         + Debug
@@ -628,22 +613,19 @@ where
         + 'static,
     DaPool: MemPool<BlockId = HeaderId, Key = SamplingBackend::BlobId> + Send + Sync + 'static,
     DaPool::Settings: Send + Sync + 'static,
+    DaPoolAdapter: MempoolAdapter<Key = DaPool::Key> + Send + Sync + 'static,
+    DaPoolAdapter::Payload: DispersedBlobInfo + Into<DaPool::Item> + Debug,
     TxS: TxSelect<Tx = ClPool::Item> + Clone + Send + Sync + 'static,
     TxS::Settings: Send,
     BS: BlobSelect<BlobId = DaPool::Item> + Clone + Send + Sync + 'static,
     BS::Settings: Send,
-    ClPool::Key: Debug + Send + Sync,
-    ClPoolAdapter:
-        MempoolAdapter<Payload = ClPool::Item, Key = ClPool::Key> + Send + Sync + 'static,
-    DaPoolAdapter: MempoolAdapter<Key = DaPool::Key> + Send + Sync + 'static,
-    DaPoolAdapter::Payload: DispersedBlobInfo + Into<DaPool::Item> + Debug,
     Storage: StorageBackend + Send + Sync + 'static,
-    SamplingRng: SeedableRng + RngCore,
     SamplingBackend: DaSamplingServiceBackend<SamplingRng> + Send,
     SamplingBackend::Settings: Clone,
     SamplingBackend::Blob: Debug + 'static,
     SamplingBackend::BlobId: Debug + Ord + Send + Sync + 'static,
     SamplingNetworkAdapter: nomos_da_sampling::network::NetworkAdapter,
+    SamplingRng: SeedableRng + RngCore,
     SamplingStorage: nomos_da_sampling::storage::DaStorageAdapter,
 {
     fn process_message(
@@ -714,7 +696,7 @@ where
             ClPoolAdapter,
             DaPool,
             DaPoolAdapter,
-            A,
+            NetAdapter,
             SamplingBackend,
             SamplingRng,
             Storage,
@@ -803,7 +785,7 @@ where
             ClPoolAdapter,
             DaPool,
             DaPoolAdapter,
-            A,
+            NetAdapter,
             SamplingBackend,
             SamplingRng,
             Storage,
@@ -871,6 +853,206 @@ where
             transactions = transactions,
             blobs = blobs
         );
+    }
+
+    /// Retrieves the blocks in the range from `from` to `to` from the storage.
+    /// Both `from` and `to` are included in the range.
+    /// This is implemented here, and not as a method of `StorageAdapter`, to simplify the panic
+    /// and error message handling.
+    ///
+    /// # Panics
+    ///
+    /// Panics if any of the blocks in the range are not found in the storage.
+    ///
+    /// # Parameters
+    ///
+    /// * `from` - The header id of the first block in the range. Must be a valid header.
+    /// * `to` - The header id of the last block in the range. Must be a valid header.
+    ///
+    /// # Returns
+    ///
+    /// A vector of blocks in the range from `from` to `to`.
+    /// If no blocks are found, returns an empty vector.
+    /// If any of the HeaderId are invalid, returns an error with the first invalid header id.
+    async fn get_blocks_in_range(
+        from: HeaderId,
+        to: HeaderId,
+        storage_adapter: &StorageAdapter<Storage, TxS::Tx, BS::BlobId>,
+    ) -> Vec<Block<ClPool::Item, DaPool::Item>> {
+        // Due to the blocks traversal order, this yields `to..from` order
+        let blocks = futures::stream::unfold(to, |header_id| async move {
+            if header_id == from {
+                None
+            } else {
+                let block = storage_adapter
+                    .get_block(&header_id)
+                    .await
+                    .unwrap_or_else(|| {
+                        panic!("Could not retrieve block {to} from storage during recovery")
+                    });
+                let parent_header_id = block.header().parent();
+                Some((block, parent_header_id))
+            }
+        });
+
+        // To avoid confusion, the order is reversed so it fits the natural `from..to` order
+        blocks.collect::<Vec<_>>().await.into_iter().rev().collect()
+    }
+
+    /// Builds cryptarchia
+    /// The build process is determined by the initial state passed:
+    /// - If the initial state doesn't contain any recovery information, cryptarchia is built from
+    ///     genesis.
+    /// - If it does, the recovery process is started: Recovery is done from genesis or security
+    ///     depending on the available information.
+    ///
+    /// # Arguments
+    ///
+    /// * `initial_state` - The initial state of cryptarchia.
+    /// * `genesis_id` - The genesis block id.
+    /// * `genesis_state` - The genesis ledger state.
+    /// * `leader` - The leader instance. It needs to be a Leader initialised to genesis. This
+    ///     function will update the leader if needed.
+    /// * `ledger_config` - The ledger configuration.
+    /// * `relays` - The relays object containing all the necessary relays for the consensus.
+    /// * `block_subscription_sender` - The broadcast channel to send the blocks to the services.
+    async fn build_cryptarchia(
+        mut initial_state: CryptarchiaConsensusState<
+            TxS::Settings,
+            BS::Settings,
+            NetAdapter::Settings,
+            BlendAdapter::Settings,
+        >,
+        genesis_id: HeaderId,
+        genesis_state: LedgerState,
+        ledger_config: nomos_ledger::Config,
+        leader_config: LeaderConfig,
+        relays: &CryptarchiaConsensusRelays<
+            BlendAdapter,
+            BS,
+            ClPool,
+            ClPoolAdapter,
+            DaPool,
+            DaPoolAdapter,
+            NetAdapter,
+            SamplingBackend,
+            SamplingRng,
+            Storage,
+            TxS,
+        >,
+        block_subscription_sender: &mut broadcast::Sender<Block<ClPool::Item, DaPool::Item>>,
+    ) -> (Cryptarchia, Leader) {
+        match initial_state.recovery_strategy() {
+            CryptarchiaInitialisationStrategy::Genesis => {
+                info!("Building Cryptarchia from genesis...");
+                let leader = Leader::from_genesis(genesis_id, leader_config, ledger_config.clone());
+                let cryptarchia = Cryptarchia::new(genesis_id, genesis_state, ledger_config);
+
+                (cryptarchia, leader)
+            }
+            CryptarchiaInitialisationStrategy::RecoveryFromGenesis(GenesisRecoveryStrategy {
+                tip,
+            }) => {
+                info!("Recovering Cryptarchia with Genesis strategy.");
+                let mut leader =
+                    Leader::from_genesis(genesis_id, leader_config, ledger_config.clone());
+                let cryptarchia = Self::recover_cryptarchia(
+                    genesis_id,
+                    genesis_state,
+                    tip,
+                    &mut leader,
+                    ledger_config,
+                    relays,
+                    block_subscription_sender,
+                )
+                .await;
+
+                (cryptarchia, leader)
+            }
+            CryptarchiaInitialisationStrategy::RecoveryFromSecurity(strategy) => {
+                let SecurityRecoveryStrategy {
+                    tip,
+                    security_block_id,
+                    security_ledger_state,
+                    security_leader_notes,
+                } = *strategy;
+
+                info!("Recovering Cryptarchia with Security strategy.");
+                let mut leader = Leader::new(
+                    security_block_id,
+                    security_leader_notes,
+                    leader_config.nf_sk,
+                    ledger_config.clone(),
+                );
+
+                let cryptarchia = Self::recover_cryptarchia(
+                    security_block_id,
+                    security_ledger_state,
+                    tip,
+                    &mut leader,
+                    ledger_config,
+                    relays,
+                    block_subscription_sender,
+                )
+                .await;
+
+                (cryptarchia, leader)
+            }
+        }
+    }
+
+    /// Recovers cryptarchia from a previously saved state.
+    ///
+    /// # Arguments
+    ///
+    /// * `from_header_id` - The header id where the recovery should start from. In case none
+    ///   was stored, the genesis block id should be passed.
+    /// * `from_ledger_state` - The ledger state up to the security block. In case none was
+    ///   stored, the genesis ledger state should be passed.
+    /// * `to_header_id` - The header id up to which the ledger state should be restored.
+    /// * `leader` - The leader instance to be used for the recovery. The passed leader needs to be
+    ///   up-to-date with the state of the ledger up to the security block.
+    /// * `relays` - The relays object containing all the necessary relays for the consensus.
+    /// * `block_broadcaster` - The broadcast channel to send the blocks to the services.
+    /// * `ledger_config` - The ledger configuration.
+    async fn recover_cryptarchia(
+        from_header_id: HeaderId,
+        from_ledger_state: LedgerState,
+        to_header_id: HeaderId,
+        leader: &mut Leader,
+        ledger_config: nomos_ledger::Config,
+        relays: &CryptarchiaConsensusRelays<
+            BlendAdapter,
+            BS,
+            ClPool,
+            ClPoolAdapter,
+            DaPool,
+            DaPoolAdapter,
+            NetAdapter,
+            SamplingBackend,
+            SamplingRng,
+            Storage,
+            TxS,
+        >,
+        block_subscription_sender: &mut broadcast::Sender<Block<ClPool::Item, DaPool::Item>>,
+    ) -> Cryptarchia {
+        let mut cryptarchia = Cryptarchia::new(from_header_id, from_ledger_state, ledger_config);
+
+        let blocks =
+            Self::get_blocks_in_range(from_header_id, to_header_id, relays.storage_adapter()).await;
+
+        for block in blocks {
+            cryptarchia = Self::process_block(
+                cryptarchia,
+                leader,
+                block,
+                relays,
+                block_subscription_sender,
+            )
+            .await
+        }
+
+        cryptarchia
     }
 }
 
