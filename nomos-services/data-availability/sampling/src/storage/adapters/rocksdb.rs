@@ -14,7 +14,8 @@ use overwatch_rs::{
     services::{relay::OutboundRelay, ServiceData},
     DynError,
 };
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde::de::DeserializeOwned;
+use serde::{Deserialize, Serialize};
 // internal
 use crate::storage::DaStorageAdapter;
 
@@ -92,7 +93,6 @@ where
             )),
             _ => None,
         };
-
         Ok(blob)
     }
 }
