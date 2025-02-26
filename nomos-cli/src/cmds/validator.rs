@@ -32,22 +32,22 @@ pub struct Retrieve {
 }
 
 #[allow(clippy::type_complexity)]
-fn parse_app_blobs(val: &str) -> Result<Vec<(Index, Vec<Vec<u8>>)>, String> {
+fn parse_app_blobs(val: &str) -> Result<Vec<(Index, Vec<DaBlob>)>, String> {
     let val: String = val.chars().filter(|&c| c != ' ' && c != '\n').collect();
     serde_json::from_str(&val).map_err(|e| e.to_string())
 }
 
 #[derive(Args, Debug)]
 pub struct Reconstruct {
-    /// Blobs to use for reconstruction. Half of the blobs per index is expected.
+    /// DaBlobs to use for reconstruction. Half of the blobs per index is expected.
     #[clap(
         short,
         long,
-        help = "JSON array of blobs [[[index0], [[blob0],[blob1]...]]...]",
+        help = "JSON array of blobs [[[index0], [{DaBlob0}, {DaBlob1}...]]...]",
         value_name = "APP_BLOBS",
         value_parser(parse_app_blobs)
     )]
-    pub app_blobs: Option<std::vec::Vec<(Index, Vec<Vec<u8>>)>>,
+    pub app_blobs: Option<std::vec::Vec<(Index, Vec<DaBlob>)>>,
     /// File with blobs.
     #[clap(short, long)]
     pub file: Option<PathBuf>,
@@ -139,7 +139,7 @@ where
 
 impl Reconstruct {
     pub fn run(self) -> Result<(), Box<dyn std::error::Error>> {
-        let app_blobs: Vec<(Index, Vec<Vec<u8>>)> = if let Some(blobs) = self.app_blobs {
+        let app_blobs: Vec<(Index, Vec<DaBlob>)> = if let Some(blobs) = self.app_blobs {
             blobs
         } else {
             let file_path = self.file.as_ref().unwrap();
@@ -152,9 +152,8 @@ impl Reconstruct {
         for (index, blobs) in app_blobs.iter() {
             tracing::info!("Index {:?} has {:} blobs", (index), blobs.len());
             for blob in blobs.iter() {
-                let da_blob = wire::deserialize::<DaBlob>(blob).unwrap();
-                da_blobs.push(da_blob);
-                tracing::info!("Index {:?}; Blob: {blob:?}", index.to_u64());
+                da_blobs.push(blob.clone());
+                tracing::info!("Index {:?}; DaBlob: {blob:?}", index.to_u64());
             }
         }
 
