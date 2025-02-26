@@ -6,6 +6,7 @@ use libp2p::swarm::NetworkBehaviour;
 use libp2p::PeerId;
 // internal
 use crate::address_book::AddressBook;
+use crate::maintenance::balancer::{ConnectionBalancer, ConnectionBalancerBehaviour};
 use crate::maintenance::monitor::{ConnectionMonitor, ConnectionMonitorBehaviour};
 use crate::{
     protocols::dispersal::executor::behaviour::DispersalExecutorBehaviour,
@@ -26,8 +27,9 @@ use subnetworks_assignations::MembershipHandler;
 /// 2) Dispersal so we do not bottleneck executors.
 /// 3) Replication is the least important (and probably the least used), it is also dependant of dispersal.
 #[derive(NetworkBehaviour)]
-pub struct ExecutorBehaviour<Monitor, Membership>
+pub struct ExecutorBehaviour<Balancer, Monitor, Membership>
 where
+    Balancer: ConnectionBalancer,
     Monitor: ConnectionMonitor,
     Membership: MembershipHandler,
 {
@@ -35,11 +37,13 @@ where
     executor_dispersal: DispersalExecutorBehaviour<Membership>,
     validator_dispersal: DispersalValidatorBehaviour<Membership>,
     replication: ReplicationBehaviour<Membership>,
+    balancer: ConnectionBalancerBehaviour<Balancer>,
     monitor: ConnectionMonitorBehaviour<Monitor>,
 }
 
-impl<Monitor, Membership> ExecutorBehaviour<Monitor, Membership>
+impl<Balancer, Monitor, Membership> ExecutorBehaviour<Balancer, Monitor, Membership>
 where
+    Balancer: ConnectionBalancer,
     Monitor: ConnectionMonitor,
     Membership: MembershipHandler + Clone + Send + 'static,
     <Membership as MembershipHandler>::NetworkId: Send,
@@ -48,6 +52,7 @@ where
         key: &Keypair,
         membership: Membership,
         addresses: AddressBook,
+        balancer: Balancer,
         monitor: Monitor,
         redial_cooldown: Duration,
     ) -> Self {
@@ -61,6 +66,7 @@ where
             ),
             validator_dispersal: DispersalValidatorBehaviour::new(membership.clone()),
             replication: ReplicationBehaviour::new(peer_id, membership),
+            balancer: ConnectionBalancerBehaviour::new(addresses, balancer),
             monitor: ConnectionMonitorBehaviour::new(monitor, redial_cooldown),
         }
     }
@@ -111,5 +117,9 @@ where
 
     pub fn monitor_behaviour_mut(&mut self) -> &mut ConnectionMonitorBehaviour<Monitor> {
         &mut self.monitor
+    }
+
+    pub fn balancer_behaviour_mut(&mut self) -> &mut ConnectionBalancerBehaviour<Balancer> {
+        &mut self.balancer
     }
 }

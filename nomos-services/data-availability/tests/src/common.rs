@@ -257,6 +257,7 @@ pub fn new_node(
                     listening_address: da_network_settings.listening_address,
                     policy_settings: Default::default(),
                     monitor_settings: Default::default(),
+                    balancer_interval: Duration::ZERO,
                     redial_cooldown: Duration::ZERO,
                 },
             },
