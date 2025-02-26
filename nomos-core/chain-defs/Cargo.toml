@@ -13,7 +13,6 @@ async-trait            = { version = "0.1" }
 bincode                = "1.3"
 blake2                 = { version = "0.10" }
 bytes                  = "1.3"
-carnot-engine          = { workspace = true, features = ["serde"] }
 cl                     = { workspace = true }
 const-hex              = "1"
 cryptarchia-engine     = { workspace = true, features = ["serde"] }
