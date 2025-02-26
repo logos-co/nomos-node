@@ -5,7 +5,7 @@ use nomos_core::{
 use nomos_mempool::{
     backend::mockpool::MockPool,
     network::adapters::mock::{MockAdapter, MOCK_TX_CONTENT_TOPIC},
-    tx::service::GenericTxMempoolService,
+    tx::{service::GenericTxMempoolService, state::TxMempoolState},
     MempoolMsg, TxMempoolSettings,
 };
 use nomos_network::{
@@ -21,7 +21,7 @@ use services_utils::{
 };
 
 type MockRecoveryBackend = JsonFileBackend<
-    MockPool<HeaderId, MockTransaction<MockMessage>, MockTxId>,
+    TxMempoolState<MockPool<HeaderId, MockTransaction<MockMessage>, MockTxId>, (), ()>,
     TxMempoolSettings<(), ()>,
 >;
 type MockMempoolService = GenericTxMempoolService<
@@ -146,8 +146,8 @@ fn test_mockmempool() {
         let recovered_state = recovery_backend
             .load_state()
             .expect("Should not fail to load the state.");
-        assert_eq!(recovered_state.pending_items().len(), 2);
-        assert_eq!(recovered_state.in_block_items().len(), 0);
-        assert!(recovered_state.last_item_timestamp() > 0);
+        assert_eq!(recovered_state.pool().unwrap().pending_items().len(), 2);
+        assert_eq!(recovered_state.pool().unwrap().in_block_items().len(), 0);
+        assert!(recovered_state.pool().unwrap().last_item_timestamp() > 0);
     });
 }

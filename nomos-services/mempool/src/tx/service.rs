@@ -10,9 +10,9 @@ use std::marker::PhantomData;
 
 // crates
 use crate::network::NetworkAdapter as NetworkAdapterTrait;
+use crate::tx::state::TxMempoolState;
 use futures::StreamExt;
 use overwatch_rs::services::handle::ServiceStateHandle;
-use overwatch_rs::services::state::ServiceState;
 use serde::{Deserialize, Serialize};
 use services_utils::overwatch::recovery::operators::RecoveryBackend as RecoveryBackendTrait;
 // internal
@@ -28,7 +28,11 @@ pub type TxMempoolService<NetworkAdapter, Pool> = GenericTxMempoolService<
     Pool,
     NetworkAdapter,
     JsonFileBackend<
-        <Pool as RecoverableMempool>::RecoveryState,
+        TxMempoolState<
+            <Pool as RecoverableMempool>::RecoveryState,
+            <Pool as MemPool>::Settings,
+            <NetworkAdapter as NetworkAdapterTrait>::Settings,
+        >,
         TxMempoolSettings<
             <Pool as MemPool>::Settings,
             <NetworkAdapter as NetworkAdapterTrait>::Settings,
@@ -63,13 +67,13 @@ impl<Pool, NetworkAdapter, RecoveryBackend> ServiceData
     for GenericTxMempoolService<Pool, NetworkAdapter, RecoveryBackend>
 where
     Pool: RecoverableMempool,
-    Pool::RecoveryState: ServiceState + Serialize + for<'de> Deserialize<'de>,
+    // Pool::RecoveryState: Serialize + for<'de> Deserialize<'de>,
     NetworkAdapter: NetworkAdapterTrait,
     RecoveryBackend: RecoveryBackendTrait,
 {
     const SERVICE_ID: ServiceId = "mempool-cl";
     type Settings = TxMempoolSettings<Pool::Settings, NetworkAdapter::Settings>;
-    type State = Pool::RecoveryState;
+    type State = TxMempoolState<Pool::RecoveryState, Pool::Settings, NetworkAdapter::Settings>;
     type StateOperator = RecoveryOperator<RecoveryBackend>;
     type Message = MempoolMsg<Pool::BlockId, Pool::Item, Pool::Item, Pool::Key>;
 }
@@ -79,7 +83,7 @@ impl<Pool, NetworkAdapter, RecoveryBackend> ServiceCore
     for GenericTxMempoolService<Pool, NetworkAdapter, RecoveryBackend>
 where
     Pool: RecoverableMempool + Send,
-    Pool::RecoveryState: ServiceState + Debug + Serialize + for<'de> Deserialize<'de> + Send + Sync,
+    Pool::RecoveryState: Debug + Serialize + for<'de> Deserialize<'de> + Send + Sync,
     Pool::Settings: Clone + Send + Sync,
     Pool::BlockId: Send + 'static,
     Pool::Key: Send,
@@ -94,10 +98,13 @@ where
     ) -> Result<Self, overwatch_rs::DynError> {
         tracing::trace!(
             "Initializing TxMempoolService with initial state {:#?}",
-            init_state
+            init_state.pool
         );
         let settings = service_state.settings_reader.get_updated_settings();
-        let recovered_pool = Pool::recover(settings.pool, init_state);
+        let recovered_pool = init_state.pool.map_or_else(
+            || Pool::new(settings.pool.clone()),
+            |recovered_pool| Pool::recover(settings.pool.clone(), recovered_pool),
+        );
 
         Ok(Self::new(recovered_pool, service_state))
     }
@@ -136,7 +143,7 @@ where
                         tracing::debug!("could not add item to the pool due to: {e}");
                     });
                     tracing::info!(counter.tx_mempool_pending_items = self.pool.pending_item_count());
-                    self.service_state_handle.state_updater.update(self.pool.save());
+                    self.service_state_handle.state_updater.update(self.pool.save().into());
                 }
                 Some(lifecycle_msg) = lifecycle_stream.next() =>  {
                     if lifecycle::should_stop_service::<Self>(&lifecycle_msg).await {
@@ -153,7 +160,7 @@ impl<Pool, NetworkAdapter, RecoveryBackend>
     GenericTxMempoolService<Pool, NetworkAdapter, RecoveryBackend>
 where
     Pool: RecoverableMempool + Send,
-    Pool::RecoveryState: ServiceState + Serialize + for<'de> Deserialize<'de> + Send + Sync,
+    Pool::RecoveryState: Serialize + for<'de> Deserialize<'de> + Send + Sync,
     Pool::Item: Clone + Send + 'static,
     Pool::Key: Send,
     Pool::BlockId: Send,
@@ -183,7 +190,7 @@ where
                             .network_adapter;
                         self.service_state_handle
                             .state_updater
-                            .update(self.pool.save());
+                            .update(self.pool.save().into());
                         // move sending to a new task so local operations can complete in the meantime
                         tokio::spawn(async {
                             let adapter = NetworkAdapter::new(settings, network_relay).await;
