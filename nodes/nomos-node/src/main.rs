@@ -59,11 +59,12 @@ fn main() -> Result<()> {
             tracing: config.tracing,
             http: config.http,
             cl_mempool: nomos_mempool::TxMempoolSettings {
-                backend: (),
-                network: AdapterSettings {
+                pool: (),
+                network_adapter: AdapterSettings {
                     topic: String::from(nomos_node::CL_TOPIC),
                     id: <Tx as Transaction>::hash,
                 },
+                recovery_path: "test".into(),
             },
             da_mempool: nomos_mempool::DaMempoolSettings {
                 backend: (),

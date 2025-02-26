@@ -261,11 +261,12 @@ pub fn new_node(
                 },
             },
             cl_mempool: TxMempoolSettings {
-                backend: (),
-                network: AdapterSettings {
+                pool: (),
+                network_adapter: AdapterSettings {
                     topic: String::from(nomos_node::CL_TOPIC),
                     id: <Tx as Transaction>::hash,
                 },
+                recovery_path: "test".into(),
             },
             da_mempool: DaMempoolSettings {
                 backend: (),

@@ -59,11 +59,12 @@ fn main() -> Result<()> {
             tracing: config.tracing,
             http: config.http,
             cl_mempool: TxMempoolSettings {
-                backend: (),
-                network: MempoolAdapterSettings {
+                pool: (),
+                network_adapter: MempoolAdapterSettings {
                     topic: String::from(CL_TOPIC),
                     id: <Tx as Transaction>::hash,
                 },
+                recovery_path: "test".into(),
             },
             da_mempool: DaMempoolSettings {
                 backend: (),
