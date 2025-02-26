@@ -177,3 +177,5 @@ storage:
   db_path: nomos_db
   read_only: false
   column_family: blocks
+mempool:
+  recovery_path: ./recovery/mempool.json

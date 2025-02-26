@@ -24,6 +24,7 @@ use nomos_network::{backends::libp2p::Libp2pConfig, NetworkConfig};
 use nomos_node::api::paths::{
     CL_METRICS, CRYPTARCHIA_HEADERS, CRYPTARCHIA_INFO, DA_GET_RANGE, STORAGE_BLOCK,
 };
+use nomos_node::config::mempool::MempoolConfig;
 use nomos_node::{api::backend::AxumBackendSettings, Config, RocksBackendSettings};
 use nomos_node::{BlobInfo, HeaderId, Tx};
 use nomos_tracing::logging::local::FileConfig;
@@ -329,6 +330,9 @@ pub fn create_validator_config(config: GeneralConfig) -> Config {
             db_path: "./db".into(),
             read_only: false,
             column_family: Some("blocks".into()),
+        },
+        mempool: MempoolConfig {
+            recovery_path: "./recovery/cryptarchia.json".into(),
         },
     }
 }

@@ -64,7 +64,7 @@ fn main() -> Result<()> {
                     topic: String::from(CL_TOPIC),
                     id: <Tx as Transaction>::hash,
                 },
-                recovery_path: unimplemented!("Must be fetched from the config store."),
+                recovery_path: config.mempool.recovery_path,
             },
             da_mempool: DaMempoolSettings {
                 backend: (),

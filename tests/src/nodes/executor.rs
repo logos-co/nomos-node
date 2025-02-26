@@ -25,6 +25,7 @@ use nomos_da_verifier::backend::kzgrs::KzgrsDaVerifierSettings;
 use nomos_da_verifier::storage::adapters::rocksdb::RocksAdapterSettings as VerifierStorageAdapterSettings;
 use nomos_da_verifier::DaVerifierServiceSettings;
 use nomos_executor::api::backend::AxumBackendSettings;
+use nomos_executor::config::mempool::MempoolConfig;
 use nomos_executor::config::Config;
 use nomos_network::{backends::libp2p::Libp2pConfig, NetworkConfig};
 use nomos_node::api::paths::{CL_METRICS, DA_GET_RANGE};
@@ -257,6 +258,9 @@ pub fn create_executor_config(config: GeneralConfig) -> Config {
                 },
                 dispersal_timeout: Duration::from_secs(u64::MAX),
             },
+        },
+        mempool: MempoolConfig {
+            recovery_path: "./recovery/cryptarchia.json".into(),
         },
     }
 }
