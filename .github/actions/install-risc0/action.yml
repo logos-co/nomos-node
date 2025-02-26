@@ -13,9 +13,11 @@ runs:
     - name: Install cargo-binstall
       uses: cargo-bins/cargo-binstall@v1.11.1
       env:
+        # Required to avoid throttling by GitHub
         GITHUB_TOKEN: ${{ inputs.github_token }}
     - name: Install risc0 using cargo-binstall
       run: cargo binstall -y cargo-risczero@1.2.0 && cargo risczero install
       shell: bash
       env:
+        # Required to avoid throttling by GitHub
         GITHUB_TOKEN: ${{ inputs.github_token }}

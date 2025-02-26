@@ -46,7 +46,8 @@ jobs:
         uses: ./.github/actions/install-risc0
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-      - name: Set up Cargo cache
+      - name: Set up Cargo cache (if not on `master`)
+        if: ${{ github.ref != 'refs/heads/master' }}
         uses: ./.github/actions/setup-cargo-cache
         with:
           key: ${{ github.ref }}->${{ github.workflow }}->${{ github.job }}
@@ -58,8 +59,8 @@ jobs:
         with:
           command: clippy
           args: --all --all-targets --all-features -- -D warnings
-      - name: Update Cargo cache
-        if: success() || failure()
+      - name: Update Cargo cache (if not on `master`)
+        if: ${{ github.ref != 'refs/heads/master' }} && (success() || failure())
         uses: ./.github/actions/update-cargo-cache
         with:
           key: ${{ github.ref }}->${{ github.workflow }}->${{ github.job }}
@@ -79,7 +80,8 @@ jobs:
         uses: ./.github/actions/install-risc0
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-      - name: Setup Cargo cache
+      - name: Set up Cargo cache (if not on `master`)
+        if: ${{ github.ref != 'refs/heads/master' }}
         uses: ./.github/actions/setup-cargo-cache
         with:
           key: ${{ github.ref }}->${{ github.workflow }}->${{ github.job }}->${{ matrix.os }}
@@ -98,8 +100,8 @@ jobs:
           command: test
           # We don't test benches as they take 6h+, leading to a timeout
           args: --all --lib --bins --tests --examples --all-features
-      - name: Update Cargo cache
-        if: success() || failure()
+      - name: Update Cargo cache (if not on `master`)
+        if: ${{ github.ref != 'refs/heads/master' }} && (success() || failure())
         uses: ./.github/actions/update-cargo-cache
         with:
           key: ${{ github.ref }}->${{ github.workflow }}->${{ github.job }}->${{ matrix.os }}
