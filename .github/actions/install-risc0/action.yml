@@ -15,7 +15,7 @@ runs:
       env:
         GITHUB_TOKEN: ${{ inputs.github_token }}
     - name: Install risc0 using cargo-binstall
-      run: cargo binstall -y cargo-risczero@1.2.4 && cargo risczero install
+      run: cargo binstall -y cargo-risczero@1.2.0 && cargo risczero install
       shell: bash
       env:
         GITHUB_TOKEN: ${{ inputs.github_token }}
