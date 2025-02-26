@@ -50,7 +50,6 @@ where
         Backend::from_settings(settings)
             .load_state()
             .map(Option::from)
-            .map_err(RecoveryError::from)
     }
 
     fn from_settings(settings: <Self::StateInput as ServiceState>::Settings) -> Self {
@@ -59,10 +58,7 @@ where
     }
 
     async fn run(&mut self, state: Self::StateInput) {
-        let save_result = self
-            .recovery_backend
-            .save_state(&state)
-            .map_err(RecoveryError::from);
+        let save_result = self.recovery_backend.save_state(&state);
         if let Err(error) = save_result {
             error!("{}", error);
         }
