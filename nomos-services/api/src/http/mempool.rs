@@ -9,6 +9,7 @@ use nomos_mempool::{
 };
 use nomos_network::backends::NetworkBackend;
 use rand::{RngCore, SeedableRng};
+use serde::{Deserialize, Serialize};
 use tokio::sync::oneshot;
 
 pub async fn add_tx<N, A, Item, Key>(
@@ -20,8 +21,8 @@ where
     N: NetworkBackend,
     A: NetworkAdapter<Backend = N, Payload = Item, Key = Key> + Send + Sync + 'static,
     A::Settings: Send + Sync,
-    Item: Clone + Debug + Send + Sync + 'static + Hash,
-    Key: Clone + Debug + Ord + Hash + 'static,
+    Item: Clone + Debug + Send + Sync + Serialize + for<'de> Deserialize<'de> + 'static + Hash,
+    Key: Clone + Debug + Ord + Hash + Send + Serialize + for<'de> Deserialize<'de> + 'static,
 {
     let relay = handle
         .relay::<TxMempoolService<A, MockPool<HeaderId, Item, Key>>>()
@@ -65,7 +66,7 @@ where
     A::Payload: DispersedBlobInfo + Into<Item> + Debug,
     A::Settings: Send + Sync,
     Item: Clone + Debug + Send + Sync + 'static + Hash,
-    Key: Clone + Debug + Ord + Hash + 'static,
+    Key: Clone + Debug + Ord + Hash + Send + 'static,
     SamplingBackend: DaSamplingServiceBackend<SamplingRng, BlobId = Key> + Send,
     SamplingBackend::BlobId: Debug,
     SamplingBackend::Blob: Debug + 'static,
