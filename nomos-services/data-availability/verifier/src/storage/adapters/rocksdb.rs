@@ -3,8 +3,8 @@ use std::{marker::PhantomData, path::PathBuf};
 // crates
 use futures::try_join;
 use nomos_core::da::blob::Blob;
-use nomos_da_storage::rocksdb::{create_blob_idx, key_bytes, DA_VERIFIED_KEY_PREFIX};
-use nomos_da_storage::rocksdb::{DA_BLOB_PATH, DA_SHARED_COMMITMENTS_PATH};
+use nomos_da_storage::rocksdb::{create_blob_idx, key_bytes};
+use nomos_da_storage::rocksdb::{DA_BLOB_PREFIX, DA_SHARED_COMMITMENTS_PREFIX};
 use nomos_storage::{
     backends::{rocksdb::RocksBackend, StorageSerde},
     StorageMsg, StorageService,
@@ -56,18 +56,15 @@ where
         try_join!(
             {
                 // Store the blob in the storage backend.
-                let blob_prefix = format!("{}{}", DA_VERIFIED_KEY_PREFIX, DA_BLOB_PATH);
                 let blob_idx = create_blob_idx(blob_id.as_ref(), column_idx.as_ref());
-                let blob_key = key_bytes(&blob_prefix, blob_idx);
+                let blob_key = key_bytes(DA_BLOB_PREFIX, blob_idx);
                 self.storage_relay.send(StorageMsg::Store {
                     key: blob_key,
                     value: S::serialize(light_blob),
                 })
             },
             {
-                let shared_commitments_prefix =
-                    format!("{}{}", DA_VERIFIED_KEY_PREFIX, DA_SHARED_COMMITMENTS_PATH);
-                let shared_commitments_key = key_bytes(&shared_commitments_prefix, &blob_id);
+                let shared_commitments_key = key_bytes(DA_SHARED_COMMITMENTS_PREFIX, &blob_id);
                 self.storage_relay.send(StorageMsg::Store {
                     key: shared_commitments_key,
                     value: S::serialize(shared_commitments),
@@ -83,9 +80,8 @@ where
         blob_id: <Self::Blob as Blob>::BlobId,
         column_idx: <Self::Blob as Blob>::ColumnIndex,
     ) -> Result<Option<<Self::Blob as Blob>::LightBlob>, DynError> {
-        let blob_prefix = format!("{}{}", DA_VERIFIED_KEY_PREFIX, DA_BLOB_PATH);
         let blob_idx = create_blob_idx(blob_id.as_ref(), column_idx.as_ref());
-        let blob_key = key_bytes(&blob_prefix, blob_idx);
+        let blob_key = key_bytes(DA_BLOB_PREFIX, blob_idx);
         let (reply_channel, reply_rx) = tokio::sync::oneshot::channel();
         self.storage_relay
             .send(StorageMsg::Load {

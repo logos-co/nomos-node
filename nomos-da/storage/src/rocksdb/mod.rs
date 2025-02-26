@@ -1,9 +1,11 @@
 use bytes::{Bytes, BytesMut};
 
+// "DA/VID/" PREFIX
 pub const DA_VID_KEY_PREFIX: &str = "da/vid/";
-pub const DA_VERIFIED_KEY_PREFIX: &str = "da/verified/";
-pub const DA_BLOB_PATH: &str = "bl";
-pub const DA_SHARED_COMMITMENTS_PATH: &str = "sc";
+
+// "DA/VERIFIED/" PREFIX
+pub const DA_SHARED_COMMITMENTS_PREFIX: &str = concat!("da/verified/", "sc");
+pub const DA_BLOB_PREFIX: &str = concat!("da/verified/", "bl");
 
 pub fn key_bytes(prefix: &str, id: impl AsRef<[u8]>) -> Bytes {
     let mut buffer = BytesMut::new();

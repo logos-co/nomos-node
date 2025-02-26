@@ -4,8 +4,8 @@ use std::{marker::PhantomData, path::PathBuf};
 use futures::try_join;
 use kzgrs_backend::common::ColumnIndex;
 use nomos_core::da::blob::Blob;
-use nomos_da_storage::rocksdb::{create_blob_idx, key_bytes, DA_VERIFIED_KEY_PREFIX};
-use nomos_da_storage::rocksdb::{DA_BLOB_PATH, DA_SHARED_COMMITMENTS_PATH};
+use nomos_da_storage::rocksdb::{create_blob_idx, key_bytes};
+use nomos_da_storage::rocksdb::{DA_BLOB_PREFIX, DA_SHARED_COMMITMENTS_PREFIX};
 use nomos_storage::{
     backends::{rocksdb::RocksBackend, StorageSerde},
     StorageMsg, StorageService,
@@ -57,8 +57,7 @@ where
         let blob_idx = create_blob_idx(blob_id.as_ref(), column_idx.to_be_bytes().as_ref());
         let (blob, shared_commitments) = try_join!(
             {
-                let blob_prefix = format!("{}{}", DA_VERIFIED_KEY_PREFIX, DA_BLOB_PATH);
-                let blob_key = key_bytes(&blob_prefix, blob_idx);
+                let blob_key = key_bytes(DA_BLOB_PREFIX, blob_idx);
                 let (blob_reply_tx, blob_reply_rx) = tokio::sync::oneshot::channel();
                 self.storage_relay
                     .send(StorageMsg::Load {
@@ -70,9 +69,7 @@ where
                 blob_reply_rx
             },
             {
-                let shared_commitments_prefix =
-                    format!("{}{}", DA_VERIFIED_KEY_PREFIX, DA_SHARED_COMMITMENTS_PATH);
-                let shared_commitments_key = key_bytes(&shared_commitments_prefix, blob_id);
+                let shared_commitments_key = key_bytes(DA_SHARED_COMMITMENTS_PREFIX, blob_id);
                 let (sc_reply_tx, sc_reply_rx) = tokio::sync::oneshot::channel();
                 self.storage_relay
                     .send(StorageMsg::Load {

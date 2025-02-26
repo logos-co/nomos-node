@@ -18,7 +18,7 @@ use nomos_core::da::blob::Blob;
 use nomos_core::da::DaEncoder as _;
 use nomos_core::{da::blob::metadata::Metadata as _, staking::NMO_UNIT};
 use nomos_da_storage::rocksdb::{create_blob_idx, key_bytes};
-use nomos_da_storage::rocksdb::{DA_BLOB_PATH, DA_SHARED_COMMITMENTS_PATH, DA_VERIFIED_KEY_PREFIX};
+use nomos_da_storage::rocksdb::{DA_BLOB_PREFIX, DA_SHARED_COMMITMENTS_PREFIX};
 use nomos_da_verifier::backend::kzgrs::KzgrsDaVerifierSettings;
 use nomos_ledger::LedgerState;
 use nomos_libp2p::{Multiaddr, SwarmConfig};
@@ -383,9 +383,7 @@ async fn store_blobs_in_db(
         let idx = create_blob_idx(id.as_ref(), blob.column_idx().as_ref());
 
         let (light_blob, shared_commitments) = blob.into_blob_and_shared_commitments();
-
-        let blob_prefix = format!("{}{}", DA_VERIFIED_KEY_PREFIX, DA_BLOB_PATH);
-        let blob_key = key_bytes(&blob_prefix, idx);
+        let blob_key = key_bytes(DA_BLOB_PREFIX, idx);
         storage_outbound
             .send(StorageMsg::Store {
                 key: blob_key,
@@ -394,9 +392,7 @@ async fn store_blobs_in_db(
             .await
             .unwrap();
 
-        let shared_commitments_prefix =
-            format!("{}{}", DA_VERIFIED_KEY_PREFIX, DA_SHARED_COMMITMENTS_PATH);
-        let shared_commitments_key = key_bytes(&shared_commitments_prefix, &id);
+        let shared_commitments_key = key_bytes(DA_SHARED_COMMITMENTS_PREFIX, &id);
         let bytes = Wire::serialize(shared_commitments);
         storage_outbound
             .send(StorageMsg::Store {

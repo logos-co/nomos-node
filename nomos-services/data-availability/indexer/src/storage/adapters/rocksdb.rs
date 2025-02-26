@@ -12,7 +12,7 @@ use nomos_core::da::blob::{
 };
 use nomos_core::da::BlobId;
 use nomos_da_storage::rocksdb::{
-    key_bytes, DA_BLOB_PATH, DA_SHARED_COMMITMENTS_PATH, DA_VERIFIED_KEY_PREFIX, DA_VID_KEY_PREFIX,
+    key_bytes, DA_BLOB_PREFIX, DA_SHARED_COMMITMENTS_PREFIX, DA_VID_KEY_PREFIX,
 };
 use nomos_storage::{
     backends::{rocksdb::RocksBackend, StorageSerde},
@@ -59,11 +59,8 @@ where
 
     async fn add_index(&self, info: &Self::Info) -> Result<(), DynError> {
         // Check if Info in a block is something that the node've seen before.
-        let blob_prefix = format!("{}{}", DA_VERIFIED_KEY_PREFIX, DA_BLOB_PATH);
-        let blob_key = key_bytes(&blob_prefix, info.blob_id().as_ref());
-
+        let blob_key = key_bytes(DA_BLOB_PREFIX, info.blob_id().as_ref());
         let (reply_tx, reply_rx) = tokio::sync::oneshot::channel();
-
         self.storage_relay
             .send(StorageMsg::LoadPrefix {
                 prefix: blob_key,
@@ -136,8 +133,7 @@ where
 
                 let Ok((blobs, shared_commitments)) = try_join!(
                     async {
-                        let blobs_prefix = format!("{}{}", DA_VERIFIED_KEY_PREFIX, DA_BLOB_PATH);
-                        let blobs_prefix_key = key_bytes(&blobs_prefix, id.as_ref());
+                        let blobs_prefix_key = key_bytes(DA_BLOB_PREFIX, id.as_ref());
                         let (blob_reply_tx, blob_reply_rx) = tokio::sync::oneshot::channel();
                         storage_relay
                             .send(StorageMsg::LoadPrefix {
@@ -150,10 +146,8 @@ where
                         blob_reply_rx.await.map_err(|e| Box::new(e) as DynError)
                     },
                     async {
-                        let shared_commitments_prefix =
-                            format!("{}{}", DA_VERIFIED_KEY_PREFIX, DA_SHARED_COMMITMENTS_PATH);
                         let shared_commitments_key =
-                            key_bytes(&shared_commitments_prefix, id.as_ref());
+                            key_bytes(DA_SHARED_COMMITMENTS_PREFIX, id.as_ref());
                         let (shared_commitments_reply_tx, shared_commitments_reply_rx) =
                             tokio::sync::oneshot::channel();
                         storage_relay
