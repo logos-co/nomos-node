@@ -167,7 +167,8 @@ pub struct CryptarchiaConsensus<
     BlendAdapter: blend::BlendAdapter,
     BlendAdapter::Settings: Send,
     ClPool: RecoverableMempool<BlockId = HeaderId>,
-    ClPool::RecoveryState: ServiceState + Serialize + for<'de> Deserialize<'de>,
+    ClPool::RecoveryState: Serialize + for<'de> Deserialize<'de>,
+    ClPool::Settings: Clone,
     ClPool::Item: Clone + Eq + Hash + Debug + 'static,
     ClPool::Key: Debug + 'static,
     ClPoolAdapter: MempoolAdapter<Payload = ClPool::Item, Key = ClPool::Key>,
@@ -250,7 +251,8 @@ where
     BlendAdapter: blend::BlendAdapter,
     BlendAdapter::Settings: Send,
     ClPool: RecoverableMempool<BlockId = HeaderId>,
-    ClPool::RecoveryState: ServiceState + Serialize + for<'de> Deserialize<'de>,
+    ClPool::RecoveryState: Serialize + for<'de> Deserialize<'de>,
+    ClPool::Settings: Clone,
     ClPool::Item: Clone + Eq + Hash + Debug,
     ClPool::Key: Debug,
     ClPoolAdapter: MempoolAdapter<Payload = ClPool::Item, Key = ClPool::Key>,
@@ -335,8 +337,8 @@ where
         + 'static,
     BlendAdapter::Settings: Send + Sync + 'static,
     ClPool: RecoverableMempool<BlockId = HeaderId> + Send + Sync + 'static,
-    ClPool::RecoveryState: ServiceState + Serialize + for<'de> Deserialize<'de>,
-    ClPool::Settings: Send + Sync + 'static,
+    ClPool::RecoveryState: Serialize + for<'de> Deserialize<'de>,
+    ClPool::Settings: Clone + Send + Sync + 'static,
     DaPool: MemPool<BlockId = HeaderId, Key = SamplingBackend::BlobId> + Send + Sync + 'static,
     DaPool::Settings: Clone + Send + Sync + 'static,
     ClPool::Item: Transaction<Hash = ClPool::Key>
@@ -610,8 +612,8 @@ where
     BlendAdapter: blend::BlendAdapter + Clone + Send + Sync + 'static,
     BlendAdapter::Settings: Send,
     ClPool: RecoverableMempool<BlockId = HeaderId> + Send + Sync + 'static,
-    ClPool::RecoveryState: ServiceState + Serialize + for<'de> Deserialize<'de>,
-    ClPool::Settings: Send + Sync + 'static,
+    ClPool::RecoveryState: Serialize + for<'de> Deserialize<'de>,
+    ClPool::Settings: Clone + Send + Sync + 'static,
     ClPool::Item: Transaction<Hash = ClPool::Key>
         + Debug
         + Clone

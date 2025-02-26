@@ -267,7 +267,7 @@ pub fn new_node(
                     topic: String::from(nomos_node::CL_TOPIC),
                     id: <Tx as Transaction>::hash,
                 },
-                recovery_path: "test".into(),
+                recovery_path: "tmp".into(),
             },
             da_mempool: DaMempoolSettings {
                 backend: (),

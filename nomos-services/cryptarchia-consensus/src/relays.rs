@@ -1,7 +1,6 @@
 use std::hash::Hash;
 // std
 use nomos_mempool::backend::RecoverableMempool;
-use overwatch_rs::services::state::ServiceState;
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
 // Crates
@@ -107,10 +106,11 @@ where
     BlendAdapter: blend::BlendAdapter<Network: BlendNetworkAdapter>,
     BS: BlobSelect<BlobId = DaPool::Item> + Clone,
     ClPool: RecoverableMempool<BlockId = HeaderId>,
-    ClPool::RecoveryState: ServiceState + Serialize + for<'de> Deserialize<'de>,
+    ClPool::RecoveryState: Serialize + for<'de> Deserialize<'de>,
     ClPool::BlockId: Debug,
     ClPool::Item: Debug + DeserializeOwned + Eq + Hash + Clone + Send + Sync + 'static,
     ClPool::Key: Debug + 'static,
+    ClPool::Settings: Clone,
     ClPoolAdapter: MempoolAdapter<Payload = ClPool::Item, Key = ClPool::Key>,
     DaPool: MemPool<BlockId = HeaderId>,
     DaPool::BlockId: Debug,

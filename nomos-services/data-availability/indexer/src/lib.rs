@@ -20,7 +20,7 @@ use nomos_storage::backends::StorageBackend;
 use nomos_storage::StorageService;
 use nomos_tracing::info_with_id;
 use overwatch_rs::services::relay::{Relay, RelayMessage};
-use overwatch_rs::services::state::{NoOperator, NoState, ServiceState};
+use overwatch_rs::services::state::{NoOperator, NoState};
 use overwatch_rs::services::{ServiceCore, ServiceData, ServiceId};
 use overwatch_rs::{DynError, OpaqueServiceStateHandle};
 use rand::{RngCore, SeedableRng};
@@ -90,12 +90,13 @@ pub struct DataIndexerService<
     BlendAdapter::Settings: Send,
     ClPoolAdapter: MempoolAdapter<Payload = ClPool::Item, Key = ClPool::Key>,
     ClPool: RecoverableMempool<BlockId = HeaderId>,
-    ClPool::RecoveryState: ServiceState + Serialize + for<'de> Deserialize<'de>,
+    ClPool::RecoveryState: Serialize + for<'de> Deserialize<'de>,
     DaPool: MemPool<BlockId = HeaderId>,
     DaPoolAdapter: MempoolAdapter<Key = DaPool::Key>,
     DaPoolAdapter::Payload: DispersedBlobInfo + Into<DaPool::Item> + Debug,
     ClPool::Item: Clone + Eq + Hash + Debug + 'static,
     ClPool::Key: Debug + 'static,
+    ClPool::Settings: Clone,
     DaPool::Item: Metadata + Clone + Eq + Hash + Debug + 'static,
     DaPool::Key: Debug + 'static,
     DaPool::Settings: Clone,
@@ -204,12 +205,13 @@ where
     BlendAdapter::Settings: Send,
     ClPoolAdapter: MempoolAdapter<Payload = ClPool::Item, Key = ClPool::Key>,
     ClPool: RecoverableMempool<BlockId = HeaderId>,
-    ClPool::RecoveryState: ServiceState + Serialize + for<'de> Deserialize<'de>,
+    ClPool::RecoveryState: Serialize + for<'de> Deserialize<'de>,
     DaPool: MemPool<BlockId = HeaderId>,
     DaPoolAdapter: MempoolAdapter<Key = DaPool::Key>,
     DaPoolAdapter::Payload: DispersedBlobInfo + Into<DaPool::Item> + Debug,
     ClPool::Item: Clone + Eq + Hash + Debug + 'static,
     ClPool::Key: Debug + 'static,
+    ClPool::Settings: Clone,
     DaPool::Item: Metadata + Clone + Eq + Hash + Debug + 'static,
     DaPool::Key: Debug + 'static,
     DaPool::Settings: Clone,
@@ -279,12 +281,13 @@ where
     BlendAdapter::Settings: Send,
     ClPoolAdapter: MempoolAdapter<Payload = ClPool::Item, Key = ClPool::Key>,
     ClPool: RecoverableMempool<BlockId = HeaderId>,
-    ClPool::RecoveryState: ServiceState + Serialize + for<'de> Deserialize<'de>,
+    ClPool::RecoveryState: Serialize + for<'de> Deserialize<'de>,
     DaPool: MemPool<BlockId = HeaderId>,
     DaPoolAdapter: MempoolAdapter<Key = DaPool::Key>,
     DaPoolAdapter::Payload: DispersedBlobInfo + Into<DaPool::Item> + Debug,
     ClPool::Item: Clone + Eq + Hash + Debug + 'static,
     ClPool::Key: Debug + 'static,
+    ClPool::Settings: Clone,
     DaPool::Item: DispersedBlobInfo + Metadata + Clone + Eq + Hash + Debug + 'static,
     <DaPool::Item as DispersedBlobInfo>::BlobId: AsRef<[u8]>,
     DaPool::Key: Debug + 'static,
@@ -388,11 +391,12 @@ where
     BlendAdapter::Settings: Send,
     ClPoolAdapter: MempoolAdapter<Payload = ClPool::Item, Key = ClPool::Key>,
     ClPool: RecoverableMempool<BlockId = HeaderId>,
-    ClPool::RecoveryState: ServiceState + Serialize + for<'de> Deserialize<'de>,
+    ClPool::RecoveryState: Serialize + for<'de> Deserialize<'de>,
     DaPool: MemPool<BlockId = HeaderId>,
     DaPoolAdapter: MempoolAdapter<Key = DaPool::Key>,
     DaPoolAdapter::Payload: DispersedBlobInfo + Into<DaPool::Item> + Debug,
     ClPool::Key: Debug + 'static,
+    ClPool::Settings: Clone,
     DaPool::Key: Debug + 'static,
     DaPool::Settings: Clone,
     ClPool::Item: Transaction<Hash = ClPool::Key>
