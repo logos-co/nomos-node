@@ -68,12 +68,11 @@ pub type DaIndexer<
     SamplingStorage,
 >;
 
-pub type DaVerifier<Attestation, Blob, Membership, VerifierBackend, StorageSerializer> =
-    DaVerifierService<
-        VerifierBackend,
-        Libp2pAdapter<Membership>,
-        VerifierStorageAdapter<Attestation, Blob, StorageSerializer>,
-    >;
+pub type DaVerifier<Blob, Membership, VerifierBackend, StorageSerializer> = DaVerifierService<
+    VerifierBackend,
+    Libp2pAdapter<Membership>,
+    VerifierStorageAdapter<Blob, StorageSerializer>,
+>;
 
 pub type DaDispersal<Backend, NetworkAdapter, MempoolAdapter, Membership, Metadata> =
     DispersalService<Backend, NetworkAdapter, MempoolAdapter, Membership, Metadata>;
@@ -87,6 +86,8 @@ where
     B: Blob + Serialize + DeserializeOwned + Clone + Send + Sync + 'static,
     <B as Blob>::BlobId: AsRef<[u8]> + Send + Sync + 'static,
     <B as Blob>::ColumnIndex: AsRef<[u8]> + Send + Sync + 'static,
+    <B as Blob>::LightBlob: Serialize + DeserializeOwned + Clone + Send + Sync + 'static,
+    <B as Blob>::SharedCommitments: Serialize + DeserializeOwned + Clone + Send + Sync + 'static,
     M: MembershipHandler<NetworkId = SubnetworkId, Id = PeerId>
         + Clone
         + Debug
@@ -98,10 +99,7 @@ where
     <VB as CoreDaVerifier>::Error: Error,
     SS: StorageSerde + Send + Sync + 'static,
 {
-    let relay = handle
-        .relay::<DaVerifier<A, B, M, VB, SS>>()
-        .connect()
-        .await?;
+    let relay = handle.relay::<DaVerifier<B, M, VB, SS>>().connect().await?;
     let (sender, receiver) = oneshot::channel();
     relay
         .send(DaVerifierMsg::AddBlob {

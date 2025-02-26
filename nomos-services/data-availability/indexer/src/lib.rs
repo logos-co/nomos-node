@@ -459,11 +459,7 @@ where
 
         let consensus_adapter = Consensus::new(consensus_relay).await;
         let mut consensus_blocks = consensus_adapter.block_stream().await;
-        let storage_adapter = DaStorage::new(
-            service_state.settings_reader.get_updated_settings().storage,
-            storage_relay,
-        )
-        .await;
+        let storage_adapter = DaStorage::new(storage_relay).await;
 
         let mut lifecycle_stream = service_state.lifecycle_handle.message_stream();
         loop {
