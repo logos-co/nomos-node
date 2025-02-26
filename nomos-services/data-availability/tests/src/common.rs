@@ -31,7 +31,7 @@ use nomos_da_indexer::storage::adapters::rocksdb::RocksAdapter as IndexerStorage
 use nomos_da_indexer::storage::adapters::rocksdb::RocksAdapterSettings as IndexerStorageSettings;
 use nomos_da_indexer::DataIndexerService;
 use nomos_da_indexer::IndexerSettings;
-use nomos_da_network_core::swarm::DAConnectionPolicySettings;
+use nomos_da_network_core::swarm::{DAConnectionMonitorSettings, DAConnectionPolicySettings};
 use nomos_da_network_service::backends::libp2p::validator::DaNetworkValidatorBackend;
 use nomos_da_network_service::NetworkConfig as DaNetworkConfig;
 use nomos_da_network_service::NetworkService as DaNetworkService;
@@ -259,14 +259,17 @@ pub fn new_node(
                     policy_settings: DAConnectionPolicySettings {
                         min_dispersal_peers: 1,
                         min_replication_peers: 1,
-                        max_dispersal_failures: 0,
-                        max_sampling_failures: 0,
-                        max_replication_failures: 0,
-                        malicious_threshold: 0,
+                        max_dispersal_failures: 10,
+                        max_sampling_failures: 10,
+                        max_replication_failures: 10,
+                        malicious_threshold: 10,
                     },
-                    monitor_settings: Default::default(),
+                    monitor_settings: DAConnectionMonitorSettings {
+                        failure_time_window: Duration::from_secs(1),
+                        ..Default::default()
+                    },
                     balancer_interval: Duration::from_secs(3),
-                    redial_cooldown: Duration::ZERO,
+                    redial_cooldown: Duration::from_millis(100),
                 },
             },
             cl_mempool: TxMempoolSettings {
