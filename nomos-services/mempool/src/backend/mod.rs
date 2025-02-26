@@ -56,10 +56,14 @@ pub trait MemPool {
     fn status(&self, items: &[Self::Key]) -> Vec<Status<Self::BlockId>>;
 }
 
+/// A mempool with recovery capabilities.
 pub trait RecoverableMempool: MemPool {
+    /// The state that is serialized and deserialized and from which the pool state is recreated.
     type RecoveryState;
 
+    /// Restore the mempool from the provided settings and state.
     fn recover(settings: Self::Settings, state: Self::RecoveryState) -> Self;
+    /// Save some state for later recovery.
     fn save(&self) -> Self::RecoveryState;
 }
 

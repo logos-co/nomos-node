@@ -6,8 +6,10 @@ use overwatch_rs::services::state::ServiceState;
 
 use crate::TxMempoolSettings;
 
+/// State that is maintained across service restarts.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct TxMempoolState<PoolState, PoolSettings, NetworkSettings> {
+    /// The (optional) pool snapshot.
     pub(crate) pool: Option<PoolState>,
     #[serde(skip)]
     _phantom: PhantomData<(PoolSettings, NetworkSettings)>,

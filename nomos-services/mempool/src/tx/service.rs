@@ -23,6 +23,7 @@ use overwatch_rs::services::{relay::OutboundRelay, ServiceCore, ServiceData, Ser
 use overwatch_rs::OpaqueServiceStateHandle;
 use services_utils::overwatch::{lifecycle, JsonFileBackend, RecoveryOperator};
 
+/// A tx mempool service that uses a [`JsonFileBackend`] as a recovery mechanism.
 pub type TxMempoolService<NetworkAdapter, Pool> = GenericTxMempoolService<
     Pool,
     NetworkAdapter,
@@ -39,6 +40,7 @@ pub type TxMempoolService<NetworkAdapter, Pool> = GenericTxMempoolService<
     >,
 >;
 
+/// A generic tx mempool service which wraps around a mempool, a network adapter, and a recovery backend.
 pub struct GenericTxMempoolService<Pool, NetworkAdapter, RecoveryBackend>
 where
     Pool: RecoverableMempool,
