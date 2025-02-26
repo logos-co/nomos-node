@@ -68,7 +68,7 @@ impl Default for DaParams {
     }
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct GeneralDaConfig {
     pub node_key: ed25519::SecretKey,
     pub peer_id: PeerId,
