@@ -1,3 +1,5 @@
+use std::path::{Path, PathBuf};
+
 use nomos_core::{
     header::HeaderId,
     tx::mock::{MockTransaction, MockTxId},
@@ -15,6 +17,7 @@ use nomos_network::{
 use nomos_tracing_service::{Tracing, TracingSettings};
 use overwatch_derive::*;
 use overwatch_rs::{overwatch::OverwatchRunner, OpaqueServiceHandle};
+use rand::distributions::{Alphanumeric, DistString};
 use services_utils::{
     overwatch::{recovery::operators::RecoveryBackend, JsonFileBackend},
     traits::FromSettings,
@@ -37,16 +40,19 @@ struct MockPoolNode {
     mockpool: OpaqueServiceHandle<MockMempoolService>,
 }
 
-// Run the provided closure, and then removes any file-based recovery mechanism that was run.
-const RECOVERY_FILE_PATH: &str = "mock_recovery.json";
-fn run_with_recovery_teardown(run: impl Fn()) {
+fn run_with_recovery_teardown(recovery_path: &Path, run: impl Fn()) {
     run();
-    let _ = std::fs::remove_file(RECOVERY_FILE_PATH);
+    let _ = std::fs::remove_file(recovery_path);
+}
+
+fn get_test_random_path() -> PathBuf {
+    PathBuf::from(Alphanumeric.sample_string(&mut rand::thread_rng(), 5)).with_extension(".json")
 }
 
 #[test]
 fn test_mockmempool() {
-    run_with_recovery_teardown(|| {
+    let recovery_file_path = get_test_random_path();
+    run_with_recovery_teardown(&recovery_file_path, || {
         let exist = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
         let exist2 = exist.clone();
 
@@ -84,7 +90,7 @@ fn test_mockmempool() {
                 mockpool: TxMempoolSettings {
                     pool: (),
                     network_adapter: (),
-                    recovery_path: RECOVERY_FILE_PATH.into(),
+                    recovery_path: recovery_file_path.clone(),
                 },
                 logging: TracingSettings::default(),
             },
@@ -141,7 +147,7 @@ fn test_mockmempool() {
         let recovery_backend = MockRecoveryBackend::from_settings(&TxMempoolSettings {
             pool: (),
             network_adapter: (),
-            recovery_path: RECOVERY_FILE_PATH.into(),
+            recovery_path: recovery_file_path.clone(),
         });
         let recovered_state = recovery_backend
             .load_state()
