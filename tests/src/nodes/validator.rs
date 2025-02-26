@@ -332,7 +332,7 @@ pub fn create_validator_config(config: GeneralConfig) -> Config {
             column_family: Some("blocks".into()),
         },
         mempool: MempoolConfig {
-            recovery_path: "./recovery/cryptarchia.json".into(),
+            recovery_path: "./recovery/mempool.json".into(),
         },
     }
 }

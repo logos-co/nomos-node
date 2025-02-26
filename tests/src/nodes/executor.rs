@@ -260,7 +260,7 @@ pub fn create_executor_config(config: GeneralConfig) -> Config {
             },
         },
         mempool: MempoolConfig {
-            recovery_path: "./recovery/cryptarchia.json".into(),
+            recovery_path: "./recovery/mempool.json".into(),
         },
     }
 }
