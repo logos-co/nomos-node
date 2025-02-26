@@ -14,7 +14,8 @@ runs:
   using: composite
   steps:
     - name: Force toolchain update
-      uses: actions-rs/toolchain@v1
+      shell: bash
+      run: rustup update
     - name: Set up Cargo cache
       uses: actions/cache/restore@v4
       with:
