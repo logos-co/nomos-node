@@ -28,7 +28,7 @@ async fn disseminate_with_metadata(
     client.publish_blob(data.to_vec(), metadata).await.unwrap();
 }
 
-#[ignore = "todo: reenable after blendnet is tested"]
+//#[ignore = "todo: reenable after blendnet is tested"]
 #[tokio::test]
 async fn disseminate_and_retrieve() {
     let topology = Topology::spawn(TopologyConfig::validator_and_executor()).await;
