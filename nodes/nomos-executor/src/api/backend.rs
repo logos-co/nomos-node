@@ -28,7 +28,7 @@ use nomos_libp2p::PeerId;
 use nomos_mempool::{tx::service::openapi::Status, MempoolMetrics};
 use nomos_node::api::handlers::{
     add_blob, add_blob_info, add_tx, block, cl_metrics, cl_status, cryptarchia_headers,
-    cryptarchia_info, get_range, libp2p_info,
+    cryptarchia_info, da_get_commitments, get_range, libp2p_info,
 };
 use nomos_storage::backends::StorageSerde;
 use overwatch_rs::overwatch::handle::OverwatchHandle;
@@ -139,7 +139,8 @@ impl<
 where
     DaAttestation: Serialize + DeserializeOwned + Clone + Send + Sync + 'static,
     DaBlob: Blob + Serialize + DeserializeOwned + Clone + Send + Sync + 'static,
-    <DaBlob as Blob>::BlobId: AsRef<[u8]> + Send + Sync + 'static,
+    <DaBlob as Blob>::BlobId:
+        AsRef<[u8]> + Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
     <DaBlob as Blob>::ColumnIndex: AsRef<[u8]> + Send + Sync + 'static,
     <DaBlob as Blob>::LightBlob: Serialize + DeserializeOwned + Clone + Send + Sync + 'static,
     <DaBlob as Blob>::SharedCommitments:
@@ -341,6 +342,10 @@ where
                         Metadata,
                     >,
                 ),
+            )
+            .route(
+                paths::DA_GET_SHARED_COMMITMENTS,
+                routing::get(da_get_commitments::<DaStorageSerializer, DaBlob>),
             )
             .with_state(handle);
 
