@@ -32,7 +32,13 @@ impl Slot {
             // current slot is behind the start time, so return default 0
             Slot::genesis()
         } else {
-            Slot::from(since_start.whole_seconds() as u64 / slot_config.slot_duration.as_secs())
+            // safety: since_start is already checked never negative in this case
+            // division panics if `slot_duration` is less than a second.
+            Slot::from(
+                (since_start.whole_seconds() as u64)
+                    .checked_div(slot_config.slot_duration.as_secs())
+                    .expect("slots tick should be at least a second"),
+            )
         }
     }
 }
