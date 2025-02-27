@@ -8,7 +8,10 @@ use nomos_da_network_service::backends::libp2p::executor::DaNetworkExecutorBacke
 use nomos_da_network_service::NetworkService as DaNetworkService;
 use nomos_network::backends::libp2p::Libp2p as NetworkBackend;
 use nomos_node::{
-    config::{update_blend, update_cryptarchia_consensus, update_network, BlendArgs},
+    config::{
+        mempool::MempoolConfig, update_blend, update_cryptarchia_consensus, update_network,
+        BlendArgs,
+    },
     CryptarchiaArgs, HttpArgs, LogArgs, NetworkArgs, NetworkService, Wire,
 };
 use nomos_storage::backends::rocksdb::RocksBackend;
@@ -16,9 +19,7 @@ use overwatch_rs::services::ServiceData;
 use serde::{Deserialize, Serialize};
 use subnetworks_assignations::versions::v1::FillFromNodeList;
 // internal
-use crate::{config::mempool::MempoolConfig, ExecutorApiService};
-
-pub mod mempool;
+use crate::ExecutorApiService;
 
 #[derive(Deserialize, Debug, Clone, Serialize)]
 pub struct Config {
