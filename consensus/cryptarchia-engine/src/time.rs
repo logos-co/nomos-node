@@ -108,10 +108,10 @@ pub struct EpochConfig {
 
 impl EpochConfig {
     pub fn epoch_length(&self, base_period_length: NonZero<u64>) -> u64 {
-        ((self.epoch_stake_distribution_stabilization.get()
-            + self.epoch_period_nonce_buffer.get()
-            + self.epoch_period_nonce_stabilization.get()) as u64)
-            .saturating_mul(base_period_length.get())
+        (u64::from(self.epoch_stake_distribution_stabilization.get())
+            + u64::from(self.epoch_period_nonce_buffer.get())
+            + u64::from(self.epoch_period_nonce_stabilization.get()))
+        .saturating_mul(base_period_length.get())
     }
 
     pub fn epoch(&self, slot: Slot, base_period_length: NonZero<u64>) -> Epoch {
