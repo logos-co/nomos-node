@@ -1,3 +1,4 @@
+use std::num::NonZero;
 use std::ops::Add;
 use std::time::Duration;
 use time::OffsetDateTime;
@@ -48,6 +49,14 @@ impl From<Epoch> for u32 {
     }
 }
 
+impl TryFrom<u64> for Epoch {
+    type Error = <u64 as TryInto<u32>>::Error;
+
+    fn try_from(value: u64) -> Result<Self, Self::Error> {
+        value.try_into().map(Self)
+    }
+}
+
 impl From<u64> for Slot {
     fn from(slot: u64) -> Self {
         Self(slot)
@@ -82,25 +91,27 @@ pub struct EpochConfig {
     // The stake distribution is always taken at the beginning of the previous epoch.
     // This parameters controls how many slots to wait for it to be stabilized
     // The value is computed as epoch_stake_distribution_stabilization * int(floor(k / f))
-    pub epoch_stake_distribution_stabilization: u8,
+    pub epoch_stake_distribution_stabilization: NonZero<u8>,
     // This parameter controls how many slots we wait after the stake distribution
     // snapshot has stabilized to take the nonce snapshot.
-    pub epoch_period_nonce_buffer: u8,
+    pub epoch_period_nonce_buffer: NonZero<u8>,
     // This parameter controls how many slots we wait for the nonce snapshot to be considered
     // stabilized
-    pub epoch_period_nonce_stabilization: u8,
+    pub epoch_period_nonce_stabilization: NonZero<u8>,
 }
 
 impl EpochConfig {
-    pub fn epoch_length(&self, base_period_length: u64) -> u64 {
-        (self.epoch_stake_distribution_stabilization as u64
-            + self.epoch_period_nonce_buffer as u64
-            + self.epoch_period_nonce_stabilization as u64)
-            * base_period_length
+    pub fn epoch_length(&self, base_period_length: NonZero<u64>) -> u64 {
+        ((self.epoch_stake_distribution_stabilization.get()
+            + self.epoch_period_nonce_buffer.get()
+            + self.epoch_period_nonce_stabilization.get()) as u64)
+            .saturating_mul(base_period_length.get())
     }
 
-    pub fn epoch(&self, slot: Slot, base_period_length: u64) -> Epoch {
-        ((u64::from(slot) / self.epoch_length(base_period_length)) as u32).into()
+    pub fn epoch(&self, slot: Slot, base_period_length: NonZero<u64>) -> Epoch {
+        (u64::from(slot) / self.epoch_length(base_period_length))
+            .try_into()
+            .expect("Epoch should build from a correct configuration")
     }
 }
 

@@ -1,4 +1,5 @@
 use std::{
+    num::NonZero,
     str::FromStr,
     sync::{
         atomic::{AtomicBool, Ordering::SeqCst},
@@ -55,12 +56,12 @@ fn test_verifier() {
     let genesis_state = LedgerState::from_commitments(commitments, (ids.len() as u32).into());
     let ledger_config = nomos_ledger::Config {
         epoch_config: EpochConfig {
-            epoch_stake_distribution_stabilization: 3,
-            epoch_period_nonce_buffer: 3,
-            epoch_period_nonce_stabilization: 4,
+            epoch_stake_distribution_stabilization: NonZero::new(3).unwrap(),
+            epoch_period_nonce_buffer: NonZero::new(3).unwrap(),
+            epoch_period_nonce_stabilization: NonZero::new(4).unwrap(),
         },
         consensus_config: cryptarchia_engine::Config {
-            security_param: 10,
+            security_param: NonZero::new(10).unwrap(),
             active_slot_coeff: 0.9,
         },
     };

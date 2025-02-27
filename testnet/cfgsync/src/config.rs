@@ -261,7 +261,7 @@ mod cfgsync_tests {
         let configs = create_node_configs(
             ConsensusParams {
                 n_participants: 10,
-                security_param: 10,
+                security_param: NonZero::new(10).unwrap(),
                 active_slot_coeff: 0.9,
             },
             DaParams {

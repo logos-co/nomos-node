@@ -13,6 +13,8 @@ use tests::{
     topology::configs::{consensus::ConsensusParams, da::DaParams},
 };
 use tokio::sync::oneshot::channel;
+use std::num::NonZero;
+
 
 #[derive(Parser, Debug)]
 #[command(about = "CfgSync")]
@@ -27,7 +29,7 @@ struct CfgSyncConfig {
     timeout: u64,
 
     // ConsensusConfig related parameters
-    security_param: u32,
+    security_param: NonZero<u32>,
     active_slot_coeff: f64,
 
     // DaConfig related parameters

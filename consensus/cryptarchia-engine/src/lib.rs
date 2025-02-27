@@ -2,7 +2,6 @@ pub mod config;
 mod time;
 
 use std::collections::{HashMap, HashSet};
-
 pub use config::*;
 use thiserror::Error;
 pub use time::{Epoch, EpochConfig, Slot};
@@ -168,7 +167,7 @@ where
     }
 
     pub fn fork_choice(&self) -> Branch<Id> {
-        let k = self.config.security_param as u64;
+        let k = self.config.security_param.get() as u64;
         let s = self.config.s();
         Self::maxvalid_bg(self.local_chain.clone(), &self.branches, k, s)
     }
@@ -221,7 +220,7 @@ where
     }
 
     pub fn get_security_block_header_id(&self) -> Option<Id> {
-        (0..self.config.security_param).try_fold(self.tip(), |header, _| {
+        (0..self.config.security_param.get()).try_fold(self.tip(), |header, _| {
             self.branches.get(&header).and_then(|branch| {
                 let parent = branch.parent;
                 if header == parent {
@@ -241,10 +240,12 @@ pub mod tests {
 
     use super::{Cryptarchia, Slot};
     use crate::Config;
+    use std::hash::{DefaultHasher, Hash, Hasher};
+    use std::num::NonZero;
 
     pub fn config() -> Config {
         Config {
-            security_param: 1,
+            security_param: NonZero::new(1).unwrap(),
             active_slot_coeff: 1.0,
         }
     }
@@ -255,7 +256,7 @@ pub mod tests {
         let mut engine = Cryptarchia::from_genesis([0; 32], config());
         // by setting a low k we trigger the density choice rule, and the shorter chain
         // is denser after the fork
-        engine.config.security_param = 10;
+        engine.config.security_param = NonZero::new(10).unwrap();
 
         let mut parent = engine.genesis();
         for i in 1..50 {
@@ -389,7 +390,8 @@ pub mod tests {
             parent_header = current_header;
         }
 
-        let security_header_position = (headers_size - engine.config.security_param - 1) as usize;
+        let security_header_position =
+            (headers_size - engine.config.security_param.get() - 1) as usize;
         assert_eq!(
             engine.get_security_block_header_id().unwrap(),
             headers[security_header_position]

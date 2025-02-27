@@ -17,7 +17,7 @@ async fn happy_test(topology: &Topology) {
     let nodes = topology.validators();
     let config = nodes[0].config();
     let security_param = config.cryptarchia.config.consensus_config.security_param;
-    let n_blocks = security_param * CHAIN_LENGTH_MULTIPLIER;
+    let n_blocks = security_param.get() * CHAIN_LENGTH_MULTIPLIER;
     println!("waiting for {n_blocks} blocks");
     let timeout = (n_blocks as f64 / config.cryptarchia.config.consensus_config.active_slot_coeff
         * config
@@ -49,7 +49,7 @@ async fn happy_test(topology: &Topology) {
         } => {}
     };
 
-    let last_committed_block_height = n_blocks - security_param;
+    let last_committed_block_height = n_blocks - security_param.get();
     println!("{:?}", nodes[0].consensus_info().await);
 
     let infos = stream::iter(nodes)
