@@ -16,10 +16,14 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4        
+      - name: Install nightly toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly-2025-01-03
+          override: true
       - name: Run cargo fmt
         uses: actions-rs/cargo@v1
         with:
-          toolchain: nightly-2025-01-03
           command: fmt
           args: --all --check
 
