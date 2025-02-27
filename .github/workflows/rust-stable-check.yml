@@ -52,6 +52,6 @@ jobs:
           RUST_VERSION: ${{ needs.check-latest-release.outputs.new-version }}
         with:
           assignees: danielSanchezQ, ntn-x2
-          filename: ./.github/workflows/rust_update_issue_template.md
+          filename: ./.github/rust_update_issue_template.md
           update_existing: false
           search_existing: all
