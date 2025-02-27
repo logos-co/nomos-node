@@ -168,7 +168,7 @@ where
     }
 
     pub fn fork_choice(&self) -> Branch<Id> {
-        let k = self.config.security_param.get() as u64;
+        let k = self.config.security_param.get().into();
         let s = self.config.s();
         Self::maxvalid_bg(self.local_chain.clone(), &self.branches, k, s)
     }
