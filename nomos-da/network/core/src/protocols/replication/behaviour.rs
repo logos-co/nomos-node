@@ -174,7 +174,7 @@ where
         self.try_wake();
     }
 
-    pub fn try_wake(&mut self) {
+    fn try_wake(&mut self) {
         if let Some(waker) = self.waker.take() {
             waker.wake();
         }
