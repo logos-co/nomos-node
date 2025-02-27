@@ -13,13 +13,13 @@ struct MinimalBoundedDuration<const MIN_DURATION: usize, TAG: TimeTag> {
     _tag: PhantomData<*const TAG>,
 }
 
-trait TimeTag {
-    fn as_inner() -> char;
+pub(crate) trait TimeTag {
+    fn inner() -> char;
 }
 
 pub struct BoundTag<const TAG: char> {}
 impl<const TAG: char> TimeTag for BoundTag<TAG> {
-    fn as_inner() -> char {
+    fn inner() -> char {
         TAG
     }
 }
@@ -33,7 +33,7 @@ pub type DAY = BoundTag<'d'>;
 
 // we have a limitation to const types, so we better use the ones defined.
 fn fill_duration_measure<T: TimeTag>() -> Result<String, impl Display> {
-    match T::as_inner() {
+    match T::inner() {
         v @ ('d' | 'h' | 'm' | 's') => Ok(v.to_string()),
         'l' => Ok("ms".to_string()),
         'n' => Ok("ns".to_string()),
@@ -57,14 +57,16 @@ impl<'de, const MIN_DURATION: usize, TAG: TimeTag> Deserialize<'de>
             parsed_duration
                 .as_secs()
                 .try_into()
-                .map_err(|e| Error::custom("Value"))?,
+                .map_err(Error::custom)?,
             parsed_duration
                 .subsec_nanos()
                 .try_into()
-                .map(Error::custom)?,
+                .map_err(Error::custom)?,
         );
         if value < min_duration {
-            return Err(Error::custom("Minimal duration "));
+            return Err(Error::custom(format!(
+                "Minimal duration is {min_duration} but got {value}"
+            )));
         }
         Ok(Self {
             duration: value,
@@ -83,22 +85,20 @@ impl<const MIN_DURATION: usize, TAG: TimeTag> From<MinimalBoundedDuration<MIN_DU
 
 #[cfg(test)]
 mod test {
-    use crate::bounded_duration::{MinimalBoundedDuration, DAY};
-    use serde_json::Value;
+    use crate::bounded_duration::{MinimalBoundedDuration, DAY, SECOND};
+    use time::Duration;
 
     #[test]
     fn success_deserialize() {
-        let _duration: MinimalBoundedDuration<1, DAY> =
-            serde_json::from_value(Value::String("1s".to_string())).unwrap();
+        let value = serde_json::to_value(Duration::days(1)).unwrap();
+        let _duration: MinimalBoundedDuration<1, SECOND> = serde_json::from_value(value).unwrap();
     }
 
-    // #[test]
-    // fn fail_deserialize_with_type_bound() {
-    //     let _duration: MinimalBoundedDuration<1, 's'> = serde_json::from_str("10ms").unwrap();
-    // }
-    //
-    // #[test]
-    // fn fail_with_wrong_type() {
-    //     let _duration: MinimalBoundedDuration<1, 'k'> = serde_json::from_str("10s").unwrap();
-    // }
+    #[test]
+    #[should_panic]
+    fn fail_deserialize_with_type_bound() {
+        let value = serde_json::to_value(Duration::seconds(1)).unwrap();
+
+        let _duration: MinimalBoundedDuration<1, DAY> = serde_json::from_value(value).unwrap();
+    }
 }
