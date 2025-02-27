@@ -1,0 +1,41 @@
+name: Check for new Rust versions
+
+on:
+  push:
+    branches: 
+      - aa/rustc-version-pin
+
+jobs:
+  check-latest-release:
+    name: Fetch and compare latest Rust release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Fetch latest Rust release
+        id: latest-version
+        run: |
+          LATEST=$(curl -s https://api.github.com/repos/rust-lang/rust/releases/latest | jq -r .tag_name)
+          echo "Latest Rust version: $LATEST"
+          echo "VERSION=$LATEST" >> $GITHUB_OUTPUT
+      - name: Retrieve local Rust version
+        id: installed-version
+        run: |
+          INSTALLED=$(cargo --version | awk '{print $2}')
+          echo "Installed Rust version: $INSTALLED"
+          echo "VERSION=$INSTALLED" >> $GITHUB_OUTPUT
+      - name: Compare latest and local Rust versions
+        run: |
+          if [ "${{ steps.latest-version.outputs.VERSION }}" != "${{ steps.installed-version.outputs.VERSION }}" ]; then
+            NEW_VERSION=true
+          else
+            NEW_VERSION=false
+          fi
+          echo "NEW_VERSION=$NEW_VERSION" >> $GITHUB_OUTPUT
+  notify-new-release:
+    name: Notify of new Rust release
+    runs-on: ubuntu-latest
+    needs: check-latest-release
+    if: ${{ needs.check-latest-release.outputs.NEW_VERSION == 'true' }}
+    steps:
+      - run: echo "Ok"
