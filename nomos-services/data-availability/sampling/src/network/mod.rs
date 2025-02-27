@@ -1,15 +1,18 @@
 pub mod adapters;
 
+use std::pin::Pin;
+
 use futures::Stream;
 use nomos_core::da::BlobId;
 use nomos_da_network_core::SubnetworkId;
-use nomos_da_network_service::backends::libp2p::common::SamplingEvent;
-use nomos_da_network_service::backends::NetworkBackend;
-use nomos_da_network_service::NetworkService;
-use overwatch_rs::services::relay::OutboundRelay;
-use overwatch_rs::services::ServiceData;
-use overwatch_rs::DynError;
-use std::pin::Pin;
+use nomos_da_network_service::{
+    backends::{libp2p::common::SamplingEvent, NetworkBackend},
+    NetworkService,
+};
+use overwatch_rs::{
+    services::{relay::OutboundRelay, ServiceData},
+    DynError,
+};
 
 #[async_trait::async_trait]
 pub trait NetworkAdapter {

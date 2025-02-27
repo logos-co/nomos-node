@@ -1,23 +1,24 @@
 pub mod backends;
 
-// std
-use std::fmt::{self, Debug};
-use std::pin::Pin;
-// crates
+use std::{
+    fmt::{self, Debug},
+    pin::Pin,
+};
+
 use async_trait::async_trait;
 use backends::NetworkBackend;
 use futures::{Stream, StreamExt};
-use overwatch_rs::services::{
-    relay::RelayMessage,
-    state::{NoOperator, ServiceState},
-    ServiceCore, ServiceData, ServiceId,
+use overwatch_rs::{
+    services::{
+        relay::RelayMessage,
+        state::{NoOperator, ServiceState},
+        ServiceCore, ServiceData, ServiceId,
+    },
+    OpaqueServiceStateHandle,
 };
-use overwatch_rs::OpaqueServiceStateHandle;
 use serde::{Deserialize, Serialize};
-use tokio::sync::oneshot;
-
-// internal
 use services_utils::overwatch::lifecycle;
+use tokio::sync::oneshot;
 
 const DA_NETWORK_TAG: ServiceId = "DA-Network";
 

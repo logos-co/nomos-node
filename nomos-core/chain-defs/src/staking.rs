@@ -8,8 +8,9 @@ pub const NMO_UNIT: Unit = [
 
 #[cfg(test)]
 mod test {
-    use super::*;
     use cl::note::derive_unit;
+
+    use super::*;
 
     #[test]
     fn test_unit_derivation() {

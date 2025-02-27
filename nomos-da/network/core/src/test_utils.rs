@@ -1,7 +1,9 @@
-use crate::SubnetworkId;
-use libp2p::PeerId;
 use std::collections::HashSet;
+
+use libp2p::PeerId;
 use subnetworks_assignations::MembershipHandler;
+
+use crate::SubnetworkId;
 
 #[derive(Clone)]
 pub struct AllNeighbours {

@@ -1,9 +1,6 @@
-// STD
-// Crates
 use nomos_core::da::DaEncoder;
-// Internal
-use crate::common::blob::DaBlob;
-use crate::testutils::encoder::get_encoder;
+
+use crate::{common::blob::DaBlob, testutils::encoder::get_encoder};
 
 pub fn get_default_da_blob_data() -> Vec<u8> {
     vec![

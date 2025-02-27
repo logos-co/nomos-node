@@ -2,11 +2,9 @@ mod fuzz;
 
 use std::panic;
 
-use proptest::prelude::*;
-use proptest::test_runner::Config;
-use proptest_state_machine::{prop_state_machine, ReferenceStateMachine, StateMachineTest};
-
 use fuzz::sut::ConsensusEngineTest;
+use proptest::{prelude::*, test_runner::Config};
+use proptest_state_machine::{prop_state_machine, ReferenceStateMachine, StateMachineTest};
 
 prop_state_machine! {
     #![proptest_config(Config {

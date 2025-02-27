@@ -1,9 +1,9 @@
 pub mod config;
-
 mod time;
 
-pub use config::*;
 use std::collections::{HashMap, HashSet};
+
+pub use config::*;
 use thiserror::Error;
 pub use time::{Epoch, Slot};
 
@@ -68,7 +68,8 @@ where
     fn apply_header(&self, header: Id, parent: Id, slot: Slot) -> Result<Self, Error<Id>> {
         let mut branches = self.branches.clone();
         let mut tips = self.tips.clone();
-        // if the parent was the head of a branch, remove it as it has been superseded by the new header
+        // if the parent was the head of a branch, remove it as it has been superseded
+        // by the new header
         tips.remove(&parent);
         let length = branches
             .get(&parent)
@@ -190,9 +191,10 @@ where
         &self.branches
     }
 
-    //  Implementation of the fork choice rule as defined in the Ouroboros Genesis paper
-    //  k defines the forking depth of chain we accept without more analysis
-    //  s defines the length of time (unit of slots) after the fork happened we will inspect for chain density
+    //  Implementation of the fork choice rule as defined in the Ouroboros Genesis
+    // paper  k defines the forking depth of chain we accept without more
+    // analysis  s defines the length of time (unit of slots) after the fork
+    // happened we will inspect for chain density
     fn maxvalid_bg(local_chain: Branch<Id>, branches: &Branches<Id>, k: u64, s: u64) -> Branch<Id> {
         let mut cmax = local_chain;
         let forks = branches.branches();
@@ -235,9 +237,10 @@ where
 
 #[cfg(test)]
 pub mod tests {
+    use std::hash::{DefaultHasher, Hash, Hasher};
+
     use super::{Cryptarchia, Slot};
     use crate::Config;
-    use std::hash::{DefaultHasher, Hash, Hasher};
 
     pub fn config() -> Config {
         Config {
@@ -250,8 +253,8 @@ pub mod tests {
     fn test_fork_choice() {
         // TODO: use cryptarchia
         let mut engine = Cryptarchia::from_genesis([0; 32], config());
-        // by setting a low k we trigger the density choice rule, and the shorter chain is denser after
-        // the fork
+        // by setting a low k we trigger the density choice rule, and the shorter chain
+        // is denser after the fork
         engine.config.security_param = 10;
 
         let mut parent = engine.genesis();
@@ -288,7 +291,8 @@ pub mod tests {
             }
             assert_eq!(engine.tip(), short_p);
         }
-        // even if the long chain is much longer, it will never be accepted as it's not dense enough
+        // even if the long chain is much longer, it will never be accepted as it's not
+        // dense enough
         for slot in 70..100 {
             let new_block = hash(&format!("long-{}", slot));
             engine = engine
@@ -316,7 +320,8 @@ pub mod tests {
             long_p
         );
 
-        // a longer chain which is equally dense after the fork will be selected as the main tip
+        // a longer chain which is equally dense after the fork will be selected as the
+        // main tip
         for slot in 50..71 {
             let new_block = hash(&format!("long-dense-{}", slot));
             engine = engine

@@ -1,18 +1,16 @@
 use std::fmt;
 
-// std
-// crates
-use crate::{FieldElement, BYTES_PER_FIELD_ELEMENT};
 use ark_bls12_381::fr::Fr;
 use ark_ff::Zero;
-use ark_poly::domain::general::GeneralEvaluationDomain;
-use ark_poly::evaluations::univariate::Evaluations;
-use ark_poly::univariate::DensePolynomial;
-use ark_poly::EvaluationDomain;
+use ark_poly::{
+    domain::general::GeneralEvaluationDomain, evaluations::univariate::Evaluations,
+    univariate::DensePolynomial, EvaluationDomain,
+};
 use blst::BLST_ERROR;
 use num_bigint::BigUint;
 use thiserror::Error;
-// internal
+
+use crate::{FieldElement, BYTES_PER_FIELD_ELEMENT};
 
 #[derive(Error, Debug)]
 pub struct BlstError(pub BLST_ERROR);
@@ -62,8 +60,8 @@ pub enum KzgRsError {
     DivisionByZeroPolynomial,
 }
 
-/// Transform chunks of bytes (of size `CHUNK_SIZE`) into `Fr` which are considered evaluations of a
-/// polynomial.
+/// Transform chunks of bytes (of size `CHUNK_SIZE`) into `Fr` which are
+/// considered evaluations of a polynomial.
 pub fn bytes_to_evaluations<const CHUNK_SIZE: usize>(
     data: &[u8],
     domain: GeneralEvaluationDomain<Fr>,
@@ -81,11 +79,12 @@ pub fn bytes_to_evaluations<const CHUNK_SIZE: usize>(
     )
 }
 
-/// Transform chunks of bytes (of size `CHUNK_SIZE`) into `Fr` which are considered evaluations of a
-/// polynomial. Then use FFT to transform that polynomial into coefficient form.
-/// `CHUNK_SIZE` needs to be 31 (bytes) or less, otherwise it cannot be encoded.
-/// The input data need to be padded, so it fits in a len modulus of `CHUNK_SIZE`.
-/// Returns the polynomial in evaluation form and in coefficient form
+/// Transform chunks of bytes (of size `CHUNK_SIZE`) into `Fr` which are
+/// considered evaluations of a polynomial. Then use FFT to transform that
+/// polynomial into coefficient form. `CHUNK_SIZE` needs to be 31 (bytes) or
+/// less, otherwise it cannot be encoded. The input data need to be padded, so
+/// it fits in a len modulus of `CHUNK_SIZE`. Returns the polynomial in
+/// evaluation form and in coefficient form
 pub fn bytes_to_polynomial<const CHUNK_SIZE: usize>(
     data: &[u8],
     domain: GeneralEvaluationDomain<Fr>,
@@ -102,11 +101,11 @@ pub fn bytes_to_polynomial<const CHUNK_SIZE: usize>(
     Ok(bytes_to_polynomial_unchecked::<CHUNK_SIZE>(data, domain))
 }
 
-/// Transform chunks of bytes (of size `CHUNK_SIZE`) into `Fr` which are considered evaluations of a
-/// polynomial. Then use FFT to transform that polynomial into coefficient form.
-/// No extra checks are done for the caller.
-/// Caller need to ensure that `CHUNK_SIZE` is not bigger than the underlying `Fr` element can be
-/// decoded from.
+/// Transform chunks of bytes (of size `CHUNK_SIZE`) into `Fr` which are
+/// considered evaluations of a polynomial. Then use FFT to transform that
+/// polynomial into coefficient form. No extra checks are done for the caller.
+/// Caller need to ensure that `CHUNK_SIZE` is not bigger than the underlying
+/// `Fr` element can be decoded from.
 pub fn bytes_to_polynomial_unchecked<const CHUNK_SIZE: usize>(
     data: &[u8],
     domain: GeneralEvaluationDomain<Fr>,
@@ -132,15 +131,16 @@ pub fn compute_roots_of_unity(size: usize) -> Vec<Fr> {
 
 #[cfg(test)]
 mod test {
-    use super::{
-        bytes_to_evaluations, bytes_to_polynomial, compute_roots_of_unity, BlstError, KzgRsError,
-    };
     use ark_bls12_381::fr::Fr;
     use ark_ff::{BigInteger, PrimeField};
     use ark_poly::{EvaluationDomain, GeneralEvaluationDomain, Polynomial};
     use blst::BLST_ERROR;
     use once_cell::sync::Lazy;
     use rand::{thread_rng, Fill};
+
+    use super::{
+        bytes_to_evaluations, bytes_to_polynomial, compute_roots_of_unity, BlstError, KzgRsError,
+    };
 
     const CHUNK_SIZE: usize = 31;
     static DOMAIN: Lazy<GeneralEvaluationDomain<Fr>> =

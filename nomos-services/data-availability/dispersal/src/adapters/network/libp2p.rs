@@ -1,21 +1,25 @@
-use crate::adapters::network::DispersalNetworkAdapter;
-use futures::stream::BoxStream;
-use futures::{Stream, StreamExt};
+use std::{fmt::Debug, pin::Pin};
+
+use futures::{stream::BoxStream, Stream, StreamExt};
 use kzgrs_backend::common::blob::DaBlob;
 use nomos_core::da::BlobId;
-use nomos_da_network_core::protocols::dispersal::executor::behaviour::DispersalExecutorEvent;
-use nomos_da_network_core::{PeerId, SubnetworkId};
-use nomos_da_network_service::backends::libp2p::executor::{
-    DaNetworkEvent, DaNetworkEventKind, DaNetworkExecutorBackend, ExecutorDaNetworkMessage,
+use nomos_da_network_core::{
+    protocols::dispersal::executor::behaviour::DispersalExecutorEvent, PeerId, SubnetworkId,
 };
-use nomos_da_network_service::{DaNetworkMsg, NetworkService};
-use overwatch_rs::services::relay::OutboundRelay;
-use overwatch_rs::services::ServiceData;
-use overwatch_rs::DynError;
-use std::fmt::Debug;
-use std::pin::Pin;
+use nomos_da_network_service::{
+    backends::libp2p::executor::{
+        DaNetworkEvent, DaNetworkEventKind, DaNetworkExecutorBackend, ExecutorDaNetworkMessage,
+    },
+    DaNetworkMsg, NetworkService,
+};
+use overwatch_rs::{
+    services::{relay::OutboundRelay, ServiceData},
+    DynError,
+};
 use subnetworks_assignations::MembershipHandler;
 use tokio::sync::oneshot;
+
+use crate::adapters::network::DispersalNetworkAdapter;
 
 pub struct Libp2pNetworkAdapter<Membership>
 where

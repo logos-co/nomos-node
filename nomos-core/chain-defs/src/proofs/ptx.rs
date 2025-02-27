@@ -1,9 +1,6 @@
-// std
-// crates
+use nomos_proof_statements::ptx::{PtxPrivate, PtxPublic};
 use risc0_zkvm::Prover;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
-// internal
-use nomos_proof_statements::ptx::{PtxPrivate, PtxPublic};
 
 #[derive(Debug, Clone)]
 pub struct PtxProof {

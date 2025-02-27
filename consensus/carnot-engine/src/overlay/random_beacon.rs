@@ -1,14 +1,12 @@
-use crate::overlay::CommitteeMembership;
-use crate::types::*;
 use bls_signatures::{PrivateKey, PublicKey, Serialize, Signature};
 use nomos_utils::fisheryates::FisherYatesShuffle;
 use rand::{seq::SliceRandom, SeedableRng};
 use serde::{Deserialize, Serialize as SerdeSerialize};
 use sha2::{Digest, Sha256};
-
 use thiserror::Error;
 
 use super::LeaderSelection;
+use crate::{overlay::CommitteeMembership, types::*};
 
 pub type Entropy = [u8];
 pub type Context = [u8];
@@ -117,8 +115,9 @@ impl CommitteeMembership for RandomBeaconState {
 }
 
 mod serialize_bls {
-    use super::*;
     use serde::{Deserializer, Serializer};
+
+    use super::*;
 
     pub fn deserialize<'de, D, T>(deserializer: D) -> Result<T, D::Error>
     where

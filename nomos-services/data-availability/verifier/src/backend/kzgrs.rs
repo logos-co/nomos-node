@@ -1,13 +1,12 @@
-// std
 use core::fmt;
-// crates
+
 use kzgrs_backend::{
     common::blob::DaBlob, global::global_parameters_from_file,
     verifier::DaVerifier as NomosKzgrsVerifier,
 };
 use nomos_core::da::DaVerifier;
 use serde::{Deserialize, Serialize};
-// internal
+
 use super::VerifierBackend;
 
 #[derive(Debug)]
@@ -47,8 +46,8 @@ impl DaVerifier for KzgrsDaVerifier {
 
     fn verify(&self, blob: &Self::DaBlob) -> Result<(), Self::Error> {
         let blob = blob.clone();
-        // TODO: Prepare the domain depending the size, if fixed, so fixed domain, if not it needs
-        // to come with some metadata.
+        // TODO: Prepare the domain depending the size, if fixed, so fixed domain, if
+        // not it needs to come with some metadata.
         let domain_size = 2usize;
         self.verifier
             .verify(&blob, domain_size)

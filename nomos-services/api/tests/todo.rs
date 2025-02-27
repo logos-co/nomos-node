@@ -99,7 +99,8 @@ impl Backend for WebServer {
 fn test_todo() -> Result<(), Error> {
     let addr = SocketAddr::new(Ipv4Addr::LOCALHOST.into(), 8080);
 
-    // have to spawn the server in a separate thread because the overwatch limitation
+    // have to spawn the server in a separate thread because the overwatch
+    // limitation
     std::thread::spawn(move || {
         let app = OverwatchRunner::<NomosApi>::run(
             NomosApiServiceSettings {
@@ -127,7 +128,7 @@ fn test_todo() -> Result<(), Error> {
 }
 
 mod todo {
-    use std::sync::Arc;
+    use std::sync::{Arc, Mutex};
 
     use axum::{
         extract::{Path, Query, State},
@@ -136,7 +137,6 @@ mod todo {
     };
     use hyper::{HeaderMap, StatusCode};
     use serde::{Deserialize, Serialize};
-    use std::sync::Mutex;
     use utoipa::{IntoParams, ToSchema};
 
     /// In-memory todo store
@@ -223,7 +223,8 @@ mod todo {
 
     /// Create new Todo
     ///
-    /// Tries to create a new Todo item to in-memory storage or fails with 409 conflict if already exists.
+    /// Tries to create a new Todo item to in-memory storage or fails with 409
+    /// conflict if already exists.
     #[utoipa::path(
       post,
       path = "/todo",
@@ -261,7 +262,8 @@ mod todo {
 
     /// Mark Todo item done by id
     ///
-    /// Mark Todo item done by given id. Return only status 200 on success or 404 if Todo is not found.
+    /// Mark Todo item done by given id. Return only status 200 on success or
+    /// 404 if Todo is not found.
     #[utoipa::path(
       put,
       path = "/todo/{id}",
@@ -301,7 +303,8 @@ mod todo {
 
     /// Delete Todo item by id
     ///
-    /// Delete Todo item from in-memory storage by id. Returns either 200 success of 404 with TodoError if Todo is not found.
+    /// Delete Todo item from in-memory storage by id. Returns either 200
+    /// success of 404 with TodoError if Todo is not found.
     #[utoipa::path(
       delete,
       path = "/todo/{id}",
@@ -344,7 +347,8 @@ mod todo {
         }
     }
 
-    // normally you should create a middleware for this but this is sufficient for sake of example.
+    // normally you should create a middleware for this but this is sufficient for
+    // sake of example.
     fn check_api_key(
         require_api_key: bool,
         headers: HeaderMap,

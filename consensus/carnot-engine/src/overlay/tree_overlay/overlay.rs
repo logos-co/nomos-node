@@ -1,11 +1,14 @@
-use super::tree::Tree;
-use crate::overlay::threshold::{
-    apply_threshold, default_super_majority_threshold, deser_fraction,
-};
-use crate::overlay::CommitteeMembership;
-use crate::{overlay::LeaderSelection, Committee, NodeId, Overlay};
 use fraction::Fraction;
 use serde::{Deserialize, Serialize};
+
+use super::tree::Tree;
+use crate::{
+    overlay::{
+        threshold::{apply_threshold, default_super_majority_threshold, deser_fraction},
+        CommitteeMembership, LeaderSelection,
+    },
+    Committee, NodeId, Overlay,
+};
 
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
@@ -152,10 +155,11 @@ where
             .expect("node is not part of any committee")
     }
 
-    // TODO: Carnot node in sim does not send votes to the next leader from the child committee of
-    // root committee yet. *For now* leader super majority threshold should be calculated only from
-    // the number of root committee nodes. The code will be reverted once vote sending from
-    // child committee of root committee is added to Carnot node.
+    // TODO: Carnot node in sim does not send votes to the next leader from the
+    // child committee of root committee yet. *For now* leader super majority
+    // threshold should be calculated only from the number of root committee
+    // nodes. The code will be reverted once vote sending from child committee
+    // of root committee is added to Carnot node.
     fn leader_super_majority_threshold(&self, _id: NodeId) -> usize {
         // let root_committee = &self.carnot_tree.inner_committees[0];
         // let children = self.carnot_tree.child_committees(root_committee);
@@ -233,10 +237,8 @@ where
 mod tests {
     use nomos_utils::fisheryates::FisherYatesShuffle;
 
-    use crate::overlay::leadership::RoundRobin;
-    use crate::Overlay;
-
     use super::*;
+    use crate::{overlay::leadership::RoundRobin, Overlay};
     const ENTROPY: [u8; 32] = [0; 32];
 
     #[test]

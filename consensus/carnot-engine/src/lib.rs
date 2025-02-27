@@ -1,10 +1,11 @@
+pub mod overlay;
+mod types;
+
 use std::{
     collections::{HashMap, HashSet},
     hash::Hash,
 };
 
-pub mod overlay;
-mod types;
 pub use overlay::Overlay;
 pub use types::*;
 
@@ -60,11 +61,11 @@ where
     /// Upon reception of a block
     ///
     /// Preconditions:
-    ///  *  The parent-children relation between blocks must be preserved when calling
-    ///     this function. In other words, you must call `receive_block(b.parent())` with
-    ///     success before `receive_block(b)`.
-    ///  *  Overlay changes for views < block.view should be made available before trying to process
-    ///     a block by calling `receive_timeout_qc`.
+    ///  * The parent-children relation between blocks must be preserved when
+    ///    calling this function. In other words, you must call
+    ///    `receive_block(b.parent())` with success before `receive_block(b)`.
+    ///  * Overlay changes for views < block.view should be made available
+    ///    before trying to process a block by calling `receive_timeout_qc`.
     #[allow(clippy::result_unit_err)]
     pub fn receive_block(&self, block: Block<Id>) -> Result<Self, ()> {
         assert!(
@@ -91,10 +92,12 @@ where
             || block.view <= self.latest_committed_view()
         {
             //  TODO: Report malicious leader
-            //  TODO: it could be possible that a malicious leader send a block to a node and another one to
-            //  the rest of the network. The node should be able to catch up with the rest of the network after having
-            //  validated that the history of the block is correct and diverged from its fork.
-            //  By rejecting any other blocks except the first one received for a view this code does NOT do that.
+            //  TODO: it could be possible that a malicious leader send a block to a node
+            // and another one to  the rest of the network. The node should be
+            // able to catch up with the rest of the network after having
+            //  validated that the history of the block is correct and diverged from its
+            // fork.  By rejecting any other blocks except the first one
+            // received for a view this code does NOT do that.
             return Err(());
         }
         let mut new_state = self.clone();
@@ -129,12 +132,15 @@ where
         new_state
     }
 
-    /// Upon reception of a supermajority of votes for a safe block from children
-    /// of the current node. It signals approval of the block to the network.
+    /// Upon reception of a supermajority of votes for a safe block from
+    /// children of the current node. It signals approval of the block to
+    /// the network.
     ///
     /// Preconditions:
-    /// *  `receive_block(b)` must have been called successfully before trying to approve a block b.
-    /// *   A node should not attempt to vote for a block in a view earlier than the latest one it actively participated in.
+    /// * `receive_block(b)` must have been called successfully before trying to
+    ///   approve a block b.
+    /// * A node should not attempt to vote for a block in a view earlier than
+    ///   the latest one it actively participated in.
     pub fn approve_block(&self, block: Block<Id>) -> (Self, Send<Id>) {
         assert!(
             self.safe_blocks.contains_key(&block.id),
@@ -171,13 +177,15 @@ where
         )
     }
 
-    /// Upon reception of a supermajority of votes for a new view from children of the current node.
-    /// It signals approval of the new view to the network.
+    /// Upon reception of a supermajority of votes for a new view from children
+    /// of the current node. It signals approval of the new view to the
+    /// network.
     ///
     /// Preconditions:
-    /// *  `receive_timeout_qc(timeout_qc)` must have been called successfully before trying to approve a new view with that
-    ///     timeout qc.
-    /// *   A node should not attempt to approve a view earlier than the latest one it actively participated in.
+    /// * `receive_timeout_qc(timeout_qc)` must have been called successfully
+    ///   before trying to approve a new view with that timeout qc.
+    /// * A node should not attempt to approve a view earlier than the latest
+    ///   one it actively participated in.
     pub fn approve_new_view(
         &self,
         timeout_qc: TimeoutQc<Id>,
@@ -239,11 +247,12 @@ where
         )
     }
 
-    /// Upon a configurable amount of time has elapsed since the last view change
+    /// Upon a configurable amount of time has elapsed since the last view
+    /// change
     ///
     /// Preconditions: none!
-    /// Just notice that the timer only reset after a view change, i.e. a node can't timeout
-    /// more than once for the same view
+    /// Just notice that the timer only reset after a view change, i.e. a node
+    /// can't timeout more than once for the same view
     pub fn local_timeout(&self) -> (Self, Option<Send<Id>>) {
         let mut new_state = self.clone();
 
@@ -319,7 +328,8 @@ where
         self.blocks_in_view(View(0))[0].clone()
     }
 
-    // Returns the id of the grandparent block if it can be committed or None otherwise
+    // Returns the id of the grandparent block if it can be committed or None
+    // otherwise
     fn can_commit_grandparent(&self, block: &Block<Id>) -> Option<Block<Id>> {
         let parent = self.safe_blocks.get(&block.parent())?;
         let grandparent = self.safe_blocks.get(&parent.parent())?;
@@ -441,9 +451,8 @@ where
 mod test {
     use std::convert::Infallible;
 
-    use crate::overlay::{FlatOverlay, FlatOverlaySettings, FreezeMembership, RoundRobin};
-
     use super::*;
+    use crate::overlay::{FlatOverlay, FlatOverlaySettings, FreezeMembership, RoundRobin};
 
     fn init(nodes: Vec<NodeId>) -> Carnot<FlatOverlay<RoundRobin, FreezeMembership>, usize> {
         assert!(!nodes.is_empty());
@@ -526,7 +535,8 @@ mod test {
     }
 
     #[test]
-    // Ensure that receive_block() returns early if the same block ID has already been received.
+    // Ensure that receive_block() returns early if the same block ID has already
+    // been received.
     fn receive_duplicate_block_id() {
         let mut engine = init(vec![NodeId::new([0; 32])]);
 
@@ -542,7 +552,8 @@ mod test {
 
     #[test]
     #[should_panic(expected = "out of order view not supported, missing parent block")]
-    // Ensure that receive_block() fails if the parent block has never been received.
+    // Ensure that receive_block() fails if the parent block has never been
+    // received.
     fn receive_block_with_unknown_parent() {
         let engine = init(vec![NodeId::new([0; 32])]);
         let parent_block_id = 42;
@@ -671,7 +682,8 @@ mod test {
     }
 
     #[test]
-    // Ensure that approve_block updates highest_voted_view and returns a correct Send.
+    // Ensure that approve_block updates highest_voted_view and returns a correct
+    // Send.
     fn approve_block() {
         let mut engine = init(vec![
             NodeId::new([0; 32]),
@@ -752,7 +764,8 @@ mod test {
     }
 
     #[test]
-    // Ensure that receive_timeout_qc updates current_view, last_view_timeout_qc and local_high_qc.
+    // Ensure that receive_timeout_qc updates current_view, last_view_timeout_qc and
+    // local_high_qc.
     fn receive_timeout_qc_after_local_timeout() {
         let mut engine = init(vec![NodeId::new([0; 32])]);
         let block = next_block(&engine, &engine.genesis_block());

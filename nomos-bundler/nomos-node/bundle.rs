@@ -1,16 +1,13 @@
-// STD
-use std::env::set_var;
-use std::fs::canonicalize;
-// Crates
-use clap::{arg, Parser};
-use log::{error, info};
-use tauri_bundler::RpmSettings;
-use tauri_utils::platform::target_triple;
-// Internal
+use std::{env::set_var, fs::canonicalize};
+
 use bundler::utils::{
     get_formatted_cargo_package_version, get_project_identifier,
     get_target_directory_for_current_profile, get_workspace_root,
 };
+use clap::{arg, Parser};
+use log::{error, info};
+use tauri_bundler::RpmSettings;
+use tauri_utils::platform::target_triple;
 
 const CRATE_NAME: &str = "nomos-node";
 const CRATE_PATH_RELATIVE_TO_WORKSPACE_ROOT: &str = "nodes/nomos-node";
@@ -19,11 +16,11 @@ fn prepare_environment(architecture: &str) {
     // Bypass an issue in the current linuxdeploy's version
     set_var("NO_STRIP", "true");
 
-    // Tell `appimagetool` what arch we're building for, without it the tool errors out
-    // This could be due to us making an ad-hoc use of `tauri-bundler` here,
-    // perhaps we are bypassing some `tauri-bundler` piece of code or config that handles that,
-    // but if that's the actual reason I couldn't find where that would be
-    // Regardless, this works.
+    // Tell `appimagetool` what arch we're building for, without it the tool errors
+    // out This could be due to us making an ad-hoc use of `tauri-bundler` here,
+    // perhaps we are bypassing some `tauri-bundler` piece of code or config that
+    // handles that, but if that's the actual reason I couldn't find where that
+    // would be Regardless, this works.
     set_var("ARCH", architecture);
 }
 
@@ -133,8 +130,9 @@ struct BundleArguments {
     version: Option<String>,
 }
 
-/// If a version argument is provided, verify it matches the Cargo package version
-/// This is passed by the CI/CD pipeline to ensure the version is consistent
+/// If a version argument is provided, verify it matches the Cargo package
+/// version This is passed by the CI/CD pipeline to ensure the version is
+/// consistent
 fn parse_version(arguments: BundleArguments, cargo_package_version: String) -> String {
     if let Some(version) = arguments.version {
         // Check for version mismatch

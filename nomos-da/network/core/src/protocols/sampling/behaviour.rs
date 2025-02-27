@@ -1,38 +1,41 @@
-// std
-use std::collections::{HashMap, HashSet, VecDeque};
-use std::task::{Context, Poll};
-// crates
-use either::Either;
-use futures::channel::oneshot;
-use futures::channel::oneshot::{Canceled, Receiver, Sender};
-use futures::future::BoxFuture;
-use futures::stream::{BoxStream, FuturesUnordered};
-use futures::{AsyncWriteExt, FutureExt, StreamExt, TryFutureExt};
-use kzgrs_backend::common::blob::DaBlob;
-use kzgrs_backend::common::ColumnIndex;
-use libp2p::core::transport::PortUse;
-use libp2p::core::Endpoint;
-use libp2p::swarm::dial_opts::DialOpts;
-use libp2p::swarm::{
-    ConnectionDenied, ConnectionId, FromSwarm, NetworkBehaviour, THandler, THandlerInEvent,
-    THandlerOutEvent, ToSwarm,
+use std::{
+    collections::{HashMap, HashSet, VecDeque},
+    task::{Context, Poll},
 };
-use libp2p::{Multiaddr, PeerId, Stream};
+
+use either::Either;
+use futures::{
+    channel::{
+        oneshot,
+        oneshot::{Canceled, Receiver, Sender},
+    },
+    future::BoxFuture,
+    stream::{BoxStream, FuturesUnordered},
+    AsyncWriteExt, FutureExt, StreamExt, TryFutureExt,
+};
+use kzgrs_backend::common::{blob::DaBlob, ColumnIndex};
+use libp2p::{
+    core::{transport::PortUse, Endpoint},
+    swarm::{
+        dial_opts::DialOpts, ConnectionDenied, ConnectionId, FromSwarm, NetworkBehaviour, THandler,
+        THandlerInEvent, THandlerOutEvent, ToSwarm,
+    },
+    Multiaddr, PeerId, Stream,
+};
 use libp2p_stream::{Control, IncomingStreams, OpenStreamError};
-use nomos_core::da::BlobId;
-use nomos_core::wire;
-use nomos_da_messages::packing::{pack_to_writer, unpack_from_reader};
-use nomos_da_messages::{common, sampling};
+use nomos_core::{da::BlobId, wire};
+use nomos_da_messages::{
+    common,
+    packing::{pack_to_writer, unpack_from_reader},
+    sampling,
+};
 use subnetworks_assignations::MembershipHandler;
 use thiserror::Error;
-use tokio::sync::mpsc;
-use tokio::sync::mpsc::UnboundedSender;
+use tokio::sync::{mpsc, mpsc::UnboundedSender};
 use tokio_stream::wrappers::UnboundedReceiverStream;
 use tracing::error;
-// internal
-use crate::address_book::AddressBook;
-use crate::protocol::SAMPLING_PROTOCOL;
-use crate::SubnetworkId;
+
+use crate::{address_book::AddressBook, protocol::SAMPLING_PROTOCOL, SubnetworkId};
 
 #[derive(Debug, Error)]
 pub enum SamplingError {
@@ -230,7 +233,8 @@ struct SampleStream {
     peer_id: PeerId,
 }
 
-/// Auxiliary struct that binds where to send a request and the pair channel to listen for a response
+/// Auxiliary struct that binds where to send a request and the pair channel to
+/// listen for a response
 struct ResponseChannel {
     request_sender: Sender<BehaviourSampleReq>,
     response_receiver: Receiver<BehaviourSampleRes>,
@@ -439,8 +443,8 @@ where
     }
 
     /// Schedule an incoming stream to be replied
-    /// Creates the necessary channels so requests can be replied from outside of this behaviour
-    /// from whoever that takes the channels
+    /// Creates the necessary channels so requests can be replied from outside
+    /// of this behaviour from whoever that takes the channels
     fn schedule_incoming_stream_task(
         incoming_tasks: &mut FuturesUnordered<IncomingStreamHandlerFuture>,
         sample_stream: SampleStream,
@@ -459,8 +463,8 @@ where
 impl<Membership: MembershipHandler<Id = PeerId, NetworkId = SubnetworkId> + 'static>
     SamplingBehaviour<Membership>
 {
-    /// Schedule a new task for sample the blob, if stream is not available queue messages for later
-    /// processing.
+    /// Schedule a new task for sample the blob, if stream is not available
+    /// queue messages for later processing.
     #[allow(clippy::too_many_arguments)]
     fn sample(
         peer_id: PeerId,
@@ -473,15 +477,17 @@ impl<Membership: MembershipHandler<Id = PeerId, NetworkId = SubnetworkId> + 'sta
         control: &Control,
     ) {
         let members = membership.members_of(&subnetwork_id);
-        // TODO: peer selection for sampling should be randomly selected (?) filtering ourselves
-        // currently we assume optimal setup which is one peer per blob
+        // TODO: peer selection for sampling should be randomly selected (?) filtering
+        // ourselves currently we assume optimal setup which is one peer per
+        // blob
         let peer = members
             .iter()
             .filter(|&id| id != &peer_id)
             .copied()
             .next()
             .expect("At least a single node should be a member of the subnetwork");
-        // if its connected means we are already working on some other sample, enqueue message
+        // if its connected means we are already working on some other sample, enqueue
+        // message
         if connected_peers.contains(&peer) {
             to_sample
                 .entry(peer)

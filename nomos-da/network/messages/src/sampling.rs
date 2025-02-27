@@ -1,7 +1,8 @@
-use crate::common::Blob;
 use kzgrs_backend::common::ColumnIndex;
 use nomos_core::da::BlobId;
 use serde::{Deserialize, Serialize};
+
+use crate::common::Blob;
 
 #[repr(C)]
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]

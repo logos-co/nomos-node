@@ -1,21 +1,20 @@
-// std
 use std::fmt::Debug;
-// crates
+
 use axum::{extract::State, response::Response, Json};
-use serde::de::DeserializeOwned;
-use serde::{Deserialize, Serialize};
-// internal
-use super::paths;
 use nomos_api::http::da;
 use nomos_core::da::blob::metadata;
-use nomos_da_dispersal::adapters::mempool::DaMempoolAdapter;
-use nomos_da_dispersal::adapters::network::DispersalNetworkAdapter;
-use nomos_da_dispersal::backend::DispersalBackend;
+use nomos_da_dispersal::{
+    adapters::{mempool::DaMempoolAdapter, network::DispersalNetworkAdapter},
+    backend::DispersalBackend,
+};
 use nomos_da_network_core::SubnetworkId;
 use nomos_libp2p::PeerId;
 use nomos_node::make_request_and_return_response;
 use overwatch_rs::overwatch::handle::OverwatchHandle;
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use subnetworks_assignations::MembershipHandler;
+
+use super::paths;
 
 #[derive(Serialize, Deserialize)]
 pub struct DispersalRequest<Metadata> {

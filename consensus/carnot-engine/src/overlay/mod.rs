@@ -1,5 +1,3 @@
-use super::types::*;
-
 mod branch_overlay;
 mod flat_overlay;
 mod leadership;
@@ -8,6 +6,8 @@ mod random_beacon;
 mod threshold;
 mod tree_overlay;
 
+use std::marker::Send;
+
 pub use branch_overlay::*;
 pub use flat_overlay::*;
 pub use leadership::*;
@@ -15,7 +15,7 @@ pub use membership::*;
 pub use random_beacon::*;
 pub use tree_overlay::*;
 
-use std::marker::Send;
+use super::types::*;
 
 pub trait Overlay: Clone {
     type Settings: Clone + Send + Sync + 'static;

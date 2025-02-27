@@ -1,14 +1,16 @@
-// STD
-use std::marker::PhantomData;
-use std::path::PathBuf;
-// Crates
+use std::{marker::PhantomData, path::PathBuf};
+
 use overwatch_rs::services::state::ServiceState;
-// Internal
-use crate::overwatch::recovery::errors::RecoveryError;
-use crate::overwatch::recovery::operators::RecoveryBackend;
-use crate::overwatch::recovery::serializer::{JsonRecoverySerializer, RecoverySerializer};
-use crate::overwatch::recovery::RecoveryResult;
-use crate::traits::FromSettings;
+
+use crate::{
+    overwatch::recovery::{
+        errors::RecoveryError,
+        operators::RecoveryBackend,
+        serializer::{JsonRecoverySerializer, RecoverySerializer},
+        RecoveryResult,
+    },
+    traits::FromSettings,
+};
 
 pub trait FileBackendSettings {
     fn recovery_file(&self) -> &PathBuf;

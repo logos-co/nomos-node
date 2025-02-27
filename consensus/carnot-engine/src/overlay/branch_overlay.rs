@@ -1,7 +1,7 @@
-use super::LeaderSelection;
-use crate::overlay::CommitteeMembership;
-use crate::{Committee, CommitteeId, NodeId, Overlay};
 use std::collections::HashMap;
+
+use super::LeaderSelection;
+use crate::{overlay::CommitteeMembership, Committee, CommitteeId, NodeId, Overlay};
 
 #[derive(Debug, Clone)]
 pub struct BranchOverlaySettings<L: LeaderSelection, M: CommitteeMembership> {
@@ -190,9 +190,8 @@ fn build_committee_from_nodes_with_size(
 mod tests {
     use nomos_utils::fisheryates::FisherYatesShuffle;
 
-    use crate::overlay::RoundRobin;
-
     use super::*;
+    use crate::overlay::RoundRobin;
     const ENTROPY: [u8; 32] = [0; 32];
 
     #[test]

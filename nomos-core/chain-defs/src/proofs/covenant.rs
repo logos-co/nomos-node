@@ -1,10 +1,7 @@
-// std
-// crates
-use risc0_zkvm::Prover;
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
-// internal
 use cl::Covenant;
 use nomos_proof_statements::covenant::CovenantPublic;
+use risc0_zkvm::Prover;
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 #[derive(Debug, Clone)]
 pub struct CovenantProof {

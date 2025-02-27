@@ -155,9 +155,9 @@ where
                     .connection_number_deviation(&subnetwork_id, stats);
 
                 // In DA balancer implementation we are only concerned about missing peer
-                // connections. Sampling protocol requires to allow any number of peers to request
-                // for a sample, which requires to allow any number of peers to connect at any
-                // given time.
+                // connections. Sampling protocol requires to allow any number of peers to
+                // request for a sample, which requires to allow any number of
+                // peers to connect at any given time.
                 let ConnectionDeviation::Missing(missing_count) = deviation.outbound;
                 peers_to_connect.extend(self.select_missing_peers(&subnetwork_id, missing_count));
             }
@@ -175,14 +175,16 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use futures::stream;
-    use libp2p::PeerId;
     use std::{
         collections::HashSet,
         task::{Context, Poll},
     };
+
+    use futures::stream;
+    use libp2p::PeerId;
     use tokio_stream::StreamExt;
+
+    use super::*;
 
     struct MockPolicy {
         missing: usize,

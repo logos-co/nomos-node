@@ -1,10 +1,9 @@
-// STD
-// Crates
-use serde::de::DeserializeOwned;
-use serde::Deserialize;
-// Internal
-use crate::wire::bincode::{BincodeDeserializer, OPTIONS};
-use crate::wire::Error;
+use serde::{de::DeserializeOwned, Deserialize};
+
+use crate::wire::{
+    bincode::{BincodeDeserializer, OPTIONS},
+    Error,
+};
 
 pub struct Deserializer<'de> {
     inner: BincodeDeserializer<'de>,

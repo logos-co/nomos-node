@@ -14,9 +14,9 @@ pub struct TokioIntervalStreamProvider;
 #[cfg(feature = "tokio")]
 impl IntervalStreamProvider for TokioIntervalStreamProvider {
     fn interval_stream(interval: Duration) -> impl futures::Stream<Item = ()> + Send + 'static {
-        // Since tokio::time::interval.tick() returns immediately regardless of the interval,
-        // we need to explicitly specify the time of the first tick we expect.
-        // If not, the peer would be marked as unhealthy immediately
+        // Since tokio::time::interval.tick() returns immediately regardless of the
+        // interval, we need to explicitly specify the time of the first tick we
+        // expect. If not, the peer would be marked as unhealthy immediately
         // as soon as the connection is established.
         let start = tokio::time::Instant::now() + interval;
         tokio_stream::wrappers::IntervalStream::new(tokio::time::interval_at(start, interval))
@@ -89,7 +89,8 @@ mod test {
             .is_ok());
     }
 
-    /// If the peer doesn't support the blend protocol, the message should not be forwarded to the peer.
+    /// If the peer doesn't support the blend protocol, the message should not
+    /// be forwarded to the peer.
     #[tokio::test]
     async fn peer_not_support_blend_protocol() {
         // Only swarm2 supports the blend protocol.
@@ -147,8 +148,8 @@ mod test {
         );
         swarm2.dial(node1_addr).unwrap();
 
-        // Swarm2 sends a message to Swarm1, even though expected_effective_messages is 0.
-        // Then, Swarm1 should detect Swarm2 as a malicious peer.
+        // Swarm2 sends a message to Swarm1, even though expected_effective_messages is
+        // 0. Then, Swarm1 should detect Swarm2 as a malicious peer.
         let task = async {
             let mut num_events_waiting = 2;
             let mut msg_published = false;

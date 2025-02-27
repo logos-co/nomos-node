@@ -1,11 +1,9 @@
-// std
-use std::collections::HashMap;
-use std::marker::PhantomData;
-// crates
+use std::{collections::HashMap, marker::PhantomData};
+
 use async_trait::async_trait;
 use bytes::Bytes;
 use thiserror::Error;
-// internal
+
 use super::{StorageBackend, StorageSerde, StorageTransaction};
 
 #[derive(Debug, Error)]

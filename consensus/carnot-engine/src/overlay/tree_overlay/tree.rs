@@ -1,5 +1,6 @@
-use crate::{Committee, CommitteeId, NodeId};
 use std::collections::HashMap;
+
+use crate::{Committee, CommitteeId, NodeId};
 
 #[derive(Debug, Clone)]
 pub(super) struct Tree {
@@ -318,7 +319,8 @@ mod tests {
     }
 
     fn carnot_tree_level_sizes_from_bottom(tree: Tree) -> HashMap<i32, i32> {
-        // TODO: Find a more elegant way to visit parents of leaves from different levels.
+        // TODO: Find a more elegant way to visit parents of leaves from different
+        // levels.
         let leaves: HashMap<CommitteeId, i32> =
             if is_full_balanced_binary_tree(tree.inner_committees.len()) {
                 tree.leaf_committees().keys().map(|c| (**c, 0)).collect()

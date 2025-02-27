@@ -7,8 +7,9 @@ use std::{
 use fixed::types::U57F7;
 use serde::{Deserialize, Serialize};
 
-/// Counts the number of effective and drop messages received from a peer during an interval.
-/// `interval` is a field that implements [`futures::Stream`] to support both sync and async environments.
+/// Counts the number of effective and drop messages received from a peer during
+/// an interval. `interval` is a field that implements [`futures::Stream`] to
+/// support both sync and async environments.
 pub struct ConnectionMonitor {
     settings: ConnectionMonitorSettings,
     interval: Pin<Box<dyn futures::Stream<Item = ()> + Send>>,
@@ -18,16 +19,21 @@ pub struct ConnectionMonitor {
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize)]
 pub struct ConnectionMonitorSettings {
-    /// Time interval to measure/evaluate the number of messages sent by each peer.
+    /// Time interval to measure/evaluate the number of messages sent by each
+    /// peer.
     pub interval: Duration,
-    /// The number of effective (data or cover) messages that a peer is expected to send in a given time window.
-    /// If the measured count is greater than (expected * (1 + tolerance)), the peer is considered malicious.
-    /// If the measured count is less than (expected * (1 - tolerance)), the peer is considered unhealthy.
+    /// The number of effective (data or cover) messages that a peer is expected
+    /// to send in a given time window. If the measured count is greater
+    /// than (expected * (1 + tolerance)), the peer is considered malicious.
+    /// If the measured count is less than (expected * (1 - tolerance)), the
+    /// peer is considered unhealthy.
     pub expected_effective_messages: U57F7,
     pub effective_message_tolerance: U57F7,
-    /// The number of drop messages that a peer is expected to send in a given time window.
-    /// If the measured count is greater than (expected * (1 + tolerance)), the peer is considered malicious.
-    /// If the measured count is less than (expected * (1 - tolerance)), the peer is considered unhealthy.
+    /// The number of drop messages that a peer is expected to send in a given
+    /// time window. If the measured count is greater than (expected * (1 +
+    /// tolerance)), the peer is considered malicious. If the measured count
+    /// is less than (expected * (1 - tolerance)), the peer is considered
+    /// unhealthy.
     pub expected_drop_messages: U57F7,
     pub drop_message_tolerance: U57F7,
 }
@@ -95,7 +101,8 @@ impl ConnectionMonitor {
         self.drop_messages = U57F7::ZERO;
     }
 
-    /// Check if the peer is malicious based on the number of effective and drop messages sent
+    /// Check if the peer is malicious based on the number of effective and drop
+    /// messages sent
     fn is_malicious(&self) -> bool {
         let effective_threshold = self.settings.expected_effective_messages
             * (U57F7::ONE + self.settings.effective_message_tolerance);
@@ -104,7 +111,8 @@ impl ConnectionMonitor {
         self.effective_messages > effective_threshold || self.drop_messages > drop_threshold
     }
 
-    /// Check if the peer is unhealthy based on the number of effective and drop messages sent
+    /// Check if the peer is unhealthy based on the number of effective and drop
+    /// messages sent
     fn is_unhealthy(&self) -> bool {
         let effective_threshold = self.settings.expected_effective_messages
             * (U57F7::ONE - self.settings.effective_message_tolerance);

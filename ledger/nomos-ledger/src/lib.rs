@@ -3,19 +3,18 @@ mod crypto;
 pub mod leader_proof;
 mod notetree;
 
+use std::{collections::HashMap, hash::Hash};
+
 use blake2::Digest;
+use cl::{balance::Value, note::NoteCommitment, nullifier::Nullifier};
+pub use config::Config;
 use cryptarchia_engine::{Epoch, Slot};
 use crypto::Blake2b;
 use leader_proof::OrphanProof;
 use nomos_proof_statements::leadership::LeaderPublic;
-use rpds::HashTrieSetSync;
-use std::{collections::HashMap, hash::Hash};
-use thiserror::Error;
-
-use cl::{balance::Value, note::NoteCommitment, nullifier::Nullifier};
-
-pub use config::Config;
 pub use notetree::NoteTree;
+use rpds::HashTrieSetSync;
+use thiserror::Error;
 
 #[derive(Clone, Debug, Error)]
 pub enum LedgerError<Id> {
@@ -38,10 +37,12 @@ pub enum LedgerError<Id> {
 pub struct EpochState {
     // The epoch this snapshot is for
     epoch: Epoch,
-    // value of the ledger nonce after 'epoch_period_nonce_buffer' slots from the beginning of the epoch
+    // value of the ledger nonce after 'epoch_period_nonce_buffer' slots from the beginning of the
+    // epoch
     nonce: [u8; 32],
     // stake distribution snapshot taken at the beginning of the epoch
-    // (in practice, this is equivalent to the notes the are spendable at the beginning of the epoch)
+    // (in practice, this is equivalent to the notes the are spendable at the beginning of the
+    // epoch)
     commitments: NoteTree,
     total_stake: Value,
 }
@@ -118,13 +119,14 @@ where
             .ok_or(LedgerError::ParentNotFound(parent_id))?;
         let config = self.config.clone();
 
-        // TODO: remove this extra logic, we can simply check the proof is valid and the root is a valid one
-        // just like we do anyway
+        // TODO: remove this extra logic, we can simply check the proof is valid and the
+        // root is a valid one just like we do anyway
         // Oprhan proofs need to be:
         // * locally valid for the block they were originally in
         // * not in conflict with the current ledger state
-        // This first condition is checked here, the second one is checked in the state update
-        // (in particular, we do not check the imported leader proof is for an earlier slot)
+        // This first condition is checked here, the second one is checked in the state
+        // update (in particular, we do not check the imported leader proof is
+        // for an earlier slot)
         let (orphan_ids, orphan_proofs): (Vec<_>, Vec<_>) = orphan_proofs.into_iter().unzip();
         for orphan_id in orphan_ids {
             if !self.states.contains_key(&orphan_id) {
@@ -202,12 +204,11 @@ impl LedgerState {
         let new_epoch = config.epoch(slot);
 
         // there are 3 cases to consider:
-        // 1. we are in the same epoch as the parent state
-        //    update the next epoch state
-        // 2. we are in the next epoch
-        //    use the next epoch state as the current epoch state and reset next epoch state
-        // 3. we are in the next-next or later epoch:
-        //    use the parent state as the epoch state and reset next epoch state
+        // 1. we are in the same epoch as the parent state update the next epoch state
+        // 2. we are in the next epoch use the next epoch state as the current epoch
+        //    state and reset next epoch state
+        // 3. we are in the next-next or later epoch: use the parent state as the epoch
+        //    state and reset next epoch state
         if current_epoch == new_epoch {
             // case 1)
             let next_epoch_state = self
@@ -417,12 +418,13 @@ impl core::fmt::Debug for LedgerState {
 
 #[cfg(test)]
 pub mod tests {
-    use super::*;
-    use crate::{crypto::Blake2b, leader_proof::LeaderProof, Config, LedgerError};
     use blake2::Digest;
     use cl::{note::NoteWitness as Note, NullifierSecret};
     use cryptarchia_engine::Slot;
     use rand::thread_rng;
+
+    use super::*;
+    use crate::{crypto::Blake2b, leader_proof::LeaderProof, Config, LedgerError};
 
     type HeaderId = [u8; 32];
 
@@ -513,10 +515,11 @@ pub mod tests {
             [0; 32]
         }
 
-        // for each proof, the root used is either the lead commitment root or the snapshot root if they contain the note,
-        // or a [0; 32] root if the node is not among the allowed commitments
-        // Note that the lead commitment root is evolved as the orphan proofs are produce, just like a node would update it
-        // after processing orphan proofs
+        // for each proof, the root used is either the lead commitment root or the
+        // snapshot root if they contain the note, or a [0; 32] root if the node
+        // is not among the allowed commitments Note that the lead commitment
+        // root is evolved as the orphan proofs are produce, just like a node would
+        // update it after processing orphan proofs
         let mut lead_comms = ledger_state.lead_commitments().clone();
         let snapshot_comms = &ledger_state.epoch_state().commitments;
         let (ids, imported_note): (Vec<_>, Vec<_>) = orphans.into_iter().unzip();
@@ -607,8 +610,9 @@ pub mod tests {
         note_add: Note,
     ) -> HeaderId {
         let id = update_ledger(ledger, parent, slot, note_proof).unwrap();
-        // we still don't have transactions, so the only way to add a commitment to spendable commitments and
-        // test epoch snapshotting is by doing this manually
+        // we still don't have transactions, so the only way to add a commitment to
+        // spendable commitments and test epoch snapshotting is by doing this
+        // manually
         let mut block_state = ledger.states[&id].clone();
         block_state.spend_commitments = block_state.spend_commitments.insert(commit(note_add));
         ledger.states.insert(id, block_state);
@@ -665,8 +669,8 @@ pub mod tests {
         let note_5 = note();
         let (mut ledger, genesis) = ledger(&notes.iter().copied().map(commit).collect::<Vec<_>>());
 
-        // An epoch will be 10 slots long, with stake distribution snapshot taken at the start of the epoch
-        // and nonce snapshot before slot 7
+        // An epoch will be 10 slots long, with stake distribution snapshot taken at the
+        // start of the epoch and nonce snapshot before slot 7
 
         let h_1 = update_ledger(&mut ledger, genesis, 1, notes[0]).unwrap();
         assert_eq!(ledger.states[&h_1].epoch_state.epoch, 0.into());
@@ -677,7 +681,8 @@ pub mod tests {
 
         // test epoch jump
         let h_4 = update_ledger(&mut ledger, h_3, 20, notes[3]).unwrap();
-        // nonce for epoch 2 should be taken at the end of slot 16, but in our case the last block is at slot 9
+        // nonce for epoch 2 should be taken at the end of slot 16, but in our case the
+        // last block is at slot 9
         assert_eq!(
             ledger.states[&h_4].epoch_state.nonce,
             ledger.states[&h_3].nonce,
@@ -697,8 +702,8 @@ pub mod tests {
         );
 
         let h_6 = update_ledger(&mut ledger, h_5, 20, evolve(notes[3])).unwrap();
-        // stake distribution snapshot should be taken at the end of slot 9, check that changes in slot 10
-        // are ignored
+        // stake distribution snapshot should be taken at the end of slot 9, check that
+        // changes in slot 10 are ignored
         assert_eq!(
             ledger.states[&h_6].epoch_state.commitments,
             ledger.states[&h_3].spend_commitments,
@@ -718,7 +723,8 @@ pub mod tests {
             Err(LedgerError::DoubleSpend(_)),
         ));
 
-        // the evolved note is not elibile before block 2 as it has not appeared on the ledger yet
+        // the evolved note is not elibile before block 2 as it has not appeared on the
+        // ledger yet
         assert!(matches!(
             update_ledger(&mut ledger, genesis, 2, evolve(note)),
             Err(LedgerError::InvalidRoot),
@@ -788,7 +794,8 @@ pub mod tests {
             Err(LedgerError::InvalidRoot)
         ));
 
-        // they also should not be accepted if the fork from where they have been imported has not been seen already
+        // they also should not be accepted if the fork from where they have been
+        // imported has not been seen already
         assert!(matches!(
             update_orphans(&mut ledger, genesis, 1, note_new, vec![(fork_1, note)]),
             Err(LedgerError::OrphanMissing(_))
@@ -798,7 +805,8 @@ pub mod tests {
         let h_1 = update_ledger(&mut ledger, genesis, 1, note).unwrap();
         assert_eq!(h_1, fork_1);
 
-        // and it can now be imported in another branch (note this does not validate it's for an earlier slot)
+        // and it can now be imported in another branch (note this does not validate
+        // it's for an earlier slot)
         update_orphans(
             &mut ledger.clone(),
             genesis,
@@ -807,7 +815,8 @@ pub mod tests {
             vec![(fork_1, note)],
         )
         .unwrap();
-        // but the next note is still not accepted since the second block using the evolved note has not been seen yet
+        // but the next note is still not accepted since the second block using the
+        // evolved note has not been seen yet
         assert!(matches!(
             update_orphans(
                 &mut ledger.clone(),
@@ -819,7 +828,8 @@ pub mod tests {
             Err(LedgerError::OrphanMissing(_))
         ));
 
-        // now the second block of the fork is seen as well and the note evolved twice can be used in another branch
+        // now the second block of the fork is seen as well and the note evolved twice
+        // can be used in another branch
         let h_2 = update_ledger(&mut ledger, h_1, 2, note_new).unwrap();
         assert_eq!(h_2, fork_2);
         update_orphans(
@@ -830,7 +840,8 @@ pub mod tests {
             vec![(fork_1, note), (fork_2, note_new)],
         )
         .unwrap();
-        // but we can't import just the second proof because it's using an evolved note that has not been seen yet
+        // but we can't import just the second proof because it's using an evolved note
+        // that has not been seen yet
         assert!(matches!(
             update_orphans(
                 &mut ledger.clone(),
@@ -842,7 +853,8 @@ pub mod tests {
             Err(LedgerError::InvalidRoot)
         ));
 
-        // an imported proof that uses a note that was already used in the base branch should not be allowed
+        // an imported proof that uses a note that was already used in the base branch
+        // should not be allowed
         let header_1 = update_ledger(&mut ledger, genesis, 1, note).unwrap();
         assert!(matches!(
             update_orphans(

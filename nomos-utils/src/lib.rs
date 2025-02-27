@@ -26,8 +26,9 @@ pub mod serde {
     fn deserialize_human_readable_bytes_array<'de, const N: usize, D: serde::Deserializer<'de>>(
         deserializer: D,
     ) -> Result<[u8; N], D::Error> {
-        use serde::Deserialize;
         use std::borrow::Cow;
+
+        use serde::Deserialize;
         let s: Cow<str> = Cow::deserialize(deserializer)?;
         let mut output = [0u8; N];
         const_hex::decode_to_slice(s.as_ref(), &mut output)

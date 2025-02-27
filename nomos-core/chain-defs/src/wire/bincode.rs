@@ -1,10 +1,11 @@
-// Crates
-use bincode::config::{
-    Bounded, FixintEncoding, LittleEndian, RejectTrailing, WithOtherEndian, WithOtherIntEncoding,
-    WithOtherLimit, WithOtherTrailing,
+use bincode::{
+    config::{
+        Bounded, FixintEncoding, LittleEndian, RejectTrailing, WithOtherEndian,
+        WithOtherIntEncoding, WithOtherLimit, WithOtherTrailing,
+    },
+    de::read::SliceReader,
+    Options,
 };
-use bincode::de::read::SliceReader;
-use bincode::Options;
 use once_cell::sync::Lazy;
 
 // Type composition is cool but also makes naming types a bit awkward
@@ -17,7 +18,8 @@ pub(crate) type BincodeOptions = WithOtherTrailing<
 >;
 
 // TODO: Remove this once we transition to smaller proofs
-// Risc0 proofs are HUGE (220 Kb) and it's the only reason we need to have this limit so large
+// Risc0 proofs are HUGE (220 Kb) and it's the only reason we need to have this
+// limit so large
 pub(crate) const DATA_LIMIT: u64 = 1 << 18; // Do not serialize/deserialize more than 256 KiB
 pub(crate) static OPTIONS: Lazy<BincodeOptions> = Lazy::new(|| {
     bincode::DefaultOptions::new()

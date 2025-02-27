@@ -1,13 +1,13 @@
-// std
-
-// crates
 use futures::stream::StreamExt;
-// internal
-use overwatch_rs::overwatch::handle::OverwatchHandle;
-use overwatch_rs::services::relay::NoMessage;
-use overwatch_rs::services::state::{NoOperator, NoState};
-use overwatch_rs::services::{ServiceCore, ServiceData, ServiceId};
-use overwatch_rs::{DynError, OpaqueServiceStateHandle};
+use overwatch_rs::{
+    overwatch::handle::OverwatchHandle,
+    services::{
+        relay::NoMessage,
+        state::{NoOperator, NoState},
+        ServiceCore, ServiceData, ServiceId,
+    },
+    DynError, OpaqueServiceStateHandle,
+};
 use services_utils::overwatch::lifecycle;
 
 pub struct SystemSig {

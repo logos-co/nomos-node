@@ -1,26 +1,28 @@
 pub mod crypto;
 pub mod temporal;
 
+use std::{
+    fmt::Debug,
+    hash::Hash,
+    marker::PhantomData,
+    pin::Pin,
+    task::{Context, Poll},
+};
+
 pub use crypto::CryptographicProcessorSettings;
 use futures::{Stream, StreamExt};
-use rand::RngCore;
-use std::fmt::Debug;
-use std::hash::Hash;
-use std::marker::PhantomData;
-use std::pin::Pin;
-use std::task::{Context, Poll};
-pub use temporal::TemporalSchedulerSettings;
-
-use crate::membership::Membership;
-use crate::message_blend::crypto::CryptographicProcessor;
-use crate::message_blend::temporal::TemporalProcessorExt;
-use crate::BlendOutgoingMessage;
 use nomos_blend_message::BlendMessage;
-use serde::de::DeserializeOwned;
-use serde::{Deserialize, Serialize};
-use tokio::sync::mpsc;
-use tokio::sync::mpsc::UnboundedSender;
+use rand::RngCore;
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
+pub use temporal::TemporalSchedulerSettings;
+use tokio::sync::{mpsc, mpsc::UnboundedSender};
 use tokio_stream::wrappers::UnboundedReceiverStream;
+
+use crate::{
+    membership::Membership,
+    message_blend::{crypto::CryptographicProcessor, temporal::TemporalProcessorExt},
+    BlendOutgoingMessage,
+};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct MessageBlendSettings<M>
@@ -33,7 +35,8 @@ where
 }
 
 /// [`MessageBlendStream`] handles the entire blending tiers process
-/// - Unwraps incoming messages received from network using [`CryptographicProcessor`]
+/// - Unwraps incoming messages received from network using
+///   [`CryptographicProcessor`]
 /// - Pushes unwrapped messages to [`TemporalProcessor`]
 pub struct MessageBlendStream<S, NodeId, Rng, M, Scheduler>
 where

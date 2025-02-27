@@ -1,14 +1,12 @@
 pub mod builder;
 
-use indexmap::IndexSet;
-// std
 use core::hash::Hash;
-// crates
-use crate::header::Header;
-use crate::wire;
+
 use ::serde::{de::DeserializeOwned, Deserialize, Serialize};
 use bytes::Bytes;
-// internal
+use indexmap::IndexSet;
+
+use crate::{header::Header, wire};
 
 pub type TxHash = [u8; 32];
 

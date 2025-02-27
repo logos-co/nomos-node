@@ -2,8 +2,6 @@ pub mod api;
 pub mod config;
 mod tx;
 
-// std
-// crates
 use api::backend::AxumBackend;
 use bytes::Bytes;
 use color_eyre::eyre::Result;
@@ -11,35 +9,42 @@ pub use config::{Config, CryptarchiaArgs, HttpArgs, LogArgs, NetworkArgs};
 use kzgrs_backend::common::blob::DaBlob;
 pub use kzgrs_backend::dispersal::BlobInfo;
 use nomos_api::ApiService;
-pub use nomos_blend_service::backends::libp2p::Libp2pBlendBackend as BlendBackend;
-pub use nomos_blend_service::network::libp2p::Libp2pAdapter as BlendNetworkAdapter;
-pub use nomos_blend_service::BlendService;
-pub use nomos_core::da::blob::info::DispersedBlobInfo;
+pub use nomos_blend_service::{
+    backends::libp2p::Libp2pBlendBackend as BlendBackend,
+    network::libp2p::Libp2pAdapter as BlendNetworkAdapter, BlendService,
+};
 pub use nomos_core::{
-    da::blob::select::FillSize as FillSizeWithBlobs, tx::select::FillSize as FillSizeWithTx,
+    da::blob::{info::DispersedBlobInfo, select::FillSize as FillSizeWithBlobs},
+    header::HeaderId,
+    tx::{select::FillSize as FillSizeWithTx, Transaction},
+    wire,
 };
-pub use nomos_core::{header::HeaderId, tx::Transaction, wire};
-use nomos_da_indexer::consensus::adapters::cryptarchia::CryptarchiaConsensusAdapter;
-use nomos_da_indexer::storage::adapters::rocksdb::RocksAdapter as IndexerStorageAdapter;
-use nomos_da_indexer::DataIndexerService;
-pub use nomos_da_network_service::backends::libp2p::validator::DaNetworkValidatorBackend;
-pub use nomos_da_network_service::NetworkService as DaNetworkService;
-use nomos_da_sampling::backend::kzgrs::KzgrsSamplingBackend;
-use nomos_da_sampling::network::adapters::validator::Libp2pAdapter as SamplingLibp2pAdapter;
-use nomos_da_sampling::storage::adapters::rocksdb::RocksAdapter as SamplingStorageAdapter;
-use nomos_da_sampling::DaSamplingService;
-use nomos_da_verifier::backend::kzgrs::KzgrsDaVerifier;
-use nomos_da_verifier::network::adapters::validator::Libp2pAdapter as VerifierNetworkAdapter;
-use nomos_da_verifier::storage::adapters::rocksdb::RocksAdapter as VerifierStorageAdapter;
-use nomos_da_verifier::DaVerifierService;
-pub use nomos_mempool::da::service::{DaMempoolService, DaMempoolSettings};
-pub use nomos_mempool::network::adapters::libp2p::{
-    Libp2pAdapter as MempoolNetworkAdapter, Settings as MempoolAdapterSettings,
+use nomos_da_indexer::{
+    consensus::adapters::cryptarchia::CryptarchiaConsensusAdapter,
+    storage::adapters::rocksdb::RocksAdapter as IndexerStorageAdapter, DataIndexerService,
 };
-pub use nomos_mempool::TxMempoolSettings;
+pub use nomos_da_network_service::{
+    backends::libp2p::validator::DaNetworkValidatorBackend, NetworkService as DaNetworkService,
+};
+use nomos_da_sampling::{
+    backend::kzgrs::KzgrsSamplingBackend,
+    network::adapters::validator::Libp2pAdapter as SamplingLibp2pAdapter,
+    storage::adapters::rocksdb::RocksAdapter as SamplingStorageAdapter, DaSamplingService,
+};
+use nomos_da_verifier::{
+    backend::kzgrs::KzgrsDaVerifier,
+    network::adapters::validator::Libp2pAdapter as VerifierNetworkAdapter,
+    storage::adapters::rocksdb::RocksAdapter as VerifierStorageAdapter, DaVerifierService,
+};
 use nomos_mempool::{backend::mockpool::MockPool, TxMempoolService};
-pub use nomos_network::backends::libp2p::Libp2p as NetworkBackend;
-pub use nomos_network::NetworkService;
+pub use nomos_mempool::{
+    da::service::{DaMempoolService, DaMempoolSettings},
+    network::adapters::libp2p::{
+        Libp2pAdapter as MempoolNetworkAdapter, Settings as MempoolAdapterSettings,
+    },
+    TxMempoolSettings,
+};
+pub use nomos_network::{backends::libp2p::Libp2p as NetworkBackend, NetworkService};
 pub use nomos_storage::{
     backends::{
         rocksdb::{RocksBackend, RocksBackendSettings},
@@ -55,7 +60,6 @@ use overwatch_rs::OpaqueServiceHandle;
 use rand_chacha::ChaCha20Rng;
 use serde::{de::DeserializeOwned, Serialize};
 use subnetworks_assignations::versions::v1::FillFromNodeList;
-// internal
 pub use tx::Tx;
 
 /// Membership used by the DA Network service.

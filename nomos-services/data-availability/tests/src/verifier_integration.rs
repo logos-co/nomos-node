@@ -1,4 +1,3 @@
-// std
 use std::{
     str::FromStr,
     sync::{
@@ -7,21 +6,19 @@ use std::{
     },
     time::Duration,
 };
-// crates
+
 use cl::{NoteWitness, NullifierSecret};
 use cryptarchia_consensus::{LeaderConfig, TimeConfig};
 use kzgrs_backend::common::blob::DaBlob;
 use nomos_core::{da::DaEncoder as _, staking::NMO_UNIT};
 use nomos_da_verifier::backend::kzgrs::KzgrsDaVerifierSettings;
 use nomos_ledger::LedgerState;
-use nomos_libp2p::Multiaddr;
-use nomos_libp2p::SwarmConfig;
+use nomos_libp2p::{Multiaddr, SwarmConfig};
 use rand::{thread_rng, Rng};
 use tempfile::{NamedTempFile, TempDir};
 use time::OffsetDateTime;
-use tracing_subscriber::fmt::TestWriter;
-use tracing_subscriber::EnvFilter;
-// internal
+use tracing_subscriber::{fmt::TestWriter, EnvFilter};
+
 use crate::common::*;
 
 #[test]

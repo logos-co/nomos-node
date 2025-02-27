@@ -1,10 +1,13 @@
-use super::threshold::{apply_threshold, default_super_majority_threshold, deser_fraction};
-use super::LeaderSelection;
-use crate::overlay::CommitteeMembership;
-use crate::{NodeId, Overlay};
+use std::marker::PhantomData;
+
 use fraction::Fraction;
 use serde::{Deserialize, Serialize};
-use std::marker::PhantomData;
+
+use super::{
+    threshold::{apply_threshold, default_super_majority_threshold, deser_fraction},
+    LeaderSelection,
+};
+use crate::{overlay::CommitteeMembership, NodeId, Overlay};
 
 #[derive(Clone, Debug, PartialEq)]
 /// Flat overlay with a single committee and round robin leader selection.

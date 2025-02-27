@@ -1,11 +1,11 @@
-// std
 use std::{marker::PhantomData, path::PathBuf};
-// crates
+
 use futures::try_join;
 use kzgrs_backend::common::ColumnIndex;
 use nomos_core::da::blob::Blob;
-use nomos_da_storage::rocksdb::{create_blob_idx, key_bytes};
-use nomos_da_storage::rocksdb::{DA_BLOB_PREFIX, DA_SHARED_COMMITMENTS_PREFIX};
+use nomos_da_storage::rocksdb::{
+    create_blob_idx, key_bytes, DA_BLOB_PREFIX, DA_SHARED_COMMITMENTS_PREFIX,
+};
 use nomos_storage::{
     backends::{rocksdb::RocksBackend, StorageSerde},
     StorageMsg, StorageService,
@@ -14,9 +14,8 @@ use overwatch_rs::{
     services::{relay::OutboundRelay, ServiceData},
     DynError,
 };
-use serde::de::DeserializeOwned;
-use serde::{Deserialize, Serialize};
-// internal
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
+
 use crate::storage::DaStorageAdapter;
 
 pub struct RocksAdapter<B, S>

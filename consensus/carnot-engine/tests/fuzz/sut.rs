@@ -1,14 +1,12 @@
 use std::{collections::HashSet, panic};
 
-use carnot_engine::overlay::FreezeMembership;
 use carnot_engine::{
-    overlay::{FlatOverlay, FlatOverlaySettings, RoundRobin},
+    overlay::{FlatOverlay, FlatOverlaySettings, FreezeMembership, RoundRobin},
     *,
 };
 use proptest_state_machine::{ReferenceStateMachine, StateMachineTest};
 
-use crate::fuzz::ref_state::RefState;
-use crate::fuzz::{transition::Transition, Block};
+use crate::fuzz::{ref_state::RefState, transition::Transition, Block};
 
 // ConsensusEngineTest defines a state that we want to test.
 // This is called as SUT (System Under Test).
@@ -40,8 +38,8 @@ impl ConsensusEngineTest {
     }
 }
 
-// StateMachineTest defines how transitions are applied to the real state machine
-// and what checks should be performed.
+// StateMachineTest defines how transitions are applied to the real state
+// machine and what checks should be performed.
 impl StateMachineTest for ConsensusEngineTest {
     // SUT is the real state machine that we want to test.
     type SystemUnderTest = Self;
@@ -68,8 +66,9 @@ impl StateMachineTest for ConsensusEngineTest {
             Transition::Nop => state,
             Transition::ReceiveSafeBlock(block) => {
                 // Because we generate/apply transitions sequentially,
-                // this transition will always be applied to the same state that it was generated against.
-                // In other words, we can assume that the `block` is always safe for the current state.
+                // this transition will always be applied to the same state that it was
+                // generated against. In other words, we can assume that the
+                // `block` is always safe for the current state.
                 let engine = state.engine.receive_block(block.clone()).unwrap();
                 assert!(engine.blocks_in_view(block.view).contains(&block));
 

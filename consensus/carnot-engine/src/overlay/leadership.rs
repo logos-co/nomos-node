@@ -1,11 +1,6 @@
-// std
-
-// crates
 use serde::{Deserialize, Serialize};
 
-// internal
-use crate::overlay::LeaderSelection;
-use crate::NodeId;
+use crate::{overlay::LeaderSelection, NodeId};
 
 #[derive(Clone, Debug, Default, PartialEq)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]

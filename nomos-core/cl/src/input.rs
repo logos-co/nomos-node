@@ -1,3 +1,5 @@
+use serde::{Deserialize, Serialize};
+
 /// This module defines the partial transaction structure.
 ///
 /// Partial transactions, as the name suggests, are transactions
@@ -8,7 +10,6 @@ use crate::{
     nullifier::{Nullifier, NullifierSecret},
     Nonce,
 };
-use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Input {

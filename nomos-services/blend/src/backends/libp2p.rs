@@ -1,6 +1,5 @@
 use std::{collections::HashSet, pin::Pin, time::Duration};
 
-use super::BlendBackend;
 use async_trait::async_trait;
 use futures::{Stream, StreamExt};
 use libp2p::{
@@ -22,6 +21,8 @@ use tokio::{
     task::JoinHandle,
 };
 use tokio_stream::wrappers::BroadcastStream;
+
+use super::BlendBackend;
 
 /// A blend backend that uses the libp2p network stack.
 pub struct Libp2pBlendBackend {
@@ -161,8 +162,9 @@ where
             .with_behaviour(|_| BlendBehaviour::new(&config))
             .expect("Blend Behaviour should be built")
             .with_swarm_config(|cfg| {
-                // The idle timeout starts ticking once there are no active streams on a connection.
-                // We want the connection to be closed as soon as all streams are dropped.
+                // The idle timeout starts ticking once there are no active streams on a
+                // connection. We want the connection to be closed as soon as
+                // all streams are dropped.
                 cfg.with_idle_connection_timeout(Duration::ZERO)
             })
             .build();

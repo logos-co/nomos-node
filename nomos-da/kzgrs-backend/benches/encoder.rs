@@ -1,9 +1,11 @@
-use divan::counter::BytesCount;
-use divan::Bencher;
-use kzgrs_backend::encoder::{DaEncoder, DaEncoderParams};
-use kzgrs_backend::global::GLOBAL_PARAMETERS;
-use rand::RngCore;
 use std::hint::black_box;
+
+use divan::{counter::BytesCount, Bencher};
+use kzgrs_backend::{
+    encoder::{DaEncoder, DaEncoderParams},
+    global::GLOBAL_PARAMETERS,
+};
+use rand::RngCore;
 
 fn main() {
     divan::main()

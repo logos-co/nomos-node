@@ -1,16 +1,15 @@
 use std::collections::{BTreeMap, HashSet};
 
 use carnot_engine::{LeaderProof, NodeId, View};
-use proptest::prelude::*;
-use proptest::strategy::BoxedStrategy;
+use proptest::{prelude::*, strategy::BoxedStrategy};
 use proptest_state_machine::ReferenceStateMachine;
 
-use crate::fuzz::transition::Transition;
-use crate::fuzz::{AggregateQc, Block, Qc, StandardQc, TimeoutQc};
+use crate::fuzz::{transition::Transition, AggregateQc, Block, Qc, StandardQc, TimeoutQc};
 
 // A reference state machine (RefState) is used to generated state transitions.
-// To generate some kinds of transition, we may need to keep historical blocks in RefState.
-// Also, RefState can be used to check invariants of the real state machine in some cases.
+// To generate some kinds of transition, we may need to keep historical blocks
+// in RefState. Also, RefState can be used to check invariants of the real state
+// machine in some cases.
 //
 // We should try to design this reference state as simple/intuitive as possible,
 // so that we don't need to replicate the logic implemented in carnot-engine.
@@ -61,11 +60,12 @@ impl ReferenceStateMachine for RefState {
 
     // Generate transitions based on the current reference state machine
     fn transitions(state: &Self::State) -> BoxedStrategy<Self::Transition> {
-        // Instead of using verbose `if` statements here to filter out the types of transitions
-        // which cannot be created based on the current reference state,
-        // each `state.transition_*` function returns a Nop transition
-        // if it cannot generate the promised transition for the current reference state.
-        // Both reference and real state machine do nothing for Nop transitions.
+        // Instead of using verbose `if` statements here to filter out the types of
+        // transitions which cannot be created based on the current reference
+        // state, each `state.transition_*` function returns a Nop transition
+        // if it cannot generate the promised transition for the current reference
+        // state. Both reference and real state machine do nothing for Nop
+        // transitions.
         prop_oneof![
             state.transition_receive_safe_block(),
             state.transition_receive_unsafe_block(),
@@ -80,17 +80,19 @@ impl ReferenceStateMachine for RefState {
         .boxed()
     }
 
-    // Check if the transition is valid for a given reference state, before applying the transition
-    // If invalid, the transition will be ignored and a new transition will be generated.
+    // Check if the transition is valid for a given reference state, before applying
+    // the transition If invalid, the transition will be ignored and a new
+    // transition will be generated.
     //
     // Also, preconditions are used for shrinking in failure cases.
-    // Preconditions check if the transition is still valid after some shrinking is applied.
-    // If the transition became invalid for the shrinked state, the shrinking is stopped or
-    // is continued to other directions.
+    // Preconditions check if the transition is still valid after some shrinking is
+    // applied. If the transition became invalid for the shrinked state, the
+    // shrinking is stopped or is continued to other directions.
     fn preconditions(state: &Self::State, transition: &Self::Transition) -> bool {
-        // In most cases, we need to check the same conditions again used to create transitions.
-        // This is redundant for success cases, but is necessary for shrinking in failure cases,
-        // because some transitions may no longer be valid after some shrinking is applied.
+        // In most cases, we need to check the same conditions again used to create
+        // transitions. This is redundant for success cases, but is necessary
+        // for shrinking in failure cases, because some transitions may no
+        // longer be valid after some shrinking is applied.
         match transition {
             Transition::Nop => true,
             Transition::ReceiveSafeBlock(block) => {

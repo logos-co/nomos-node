@@ -1,17 +1,24 @@
-use crate::backend::KMSBackend;
-use crate::secure_key::SecuredKey;
+use std::{
+    fmt::{Debug, Formatter},
+    future::Future,
+    pin::Pin,
+};
+
 use bytes::Bytes;
 use futures::StreamExt;
 use log::error;
-use overwatch_rs::services::relay::RelayMessage;
-use overwatch_rs::services::state::{NoOperator, NoState};
-use overwatch_rs::services::{ServiceCore, ServiceData, ServiceId};
-use overwatch_rs::{DynError, OpaqueServiceStateHandle};
+use overwatch_rs::{
+    services::{
+        relay::RelayMessage,
+        state::{NoOperator, NoState},
+        ServiceCore, ServiceData, ServiceId,
+    },
+    DynError, OpaqueServiceStateHandle,
+};
 use services_utils::overwatch::lifecycle;
-use std::fmt::{Debug, Formatter};
-use std::future::Future;
-use std::pin::Pin;
 use tokio::sync::oneshot;
+
+use crate::{backend::KMSBackend, secure_key::SecuredKey};
 
 mod backend;
 mod keys;

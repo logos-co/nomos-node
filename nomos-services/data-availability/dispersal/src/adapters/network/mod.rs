@@ -1,11 +1,13 @@
 pub mod libp2p;
+use std::pin::Pin;
+
 use futures::Stream;
 use kzgrs_backend::common::blob::DaBlob;
 use nomos_core::da::BlobId;
-use overwatch_rs::services::relay::OutboundRelay;
-use overwatch_rs::services::ServiceData;
-use overwatch_rs::DynError;
-use std::pin::Pin;
+use overwatch_rs::{
+    services::{relay::OutboundRelay, ServiceData},
+    DynError,
+};
 
 #[async_trait::async_trait]
 pub trait DispersalNetworkAdapter {

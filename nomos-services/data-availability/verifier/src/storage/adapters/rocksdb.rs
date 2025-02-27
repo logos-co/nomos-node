@@ -1,10 +1,10 @@
-// std
 use std::{marker::PhantomData, path::PathBuf};
-// crates
+
 use futures::try_join;
 use nomos_core::da::blob::Blob;
-use nomos_da_storage::rocksdb::{create_blob_idx, key_bytes};
-use nomos_da_storage::rocksdb::{DA_BLOB_PREFIX, DA_SHARED_COMMITMENTS_PREFIX};
+use nomos_da_storage::rocksdb::{
+    create_blob_idx, key_bytes, DA_BLOB_PREFIX, DA_SHARED_COMMITMENTS_PREFIX,
+};
 use nomos_storage::{
     backends::{rocksdb::RocksBackend, StorageSerde},
     StorageMsg, StorageService,
@@ -14,7 +14,7 @@ use overwatch_rs::{
     DynError,
 };
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
-// internal
+
 use crate::storage::DaStorageAdapter;
 
 pub struct RocksAdapter<B, S>
@@ -93,8 +93,9 @@ where
 
         // TODO: Use storage backend ser/de functionality.
         //
-        // Storage backend already handles ser/de, but lacks the ability to seperate storage
-        // domains using prefixed keys. Once implemented Indexer and Verifier can be simplified.
+        // Storage backend already handles ser/de, but lacks the ability to seperate
+        // storage domains using prefixed keys. Once implemented Indexer and
+        // Verifier can be simplified.
         reply_rx
             .await
             .map(|maybe_bytes| {

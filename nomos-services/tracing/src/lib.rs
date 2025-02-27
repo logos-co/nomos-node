@@ -1,30 +1,34 @@
-// std
-use std::fmt::{Debug, Formatter};
-use std::io::Write;
-use std::panic;
-use std::sync::{Arc, Mutex};
-// crates
-use futures::StreamExt;
-use nomos_tracing::filter::envfilter::{create_envfilter_layer, EnvFilterConfig};
-use nomos_tracing::logging::gelf::{create_gelf_layer, GelfConfig};
-use nomos_tracing::logging::local::{create_file_layer, create_writer_layer, FileConfig};
-use nomos_tracing::logging::loki::{create_loki_layer, LokiConfig};
-use nomos_tracing::metrics::otlp::{create_otlp_metrics_layer, OtlpMetricsConfig};
-use overwatch_rs::services::life_cycle::LifecycleMessage;
-use overwatch_rs::services::{
-    relay::NoMessage,
-    state::{NoOperator, NoState},
-    ServiceCore, ServiceData,
+use std::{
+    fmt::{Debug, Formatter},
+    io::Write,
+    panic,
+    sync::{Arc, Mutex},
 };
-use overwatch_rs::OpaqueServiceStateHandle;
+
+use futures::StreamExt;
+use nomos_tracing::{
+    filter::envfilter::{create_envfilter_layer, EnvFilterConfig},
+    logging::{
+        gelf::{create_gelf_layer, GelfConfig},
+        local::{create_file_layer, create_writer_layer, FileConfig},
+        loki::{create_loki_layer, LokiConfig},
+    },
+    metrics::otlp::{create_otlp_metrics_layer, OtlpMetricsConfig},
+    tracing::otlp::{create_otlp_tracing_layer, OtlpTracingConfig},
+};
+use overwatch_rs::{
+    services::{
+        life_cycle::LifecycleMessage,
+        relay::NoMessage,
+        state::{NoOperator, NoState},
+        ServiceCore, ServiceData,
+    },
+    OpaqueServiceStateHandle,
+};
 use serde::{Deserialize, Serialize};
 use tracing::{error, Level};
 use tracing_appender::non_blocking::WorkerGuard;
-use tracing_subscriber::filter::LevelFilter;
-use tracing_subscriber::layer::SubscriberExt;
-use tracing_subscriber::util::SubscriberInitExt;
-// internal
-use nomos_tracing::tracing::otlp::{create_otlp_tracing_layer, OtlpTracingConfig};
+use tracing_subscriber::{filter::LevelFilter, layer::SubscriberExt, util::SubscriberInitExt};
 
 pub struct Tracing {
     service_state: OpaqueServiceStateHandle<Self>,
@@ -275,8 +279,9 @@ impl ServiceCore for Tracing {
 }
 
 mod serde_level {
-    use super::Level;
     use serde::{de::Error, Deserialize, Deserializer, Serialize, Serializer};
+
+    use super::Level;
 
     pub fn deserialize<'de, D>(deserializer: D) -> Result<Level, D::Error>
     where

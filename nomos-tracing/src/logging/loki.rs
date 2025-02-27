@@ -1,10 +1,8 @@
-// std
 use std::error::Error;
-// crates
+
 use serde::{Deserialize, Serialize};
 use tokio::runtime::Handle;
 use url::Url;
-// internal
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct LokiConfig {

@@ -1,7 +1,6 @@
-// internal
-use crate::overlay::CommitteeMembership;
-use crate::NodeId;
 use nomos_utils::fisheryates::FisherYatesShuffle;
+
+use crate::{overlay::CommitteeMembership, NodeId};
 
 impl CommitteeMembership for FisherYatesShuffle {
     fn reshape_committees(&self, nodes: &mut [NodeId]) {

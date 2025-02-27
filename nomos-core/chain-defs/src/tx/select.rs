@@ -1,10 +1,9 @@
-// std
 use std::marker::PhantomData;
-// crates
 
-// internal
-use crate::tx::{Transaction, TxSelect};
-use crate::utils;
+use crate::{
+    tx::{Transaction, TxSelect},
+    utils,
+};
 
 #[derive(Default, Clone, Copy)]
 pub struct FillSize<const SIZE: usize, Tx> {

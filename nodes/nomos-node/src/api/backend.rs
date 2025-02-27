@@ -1,15 +1,16 @@
-// std
-use std::error::Error;
-use std::{fmt::Debug, hash::Hash};
-// crates
-use crate::api::paths;
+use std::{error::Error, fmt::Debug, hash::Hash};
+
 use axum::{http::HeaderValue, routing, Router, Server};
 use hyper::header::{CONTENT_TYPE, USER_AGENT};
 use nomos_api::Backend;
-use nomos_core::da::blob::info::DispersedBlobInfo;
-use nomos_core::da::blob::metadata::Metadata;
-use nomos_core::da::DaVerifier as CoreDaVerifier;
-use nomos_core::{da::blob::Blob, header::HeaderId, tx::Transaction};
+use nomos_core::{
+    da::{
+        blob::{info::DispersedBlobInfo, metadata::Metadata, Blob},
+        DaVerifier as CoreDaVerifier,
+    },
+    header::HeaderId,
+    tx::Transaction,
+};
 use nomos_da_network_core::SubnetworkId;
 use nomos_da_sampling::backend::DaSamplingServiceBackend;
 use nomos_da_verifier::backend::VerifierBackend;
@@ -26,11 +27,12 @@ use tower_http::{
 };
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
-// internal
+
 use super::handlers::{
     add_blob, add_blob_info, add_tx, block, cl_metrics, cl_status, cryptarchia_headers,
     cryptarchia_info, get_range, libp2p_info,
 };
+use crate::api::paths;
 
 /// Configuration for the Http Server
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]

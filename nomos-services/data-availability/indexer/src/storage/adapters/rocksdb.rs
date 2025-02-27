@@ -1,16 +1,16 @@
-// std
-use std::path::PathBuf;
-use std::{marker::PhantomData, ops::Range};
-// crates
+use std::{marker::PhantomData, ops::Range, path::PathBuf};
+
 use bytes::Bytes;
 use futures::{stream::FuturesUnordered, try_join, Stream};
 use kzgrs_backend::common::blob::{DaBlob, DaBlobSharedCommitments, DaLightBlob};
-use nomos_core::da::blob::{
-    info::DispersedBlobInfo,
-    metadata::{Metadata, Next},
-    Blob,
+use nomos_core::da::{
+    blob::{
+        info::DispersedBlobInfo,
+        metadata::{Metadata, Next},
+        Blob,
+    },
+    BlobId,
 };
-use nomos_core::da::BlobId;
 use nomos_da_storage::rocksdb::{
     key_bytes, DA_BLOB_PREFIX, DA_SHARED_COMMITMENTS_PREFIX, DA_VID_KEY_PREFIX,
 };
@@ -23,7 +23,7 @@ use overwatch_rs::{
     DynError,
 };
 use serde::{Deserialize, Serialize};
-// internal
+
 use crate::storage::DaStorageAdapter;
 
 pub struct RocksAdapter<S, B>
@@ -80,7 +80,8 @@ where
             [app_id.clone().as_ref(), idx.as_ref()].concat(),
         );
 
-        // We are only persisting the id part of Info, the metadata can be derived from the key.
+        // We are only persisting the id part of Info, the metadata can be derived from
+        // the key.
         let value = Bytes::from(info.blob_id().to_vec());
 
         self.storage_relay
@@ -102,9 +103,9 @@ where
 
         // TODO: Using while loop here until `Step` trait is stable.
         //
-        // For index_range to be used as Range with the stepping capabilities (eg. `for idx in
-        // item_range`), Metadata::Index needs to implement `Step` trait, which is unstable.
-        // See issue #42168 <https://github.com/rust-lang/rust/issues/42168> for more information.
+        // For index_range to be used as Range with the stepping capabilities (eg. `for
+        // idx in item_range`), Metadata::Index needs to implement `Step` trait,
+        // which is unstable. See issue #42168 <https://github.com/rust-lang/rust/issues/42168> for more information.
         let mut current_index = index_range.start.clone();
         while current_index <= index_range.end {
             let idx = current_index.clone();

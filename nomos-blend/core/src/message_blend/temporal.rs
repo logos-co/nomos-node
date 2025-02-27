@@ -14,8 +14,9 @@ pub struct TemporalScheduler<Rng> {
     settings: TemporalSchedulerSettings,
     /// Interval in seconds for running the lottery to release a message
     lottery_interval: time::Interval,
-    /// To wait a few seconds after running the lottery before releasing the message.
-    /// The lottery returns how long to wait before releasing the message.
+    /// To wait a few seconds after running the lottery before releasing the
+    /// message. The lottery returns how long to wait before releasing the
+    /// message.
     release_timer: Option<Pin<Box<time::Sleep>>>,
     /// local lottery rng
     rng: Rng,
@@ -41,8 +42,8 @@ impl<Rng> TemporalScheduler<Rng> {
 
     /// Calculate the interval in seconds for running the lottery.
     /// The lottery interval is half of the maximum delay,
-    /// in order to guarantee that the interval between two subsequent message emissions
-    /// is at most [`max_delay_seconds`].
+    /// in order to guarantee that the interval between two subsequent message
+    /// emissions is at most [`max_delay_seconds`].
     fn lottery_interval_seconds(max_delay_seconds: u64) -> u64 {
         max_delay_seconds / 2
     }

@@ -8,7 +8,8 @@ pub(crate) fn default_super_majority_threshold() -> GenericFraction<u64> {
 }
 
 pub(crate) fn apply_threshold(size: usize, threshold: GenericFraction<u64>) -> usize {
-    // `threshold` is a tuple of (num, den) where `num/den` is the super majority threshold
+    // `threshold` is a tuple of (num, den) where `num/den` is the super majority
+    // threshold
     (Fraction::from(size) * threshold)
         .ceil()
         .to_usize()
@@ -16,9 +17,10 @@ pub(crate) fn apply_threshold(size: usize, threshold: GenericFraction<u64>) -> u
 }
 
 pub mod deser_fraction {
+    use std::str::FromStr;
+
     use fraction::Fraction;
     use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
-    use std::str::FromStr;
 
     pub fn deserialize<'de, D>(deserializer: D) -> Result<Option<Fraction>, D::Error>
     where

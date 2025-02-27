@@ -1,37 +1,39 @@
 pub mod api;
 pub mod config;
 
-// std
-// crates
-use rand_chacha::ChaCha20Rng;
-// internal
 use api::backend::AxumBackend;
 use kzgrs_backend::common::blob::DaBlob;
 use nomos_api::ApiService;
-use nomos_blend_service::backends::libp2p::Libp2pBlendBackend as BlendBackend;
-use nomos_blend_service::network::libp2p::Libp2pAdapter as BlendNetworkAdapter;
-use nomos_blend_service::BlendService;
-use nomos_da_dispersal::adapters::mempool::kzgrs::KzgrsMempoolAdapter;
-use nomos_da_dispersal::adapters::network::libp2p::Libp2pNetworkAdapter as DispersalNetworkAdapter;
-use nomos_da_dispersal::backend::kzgrs::DispersalKZGRSBackend;
-use nomos_da_dispersal::DispersalService;
+use nomos_blend_service::{
+    backends::libp2p::Libp2pBlendBackend as BlendBackend,
+    network::libp2p::Libp2pAdapter as BlendNetworkAdapter, BlendService,
+};
+use nomos_da_dispersal::{
+    adapters::{
+        mempool::kzgrs::KzgrsMempoolAdapter,
+        network::libp2p::Libp2pNetworkAdapter as DispersalNetworkAdapter,
+    },
+    backend::kzgrs::DispersalKZGRSBackend,
+    DispersalService,
+};
 use nomos_da_network_service::backends::libp2p::executor::DaNetworkExecutorBackend;
-use nomos_da_sampling::backend::kzgrs::KzgrsSamplingBackend;
-use nomos_da_sampling::storage::adapters::rocksdb::RocksAdapter as SamplingStorageAdapter;
-use nomos_da_verifier::backend::kzgrs::KzgrsDaVerifier;
-use nomos_da_verifier::network::adapters::executor::Libp2pAdapter as VerifierNetworkAdapter;
+use nomos_da_sampling::{
+    backend::kzgrs::KzgrsSamplingBackend,
+    storage::adapters::rocksdb::RocksAdapter as SamplingStorageAdapter,
+};
+use nomos_da_verifier::{
+    backend::kzgrs::KzgrsDaVerifier,
+    network::adapters::executor::Libp2pAdapter as VerifierNetworkAdapter,
+};
 use nomos_mempool::backend::mockpool::MockPool;
-use nomos_node::DispersedBlobInfo;
-use nomos_node::HeaderId;
-use nomos_node::MempoolNetworkAdapter;
-use nomos_node::NetworkBackend;
 use nomos_node::{
     BlobInfo, Cryptarchia, DaIndexer, DaMempool, DaNetworkService, DaSampling, DaVerifier,
-    NetworkService, NomosDaMembership, RocksBackend, StorageService, SystemSig, Tx, TxMempool,
-    Wire, MB16,
+    DispersedBlobInfo, HeaderId, MempoolNetworkAdapter, NetworkBackend, NetworkService,
+    NomosDaMembership, RocksBackend, StorageService, SystemSig, Tx, TxMempool, Wire, MB16,
 };
 use overwatch_derive::Services;
 use overwatch_rs::OpaqueServiceHandle;
+use rand_chacha::ChaCha20Rng;
 
 pub type ExecutorApiService = ApiService<
     AxumBackend<

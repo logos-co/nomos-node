@@ -1,10 +1,9 @@
-// std
 use std::{
     collections::VecDeque,
     convert::Infallible,
     task::{Context, Poll},
 };
-// crates
+
 use libp2p::{
     core::{
         transport::PortUse,
@@ -17,7 +16,7 @@ use libp2p::{
     },
     Multiaddr, PeerId,
 };
-// internal
+
 use crate::address_book::AddressBook;
 
 pub enum ConnectionEvent {
@@ -137,17 +136,19 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use std::{
+        collections::{HashSet, VecDeque},
+        time::Duration,
+    };
+
     use libp2p::{
         swarm::{Swarm, SwarmEvent},
         PeerId,
     };
     use libp2p_swarm_test::SwarmExt;
-    use std::{
-        collections::{HashSet, VecDeque},
-        time::Duration,
-    };
     use tokio::time::timeout;
+
+    use super::*;
 
     #[derive(Default)]
     struct MockBalancer {
@@ -204,8 +205,8 @@ mod tests {
         );
 
         dialer.behaviour_mut().update_addresses(address_book);
-        // Using balancer `peer_to_connect` we are populating the peers list that will be
-        // returned when the balancer is polled by the dialer.
+        // Using balancer `peer_to_connect` we are populating the peers list that will
+        // be returned when the balancer is polled by the dialer.
         dialer
             .behaviour_mut()
             .balancer

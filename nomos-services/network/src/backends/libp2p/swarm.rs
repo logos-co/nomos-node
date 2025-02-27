@@ -6,12 +6,11 @@ use nomos_libp2p::{
 use tokio::sync::{broadcast, mpsc, oneshot};
 use tokio_stream::StreamExt;
 
-use crate::backends::libp2p::Libp2pInfo;
-
 use super::{
     command::{Command, Dial, Topic},
     Event, Libp2pConfig,
 };
+use crate::backends::libp2p::Libp2pInfo;
 
 pub struct SwarmHandler {
     pub swarm: Swarm,
@@ -43,7 +42,8 @@ impl SwarmHandler {
     ) -> Self {
         let swarm = Swarm::build(&config.inner).unwrap();
 
-        // Keep the dialing history since swarm.connect doesn't return the result synchronously
+        // Keep the dialing history since swarm.connect doesn't return the result
+        // synchronously
         let pending_dials = HashMap::<ConnectionId, Dial>::new();
 
         Self {

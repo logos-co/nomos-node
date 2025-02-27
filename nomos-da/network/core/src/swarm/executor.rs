@@ -1,43 +1,47 @@
-// std
-use std::io;
-use std::time::Duration;
-// crates
+use std::{io, time::Duration};
+
 use futures::{stream, StreamExt};
 use kzgrs_backend::common::blob::DaBlob;
-use libp2p::core::transport::ListenerId;
-use libp2p::identity::Keypair;
-use libp2p::swarm::{DialError, SwarmEvent};
-use libp2p::{Multiaddr, PeerId, Swarm, SwarmBuilder, TransportError};
+use libp2p::{
+    core::transport::ListenerId,
+    identity::Keypair,
+    swarm::{DialError, SwarmEvent},
+    Multiaddr, PeerId, Swarm, SwarmBuilder, TransportError,
+};
 use log::debug;
 use nomos_core::da::BlobId;
-use tokio::sync::mpsc::{unbounded_channel, UnboundedSender};
-use tokio::time::interval;
-use tokio_stream::wrappers::{IntervalStream, UnboundedReceiverStream};
-// internal
-use crate::address_book::AddressBook;
-use crate::behaviour::executor::{ExecutorBehaviour, ExecutorBehaviourEvent};
-use crate::protocols::{
-    dispersal::{
-        executor::behaviour::DispersalExecutorEvent, validator::behaviour::DispersalEvent,
-    },
-    replication::behaviour::ReplicationEvent,
-    sampling::behaviour::SamplingEvent,
-};
-use crate::swarm::common::monitor::MonitorEvent;
-use crate::swarm::common::policy::DAConnectionPolicy;
-use crate::swarm::DAConnectionMonitorSettings;
-use crate::swarm::DAConnectionPolicySettings;
-use crate::swarm::{
-    common::handlers::{
-        handle_replication_event, handle_sampling_event, handle_validator_dispersal_event,
-        monitor_event,
-    },
-    validator::ValidatorEventsStream,
-};
-use crate::{swarm::ConnectionMonitor, SubnetworkId};
 use subnetworks_assignations::MembershipHandler;
+use tokio::{
+    sync::mpsc::{unbounded_channel, UnboundedSender},
+    time::interval,
+};
+use tokio_stream::wrappers::{IntervalStream, UnboundedReceiverStream};
 
 use super::ConnectionBalancer;
+use crate::{
+    address_book::AddressBook,
+    behaviour::executor::{ExecutorBehaviour, ExecutorBehaviourEvent},
+    protocols::{
+        dispersal::{
+            executor::behaviour::DispersalExecutorEvent, validator::behaviour::DispersalEvent,
+        },
+        replication::behaviour::ReplicationEvent,
+        sampling::behaviour::SamplingEvent,
+    },
+    swarm::{
+        common::{
+            handlers::{
+                handle_replication_event, handle_sampling_event, handle_validator_dispersal_event,
+                monitor_event,
+            },
+            monitor::MonitorEvent,
+            policy::DAConnectionPolicy,
+        },
+        validator::ValidatorEventsStream,
+        ConnectionMonitor, DAConnectionMonitorSettings, DAConnectionPolicySettings,
+    },
+    SubnetworkId,
+};
 
 // Metrics
 const EVENT_SAMPLING: &str = "sampling";

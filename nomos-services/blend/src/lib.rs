@@ -1,46 +1,49 @@
 pub mod backends;
 pub mod network;
 
+use std::{fmt::Debug, hash::Hash, time::Duration};
+
 use async_trait::async_trait;
 use backends::BlendBackend;
 use futures::StreamExt;
 use network::NetworkAdapter;
-use nomos_blend::message_blend::temporal::TemporalScheduler;
-use nomos_blend::message_blend::{crypto::CryptographicProcessor, CryptographicProcessorSettings};
-use nomos_blend::message_blend::{MessageBlendExt, MessageBlendSettings};
-use nomos_blend::persistent_transmission::{
-    PersistentTransmissionExt, PersistentTransmissionSettings, PersistentTransmissionStream,
-};
-use nomos_blend::BlendOutgoingMessage;
 use nomos_blend::{
     cover_traffic::{CoverTraffic, CoverTrafficSettings},
     membership::{Membership, Node},
+    message_blend::{
+        crypto::CryptographicProcessor, temporal::TemporalScheduler,
+        CryptographicProcessorSettings, MessageBlendExt, MessageBlendSettings,
+    },
+    persistent_transmission::{
+        PersistentTransmissionExt, PersistentTransmissionSettings, PersistentTransmissionStream,
+    },
+    BlendOutgoingMessage,
 };
 use nomos_blend_message::{sphinx::SphinxMessage, BlendMessage};
 use nomos_core::wire;
 use nomos_network::NetworkService;
-use overwatch_rs::services::{
-    relay::{Relay, RelayMessage},
-    state::{NoOperator, NoState},
-    ServiceCore, ServiceData, ServiceId,
+use overwatch_rs::{
+    services::{
+        relay::{Relay, RelayMessage},
+        state::{NoOperator, NoState},
+        ServiceCore, ServiceData, ServiceId,
+    },
+    OpaqueServiceStateHandle,
 };
-use overwatch_rs::OpaqueServiceStateHandle;
 use rand::SeedableRng;
 use rand_chacha::ChaCha12Rng;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use services_utils::overwatch::lifecycle;
-use std::fmt::Debug;
-use std::hash::Hash;
-use std::time::Duration;
-use tokio::sync::mpsc;
-use tokio::time;
+use tokio::{sync::mpsc, time};
 use tokio_stream::wrappers::{IntervalStream, UnboundedReceiverStream};
 
 /// A blend service that sends messages to the blend network
 /// and broadcasts fully unwrapped messages through the [`NetworkService`].
 ///
-/// The blend backend and the network adapter are generic types that are independent with each other.
-/// For example, the blend backend can use the libp2p network stack, while the network adapter can use the other network backend.
+/// The blend backend and the network adapter are generic types that are
+/// independent with each other. For example, the blend backend can use the
+/// libp2p network stack, while the network adapter can use the other network
+/// backend.
 pub struct BlendService<Backend, Network>
 where
     Backend: BlendBackend + 'static,
@@ -314,7 +317,8 @@ where
 /// A message that is handled by [`BlendService`].
 #[derive(Debug)]
 pub enum ServiceMessage<BroadcastSettings> {
-    /// To send a message to the blend network and eventually broadcast it to the [`NetworkService`].
+    /// To send a message to the blend network and eventually broadcast it to
+    /// the [`NetworkService`].
     Blend(NetworkMessage<BroadcastSettings>),
 }
 

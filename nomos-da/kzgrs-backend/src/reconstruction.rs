@@ -1,10 +1,10 @@
-use crate::common::blob::DaBlob;
-use crate::common::Chunk;
 use kzgrs::BYTES_PER_FIELD_ELEMENT;
 
+use crate::common::{blob::DaBlob, Chunk};
+
 /// Reconstruct original data from a set of `DaBlob`
-/// Warning! This does not interpolate so it should not be used on blobs which doesn't represent
-/// the original set of data.
+/// Warning! This does not interpolate so it should not be used on blobs which
+/// doesn't represent the original set of data.
 pub fn reconstruct_without_missing_data(blobs: &[DaBlob]) -> Vec<u8> {
     // pick positions from columns
     let mut data: Vec<((usize, usize), Vec<u8>)> = blobs
@@ -30,12 +30,13 @@ pub fn reconstruct_without_missing_data(blobs: &[DaBlob]) -> Vec<u8> {
 
 #[cfg(test)]
 mod test {
-    use crate::common::blob::DaBlob;
-    use crate::common::ColumnIndex;
-    use crate::encoder::test::rand_data;
-    use crate::encoder::{DaEncoder, DaEncoderParams, EncodedData};
-    use crate::reconstruction::reconstruct_without_missing_data;
     use nomos_core::da::DaEncoder as _;
+
+    use crate::{
+        common::{blob::DaBlob, ColumnIndex},
+        encoder::{test::rand_data, DaEncoder, DaEncoderParams, EncodedData},
+        reconstruction::reconstruct_without_missing_data,
+    };
 
     #[test]
     fn test_reconstruct() {

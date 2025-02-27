@@ -7,9 +7,8 @@ use sphinx_packet::{
     payload::{Payload, PAYLOAD_OVERHEAD_SIZE},
 };
 
-use crate::sphinx::ASYM_KEY_SIZE;
-
 use super::{error::Error, parse_bytes, routing::EncryptedRoutingInformation};
+use crate::sphinx::ASYM_KEY_SIZE;
 
 /// A packet that contains a header and a payload.
 /// The header and payload are encrypted for the selected recipients.
@@ -143,7 +142,8 @@ impl Packet {
     // This is a copy of `blind_the_shared_secret` from https://github.com/nymtech/sphinx/blob/344b902df340e0d5af69c5147b05f76f324b8cef/src/header/mod.rs#L234.
     // with renaming the function name and the arguments
     // because the original function is not exposed to the public.
-    // This logic is tightly coupled with the [`sphinx_packet::header::keys::KeyMaterial::derive`].
+    // This logic is tightly coupled with the
+    // [`sphinx_packet::header::keys::KeyMaterial::derive`].
     fn derive_next_ephemeral_public_key(
         cur_ephemeral_pubkey: &x25519_dalek::PublicKey,
         blinding_factor: &x25519_dalek::StaticSecret,

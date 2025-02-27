@@ -1,6 +1,5 @@
-// std
 use std::hash::Hash;
-// crates
+
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
@@ -11,11 +10,12 @@ pub use node_id::NodeId;
 mod view;
 pub use view::View;
 
-/// The way the consensus engine communicates with the rest of the system is by returning
-/// actions to be performed.
+/// The way the consensus engine communicates with the rest of the system is by
+/// returning actions to be performed.
 /// Often, the actions are to send a message to a set of nodes.
-/// This enum represents the different types of messages that can be sent from the perspective of consensus and
-/// can't be directly used in the network as they lack things like cryptographic signatures.
+/// This enum represents the different types of messages that can be sent from
+/// the perspective of consensus and can't be directly used in the network as
+/// they lack things like cryptographic signatures.
 #[derive(Debug, Clone, Eq, PartialEq)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
@@ -47,8 +47,9 @@ pub struct Timeout<Id> {
     pub timeout_qc: Option<TimeoutQc<Id>>,
 }
 
-// TODO: We are making "mandatory" to have received the timeout_qc before the new_view votes.
-// We should consider to remove the TimoutQc from the NewView message and use a hash or id instead.
+// TODO: We are making "mandatory" to have received the timeout_qc before the
+// new_view votes. We should consider to remove the TimoutQc from the NewView
+// message and use a hash or id instead.
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]

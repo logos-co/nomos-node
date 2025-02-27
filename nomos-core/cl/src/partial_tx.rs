@@ -1,16 +1,18 @@
 use rand_core::{CryptoRngCore, RngCore};
 use serde::{Deserialize, Serialize};
 
-use crate::balance::{Balance, BalanceWitness};
-use crate::input::{Input, InputWitness};
-use crate::merkle;
-use crate::output::{Output, OutputWitness};
+use crate::{
+    balance::{Balance, BalanceWitness},
+    input::{Input, InputWitness},
+    merkle,
+    output::{Output, OutputWitness},
+};
 
 pub const MAX_INPUTS: usize = 8;
 pub const MAX_OUTPUTS: usize = 8;
 
-/// The partial transaction commitment couples an input to a partial transaction.
-/// Prevents partial tx unbundling.
+/// The partial transaction commitment couples an input to a partial
+/// transaction. Prevents partial tx unbundling.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub struct PtxRoot(pub [u8; 32]);
 
@@ -150,13 +152,12 @@ impl PartialTxOutputWitness {
 #[cfg(test)]
 mod test {
 
+    use super::*;
     use crate::{
         balance::UnitBalance,
         note::{derive_unit, NoteWitness},
         nullifier::NullifierSecret,
     };
-
-    use super::*;
 
     #[test]
     fn test_partial_tx_balance() {
