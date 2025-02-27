@@ -241,7 +241,11 @@ mod cfgsync_tests {
     use nomos_tracing_service::{
         FilterLayer, LoggerLayer, MetricsLayer, TracingLayer, TracingSettings,
     };
-    use tests::topology::configs::{consensus::ConsensusParams, da::DaParams};
+    use std::num::NonZero;
+    use std::str::FromStr;
+    use std::{net::Ipv4Addr, time::Duration};
+    use tests::topology::configs::consensus::ConsensusParams;
+    use tests::topology::configs::da::DaParams;
     use tracing::Level;
 
     use super::{create_node_configs, Host, HostKind};

@@ -2,6 +2,7 @@ use crate::backends::common::slot_timer;
 use crate::backends::TimeBackend;
 use crate::EpochSlotTickStream;
 use cryptarchia_engine::{EpochConfig, Slot, SlotConfig};
+use std::num::NonZero;
 use time::OffsetDateTime;
 
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -9,7 +10,7 @@ use time::OffsetDateTime;
 pub struct SystemTimeBackendSettings {
     pub slot_config: SlotConfig,
     pub epoch_config: EpochConfig,
-    pub base_period_length: u64,
+    pub base_period_length: NonZero<u64>,
 }
 
 pub struct SystemTimeBackend {
@@ -42,6 +43,7 @@ mod test {
     use crate::backends::TimeBackend;
     use cryptarchia_engine::{EpochConfig, Slot, SlotConfig};
     use futures::StreamExt;
+    use std::num::NonZero;
     use std::time::Duration;
     use time::OffsetDateTime;
 
@@ -55,11 +57,11 @@ mod test {
                 chain_start_time: OffsetDateTime::now_utc(),
             },
             epoch_config: EpochConfig {
-                epoch_stake_distribution_stabilization: 3,
-                epoch_period_nonce_buffer: 3,
-                epoch_period_nonce_stabilization: 4,
+                epoch_stake_distribution_stabilization: NonZero::new(3).unwrap(),
+                epoch_period_nonce_buffer: NonZero::new(3).unwrap(),
+                epoch_period_nonce_stabilization: NonZero::new(4).unwrap(),
             },
-            base_period_length: 10,
+            base_period_length: NonZero::new(10).unwrap(),
         };
         let backend = SystemTimeBackend::init(settings);
         let stream = backend.tick_stream();

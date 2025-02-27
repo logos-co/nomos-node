@@ -1,6 +1,7 @@
 use std::num::NonZero;
 
 use cryptarchia_engine::{Epoch, Slot};
+use std::num::NonZero;
 
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -20,9 +21,13 @@ impl Config {
     }
 
     pub fn nonce_snapshot(&self, epoch: Epoch) -> Slot {
-        let offset = self.base_period_length()
-            * (self.epoch_config.epoch_period_nonce_buffer
-                + self.epoch_config.epoch_stake_distribution_stabilization) as u64;
+        let offset = self.base_period_length().get().saturating_mul(
+            (self.epoch_config.epoch_period_nonce_buffer.get()
+                + self
+                    .epoch_config
+                    .epoch_stake_distribution_stabilization
+                    .get()) as u64,
+        );
         let base = (u32::from(epoch) - 1) as u64 * self.epoch_length();
         (base + offset).into()
     }
@@ -40,13 +45,14 @@ impl Config {
 #[cfg(test)]
 mod tests {
     use cryptarchia_engine::EpochConfig;
+    use std::num::NonZero;
     #[test]
     fn epoch_snapshots() {
         let config = super::Config {
             epoch_config: EpochConfig {
-                epoch_stake_distribution_stabilization: 3,
-                epoch_period_nonce_buffer: 3,
-                epoch_period_nonce_stabilization: 4,
+                epoch_stake_distribution_stabilization: NonZero::new(3u8).unwrap(),
+                epoch_period_nonce_buffer: NonZero::new(3).unwrap(),
+                epoch_period_nonce_stabilization: NonZero::new(4).unwrap(),
             },
             consensus_config: cryptarchia_engine::Config {
                 security_param: NonZero::new(5).unwrap(),
@@ -64,9 +70,9 @@ mod tests {
     fn slot_to_epoch() {
         let config = super::Config {
             epoch_config: EpochConfig {
-                epoch_stake_distribution_stabilization: 3,
-                epoch_period_nonce_buffer: 3,
-                epoch_period_nonce_stabilization: 4,
+                epoch_stake_distribution_stabilization: NonZero::new(3u8).unwrap(),
+                epoch_period_nonce_buffer: NonZero::new(3).unwrap(),
+                epoch_period_nonce_stabilization: NonZero::new(4).unwrap(),
             },
             consensus_config: cryptarchia_engine::Config {
                 security_param: NonZero::new(5).unwrap(),

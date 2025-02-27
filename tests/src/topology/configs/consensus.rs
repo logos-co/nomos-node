@@ -4,6 +4,7 @@ use cryptarchia_engine::EpochConfig;
 use nomos_core::staking::NMO_UNIT;
 use nomos_ledger::LedgerState;
 use rand::thread_rng;
+use std::num::NonZero;
 
 #[derive(Clone)]
 pub struct ConsensusParams {
@@ -16,10 +17,9 @@ impl ConsensusParams {
     pub fn default_for_participants(n_participants: usize) -> Self {
         ConsensusParams {
             n_participants,
-            // by setting the slot coeff to 1, we also increase the probability of multiple blocks
-            // (forks) being produced in the same slot (epoch). Setting the security
-            // parameter to some value > 1 ensures nodes have some time to sync before
-            // deciding on the longest chain.
+            // by setting the slot coeff to 1, we also increase the probability of multiple blocks (forks)
+            // being produced in the same slot (epoch). Setting the security parameter to some value > 1
+            // ensures nodes have some time to sync before deciding on the longest chain.
             security_param: NonZero::new(10).unwrap(),
             // a block should be produced (on average) every slot
             active_slot_coeff: 0.9,
@@ -60,9 +60,9 @@ pub fn create_consensus_configs(
     );
     let ledger_config = nomos_ledger::Config {
         epoch_config: EpochConfig {
-            epoch_stake_distribution_stabilization: 3,
-            epoch_period_nonce_buffer: 3,
-            epoch_period_nonce_stabilization: 4,
+            epoch_stake_distribution_stabilization: NonZero::new(3).unwrap(),
+            epoch_period_nonce_buffer: NonZero::new(3).unwrap(),
+            epoch_period_nonce_stabilization: NonZero::new(4).unwrap(),
         },
         consensus_config: cryptarchia_engine::Config {
             security_param: consensus_params.security_param,

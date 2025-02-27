@@ -168,7 +168,7 @@ where
     }
 
     pub fn fork_choice(&self) -> Branch<Id> {
-        let k = self.config.security_param.get().into();
+        let k = self.config.security_param.get() as u64;
         let s = self.config.s();
         Self::maxvalid_bg(self.local_chain.clone(), &self.branches, k, s)
     }
@@ -244,6 +244,8 @@ pub mod tests {
 
     use super::{Cryptarchia, Slot};
     use crate::Config;
+    use std::hash::{DefaultHasher, Hash, Hasher};
+    use std::num::NonZero;
 
     pub fn config() -> Config {
         Config {
@@ -256,8 +258,8 @@ pub mod tests {
     fn test_fork_choice() {
         // TODO: use cryptarchia
         let mut engine = Cryptarchia::from_genesis([0; 32], config());
-        // by setting a low k we trigger the density choice rule, and the shorter chain
-        // is denser after the fork
+        // by setting a low k we trigger the density choice rule, and the shorter chain is denser after
+        // the fork
         engine.config.security_param = NonZero::new(10).unwrap();
 
         let mut parent = engine.genesis();

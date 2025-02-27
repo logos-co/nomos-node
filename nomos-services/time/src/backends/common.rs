@@ -2,6 +2,7 @@ use crate::{EpochSlotTickStream, SlotTick};
 use cryptarchia_engine::time::SlotTimer;
 use cryptarchia_engine::{EpochConfig, Slot, SlotConfig};
 use futures::StreamExt;
+use std::num::NonZero;
 use std::pin::Pin;
 use time::OffsetDateTime;
 use tokio_stream::wrappers::IntervalStream;
@@ -11,7 +12,7 @@ pub(crate) fn slot_timer(
     datetime: OffsetDateTime,
     current_slot: Slot,
     epoch_config: EpochConfig,
-    base_period_length: u64,
+    base_period_length: NonZero<u64>,
 ) -> EpochSlotTickStream {
     Pin::new(Box::new(
         IntervalStream::new(SlotTimer::new(slot_config).slot_interval(datetime))

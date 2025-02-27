@@ -7,6 +7,7 @@ use crate::{EpochSlotTickStream, SlotTick};
 use cryptarchia_engine::{EpochConfig, Slot, SlotConfig};
 use futures::{Stream, StreamExt};
 use sntpc::{fraction_to_nanoseconds, NtpResult};
+use std::num::NonZero;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 use std::time::Duration;
@@ -27,7 +28,7 @@ pub struct NtpSettings {
     /// Epoch settings in order to compute proper epoch times
     pub epoch_config: EpochConfig,
     /// Base period length related to epochs, used to compute epochs as well
-    pub base_period_length: u64,
+    pub base_period_length: NonZero<u64>,
 }
 pub struct Ntp {
     settings: NtpSettings,
@@ -86,7 +87,7 @@ pub struct NtpStream {
     /// Epoch settings in order to compute proper epoch times
     epoch_config: EpochConfig,
     /// Base period length related to epochs, used to compute epochs as well
-    base_period_length: u64,
+    base_period_length: NonZero<u64>,
     /// `SlotTick` interval stream. This stream is replaced when an internal clock update happens.
     slot_timer: EpochSlotTickStream,
 }
