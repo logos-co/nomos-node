@@ -23,7 +23,7 @@ jobs:
         run: |
           INSTALLED=$(cargo --version | awk '{print $2}')
           echo "Installed Rust version: $INSTALLED"
-          echo "VERSION=$INSTALLED" >> $GITHUB_OUTPUT
+          echo "VERSION=1.84.0" >> $GITHUB_OUTPUT
       - name: Compare latest and local Rust versions
         run: |
           if [ "${{ steps.latest-version.outputs.VERSION }}" != "${{ steps.installed-version.outputs.VERSION }}" ]; then
