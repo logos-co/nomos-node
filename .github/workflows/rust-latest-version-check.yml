@@ -1,12 +1,11 @@
-name: Check for new Rust versions
+name: Check for a new Rust version
 
 on:
-  push:
-    branches: 
-      - aa/rustc-version-pin
+  schedule:
+    - cron: "0 3 * * *"
 
 jobs:
-  check-latest-release:
+  check-latest-version:
     name: Fetch and compare latest Rust release
     runs-on: ubuntu-latest
     steps:
@@ -23,33 +22,32 @@ jobs:
         run: |
           INSTALLED=$(cargo --version | awk '{print $2}')
           echo "Installed Rust version: $INSTALLED"
-          # echo "VERSION=$INSTALLED" >> $GITHUB_OUTPUT
-          echo "VERSION=1.84.0" >> $GITHUB_OUTPUT
+          echo "VERSION=$INSTALLED" >> $GITHUB_OUTPUT
       - name: Compare latest and local Rust versions
         id: compare-versions
         run: |
           if [ "${{ steps.latest-version.outputs.VERSION }}" != "${{ steps.installed-version.outputs.VERSION }}" ]; then
-            NEW_VERSION=true
+            NEW_VERSION_AVAILABLE=true
           else
-            NEW_VERSION=false
+            NEW_VERSION_AVAILABLE=false
           fi
-          echo "NEW_VERSION=$NEW_VERSION" >> $GITHUB_OUTPUT
+          echo "NEW_VERSION_AVAILABLE=$NEW_VERSION_AVAILABLE" >> $GITHUB_OUTPUT
     outputs:
-      new-version-available: ${{ steps.compare-versions.outputs.NEW_VERSION }}
+      new-version-available: ${{ steps.compare-versions.outputs.NEW_VERSION_AVAILABLE }}
       new-version: ${{ steps.latest-version.outputs.VERSION }}
-  notify-new-release:
-    name: Notify of new Rust release
+  notify-new-version:
+    name: Notify of new Rust version
     runs-on: ubuntu-latest
-    needs: check-latest-release
-    if: ${{ needs.check-latest-release.outputs.new-version-available == 'true' }}
+    needs: check-latest-version
+    if: ${{ needs.check-latest-version.outputs.new-version-available == 'true' }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-      - name: Create a GH issue
+      - name: Create a GH issue (if it does not exist)
         uses: JasonEtco/create-an-issue@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          RUST_VERSION: ${{ needs.check-latest-release.outputs.new-version }}
+          RUST_VERSION: ${{ needs.check-latest-version.outputs.new-version }}
         with:
           assignees: danielSanchezQ, ntn-x2
           filename: ./.github/rust_update_issue_template.md
