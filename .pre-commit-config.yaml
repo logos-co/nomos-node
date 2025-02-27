@@ -3,5 +3,5 @@ repos:
     rev: v1.0
     hooks:
       - id: fmt
+        entry: cargo +nightly-2025-01-03 fmt
       - id: clippy
-

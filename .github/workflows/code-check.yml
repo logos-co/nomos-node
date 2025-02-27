@@ -19,6 +19,7 @@ jobs:
       - name: Install nightly toolchain
         uses: actions-rs/toolchain@v1
         with:
+          # The same version must be used in the `.pre-commit-config.yaml` file
           toolchain: nightly-2025-01-03
           profile: minimal
           components: rustfmt
