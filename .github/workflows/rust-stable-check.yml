@@ -28,8 +28,10 @@ jobs:
         run: |
           if [ "${{ steps.latest-version.outputs.VERSION }}" != "${{ steps.installed-version.outputs.VERSION }}" ]; then
             NEW_VERSION=true
+            echo "There's a new version."
           else
             NEW_VERSION=false
+            echo "There's no new version."
           fi
           echo "NEW_VERSION=$NEW_VERSION" >> $GITHUB_OUTPUT
   notify-new-release:
