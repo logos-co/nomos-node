@@ -25,19 +25,20 @@ jobs:
           echo "Installed Rust version: $INSTALLED"
           echo "VERSION=1.84.0" >> $GITHUB_OUTPUT
       - name: Compare latest and local Rust versions
+        id: compare-versions
         run: |
           if [ "${{ steps.latest-version.outputs.VERSION }}" != "${{ steps.installed-version.outputs.VERSION }}" ]; then
             NEW_VERSION=true
-            echo "There's a new version."
           else
             NEW_VERSION=false
-            echo "There's no new version."
           fi
           echo "NEW_VERSION=$NEW_VERSION" >> $GITHUB_OUTPUT
+    outputs:
+      new-version: ${{ steps.compare-versions.outputs.NEW_VERSION }}
   notify-new-release:
     name: Notify of new Rust release
     runs-on: ubuntu-latest
     needs: check-latest-release
-    if: ${{ needs.check-latest-release.outputs.NEW_VERSION == 'true' }}
+    if: ${{ needs.check-latest-release.outputs.new-version == 'true' }}
     steps:
       - run: echo "Ok"
