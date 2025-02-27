@@ -20,6 +20,8 @@ jobs:
         uses: actions-rs/toolchain@v1
         with:
           toolchain: nightly-2025-01-03
+          profile: minimal
+          components: rustfmt
           override: true
       - name: Run cargo fmt
         uses: actions-rs/cargo@v1
