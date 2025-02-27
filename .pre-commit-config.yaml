@@ -5,3 +5,12 @@ repos:
       - id: fmt
         entry: cargo +nightly-2025-01-03 fmt
       - id: clippy
+  - repo: https://github.com/EmbarkStudios/cargo-deny
+    rev: 0.18.0
+    hooks:
+      - id: cargo-deny
+        args:
+          - --hide-inclusion-graph
+          - -c .cargo-deny.toml
+          - --show-stats
+          - -D warnings
