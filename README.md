@@ -1,12 +1,10 @@
 # Nomos
 
-Nomos is the blockchain layer of the Logos technology stack.
-
-This monorepo is a unified codebase for the Nomos ecosystem, providing a privacy-preserving and censorship-resistant
+Nomos is the blockchain layer of the Logos technology stack, providing a privacy-preserving and censorship-resistant
 framework for decentralized network states.
 
-It houses all core components, services, and tools necessary for running and interacting with the Nomos blockchain,
-including:
+This monorepo serves as a unified codebase for the Nomos ecosystem, housing all core components, services, and tools
+necessary for running and interacting with the Nomos blockchain. Key features include:
 
 - Consensus mechanisms for secure and scalable network agreement
 - Ledger management for state persistence and validation
@@ -18,6 +16,8 @@ including:
 
 - [Requirements](#requirements)
 - [Design Goals](#design-goals)
+    - [Service Architecture](#service-architecture)
+    - [Static Dispatching](#static-dispatching)
 - [Project Structure](#project-structure)
 - [Development Workflow](#development-workflow)
     - [Docker](#docker)
@@ -29,25 +29,24 @@ including:
 
 ## Requirements
 
-**Rust**
+- **Rust**
+    - We aim to maintain compatibility with the latest stable version of Rust.
+    - [Installation Guide](https://www.rust-lang.org/tools/install)
 
-- We aim to maintain compatibility with the latest stable version of Rust.
-- [Installation Guide](https://www.rust-lang.org/tools/install)
-
-**Risc0**
-
-- Required for zero-knowledge proof functionality.
-- [Installation Guide](https://dev.risczero.com/api/zkvm/install)
+- **Risc0**
+    - Required for zero-knowledge proof functionality.
+    - [Installation Guide](https://dev.risczero.com/api/zkvm/install)
 
 ## Design Goals
 
 ### Service Architecture
 
-Most of Nomos' services are implemented with the same idea behind:
-There is a front layer responsible for handling the `Overwatch` service and a back layer that implements
-the actual service logic.
+Nomos services follow a consistent design pattern: a front layer handles the `Overwatch` service, while a back layer
+implements the actual service logic.
 
-This enables us to easily replace services' components in a declarative manner. For example:
+This modular approach allows for easy replacement of components in a declarative manner.
+
+For example:
 
 ```rust ignore
 #[derive(Services)]
@@ -62,7 +61,7 @@ struct MockPoolNode {
 
 ### Static Dispatching
 
-Nomos leans toward static dispatching over dynamic, partly influenced by `Overwatch`.
+Nomos favours static dispatching over dynamic, influenced by Overwatch.
 This means you'll encounter Generics sprinkled throughout the codebase.
 While it might occasionally feel a bit over the top, it brings some solid advantages, such as:
 
