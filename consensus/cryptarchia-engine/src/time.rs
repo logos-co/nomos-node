@@ -107,9 +107,14 @@ pub struct EpochConfig {
 
 impl EpochConfig {
     pub fn epoch_length(&self, base_period_length: NonZero<u64>) -> u64 {
-        (u64::from(self.epoch_stake_distribution_stabilization.get())
-            + u64::from(self.epoch_period_nonce_buffer.get())
-            + u64::from(self.epoch_period_nonce_stabilization.get()))
+        [
+            u64::from(self.epoch_stake_distribution_stabilization.get()),
+            u64::from(self.epoch_period_nonce_buffer.get()),
+            u64::from(self.epoch_period_nonce_stabilization.get()),
+        ]
+        .into_iter()
+        .reduce(u64::saturating_add)
+        .unwrap_or(0)
         .saturating_mul(base_period_length.get())
     }
 

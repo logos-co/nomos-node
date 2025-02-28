@@ -21,6 +21,6 @@ impl Config {
     // return the number of slots required to have great confidence at least k
     // blocks have been produced
     pub fn s(&self) -> u64 {
-        self.base_period_length().get() * 3
+        self.base_period_length().get().saturating_mul(3)
     }
 }
