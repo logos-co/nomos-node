@@ -17,7 +17,8 @@ pub struct DaVerifier {
 }
 
 impl DaVerifier {
-    #[must_use] pub const fn new(global_parameters: GlobalParameters) -> Self {
+    #[must_use]
+    pub const fn new(global_parameters: GlobalParameters) -> Self {
         Self { global_parameters }
     }
 
@@ -105,7 +106,8 @@ impl DaVerifier {
         true
     }
 
-    #[must_use] pub fn verify(&self, blob: &DaBlob, rows_domain_size: usize) -> bool {
+    #[must_use]
+    pub fn verify(&self, blob: &DaBlob, rows_domain_size: usize) -> bool {
         let rows_domain = PolynomialEvaluationDomain::new(rows_domain_size)
             .expect("Domain should be able to build");
         let blob_col_idx = &u16::from_be_bytes(blob.column_idx());

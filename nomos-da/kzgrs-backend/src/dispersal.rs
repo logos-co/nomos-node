@@ -13,7 +13,8 @@ pub struct BlobInfo {
 }
 
 impl BlobInfo {
-    #[must_use] pub const fn new(id: BlobId, metadata: Metadata) -> Self {
+    #[must_use]
+    pub const fn new(id: BlobId, metadata: Metadata) -> Self {
         Self { id, metadata }
     }
 }
@@ -49,7 +50,8 @@ impl blob::metadata::Metadata for BlobInfo {
 pub struct Index([u8; 8]);
 
 impl Index {
-    #[must_use] pub const fn to_u64(self) -> u64 {
+    #[must_use]
+    pub const fn to_u64(self) -> u64 {
         u64::from_be_bytes(self.0)
     }
 }
@@ -61,11 +63,13 @@ pub struct Metadata {
 }
 
 impl Metadata {
-    #[must_use] pub const fn new(app_id: [u8; 32], index: Index) -> Self {
+    #[must_use]
+    pub const fn new(app_id: [u8; 32], index: Index) -> Self {
         Self { app_id, index }
     }
 
-    #[must_use] pub const fn size(&self) -> usize {
+    #[must_use]
+    pub const fn size(&self) -> usize {
         std::mem::size_of_val(&self.app_id) + std::mem::size_of_val(&self.index)
     }
 }

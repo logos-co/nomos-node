@@ -90,7 +90,8 @@ where
         Ok(Self { branches, tips })
     }
 
-    #[must_use] pub fn branches(&self) -> Vec<Branch<Id>> {
+    #[must_use]
+    pub fn branches(&self) -> Vec<Branch<Id>> {
         self.tips
             .iter()
             .map(|id| self.branches[id].clone())
@@ -245,7 +246,8 @@ pub mod tests {
     use super::{Cryptarchia, Slot};
     use crate::Config;
 
-    #[must_use] pub const fn config() -> Config {
+    #[must_use]
+    pub const fn config() -> Config {
         Config {
             security_param: NonZero::new(1).unwrap(),
             active_slot_coeff: 1.0,

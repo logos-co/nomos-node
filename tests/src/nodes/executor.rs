@@ -157,12 +157,14 @@ impl Executor {
             .await
     }
 
-    #[must_use] pub const fn config(&self) -> &Config {
+    #[must_use]
+    pub const fn config(&self) -> &Config {
         &self.config
     }
 }
 
-#[must_use] pub fn create_executor_config(config: GeneralConfig) -> Config {
+#[must_use]
+pub fn create_executor_config(config: GeneralConfig) -> Config {
     Config {
         network: NetworkConfig {
             backend: Libp2pConfig {

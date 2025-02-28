@@ -47,7 +47,8 @@ impl GeneralTracingConfig {
     }
 }
 
-#[must_use] pub fn create_tracing_configs(ids: &[[u8; 32]]) -> Vec<GeneralTracingConfig> {
+#[must_use]
+pub fn create_tracing_configs(ids: &[[u8; 32]]) -> Vec<GeneralTracingConfig> {
     if *IS_DEBUG_TRACING {
         create_debug_configs(ids)
     } else {

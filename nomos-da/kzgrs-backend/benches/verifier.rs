@@ -16,7 +16,8 @@ fn main() {
 
 const MB: usize = 1024;
 
-#[must_use] pub fn rand_data(elements_count: usize) -> Vec<u8> {
+#[must_use]
+pub fn rand_data(elements_count: usize) -> Vec<u8> {
     let mut buff = vec![0; elements_count * DaEncoderParams::MAX_BLS12_381_ENCODING_CHUNK_SIZE];
     thread_rng().fill_bytes(&mut buff);
     buff

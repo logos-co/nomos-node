@@ -45,7 +45,8 @@ pub fn get_available_port() -> u16 {
 }
 
 /// In slow test environments like Codecov, use 2x timeout.
-#[must_use] pub fn adjust_timeout(d: Duration) -> Duration {
+#[must_use]
+pub fn adjust_timeout(d: Duration) -> Duration {
     if *IS_SLOW_TEST_ENV {
         d.mul(2)
     } else {

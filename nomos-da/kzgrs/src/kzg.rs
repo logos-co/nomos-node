@@ -56,7 +56,8 @@ pub fn generate_element_proof(
 }
 
 /// Verify proof for a single element
-#[must_use] pub fn verify_element_proof(
+#[must_use]
+pub fn verify_element_proof(
     element_index: usize,
     element: &Fr,
     commitment: &Commitment<Bls12_381>,

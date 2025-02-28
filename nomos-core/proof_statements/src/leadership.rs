@@ -13,7 +13,8 @@ pub struct LeaderPublic {
 }
 
 impl LeaderPublic {
-    #[must_use] pub fn new(
+    #[must_use]
+    pub fn new(
         cm_root: [u8; 32],
         epoch_nonce: [u8; 32],
         slot: u64,
@@ -55,7 +56,8 @@ impl LeaderPublic {
         }
     }
 
-    #[must_use] pub fn check_winning(&self, input: &cl::InputWitness) -> bool {
+    #[must_use]
+    pub fn check_winning(&self, input: &cl::InputWitness) -> bool {
         let threshold = phi_approx(U256::from_u64(input.note.value), self.scaled_phi_approx);
         let ticket = ticket(input, self.epoch_nonce, self.slot);
         ticket < threshold

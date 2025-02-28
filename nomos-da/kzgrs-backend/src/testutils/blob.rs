@@ -2,7 +2,8 @@ use nomos_core::da::DaEncoder;
 
 use crate::{common::blob::DaBlob, testutils::encoder::get_encoder};
 
-#[must_use] pub fn get_default_da_blob_data() -> Vec<u8> {
+#[must_use]
+pub fn get_default_da_blob_data() -> Vec<u8> {
     vec![
         49u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8,
         0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8,

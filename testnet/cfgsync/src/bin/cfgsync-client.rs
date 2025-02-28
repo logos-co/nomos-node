@@ -45,8 +45,7 @@ async fn get_config<Config: Serialize + DeserializeOwned>(
     let yaml = serde_yaml::to_string(&config)
         .map_err(|err| format!("Failed to serialize config to YAML: {err}"))?;
 
-    fs::write(config_file, yaml)
-        .map_err(|err| format!("Failed to write config to file: {err}"))?;
+    fs::write(config_file, yaml).map_err(|err| format!("Failed to write config to file: {err}"))?;
 
     println!("Config saved to {config_file}");
     Ok(())

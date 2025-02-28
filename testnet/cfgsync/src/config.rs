@@ -39,7 +39,8 @@ pub struct Host {
 }
 
 impl Host {
-    #[must_use] pub const fn default_validator_from_ip(ip: Ipv4Addr, identifier: String) -> Self {
+    #[must_use]
+    pub const fn default_validator_from_ip(ip: Ipv4Addr, identifier: String) -> Self {
         Self {
             kind: HostKind::Validator,
             ip,
@@ -50,7 +51,8 @@ impl Host {
         }
     }
 
-    #[must_use] pub const fn default_executor_from_ip(ip: Ipv4Addr, identifier: String) -> Self {
+    #[must_use]
+    pub const fn default_executor_from_ip(ip: Ipv4Addr, identifier: String) -> Self {
         Self {
             kind: HostKind::Executor,
             ip,
@@ -62,7 +64,8 @@ impl Host {
     }
 }
 
-#[must_use] pub fn create_node_configs(
+#[must_use]
+pub fn create_node_configs(
     consensus_params: ConsensusParams,
     da_params: DaParams,
     tracing_settings: TracingSettings,

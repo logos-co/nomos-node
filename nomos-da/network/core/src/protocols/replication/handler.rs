@@ -68,7 +68,8 @@ pub struct ReplicationHandler {
 }
 
 impl ReplicationHandler {
-    #[must_use] pub fn new() -> Self {
+    #[must_use]
+    pub fn new() -> Self {
         Self {
             inbound: None,
             outbound: None,
@@ -98,9 +99,7 @@ impl ReplicationHandler {
                 pack_to_writer(&message, &mut stream)
                     .await
                     .unwrap_or_else(|_| {
-                        panic!(
-                            "Message should always be serializable.\nMessage: '{message:?}'"
-                        )
+                        panic!("Message should always be serializable.\nMessage: '{message:?}'")
                     });
                 stream.flush().await?;
             }

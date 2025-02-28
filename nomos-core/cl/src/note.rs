@@ -8,7 +8,8 @@ use crate::{balance::Unit, nullifier::NullifierCommitment, NullifierSecret};
 pub struct Covenant(pub [u8; 32]);
 
 impl Covenant {
-    #[must_use] pub fn from_vk(covenant_vk: &[u8]) -> Self {
+    #[must_use]
+    pub fn from_vk(covenant_vk: &[u8]) -> Self {
         let mut hasher = Sha256::new();
         hasher.update(b"NOMOS_CL_COVENANT_COMMIT");
         hasher.update(covenant_vk);
@@ -18,7 +19,8 @@ impl Covenant {
     }
 }
 
-#[must_use] pub fn derive_unit(unit: &str) -> Unit {
+#[must_use]
+pub fn derive_unit(unit: &str) -> Unit {
     let mut hasher = Sha256::new();
     hasher.update(b"NOMOS_CL_UNIT");
     hasher.update(unit.as_bytes());
@@ -30,7 +32,8 @@ impl Covenant {
 pub struct NoteCommitment(pub [u8; 32]);
 
 impl NoteCommitment {
-    #[must_use] pub const fn as_bytes(&self) -> &[u8; 32] {
+    #[must_use]
+    pub const fn as_bytes(&self) -> &[u8; 32] {
         &self.0
     }
 }
@@ -45,7 +48,8 @@ pub struct NoteWitness {
 }
 
 impl NoteWitness {
-    #[must_use] pub const fn new(
+    #[must_use]
+    pub const fn new(
         value: u64,
         unit: Unit,
         covenant: Covenant,
@@ -71,7 +75,8 @@ impl NoteWitness {
         Self::new(value, unit, covenant, [0u8; 32], Nonce::random(rng))
     }
 
-    #[must_use] pub fn evolved_nonce(&self, nf_sk: NullifierSecret, domain: &[u8]) -> Nonce {
+    #[must_use]
+    pub fn evolved_nonce(&self, nf_sk: NullifierSecret, domain: &[u8]) -> Nonce {
         let mut hasher = Sha256::new();
         hasher.update(b"NOMOS_COIN_EVOLVE");
         hasher.update(domain);
@@ -82,7 +87,8 @@ impl NoteWitness {
         Nonce::from_bytes(nonce_bytes)
     }
 
-    #[must_use] pub fn commit(&self, nf_pk: NullifierCommitment) -> NoteCommitment {
+    #[must_use]
+    pub fn commit(&self, nf_pk: NullifierCommitment) -> NoteCommitment {
         let mut hasher = Sha256::new();
         hasher.update(b"NOMOS_CL_NOTE_COMMIT");
 
@@ -119,11 +125,13 @@ impl Nonce {
         Self(nonce)
     }
 
-    #[must_use] pub const fn as_bytes(&self) -> &[u8; 32] {
+    #[must_use]
+    pub const fn as_bytes(&self) -> &[u8; 32] {
         &self.0
     }
 
-    #[must_use] pub const fn from_bytes(bytes: [u8; 32]) -> Self {
+    #[must_use]
+    pub const fn from_bytes(bytes: [u8; 32]) -> Self {
         Self(bytes)
     }
 }

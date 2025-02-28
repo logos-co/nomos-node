@@ -30,7 +30,8 @@ pub struct TopologyConfig {
 }
 
 impl TopologyConfig {
-    #[must_use] pub fn two_validators() -> Self {
+    #[must_use]
+    pub fn two_validators() -> Self {
         Self {
             n_validators: 2,
             n_executors: 0,
@@ -40,7 +41,8 @@ impl TopologyConfig {
         }
     }
 
-    #[must_use] pub fn validator_and_executor() -> Self {
+    #[must_use]
+    pub fn validator_and_executor() -> Self {
         Self {
             n_validators: 1,
             n_executors: 1,
@@ -117,11 +119,13 @@ impl Topology {
         }
     }
 
-    #[must_use] pub fn validators(&self) -> &[Validator] {
+    #[must_use]
+    pub fn validators(&self) -> &[Validator] {
         &self.validators
     }
 
-    #[must_use] pub fn executors(&self) -> &[Executor] {
+    #[must_use]
+    pub fn executors(&self) -> &[Executor] {
         &self.executors
     }
 }

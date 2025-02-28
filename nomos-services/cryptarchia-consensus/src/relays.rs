@@ -138,7 +138,14 @@ where
     ) -> Self {
         let storage_adapter =
             StorageAdapter::<Storage, TxS::Tx, BS::BlobId>::new(storage_relay).await;
-        Self { network_relay, blend_relay, cl_mempool_relay, da_mempool_relay, storage_adapter, sampling_relay }
+        Self {
+            network_relay,
+            blend_relay,
+            cl_mempool_relay,
+            da_mempool_relay,
+            storage_adapter,
+            sampling_relay,
+        }
     }
 
     pub async fn from_relays<SamplingNetworkAdapter, SamplingStorage>(

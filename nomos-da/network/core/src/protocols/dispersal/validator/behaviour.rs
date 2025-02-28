@@ -31,7 +31,8 @@ pub enum DispersalError {
 }
 
 impl DispersalError {
-    #[must_use] pub const fn peer_id(&self) -> Option<&PeerId> {
+    #[must_use]
+    pub const fn peer_id(&self) -> Option<&PeerId> {
         match self {
             Self::Io { peer_id, .. } => Some(peer_id),
         }
@@ -60,7 +61,8 @@ pub enum DispersalEvent {
 }
 
 impl DispersalEvent {
-    #[must_use] pub fn blob_size(&self) -> Option<usize> {
+    #[must_use]
+    pub fn blob_size(&self) -> Option<usize> {
         match self {
             Self::IncomingMessage { message } => Some(message.blob.data.column_len()),
             _ => None,

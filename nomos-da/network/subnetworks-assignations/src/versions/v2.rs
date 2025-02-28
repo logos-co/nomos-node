@@ -15,7 +15,8 @@ pub struct FillWithOriginalReplication {
 }
 
 impl FillWithOriginalReplication {
-    #[must_use] pub fn new(
+    #[must_use]
+    pub fn new(
         peers: &[PeerId],
         subnetwork_size: usize,
         dispersal_factor: usize,

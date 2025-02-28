@@ -23,7 +23,8 @@ pub trait BlendMessage {
         message: &[u8],
         private_key: &Self::PrivateKey,
     ) -> Result<(Vec<u8>, bool), Self::Error>;
-    #[must_use] fn is_drop_message(message: &[u8]) -> bool {
+    #[must_use]
+    fn is_drop_message(message: &[u8]) -> bool {
         message == Self::DROP_MESSAGE
     }
 }

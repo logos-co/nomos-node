@@ -17,7 +17,8 @@ pub mod prelude {
     // Opentelemetry tracing standard has a specific remote context format which is
     // supported by most tracing software.
     // More information at https://www.w3.org/TR/trace-context/#traceparent-header
-    #[must_use] pub fn set_remote_context(trace_id: TraceId, span_id: SpanId) -> HashMap<String, String> {
+    #[must_use]
+    pub fn set_remote_context(trace_id: TraceId, span_id: SpanId) -> HashMap<String, String> {
         let mut carrier = HashMap::new();
         carrier.insert(
             "traceparent".to_string(),

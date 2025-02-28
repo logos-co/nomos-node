@@ -76,7 +76,8 @@ pub enum SamplingError {
 }
 
 impl SamplingError {
-    #[must_use] pub const fn peer_id(&self) -> Option<&PeerId> {
+    #[must_use]
+    pub const fn peer_id(&self) -> Option<&PeerId> {
         match self {
             Self::Io { peer_id, .. } => Some(peer_id),
             Self::Protocol { peer_id, .. } => Some(peer_id),
@@ -89,7 +90,8 @@ impl SamplingError {
         }
     }
 
-    #[must_use] pub const fn blob_id(&self) -> Option<&BlobId> {
+    #[must_use]
+    pub const fn blob_id(&self) -> Option<&BlobId> {
         match self {
             Self::Deserialize { blob_id, .. } => Some(blob_id),
             _ => None,

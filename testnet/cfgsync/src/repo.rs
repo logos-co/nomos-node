@@ -25,7 +25,8 @@ pub struct ConfigRepo {
 }
 
 impl ConfigRepo {
-    #[must_use] pub fn new(
+    #[must_use]
+    pub fn new(
         n_hosts: usize,
         consensus_params: ConsensusParams,
         da_params: DaParams,

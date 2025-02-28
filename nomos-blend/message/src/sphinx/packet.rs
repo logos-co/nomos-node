@@ -152,7 +152,8 @@ impl Packet {
         x25519_dalek::PublicKey::from(new_shared_secret.to_bytes())
     }
 
-    #[must_use] pub fn to_bytes(&self) -> Vec<u8> {
+    #[must_use]
+    pub fn to_bytes(&self) -> Vec<u8> {
         let ephemeral_public_key = self.header.ephemeral_public_key.to_bytes();
         let encrypted_routing_info = self.header.encrypted_routing_info.to_bytes();
         itertools::chain!(
@@ -191,7 +192,8 @@ impl Packet {
         })
     }
 
-    #[must_use] pub const fn size(max_layers: usize, max_payload_size: usize) -> usize {
+    #[must_use]
+    pub const fn size(max_layers: usize, max_payload_size: usize) -> usize {
         ASYM_KEY_SIZE
             + EncryptedRoutingInformation::size(max_layers)
             + max_payload_size

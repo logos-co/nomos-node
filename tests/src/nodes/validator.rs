@@ -133,7 +133,8 @@ impl Validator {
             .await
     }
 
-    #[must_use] pub fn url(&self) -> Url {
+    #[must_use]
+    pub fn url(&self) -> Url {
         format!("http://{}", self.addr).parse().unwrap()
     }
 
@@ -197,7 +198,8 @@ impl Validator {
     }
 
     // not async so that we can use this in `Drop`
-    #[must_use] pub fn get_logs_from_file(&self) -> String {
+    #[must_use]
+    pub fn get_logs_from_file(&self) -> String {
         println!(
             "fetching logs from dir {}...",
             self.tempdir.path().display()
@@ -218,7 +220,8 @@ impl Validator {
             .collect::<String>()
     }
 
-    #[must_use] pub const fn config(&self) -> &Config {
+    #[must_use]
+    pub const fn config(&self) -> &Config {
         &self.config
     }
 
@@ -247,7 +250,8 @@ impl Validator {
     }
 }
 
-#[must_use] pub fn create_validator_config(config: GeneralConfig) -> Config {
+#[must_use]
+pub fn create_validator_config(config: GeneralConfig) -> Config {
     Config {
         network: NetworkConfig {
             backend: Libp2pConfig {

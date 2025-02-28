@@ -406,7 +406,17 @@ where
         let time_relay = service_state.overwatch_handle.relay();
         let (block_subscription_sender, _) = broadcast::channel(16);
 
-        Ok(Self { service_state, network_relay, blend_relay, cl_mempool_relay, da_mempool_relay, sampling_relay, block_subscription_sender, storage_relay, time_relay })
+        Ok(Self {
+            service_state,
+            network_relay,
+            blend_relay,
+            cl_mempool_relay,
+            da_mempool_relay,
+            sampling_relay,
+            block_subscription_sender,
+            storage_relay,
+            time_relay,
+        })
     }
 
     async fn run(mut self) -> Result<(), overwatch_rs::DynError> {
@@ -576,7 +586,8 @@ impl<TxS, BxS, NetworkAdapterSettings, BlendAdapterSettings, TimeBackendSettings
         TimeBackendSettings,
     >
 {
-    #[must_use] pub fn new(tip: Option<HeaderId>, security_block: Option<HeaderId>) -> Self {
+    #[must_use]
+    pub fn new(tip: Option<HeaderId>, security_block: Option<HeaderId>) -> Self {
         Self {
             tip,
             security_block,
@@ -819,8 +830,10 @@ where
 
                 cryptarchia = new_state;
             }
-            Err(Error::Ledger(nomos_ledger::LedgerError::ParentNotFound(parent)) |
-Error::Consensus(cryptarchia_engine::Error::ParentMissing(parent))) => {
+            Err(
+                Error::Ledger(nomos_ledger::LedgerError::ParentNotFound(parent))
+                | Error::Consensus(cryptarchia_engine::Error::ParentMissing(parent)),
+            ) => {
                 tracing::debug!("missing parent {:?}", parent);
                 // TODO: request parent block
             }
