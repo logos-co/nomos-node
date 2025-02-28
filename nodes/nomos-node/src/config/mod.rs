@@ -306,7 +306,7 @@ pub fn update_cryptarchia_consensus(
     if let (Some(value), Some(nonce)) = (note_value, note_nonce) {
         let nonce = Nonce::from_bytes(<[u8; 32]>::from_hex(nonce)?);
         cryptarchia.leader_config.notes.push(NoteWitness::new(
-            value as u64,
+            u64::from(value),
             NMO_UNIT,
             CovenantProof::nop_constraint(),
             [0; 32],

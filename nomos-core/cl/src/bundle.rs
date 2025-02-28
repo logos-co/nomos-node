@@ -10,11 +10,11 @@ pub struct Bundle {
 }
 
 impl Bundle {
-    pub const fn new(partials: Vec<PartialTx>) -> Self {
+    #[must_use] pub const fn new(partials: Vec<PartialTx>) -> Self {
         Self { partials }
     }
 
-    pub fn partial_txs(&self) -> &[PartialTx] {
+    #[must_use] pub fn partial_txs(&self) -> &[PartialTx] {
         &self.partials
     }
 }
@@ -25,21 +25,21 @@ pub struct BundleWitness {
 }
 
 impl BundleWitness {
-    pub const fn new(partials: Vec<PartialTxWitness>) -> Self {
+    #[must_use] pub const fn new(partials: Vec<PartialTxWitness>) -> Self {
         Self { partials }
     }
 
-    pub fn balance(&self) -> BalanceWitness {
-        BalanceWitness::combine(self.partials.iter().map(|ptx| ptx.balance()), [0u8; 16])
+    #[must_use] pub fn balance(&self) -> BalanceWitness {
+        BalanceWitness::combine(self.partials.iter().map(super::partial_tx::PartialTxWitness::balance), [0u8; 16])
     }
 
-    pub fn partial_witnesses(&self) -> &[PartialTxWitness] {
+    #[must_use] pub fn partial_witnesses(&self) -> &[PartialTxWitness] {
         &self.partials
     }
 
-    pub fn commit(&self) -> Bundle {
+    #[must_use] pub fn commit(&self) -> Bundle {
         Bundle {
-            partials: Vec::from_iter(self.partials.iter().map(|ptx| ptx.commit())),
+            partials: Vec::from_iter(self.partials.iter().map(super::partial_tx::PartialTxWitness::commit)),
         }
     }
 }

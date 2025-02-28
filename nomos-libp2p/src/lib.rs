@@ -146,11 +146,11 @@ impl Swarm {
             .any(|h| h == &topic_hash)
     }
 
-    pub fn topic_hash(topic: &str) -> TopicHash {
+    #[must_use] pub fn topic_hash(topic: &str) -> TopicHash {
         gossipsub::IdentTopic::new(topic).hash()
     }
 
-    pub fn multiaddr(ip: std::net::Ipv4Addr, port: u16) -> Multiaddr {
+    #[must_use] pub fn multiaddr(ip: std::net::Ipv4Addr, port: u16) -> Multiaddr {
         multiaddr!(Ip4(ip), Udp(port), QuicV1)
     }
 }

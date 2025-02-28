@@ -39,7 +39,7 @@ pub struct Host {
 }
 
 impl Host {
-    pub const fn default_validator_from_ip(ip: Ipv4Addr, identifier: String) -> Self {
+    #[must_use] pub const fn default_validator_from_ip(ip: Ipv4Addr, identifier: String) -> Self {
         Self {
             kind: HostKind::Validator,
             ip,
@@ -50,7 +50,7 @@ impl Host {
         }
     }
 
-    pub const fn default_executor_from_ip(ip: Ipv4Addr, identifier: String) -> Self {
+    #[must_use] pub const fn default_executor_from_ip(ip: Ipv4Addr, identifier: String) -> Self {
         Self {
             kind: HostKind::Executor,
             ip,
@@ -62,7 +62,7 @@ impl Host {
     }
 }
 
-pub fn create_node_configs(
+#[must_use] pub fn create_node_configs(
     consensus_params: ConsensusParams,
     da_params: DaParams,
     tracing_settings: TracingSettings,
@@ -98,11 +98,11 @@ pub fn create_node_configs(
         .collect();
 
     for (i, host) in hosts.into_iter().enumerate() {
-        let consensus_config = consensus_configs[i].to_owned();
-        let api_config = api_configs[i].to_owned();
+        let consensus_config = consensus_configs[i].clone();
+        let api_config = api_configs[i].clone();
 
         // DA Libp2p network config.
-        let mut da_config = da_configs[i].to_owned();
+        let mut da_config = da_configs[i].clone();
         da_config.addresses = new_peer_addresses.clone();
         da_config.listening_address = Multiaddr::from_str(&format!(
             "/ip4/0.0.0.0/udp/{}/quic-v1",
@@ -111,13 +111,13 @@ pub fn create_node_configs(
         .unwrap();
 
         // Libp2p network config.
-        let mut network_config = network_configs[i].to_owned();
+        let mut network_config = network_configs[i].clone();
         network_config.swarm_config.host = Ipv4Addr::from_str("0.0.0.0").unwrap();
         network_config.swarm_config.port = host.network_port;
         network_config.initial_peers = host_network_init_peers.clone();
 
         // Blend config.
-        let mut blend_config = blend_configs[i].to_owned();
+        let mut blend_config = blend_configs[i].clone();
         blend_config.backend.listening_address =
             Multiaddr::from_str(&format!("/ip4/0.0.0.0/udp/{}/quic-v1", host.blend_port)).unwrap();
         blend_config.membership = host_blend_membership.clone();
@@ -270,7 +270,7 @@ mod cfgsync_tests {
                 num_subnets: 2,
                 old_blobs_check_interval: Duration::from_secs(5),
                 blobs_validity_duration: Duration::from_secs(u64::MAX),
-                global_params_path: "".into(),
+                global_params_path: String::new(),
                 policy_settings: Default::default(),
                 monitor_settings: Default::default(),
                 balancer_interval: Duration::ZERO,
@@ -286,7 +286,7 @@ mod cfgsync_tests {
             hosts,
         );
 
-        for (host, config) in configs.iter() {
+        for (host, config) in &configs {
             let network_port = config.network_config.swarm_config.port;
             let da_network_port = extract_port(&config.da_config.listening_address);
             let blend_port = extract_port(&config.blend_config.backend.listening_address);

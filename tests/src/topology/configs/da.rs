@@ -83,7 +83,7 @@ pub struct GeneralDaConfig {
     pub redial_cooldown: Duration,
 }
 
-pub fn create_da_configs(ids: &[[u8; 32]], da_params: DaParams) -> Vec<GeneralDaConfig> {
+#[must_use] pub fn create_da_configs(ids: &[[u8; 32]], da_params: DaParams) -> Vec<GeneralDaConfig> {
     let mut node_keys = vec![];
     let mut peer_ids = vec![];
     let mut listening_addresses = vec![];
@@ -117,7 +117,7 @@ pub fn create_da_configs(ids: &[[u8; 32]], da_params: DaParams) -> Vec<GeneralDa
         .zip(node_keys)
         .enumerate()
         .map(|(i, (id, node_key))| {
-            let blob_storage_directory = PathBuf::from(format!("/tmp/blob_storage_{}", i));
+            let blob_storage_directory = PathBuf::from(format!("/tmp/blob_storage_{i}"));
             let verifier_sk = blst::min_sig::SecretKey::key_gen(id, &[]).unwrap();
             let verifier_sk_bytes = verifier_sk.to_bytes();
             let peer_id = peer_ids[i];

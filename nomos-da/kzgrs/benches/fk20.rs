@@ -15,7 +15,7 @@ use rand::SeedableRng;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 
 fn main() {
-    divan::main()
+    divan::main();
 }
 
 static GLOBAL_PARAMETERS: Lazy<GlobalParameters> = Lazy::new(|| {
@@ -64,7 +64,7 @@ fn compute_parallel_fk20_proofs_for_size(bencher: Bencher, size: usize) {
             (0..thread_count).into_par_iter().for_each(|_| {
                 fk20_batch_generate_elements_proofs(poly, &GLOBAL_PARAMETERS, None);
             });
-            black_box(())
+            black_box(());
         });
 }
 
@@ -111,6 +111,6 @@ fn compute_parallel_fk20_proofs_for_size_with_cache(bencher: Bencher, size: usiz
             (0..thread_count).into_par_iter().for_each(|_| {
                 fk20_batch_generate_elements_proofs(poly, &GLOBAL_PARAMETERS, Some(cache));
             });
-            black_box(())
+            black_box(());
         });
 }

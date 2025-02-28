@@ -199,7 +199,7 @@ impl<D: ConsistentLengthLayeredCipherData> ConsistentLengthLayeredCipher<D> {
                     &mut fillers[0..(i + 1) * Self::SINGLE_LAYER_SIZE],
                     key,
                     StreamCipherOption::FromBack,
-                )
+                );
             });
         fillers
     }
@@ -266,7 +266,7 @@ impl<D: ConsistentLengthLayeredCipherData> ConsistentLengthLayeredCipher<D> {
                 &pseudorandom_bytes[pseudorandom_bytes.len() - data.len()..]
             }
         };
-        Self::xor_in_place(data, pseudorandom_bytes)
+        Self::xor_in_place(data, pseudorandom_bytes);
     }
 
     // In-place XOR operation: b is applied to a.

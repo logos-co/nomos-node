@@ -113,7 +113,7 @@ impl<SerdeOp: StorageSerde + Send + Sync + 'static> StorageBackend for RocksBack
     }
 
     async fn load(&mut self, key: &[u8]) -> Result<Option<Bytes>, Self::Error> {
-        self.rocks.get(key).map(|opt| opt.map(|ivec| ivec.into()))
+        self.rocks.get(key).map(|opt| opt.map(std::convert::Into::into))
     }
 
     async fn load_prefix(&mut self, prefix: &[u8]) -> Result<Vec<Bytes>, Self::Error> {
@@ -135,7 +135,7 @@ impl<SerdeOp: StorageSerde + Send + Sync + 'static> StorageBackend for RocksBack
     async fn remove(&mut self, key: &[u8]) -> Result<Option<Bytes>, Self::Error> {
         self.load(key).await.and_then(|val| {
             if val.is_some() {
-                self.rocks.delete(key).map(|_| val)
+                self.rocks.delete(key).map(|()| val)
             } else {
                 Ok(None)
             }

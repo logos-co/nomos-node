@@ -35,7 +35,7 @@ pub enum ReplicationError {
 }
 
 impl ReplicationError {
-    pub const fn peer_id(&self) -> Option<&PeerId> {
+    #[must_use] pub const fn peer_id(&self) -> Option<&PeerId> {
         match self {
             Self::Io { peer_id, .. } => Some(peer_id),
         }
@@ -53,7 +53,7 @@ impl Clone for ReplicationError {
     }
 }
 
-/// Nomos DA BroadcastEvents to be bubble up to logic layers
+/// Nomos DA `BroadcastEvents` to be bubble up to logic layers
 #[derive(Debug)]
 pub enum ReplicationEvent {
     IncomingMessage {
@@ -72,7 +72,7 @@ impl From<ReplicationError> for ReplicationEvent {
 }
 
 impl ReplicationEvent {
-    pub fn blob_size(&self) -> Option<usize> {
+    #[must_use] pub fn blob_size(&self) -> Option<usize> {
         match self {
             Self::IncomingMessage { message, .. } => Some(message.blob.data.column_len()),
             _ => None,
@@ -148,7 +148,7 @@ where
             return;
         }
         self.seen_message_cache.insert(message_id);
-        self.send_message(message)
+        self.send_message(message);
     }
 
     pub fn send_message(&mut self, message: DaMessage) {
@@ -169,7 +169,7 @@ where
                 event: Either::Left(BehaviourEventToHandler::OutgoingMessage {
                     message: message.clone(),
                 }),
-            })
+            });
         }
         self.try_wake();
     }
@@ -417,7 +417,7 @@ mod tests {
         let mut all_behaviours = subnet_0_behaviours;
         all_behaviours.extend(subnet_1_behaviours);
 
-        for behaviour in all_behaviours.iter_mut() {
+        for behaviour in &mut all_behaviours {
             let membership_handler = MockMembershipHandler {
                 membership: membership.clone(),
             };

@@ -1,4 +1,4 @@
-/// Re-export for OpenAPI
+/// Re-export for `OpenAPI`
 #[cfg(feature = "openapi")]
 pub mod openapi {
     pub use crate::backend::Status;

@@ -10,7 +10,7 @@ pub struct Blob {
 }
 
 impl Blob {
-    pub const fn new(blob_id: BlobId, data: DaBlob) -> Self {
+    #[must_use] pub const fn new(blob_id: BlobId, data: DaBlob) -> Self {
         Self { blob_id, data }
     }
 }
@@ -30,7 +30,7 @@ pub struct CloseMessage {
 }
 
 impl CloseMessage {
-    pub const fn new(reason: CloseMessageReason) -> Self {
+    #[must_use] pub const fn new(reason: CloseMessageReason) -> Self {
         Self { reason }
     }
 }

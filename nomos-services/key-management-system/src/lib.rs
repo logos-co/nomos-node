@@ -135,10 +135,7 @@ where
         let KMSServiceSettings { backend_settings } =
             service_state.settings_reader.get_updated_settings();
         let backend = Backend::new(backend_settings);
-        Ok(Self {
-            service_state,
-            backend,
-        })
+        Ok(Self { backend, service_state })
     }
 
     async fn run(self) -> Result<(), DynError> {

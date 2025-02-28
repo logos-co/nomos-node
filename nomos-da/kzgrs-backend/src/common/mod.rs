@@ -21,16 +21,16 @@ pub type ColumnIndex = u16;
 pub const NOMOS_DA_DST: &[u8] = b"NOMOS_DA_AVAIL";
 
 impl Chunk {
-    pub fn len(&self) -> usize {
+    #[must_use] pub fn len(&self) -> usize {
         self.0.len()
     }
-    pub fn is_empty(&self) -> bool {
+    #[must_use] pub fn is_empty(&self) -> bool {
         self.len() == 0
     }
-    pub fn as_bytes(&self) -> Vec<u8> {
-        self.0.to_vec()
+    #[must_use] pub fn as_bytes(&self) -> Vec<u8> {
+        self.0.clone()
     }
-    pub const fn empty() -> Self {
+    #[must_use] pub const fn empty() -> Self {
         Self(vec![])
     }
 }
@@ -45,10 +45,10 @@ impl Row {
     pub fn iter(&self) -> impl Iterator<Item = &Chunk> {
         self.0.iter()
     }
-    pub fn len(&self) -> usize {
+    #[must_use] pub fn len(&self) -> usize {
         self.0.len()
     }
-    pub fn is_empty(&self) -> bool {
+    #[must_use] pub fn is_empty(&self) -> bool {
         self.len() == 0
     }
     pub fn as_bytes(&self) -> Vec<u8> {
@@ -60,10 +60,10 @@ impl Column {
     pub fn iter(&self) -> impl Iterator<Item = &Chunk> {
         self.0.iter()
     }
-    pub fn len(&self) -> usize {
+    #[must_use] pub fn len(&self) -> usize {
         self.0.len()
     }
-    pub fn is_empty(&self) -> bool {
+    #[must_use] pub fn is_empty(&self) -> bool {
         self.len() == 0
     }
     pub fn as_bytes(&self) -> Vec<u8> {
@@ -96,21 +96,21 @@ impl AsRef<[Chunk]> for Column {
 }
 
 impl ChunksMatrix {
-    pub fn len(&self) -> usize {
+    #[must_use] pub fn len(&self) -> usize {
         self.0.len()
     }
-    pub fn is_empty(&self) -> bool {
+    #[must_use] pub fn is_empty(&self) -> bool {
         self.len() == 0
     }
     pub fn rows(&self) -> impl Iterator<Item = &Row> + '_ {
         self.0.iter()
     }
     #[cfg(feature = "parallel")]
-    pub fn par_rows(&self) -> impl ParallelIterator<Item = &Row> + '_ {
+    #[must_use] pub fn par_rows(&self) -> impl ParallelIterator<Item = &Row> + '_ {
         self.0.par_iter()
     }
     pub fn columns(&self) -> impl Iterator<Item = Column> + '_ {
-        let size = self.0.first().map(|r| r.0.len()).unwrap_or(0);
+        let size = self.0.first().map_or(0, |r| r.0.len());
         (0..size).map(|i| {
             self.0
                 .iter()
@@ -119,7 +119,7 @@ impl ChunksMatrix {
         })
     }
 
-    pub fn transposed(&self) -> Self {
+    #[must_use] pub fn transposed(&self) -> Self {
         Self(self.columns().map(|c| Row(c.0)).collect())
     }
 
@@ -134,7 +134,7 @@ impl FromIterator<Row> for ChunksMatrix {
     }
 }
 
-pub fn hash_commitment<const HASH_SIZE: usize>(commitment: &Commitment) -> [u8; HASH_SIZE] {
+#[must_use] pub fn hash_commitment<const HASH_SIZE: usize>(commitment: &Commitment) -> [u8; HASH_SIZE] {
     let mut hasher = blake2::Blake2bVar::new(HASH_SIZE)
         .unwrap_or_else(|e| panic!("Blake2b should work for size {HASH_SIZE}, {e}"));
     hasher.update(commitment_to_bytes(commitment).as_ref());
@@ -145,7 +145,7 @@ pub fn hash_commitment<const HASH_SIZE: usize>(commitment: &Commitment) -> [u8; 
         .unwrap_or_else(|_| panic!("Size is guaranteed by constant {HASH_SIZE:?}"))
 }
 
-pub fn build_blob_id(
+#[must_use] pub fn build_blob_id(
     aggregated_column_commitment: &Commitment,
     rows_commitments: &[Commitment],
 ) -> [u8; 32] {
@@ -160,7 +160,7 @@ pub fn build_blob_id(
     hasher.finalize().into()
 }
 
-pub fn commitment_to_bytes(commitment: &Commitment) -> Vec<u8> {
+#[must_use] pub fn commitment_to_bytes(commitment: &Commitment) -> Vec<u8> {
     let mut buff = Cursor::new(vec![]);
     commitment
         .serialize_uncompressed(&mut buff)

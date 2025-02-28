@@ -12,7 +12,7 @@ use num_traits::Zero;
 /// original points plus the extra ones.
 ///
 /// `factor` need to be `>1`
-pub fn encode(
+#[must_use] pub fn encode(
     polynomial: &DensePolynomial<Fr>,
     domain: GeneralEvaluationDomain<Fr>,
 ) -> Evaluations<Fr> {
@@ -25,7 +25,7 @@ pub fn encode(
 /// original evaluations to recover the original data.
 /// `domain` need to be the same domain of the original `evaluations` and
 /// `polynomial` used for encoding.
-pub fn decode(
+#[must_use] pub fn decode(
     original_chunks_len: usize,
     points: &[Option<Fr>],
     domain: GeneralEvaluationDomain<Fr>,
@@ -33,7 +33,7 @@ pub fn decode(
     let (points, roots_of_unity): (Vec<Fr>, Vec<Fr>) = points
         .iter()
         .enumerate()
-        .flat_map(|(i, e)| e.map(|e| (e, domain.element(i))))
+        .filter_map(|(i, e)| e.map(|e| (e, domain.element(i))))
         .unzip();
     let coeffs = lagrange_interpolate(&points, &roots_of_unity);
     Evaluations::from_vec_and_domain(
@@ -49,10 +49,10 @@ pub fn decode(
 /// Interpolate a set of points using lagrange interpolation and roots of unity
 ///
 /// Warning!! Be aware that the mapping between points and roots of unity is the
-/// intended: A polynomial `f(x)` is derived for `w_x` (root) mapping to p_x.
+/// intended: A polynomial `f(x)` is derived for `w_x` (root) mapping to `p_x`.
 /// `[(w_1, p_1)..(w_n, p_n)]` even if points are missing it is important to
 /// keep the mapping integrity.
-pub fn lagrange_interpolate(points: &[Fr], roots_of_unity: &[Fr]) -> DensePolynomial<Fr> {
+#[must_use] pub fn lagrange_interpolate(points: &[Fr], roots_of_unity: &[Fr]) -> DensePolynomial<Fr> {
     assert_eq!(points.len(), roots_of_unity.len());
     let mut result = DensePolynomial::from_coefficients_vec(vec![Fr::zero()]);
     for i in 0..roots_of_unity.len() {
@@ -68,7 +68,7 @@ pub fn lagrange_interpolate(points: &[Fr], roots_of_unity: &[Fr]) -> DensePolyno
                 summand = summand.naive_mul(&DensePolynomial::from_coefficients_vec(vec![
                     weight_adjustment.mul(roots_of_unity[j]).neg(),
                     weight_adjustment,
-                ]))
+                ]));
             }
         }
         result = result + summand;

@@ -25,7 +25,7 @@ pub struct FileBackend<State, RecoverySettings, Serializer> {
 }
 
 impl<State, RecoverySettings, Serializer> FileBackend<State, RecoverySettings, Serializer> {
-    pub const fn recovery_file(&self) -> &PathBuf {
+    #[must_use] pub const fn recovery_file(&self) -> &PathBuf {
         &self.recovery_file
     }
 }

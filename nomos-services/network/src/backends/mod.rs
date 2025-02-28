@@ -1,7 +1,7 @@
 use overwatch_rs::{overwatch::handle::OverwatchHandle, services::state::ServiceState};
 use tokio::sync::broadcast::Receiver;
 
-use super::*;
+use super::{Debug, StreamExt, fmt, oneshot};
 
 #[cfg(feature = "libp2p")]
 pub mod libp2p;

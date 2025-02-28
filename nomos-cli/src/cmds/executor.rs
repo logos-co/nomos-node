@@ -64,7 +64,7 @@ impl Disseminate {
 
         match res_receiver.recv() {
             Ok(update) => match update {
-                Ok(_) => tracing::info!("Data successfully disseminated."),
+                Ok(()) => tracing::info!("Data successfully disseminated."),
                 Err(e) => {
                     tracing::error!("Error disseminating data: {e}");
                     return Err(e.into());
@@ -91,6 +91,6 @@ async fn disperse_data(
     let res = client
         .publish_blob(bytes, metadata)
         .await
-        .map_err(|err| format!("Failed to publish blob: {:?}", err));
+        .map_err(|err| format!("Failed to publish blob: {err:?}"));
     res_sender.send(res).unwrap();
 }

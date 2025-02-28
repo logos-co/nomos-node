@@ -128,9 +128,9 @@ impl BlendBehaviour {
                 ),
             limits: libp2p::connection_limits::Behaviour::new(
                 ConnectionLimits::default()
-                    .with_max_established(Some(config.max_peering_degree as u32))
-                    .with_max_established_incoming(Some(config.max_peering_degree as u32))
-                    .with_max_established_outgoing(Some(config.max_peering_degree as u32))
+                    .with_max_established(Some(u32::from(config.max_peering_degree)))
+                    .with_max_established_incoming(Some(u32::from(config.max_peering_degree)))
+                    .with_max_established_outgoing(Some(u32::from(config.max_peering_degree)))
                     // Blend protocol restricts the number of connections per peer to 1.
                     .with_max_established_per_peer(Some(1)),
             ),

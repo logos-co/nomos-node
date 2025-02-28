@@ -28,7 +28,7 @@ pub struct DaEncoderParams {
 impl DaEncoderParams {
     pub const MAX_BLS12_381_ENCODING_CHUNK_SIZE: usize = 31;
 
-    pub fn new(column_count: usize, with_cache: bool, global_parameters: GlobalParameters) -> Self {
+    #[must_use] pub fn new(column_count: usize, with_cache: bool, global_parameters: GlobalParameters) -> Self {
         let toeplitz1cache =
             with_cache.then(|| Toeplitz1Cache::with_size(&global_parameters, column_count));
         Self {
@@ -61,7 +61,7 @@ pub struct EncodedData {
 impl EncodedData {
     /// Returns a `DaBlob` for the given index.
     /// If the index is out of bounds, returns `None`.
-    pub fn to_da_blob(&self, index: usize) -> Option<DaBlob> {
+    #[must_use] pub fn to_da_blob(&self, index: usize) -> Option<DaBlob> {
         let column = self.extended_data.columns().nth(index)?;
         Some(DaBlob {
             column,
@@ -73,7 +73,7 @@ impl EncodedData {
             rows_proofs: self
                 .rows_proofs
                 .iter()
-                .map(|proofs| proofs.get(index).cloned().unwrap())
+                .map(|proofs| proofs.get(index).copied().unwrap())
                 .collect(),
         })
     }
@@ -109,7 +109,7 @@ pub struct EncodedDataIterator<'a> {
 }
 
 impl<'a> EncodedDataIterator<'a> {
-    pub const fn new(encoded_data: &'a EncodedData) -> Self {
+    #[must_use] pub const fn new(encoded_data: &'a EncodedData) -> Self {
         Self {
             encoded_data,
             next_index: 0,
@@ -132,7 +132,7 @@ pub struct DaEncoder {
 }
 
 impl DaEncoder {
-    pub const fn new(settings: DaEncoderParams) -> Self {
+    #[must_use] pub const fn new(settings: DaEncoderParams) -> Self {
         Self { params: settings }
     }
 
@@ -363,7 +363,7 @@ pub mod test {
         Lazy::new(|| DaEncoderParams::default_with(DOMAIN_SIZE));
     pub static ENCODER: Lazy<DaEncoder> = Lazy::new(|| DaEncoder::new(PARAMS.clone()));
 
-    pub fn rand_data(elements_count: usize) -> Vec<u8> {
+    #[must_use] pub fn rand_data(elements_count: usize) -> Vec<u8> {
         let mut buff = vec![0; elements_count * DaEncoderParams::MAX_BLS12_381_ENCODING_CHUNK_SIZE];
         rand::thread_rng().fill_bytes(&mut buff);
         buff
@@ -437,7 +437,7 @@ pub mod test {
             for (c1, c2) in izip!(r1.iter(), r2.iter()) {
                 assert_eq!(c1, c2);
             }
-            let points: Vec<_> = evals.evals.iter().cloned().map(Some).collect();
+            let points: Vec<_> = evals.evals.iter().copied().map(Some).collect();
             let poly_2 = decode(r1.len(), &points, domain);
             let (poly_1, _) = bytes_to_polynomial_unchecked::<BYTES_PER_FIELD_ELEMENT>(
                 r1.as_bytes().as_ref(),

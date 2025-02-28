@@ -355,7 +355,7 @@ pub fn new_node(
         },
         None,
     )
-    .map_err(|e| eprintln!("Error encountered: {}", e))
+    .map_err(|e| eprintln!("Error encountered: {e}"))
     .unwrap()
 }
 
@@ -421,7 +421,7 @@ pub fn new_client(db_path: PathBuf) -> Overwatch {
         },
         None,
     )
-    .map_err(|e| eprintln!("Error encountered: {}", e))
+    .map_err(|e| eprintln!("Error encountered: {e}"))
     .unwrap()
 }
 

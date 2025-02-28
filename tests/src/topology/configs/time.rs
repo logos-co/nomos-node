@@ -11,7 +11,7 @@ pub struct GeneralTimeConfig {
     pub chain_start_time: OffsetDateTime,
 }
 
-pub fn default_time_config() -> GeneralTimeConfig {
+#[must_use] pub fn default_time_config() -> GeneralTimeConfig {
     let slot_duration = std::env::var(CONSENSUS_SLOT_TIME_VAR)
         .map(|s| <u64>::from_str(&s).unwrap())
         .unwrap_or(DEFAULT_SLOT_TIME);

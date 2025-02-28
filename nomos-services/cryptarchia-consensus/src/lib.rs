@@ -406,17 +406,7 @@ where
         let time_relay = service_state.overwatch_handle.relay();
         let (block_subscription_sender, _) = broadcast::channel(16);
 
-        Ok(Self {
-            service_state,
-            network_relay,
-            blend_relay,
-            cl_mempool_relay,
-            da_mempool_relay,
-            block_subscription_sender,
-            storage_relay,
-            sampling_relay,
-            time_relay,
-        })
+        Ok(Self { service_state, network_relay, blend_relay, cl_mempool_relay, da_mempool_relay, sampling_relay, block_subscription_sender, storage_relay, time_relay })
     }
 
     async fn run(mut self) -> Result<(), overwatch_rs::DynError> {
@@ -586,7 +576,7 @@ impl<TxS, BxS, NetworkAdapterSettings, BlendAdapterSettings, TimeBackendSettings
         TimeBackendSettings,
     >
 {
-    pub fn new(tip: Option<HeaderId>, security_block: Option<HeaderId>) -> Self {
+    #[must_use] pub fn new(tip: Option<HeaderId>, security_block: Option<HeaderId>) -> Self {
         Self {
             tip,
             security_block,
@@ -721,12 +711,12 @@ where
                         .length(),
                 };
                 tx.send(info).unwrap_or_else(|e| {
-                    tracing::error!("Could not send consensus info through channel: {:?}", e)
+                    tracing::error!("Could not send consensus info through channel: {:?}", e);
                 });
             }
             ConsensusMsg::BlockSubscribe { sender } => {
                 sender.send(block_channel.subscribe()).unwrap_or_else(|_| {
-                    tracing::error!("Could not subscribe to block subscription channel")
+                    tracing::error!("Could not subscribe to block subscription channel");
                 });
             }
             ConsensusMsg::GetHeaders { from, to, tx } => {
@@ -829,8 +819,8 @@ where
 
                 cryptarchia = new_state;
             }
-            Err(Error::Ledger(nomos_ledger::LedgerError::ParentNotFound(parent)))
-            | Err(Error::Consensus(cryptarchia_engine::Error::ParentMissing(parent))) => {
+            Err(Error::Ledger(nomos_ledger::LedgerError::ParentNotFound(parent)) |
+Error::Consensus(cryptarchia_engine::Error::ParentMissing(parent))) => {
                 tracing::debug!("missing parent {:?}", parent);
                 // TODO: request parent block
             }
@@ -978,7 +968,7 @@ async fn mark_in_block<Payload, Item, Key>(
             block,
         })
         .await
-        .unwrap_or_else(|(e, _)| tracing::error!("Could not mark items in block: {e}"))
+        .unwrap_or_else(|(e, _)| tracing::error!("Could not mark items in block: {e}"));
 }
 
 async fn mark_blob_in_block<BlobId: Debug>(

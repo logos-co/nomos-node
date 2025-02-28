@@ -73,7 +73,7 @@ where
     M::PublicKey: PartialEq,
     IntervalProvider: IntervalStreamProvider,
 {
-    pub fn new(config: Config) -> Self {
+    #[must_use] pub fn new(config: Config) -> Self {
         let duplicate_cache = TimedCache::with_lifespan(config.duplicate_cache_lifespan);
         Self {
             config,
@@ -145,7 +145,7 @@ where
         hasher.finalize().to_vec()
     }
 
-    pub fn num_healthy_peers(&self) -> usize {
+    #[must_use] pub fn num_healthy_peers(&self) -> usize {
         self.negotiated_peers
             .iter()
             .filter(|(_, state)| **state == NegotiatedPeerState::Healthy)

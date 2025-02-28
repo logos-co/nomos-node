@@ -31,7 +31,7 @@ pub struct Metadata {
 }
 
 impl Metadata {
-    pub const fn new(app_id: [u8; 32], index: Index) -> Self {
+    #[must_use] pub const fn new(app_id: [u8; 32], index: Index) -> Self {
         Self { app_id, index }
     }
 
@@ -48,7 +48,7 @@ pub struct BlobInfo {
 }
 
 impl BlobInfo {
-    pub const fn new(id: [u8; 32], metadata: Metadata) -> Self {
+    #[must_use] pub const fn new(id: [u8; 32], metadata: Metadata) -> Self {
         Self { id, metadata }
     }
 }

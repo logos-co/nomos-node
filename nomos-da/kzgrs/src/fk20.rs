@@ -42,7 +42,7 @@ fn toeplitz3(mut h_extended_fft: Vec<G1Projective>) -> Vec<G1Projective> {
     h_extended_fft
 }
 
-pub fn fk20_batch_generate_elements_proofs(
+#[must_use] pub fn fk20_batch_generate_elements_proofs(
     polynomial: &Polynomial,
     global_parameters: &GlobalParameters,
     toeplitz1_cache: Option<&Toeplitz1Cache>,
@@ -85,7 +85,7 @@ pub fn fk20_batch_generate_elements_proofs(
 pub struct Toeplitz1Cache(Vec<G1Projective>);
 
 impl Toeplitz1Cache {
-    pub fn with_size(global_parameters: &GlobalParameters, polynomial_degree: usize) -> Self {
+    #[must_use] pub fn with_size(global_parameters: &GlobalParameters, polynomial_degree: usize) -> Self {
         let global_parameters: Vec<G1Affine> = global_parameters
             .powers_of_g
             .iter()

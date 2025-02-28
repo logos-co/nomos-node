@@ -52,7 +52,7 @@ impl Modify for SecurityAddon {
             components.add_security_scheme(
                 "api_key",
                 SecurityScheme::ApiKey(ApiKey::Header(ApiKeyValue::new("todo_apikey"))),
-            )
+            );
         }
     }
 }
@@ -118,7 +118,7 @@ fn test_todo() -> Result<(), Error> {
     let client = reqwest::blocking::Client::new();
 
     let response = client
-        .get(format!("http://{}/swagger-ui", addr))
+        .get(format!("http://{addr}/swagger-ui"))
         .send()
         .unwrap();
 
@@ -285,7 +285,7 @@ mod todo {
         headers: HeaderMap,
     ) -> StatusCode {
         match check_api_key(false, headers) {
-            Ok(_) => (),
+            Ok(()) => (),
             Err(_) => return StatusCode::UNAUTHORIZED,
         }
 
@@ -294,11 +294,10 @@ mod todo {
         todos
             .iter_mut()
             .find(|todo| todo.id == id)
-            .map(|todo| {
+            .map_or(StatusCode::NOT_FOUND, |todo| {
                 todo.done = true;
                 StatusCode::OK
             })
-            .unwrap_or(StatusCode::NOT_FOUND)
     }
 
     /// Delete Todo item by id
@@ -326,7 +325,7 @@ mod todo {
         headers: HeaderMap,
     ) -> impl IntoResponse {
         match check_api_key(true, headers) {
-            Ok(_) => (),
+            Ok(()) => (),
             Err(error) => return error.into_response(),
         }
 
@@ -336,14 +335,14 @@ mod todo {
 
         todos.retain(|todo| todo.id != id);
 
-        if todos.len() != len {
-            StatusCode::OK.into_response()
-        } else {
+        if todos.len() == len {
             (
                 StatusCode::NOT_FOUND,
                 Json(TodoError::NotFound(format!("id = {id}"))),
             )
                 .into_response()
+        } else {
+            StatusCode::OK.into_response()
         }
     }
 

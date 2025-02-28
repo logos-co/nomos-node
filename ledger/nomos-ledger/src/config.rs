@@ -10,16 +10,16 @@ pub struct Config {
 }
 
 impl Config {
-    pub fn base_period_length(&self) -> NonZero<u64> {
+    #[must_use] pub fn base_period_length(&self) -> NonZero<u64> {
         self.consensus_config.base_period_length()
     }
 
-    pub fn epoch_length(&self) -> u64 {
+    #[must_use] pub fn epoch_length(&self) -> u64 {
         self.epoch_config
             .epoch_length(self.consensus_config.base_period_length())
     }
 
-    pub fn nonce_snapshot(&self, epoch: Epoch) -> Slot {
+    #[must_use] pub fn nonce_snapshot(&self, epoch: Epoch) -> Slot {
         let offset = self.base_period_length().get().saturating_mul(
             u64::from(self.epoch_config.epoch_period_nonce_buffer.get()).saturating_add(u64::from(
                 self.epoch_config
@@ -32,11 +32,11 @@ impl Config {
         base.saturating_add(offset).into()
     }
 
-    pub fn stake_distribution_snapshot(&self, epoch: Epoch) -> Slot {
-        ((u32::from(epoch) - 1) as u64 * self.epoch_length()).into()
+    #[must_use] pub fn stake_distribution_snapshot(&self, epoch: Epoch) -> Slot {
+        (u64::from(u32::from(epoch) - 1) * self.epoch_length()).into()
     }
 
-    pub fn epoch(&self, slot: Slot) -> Epoch {
+    #[must_use] pub fn epoch(&self, slot: Slot) -> Epoch {
         self.epoch_config
             .epoch(slot, self.consensus_config.base_period_length())
     }

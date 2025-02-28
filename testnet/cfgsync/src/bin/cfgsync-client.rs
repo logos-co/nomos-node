@@ -31,7 +31,7 @@ async fn get_config<Config: Serialize + DeserializeOwned>(
         .json(&ClientIp { ip, identifier })
         .send()
         .await
-        .map_err(|err| format!("Failed to send IP announcement: {}", err))?;
+        .map_err(|err| format!("Failed to send IP announcement: {err}"))?;
 
     if !response.status().is_success() {
         return Err(format!("Server error: {:?}", response.status()));
@@ -40,15 +40,15 @@ async fn get_config<Config: Serialize + DeserializeOwned>(
     let config = response
         .json::<Config>()
         .await
-        .map_err(|err| format!("Failed to parse response: {}", err))?;
+        .map_err(|err| format!("Failed to parse response: {err}"))?;
 
     let yaml = serde_yaml::to_string(&config)
-        .map_err(|err| format!("Failed to serialize config to YAML: {}", err))?;
+        .map_err(|err| format!("Failed to serialize config to YAML: {err}"))?;
 
     fs::write(config_file, yaml)
-        .map_err(|err| format!("Failed to write config to file: {}", err))?;
+        .map_err(|err| format!("Failed to write config to file: {err}"))?;
 
-    println!("Config saved to {}", config_file);
+    println!("Config saved to {config_file}");
     Ok(())
 }
 
@@ -64,8 +64,8 @@ async fn main() {
     let host_kind = env::var("CFG_HOST_KIND").unwrap_or_else(|_| "validator".to_string());
 
     let node_config_endpoint = match host_kind.as_str() {
-        "executor" => format!("{}/executor", server_addr),
-        _ => format!("{}/validator", server_addr),
+        "executor" => format!("{server_addr}/executor"),
+        _ => format!("{server_addr}/validator"),
     };
 
     let config_result = match host_kind.as_str() {
@@ -81,7 +81,7 @@ async fn main() {
 
     // Handle error if the config request fails
     if let Err(err) = config_result {
-        eprintln!("Error: {}", err);
+        eprintln!("Error: {err}");
         process::exit(1);
     }
 }

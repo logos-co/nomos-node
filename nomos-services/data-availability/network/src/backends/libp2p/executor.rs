@@ -163,7 +163,7 @@ where
 
         std::thread::sleep(Duration::from_secs(1));
         // open streams to dispersal peers
-        for peer_id in dispersal_peers.iter() {
+        for peer_id in &dispersal_peers {
             executor_open_stream_sender.send(*peer_id).unwrap();
         }
 

@@ -136,7 +136,7 @@ pub mod test {
                         rows_proofs: vec![],
                     },
                 ))
-                .unwrap()
+                .unwrap();
         }
 
         assert_eq!(join_validator.await.unwrap().len(), msg_count);

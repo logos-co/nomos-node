@@ -2,7 +2,7 @@ use rand::{rngs::mock::StepRng, RngCore, SeedableRng};
 
 pub struct TestRng(StepRng);
 
-/// Implement RngCore for TestRng
+/// Implement `RngCore` for `TestRng`
 impl RngCore for TestRng {
     fn next_u32(&mut self) -> u32 {
         self.0.next_u32()
@@ -13,7 +13,7 @@ impl RngCore for TestRng {
     }
 
     fn fill_bytes(&mut self, dest: &mut [u8]) {
-        self.0.fill_bytes(dest)
+        self.0.fill_bytes(dest);
     }
 
     fn try_fill_bytes(&mut self, dest: &mut [u8]) -> Result<(), rand::Error> {

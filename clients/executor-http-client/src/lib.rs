@@ -17,7 +17,7 @@ pub struct BasicAuthCredentials {
 }
 
 impl BasicAuthCredentials {
-    pub const fn new(username: String, password: Option<String>) -> Self {
+    #[must_use] pub const fn new(username: String, password: Option<String>) -> Self {
         Self { username, password }
     }
 }
@@ -44,7 +44,7 @@ impl Default for ExecutorHttpClient {
 }
 
 impl ExecutorHttpClient {
-    pub const fn new(
+    #[must_use] pub const fn new(
         client: Client,
         executor_address: Url,
         basic_auth: Option<BasicAuthCredentials>,
@@ -81,8 +81,7 @@ impl ExecutorHttpClient {
             StatusCode::OK => Ok(()),
             StatusCode::INTERNAL_SERVER_ERROR => Err(Error::Server(body)),
             _ => Err(Error::Server(format!(
-                "Unexpected response [{}]: {}",
-                status, body
+                "Unexpected response [{status}]: {body}"
             ))),
         }
     }

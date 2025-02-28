@@ -116,7 +116,7 @@ mod test {
                                     rows_proofs: vec![],
                                 }),
                             })
-                            .unwrap()
+                            .unwrap();
                     }
                     Some(SwarmEvent::Behaviour(SamplingEvent::SamplingSuccess {
                         blob_id, ..

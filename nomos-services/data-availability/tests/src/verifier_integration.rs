@@ -238,7 +238,7 @@ fn test_verifier() {
                 rows_proofs: encoded_data
                     .rows_proofs
                     .iter()
-                    .map(|proofs| proofs.get(index).cloned().unwrap())
+                    .map(|proofs| proofs.get(index).copied().unwrap())
                     .collect(),
             };
 

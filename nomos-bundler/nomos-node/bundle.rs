@@ -104,7 +104,7 @@ fn build_package(version: String) {
 
     let arch = settings
         .target()
-        .split("-")
+        .split('-')
         .next()
         .expect("Could not determine target architecture.");
     info!("Bundling for '{}'", arch);
@@ -136,14 +136,11 @@ struct BundleArguments {
 fn parse_version(arguments: BundleArguments, cargo_package_version: String) -> String {
     if let Some(version) = arguments.version {
         // Check for version mismatch
-        if version != cargo_package_version {
-            // Maybe this should be a warning instead of a panic?
-            panic!(
-                "Error: Expected Cargo package version: '{}', but received argument: '{}'. \
-            Please ensure the version matches the Cargo package version.",
-                cargo_package_version, version
+        // Maybe this should be a warning instead of a panic?
+assert!((version == cargo_package_version), 
+                "Error: Expected Cargo package version: '{cargo_package_version}', but received argument: '{version}'. \
+            Please ensure the version matches the Cargo package version."
             );
-        }
 
         version
     } else {

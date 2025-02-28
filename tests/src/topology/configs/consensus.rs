@@ -15,7 +15,7 @@ pub struct ConsensusParams {
 }
 
 impl ConsensusParams {
-    pub const fn default_for_participants(n_participants: usize) -> Self {
+    #[must_use] pub const fn default_for_participants(n_participants: usize) -> Self {
         Self {
             n_participants,
             // by setting the slot coeff to 1, we also increase the probability of multiple blocks
@@ -38,7 +38,7 @@ pub struct GeneralConsensusConfig {
     pub genesis_state: LedgerState,
 }
 
-pub fn create_consensus_configs(
+#[must_use] pub fn create_consensus_configs(
     ids: &[[u8; 32]],
     consensus_params: ConsensusParams,
 ) -> Vec<GeneralConsensusConfig> {

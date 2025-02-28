@@ -59,7 +59,7 @@ impl SharedWriter {
         }
     }
 
-    pub fn into_inner(&self) -> Arc<Mutex<dyn Write + Send + Sync>> {
+    #[must_use] pub fn into_inner(&self) -> Arc<Mutex<dyn Write + Send + Sync>> {
         self.inner.clone()
     }
 
@@ -129,7 +129,7 @@ impl Default for TracingSettings {
 
 impl TracingSettings {
     #[inline]
-    pub const fn new(
+    #[must_use] pub const fn new(
         logger: LoggerLayer,
         tracing: TracingLayer,
         filter: FilterLayer,

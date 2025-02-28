@@ -244,19 +244,16 @@ where
                 }
                 // If the substream is idle, and if it's time to send a message, send it.
                 Some(OutboundSubstreamState::Idle(stream)) => {
-                    match self.outbound_msgs.pop_front() {
-                        Some(msg) => {
-                            tracing::debug!("Sending message to outbound stream: {:?}", msg);
-                            self.outbound_substream = Some(OutboundSubstreamState::PendingSend(
-                                send_msg(stream, msg).boxed(),
-                            ));
-                        }
-                        None => {
-                            tracing::debug!("Nothing to send to outbound stream");
-                            self.outbound_substream = Some(OutboundSubstreamState::Idle(stream));
-                            self.waker = Some(cx.waker().clone());
-                            return Poll::Pending;
-                        }
+                    if let Some(msg) = self.outbound_msgs.pop_front() {
+                        tracing::debug!("Sending message to outbound stream: {:?}", msg);
+                        self.outbound_substream = Some(OutboundSubstreamState::PendingSend(
+                            send_msg(stream, msg).boxed(),
+                        ));
+                    } else {
+                        tracing::debug!("Nothing to send to outbound stream");
+                        self.outbound_substream = Some(OutboundSubstreamState::Idle(stream));
+                        self.waker = Some(cx.waker().clone());
+                        return Poll::Pending;
                     }
                 }
                 // If a message is being sent, check if it's done.

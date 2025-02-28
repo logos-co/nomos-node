@@ -198,7 +198,7 @@ fn test_indexer() {
             rows_proofs: encoded_data
                 .rows_proofs
                 .iter()
-                .map(|proofs| proofs.get(i).cloned().unwrap())
+                .map(|proofs| proofs.get(i).copied().unwrap())
                 .collect(),
         };
 
@@ -257,7 +257,7 @@ fn test_indexer() {
             .unwrap();
         let broadcast_receiver = receiver.await.unwrap();
         let mut broadcast_receiver =
-            BroadcastStream::new(broadcast_receiver).filter_map(|result| result.ok());
+            BroadcastStream::new(broadcast_receiver).filter_map(std::result::Result::ok);
 
         // Mock both attested blobs by writting directly into the da storage.
         store_blobs_in_db(blobs, storage_outbound).await;
@@ -297,7 +297,7 @@ fn test_indexer() {
                         break;
                     }
                 }
-                _ = &mut timeout => {
+                () = &mut timeout => {
                     break;
                 }
             }

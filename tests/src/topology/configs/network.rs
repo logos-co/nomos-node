@@ -20,7 +20,7 @@ pub struct GeneralNetworkConfig {
     pub initial_peers: Vec<Multiaddr>,
 }
 
-pub fn create_network_configs(
+#[must_use] pub fn create_network_configs(
     ids: &[[u8; 32]],
     network_params: NetworkParams,
 ) -> Vec<GeneralNetworkConfig> {

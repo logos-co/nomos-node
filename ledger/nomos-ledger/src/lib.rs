@@ -70,15 +70,15 @@ impl EpochState {
         }
     }
 
-    pub const fn epoch(&self) -> Epoch {
+    #[must_use] pub const fn epoch(&self) -> Epoch {
         self.epoch
     }
 
-    pub const fn nonce(&self) -> &[u8; 32] {
+    #[must_use] pub const fn nonce(&self) -> &[u8; 32] {
         &self.nonce
     }
 
-    pub const fn total_stake(&self) -> Value {
+    #[must_use] pub const fn total_stake(&self) -> Value {
         self.total_stake
     }
 }
@@ -152,7 +152,7 @@ where
         self.states.get(id)
     }
 
-    pub const fn config(&self) -> &Config {
+    #[must_use] pub const fn config(&self) -> &Config {
         &self.config
     }
 }
@@ -346,7 +346,7 @@ impl LedgerState {
         Ok(self)
     }
 
-    pub fn is_nullified(&self, nullifier: &Nullifier) -> bool {
+    #[must_use] pub fn is_nullified(&self, nullifier: &Nullifier) -> bool {
         self.nullifiers.contains(nullifier)
     }
 
@@ -389,19 +389,19 @@ impl LedgerState {
         }
     }
 
-    pub const fn slot(&self) -> Slot {
+    #[must_use] pub const fn slot(&self) -> Slot {
         self.slot
     }
 
-    pub const fn epoch_state(&self) -> &EpochState {
+    #[must_use] pub const fn epoch_state(&self) -> &EpochState {
         &self.epoch_state
     }
 
-    pub const fn next_epoch_state(&self) -> &EpochState {
+    #[must_use] pub const fn next_epoch_state(&self) -> &EpochState {
         &self.next_epoch_state
     }
 
-    pub const fn lead_commitments(&self) -> &NoteTree {
+    #[must_use] pub const fn lead_commitments(&self) -> &NoteTree {
         &self.lead_commitments
     }
 }
@@ -564,7 +564,7 @@ pub mod tests {
         Ok(id)
     }
 
-    pub const fn config() -> Config {
+    #[must_use] pub const fn config() -> Config {
         Config {
             epoch_config: EpochConfig {
                 epoch_stake_distribution_stabilization: NonZero::new(4).unwrap(),
@@ -578,23 +578,23 @@ pub mod tests {
         }
     }
 
-    pub fn genesis_state(commitments: &[NoteCommitment]) -> LedgerState {
+    #[must_use] pub fn genesis_state(commitments: &[NoteCommitment]) -> LedgerState {
         LedgerState {
-            lead_commitments: commitments.iter().cloned().collect(),
-            spend_commitments: commitments.iter().cloned().collect(),
+            lead_commitments: commitments.iter().copied().collect(),
+            spend_commitments: commitments.iter().copied().collect(),
             nullifiers: Default::default(),
             nonce: [0; 32],
             slot: 0.into(),
             next_epoch_state: EpochState {
                 epoch: 1.into(),
                 nonce: [0; 32],
-                commitments: commitments.iter().cloned().collect(),
+                commitments: commitments.iter().copied().collect(),
                 total_stake: 1,
             },
             epoch_state: EpochState {
                 epoch: 0.into(),
                 nonce: [0; 32],
-                commitments: commitments.iter().cloned().collect(),
+                commitments: commitments.iter().copied().collect(),
                 total_stake: 1,
             },
         }

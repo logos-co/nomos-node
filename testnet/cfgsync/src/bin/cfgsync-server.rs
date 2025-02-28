@@ -46,9 +46,9 @@ struct CfgSyncConfig {
 impl CfgSyncConfig {
     fn load_from_file(file_path: &PathBuf) -> Result<Self, String> {
         let config_content = fs::read_to_string(file_path)
-            .map_err(|err| format!("Failed to read config file: {}", err))?;
+            .map_err(|err| format!("Failed to read config file: {err}"))?;
         serde_yaml::from_str(&config_content)
-            .map_err(|err| format!("Failed to parse config file: {}", err))
+            .map_err(|err| format!("Failed to parse config file: {err}"))
     }
 
     const fn to_consensus_params(&self) -> ConsensusParams {
@@ -134,7 +134,7 @@ async fn main() {
     let cli = Args::parse();
 
     let config = CfgSyncConfig::load_from_file(&cli.config).unwrap_or_else(|err| {
-        eprintln!("{}", err);
+        eprintln!("{err}");
         process::exit(1);
     });
     let consensus_params = config.to_consensus_params();

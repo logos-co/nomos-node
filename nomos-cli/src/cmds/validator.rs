@@ -37,7 +37,7 @@ fn parse_app_blobs(val: &str) -> Result<Vec<(Index, Vec<DaBlob>)>, String> {
 
 #[derive(Args, Debug)]
 pub struct Reconstruct {
-    /// DaBlobs to use for reconstruction. Half of the blobs per index is
+    /// `DaBlobs` to use for reconstruction. Half of the blobs per index is
     /// expected.
     #[clap(
         short,
@@ -68,9 +68,9 @@ impl Retrieve {
         match res_receiver.recv() {
             Ok(update) => match update {
                 Ok(app_blobs) => {
-                    for (index, blobs) in app_blobs.iter() {
+                    for (index, blobs) in &app_blobs {
                         tracing::info!("Index {:?} has {:} blobs", (index), blobs.len());
-                        for blob in blobs.iter() {
+                        for blob in blobs {
                             let blob = wire::deserialize::<DaBlob>(blob).unwrap();
                             tracing::info!("Index {:?}; Blob: {blob:?}", index.to_u64());
                         }
@@ -149,9 +149,9 @@ impl Reconstruct {
 
         let mut da_blobs = vec![];
 
-        for (index, blobs) in app_blobs.iter() {
+        for (index, blobs) in &app_blobs {
             tracing::info!("Index {:?} has {:} blobs", (index), blobs.len());
-            for blob in blobs.iter() {
+            for blob in blobs {
                 da_blobs.push(blob.clone());
                 tracing::info!("Index {:?}; DaBlob: {blob:?}", index.to_u64());
             }

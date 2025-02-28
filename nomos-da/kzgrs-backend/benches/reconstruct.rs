@@ -12,12 +12,12 @@ use nomos_core::da::DaEncoder as _;
 use rand::{prelude::IteratorRandom, thread_rng, RngCore};
 
 fn main() {
-    divan::main()
+    divan::main();
 }
 
 const MB: usize = 1024;
 
-pub fn rand_data(elements_count: usize) -> Vec<u8> {
+#[must_use] pub fn rand_data(elements_count: usize) -> Vec<u8> {
     let mut buff = vec![0; elements_count * DaEncoderParams::MAX_BLS12_381_ENCODING_CHUNK_SIZE];
     rand::thread_rng().fill_bytes(&mut buff);
     buff

@@ -90,7 +90,7 @@ where
         Ok(Self { branches, tips })
     }
 
-    pub fn branches(&self) -> Vec<Branch<Id>> {
+    #[must_use] pub fn branches(&self) -> Vec<Branch<Id>> {
         self.tips
             .iter()
             .map(|id| self.branches[id].clone())
@@ -245,7 +245,7 @@ pub mod tests {
     use super::{Cryptarchia, Slot};
     use crate::Config;
 
-    pub const fn config() -> Config {
+    #[must_use] pub const fn config() -> Config {
         Config {
             security_param: NonZero::new(1).unwrap(),
             active_slot_coeff: 1.0,
@@ -274,7 +274,7 @@ pub mod tests {
         let mut short_p = parent;
         // the node sees first the short chain
         for slot in 50..70 {
-            let new_block = hash(&format!("short-{}", slot));
+            let new_block = hash(&format!("short-{slot}"));
             engine = engine
                 .receive_block(new_block, short_p, slot.into())
                 .unwrap();
@@ -286,7 +286,7 @@ pub mod tests {
         // then it receives a longer chain which is however less dense after the fork
         for slot in 50..70 {
             if slot % 2 == 0 {
-                let new_block = hash(&format!("long-{}", slot));
+                let new_block = hash(&format!("long-{slot}"));
                 engine = engine
                     .receive_block(new_block, long_p, slot.into())
                     .unwrap();
@@ -297,7 +297,7 @@ pub mod tests {
         // even if the long chain is much longer, it will never be accepted as it's not
         // dense enough
         for slot in 70..100 {
-            let new_block = hash(&format!("long-{}", slot));
+            let new_block = hash(&format!("long-{slot}"));
             engine = engine
                 .receive_block(new_block, long_p, slot.into())
                 .unwrap();
@@ -326,7 +326,7 @@ pub mod tests {
         // a longer chain which is equally dense after the fork will be selected as the
         // main tip
         for slot in 50..71 {
-            let new_block = hash(&format!("long-dense-{}", slot));
+            let new_block = hash(&format!("long-dense-{slot}"));
             engine = engine
                 .receive_block(new_block, parent, slot.into())
                 .unwrap();

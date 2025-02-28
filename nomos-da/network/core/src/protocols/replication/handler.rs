@@ -68,7 +68,7 @@ pub struct ReplicationHandler {
 }
 
 impl ReplicationHandler {
-    pub fn new() -> Self {
+    #[must_use] pub fn new() -> Self {
         Self {
             inbound: None,
             outbound: None,
@@ -99,8 +99,7 @@ impl ReplicationHandler {
                     .await
                     .unwrap_or_else(|_| {
                         panic!(
-                            "Message should always be serializable.\nMessage: '{:?}'",
-                            message
+                            "Message should always be serializable.\nMessage: '{message:?}'"
                         )
                     });
                 stream.flush().await?;
@@ -251,14 +250,14 @@ impl ConnectionHandler for ReplicationHandler {
         match event {
             ConnectionEvent::FullyNegotiatedInbound(FullyNegotiatedInbound {
                 protocol: stream,
-                info: _,
+                info: (),
             }) => {
                 trace!("Received inbound stream");
                 self.inbound = Some(self.read_message(stream).boxed());
             }
             ConnectionEvent::FullyNegotiatedOutbound(FullyNegotiatedOutbound {
                 protocol: stream,
-                info: _,
+                info: (),
             }) => {
                 trace!("Received outbound stream");
                 self.outbound = Some(OutboundState::Idle(stream));

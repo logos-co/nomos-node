@@ -10,11 +10,11 @@ use libp2p::{Multiaddr, PeerId};
 pub struct AddressBook(Arc<HashMap<PeerId, Multiaddr>>);
 
 impl AddressBook {
-    pub fn empty() -> Self {
+    #[must_use] pub fn empty() -> Self {
         Self(Arc::new(HashMap::new()))
     }
 
-    pub fn get_address(&self, peer_id: &PeerId) -> Option<&Multiaddr> {
+    #[must_use] pub fn get_address(&self, peer_id: &PeerId) -> Option<&Multiaddr> {
         self.0.get(peer_id)
     }
 }

@@ -133,14 +133,14 @@ where
                 // split sending in two steps to help the compiler understand we do not
                 // need to hold an instance of &I (which is not send) across an await point
                 let _send = backend.process(msg);
-                _send.await
+                _send.await;
             }
             DaNetworkMsg::Subscribe { kind, sender } => sender
                 .send(backend.subscribe(kind).await)
                 .unwrap_or_else(|_| {
                     tracing::warn!(
                         "client hung up before a subscription handle could be established"
-                    )
+                    );
                 }),
         }
     }

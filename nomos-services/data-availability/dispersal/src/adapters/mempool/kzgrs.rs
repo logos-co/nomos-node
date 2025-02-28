@@ -111,6 +111,6 @@ where
         receiver
             .await
             .map_err(|e| Box::new(e) as DynError)?
-            .map_err(|_| "Failed to receive response from the mempool".into())
+            .map_err(|()| "Failed to receive response from the mempool".into())
     }
 }

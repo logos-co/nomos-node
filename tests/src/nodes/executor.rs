@@ -115,7 +115,7 @@ impl Executor {
             config,
         };
         tokio::time::timeout(adjust_timeout(Duration::from_secs(10)), async {
-            node.wait_online().await
+            node.wait_online().await;
         })
         .await
         .unwrap();
@@ -157,12 +157,12 @@ impl Executor {
             .await
     }
 
-    pub const fn config(&self) -> &Config {
+    #[must_use] pub const fn config(&self) -> &Config {
         &self.config
     }
 }
 
-pub fn create_executor_config(config: GeneralConfig) -> Config {
+#[must_use] pub fn create_executor_config(config: GeneralConfig) -> Config {
     Config {
         network: NetworkConfig {
             backend: Libp2pConfig {

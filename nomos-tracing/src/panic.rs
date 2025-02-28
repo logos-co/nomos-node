@@ -7,11 +7,11 @@ pub fn panic_hook(panic_info: &PanicHookInfo) {
     let payload = panic_info.payload();
 
     let payload = payload.downcast_ref::<&str>().map_or_else(
-        || payload.downcast_ref::<String>().map(|s| s.as_str()),
+        || payload.downcast_ref::<String>().map(std::string::String::as_str),
         |s| Some(&**s),
     );
 
-    let location = panic_info.location().map(|l| l.to_string());
+    let location = panic_info.location().map(std::string::ToString::to_string);
     let backtrace = Backtrace::capture();
     let note = (backtrace.status() == BacktraceStatus::Disabled)
         .then_some("run with RUST_BACKTRACE=1 environment variable to display a backtrace");

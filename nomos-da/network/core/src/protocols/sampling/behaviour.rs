@@ -76,7 +76,7 @@ pub enum SamplingError {
 }
 
 impl SamplingError {
-    pub const fn peer_id(&self) -> Option<&PeerId> {
+    #[must_use] pub const fn peer_id(&self) -> Option<&PeerId> {
         match self {
             Self::Io { peer_id, .. } => Some(peer_id),
             Self::Protocol { peer_id, .. } => Some(peer_id),
@@ -89,7 +89,7 @@ impl SamplingError {
         }
     }
 
-    pub const fn blob_id(&self) -> Option<&BlobId> {
+    #[must_use] pub const fn blob_id(&self) -> Option<&BlobId> {
         match self {
             Self::Deserialize { blob_id, .. } => Some(blob_id),
             _ => None,
@@ -263,7 +263,7 @@ pub struct SamplingBehaviour<Membership: MembershipHandler> {
     incoming_tasks: FuturesUnordered<IncomingStreamHandlerFuture>,
     /// Subnetworks membership information
     membership: Membership,
-    /// Pending blobs that need to be dispersed by PeerId
+    /// Pending blobs that need to be dispersed by `PeerId`
     to_sample: HashMap<PeerId, VecDeque<(Membership::NetworkId, BlobId)>>,
     /// Already connected peers connection Ids
     connected_peers: HashSet<PeerId>,
@@ -363,7 +363,7 @@ where
     ) -> Option<(SubnetworkId, BlobId)> {
         to_sample
             .get_mut(peer_id)
-            .and_then(|queue| queue.pop_front())
+            .and_then(std::collections::VecDeque::pop_front)
     }
 
     /// Handle outgoing stream
@@ -584,7 +584,7 @@ impl<M: MembershipHandler<Id = PeerId, NetworkId = SubnetworkId> + 'static> Netw
         if let FromSwarm::ConnectionClosed(connection_closed) = &event {
             self.connected_peers.remove(&connection_closed.peer_id);
         }
-        self.stream_behaviour.on_swarm_event(event)
+        self.stream_behaviour.on_swarm_event(event);
     }
 
     fn on_connection_handler_event(
@@ -595,7 +595,7 @@ impl<M: MembershipHandler<Id = PeerId, NetworkId = SubnetworkId> + 'static> Netw
     ) {
         let Either::Left(event) = event;
         self.stream_behaviour
-            .on_connection_handler_event(peer_id, connection_id, event)
+            .on_connection_handler_event(peer_id, connection_id, event);
     }
 
     fn poll(

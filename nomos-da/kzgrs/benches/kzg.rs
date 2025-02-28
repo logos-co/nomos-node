@@ -2,7 +2,7 @@ use ark_bls12_381::{Bls12_381, Fr};
 use ark_poly::{univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain};
 use ark_poly_commit::kzg10::{UniversalParams, KZG10};
 use divan::{black_box, counter::ItemsCount, Bencher};
-use kzgrs::{common::bytes_to_polynomial_unchecked, kzg::*};
+use kzgrs::{common::bytes_to_polynomial_unchecked, kzg::{commit_polynomial, generate_element_proof, verify_element_proof}};
 use once_cell::sync::Lazy;
 use rand::RngCore;
 #[cfg(feature = "parallel")]
@@ -11,7 +11,7 @@ use rayon::iter::IntoParallelIterator;
 use rayon::iter::ParallelIterator;
 
 fn main() {
-    divan::main()
+    divan::main();
 }
 
 // This allocator setting seems like it doesn't work on windows. Disable for

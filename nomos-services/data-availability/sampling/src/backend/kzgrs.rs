@@ -128,7 +128,7 @@ impl<R: Rng + Sync + Send> DaSamplingServiceBackend<R> for KzgrsSamplingBackend<
     }
 
     fn prune(&mut self) {
-        self.prune_by_time()
+        self.prune_by_time();
     }
 }
 
@@ -170,7 +170,7 @@ mod test {
         let state = backend.init_sampling(blob_id).await;
 
         if let SamplingState::Init(subnets) = state {
-            let unique_subnet_ids: HashSet<_> = subnets.iter().cloned().collect();
+            let unique_subnet_ids: HashSet<_> = subnets.iter().copied().collect();
 
             assert_eq!(
                 unique_subnet_ids.len(),
@@ -357,7 +357,7 @@ mod test {
         // second set: will fail for expired
         let ctx11 = SamplingContext {
             subnets: HashSet::new(),
-            started: Instant::now() - Duration::from_secs(1),
+            started: Instant::now().checked_sub(Duration::from_secs(1)).unwrap(),
         };
         let ctx12 = ctx11.clone();
         let ctx13 = ctx11.clone();

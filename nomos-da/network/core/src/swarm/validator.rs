@@ -204,7 +204,7 @@ where
             self.swarm.behaviour_mut().monitor_behaviour_mut(),
             MonitorEvent::from(&event),
         );
-        handle_sampling_event(&self.sampling_events_sender, event).await
+        handle_sampling_event(&self.sampling_events_sender, event).await;
     }
 
     async fn handle_dispersal_event(&mut self, event: DispersalEvent) {
@@ -217,7 +217,7 @@ where
             self.swarm.behaviour_mut().replication_behaviour_mut(),
             event,
         )
-        .await
+        .await;
     }
 
     async fn handle_replication_event(&mut self, event: ReplicationEvent) {
@@ -225,7 +225,7 @@ where
             self.swarm.behaviour_mut().monitor_behaviour_mut(),
             MonitorEvent::from(&event),
         );
-        handle_replication_event(&self.validation_events_sender, event).await
+        handle_replication_event(&self.validation_events_sender, event).await;
     }
 
     async fn handle_behaviour_event(

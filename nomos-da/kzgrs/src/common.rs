@@ -109,7 +109,7 @@ pub fn bytes_to_polynomial<const CHUNK_SIZE: usize>(
 /// Then use FFT to transform that polynomial into coefficient form. No extra
 /// checks are done for the caller. Caller need to ensure that `CHUNK_SIZE` is
 /// not bigger than the underlying `Fr` element can be decoded from.
-pub fn bytes_to_polynomial_unchecked<const CHUNK_SIZE: usize>(
+#[must_use] pub fn bytes_to_polynomial_unchecked<const CHUNK_SIZE: usize>(
     data: &[u8],
     domain: GeneralEvaluationDomain<Fr>,
 ) -> (Evaluations<Fr>, DensePolynomial<Fr>) {
@@ -123,12 +123,12 @@ pub fn bytes_to_polynomial_unchecked<const CHUNK_SIZE: usize>(
 /// This transformation is bounds unchecked, it's up to the caller to know if
 /// data fits within the bls modulus.
 /// Data len cannot be higher than `BYTES_PER_FIELD_ELEMENT`
-pub fn field_element_from_bytes_le(b: &[u8]) -> FieldElement {
+#[must_use] pub fn field_element_from_bytes_le(b: &[u8]) -> FieldElement {
     assert!(b.len() <= BYTES_PER_FIELD_ELEMENT);
     FieldElement::from(BigUint::from_bytes_le(b))
 }
 
-pub fn compute_roots_of_unity(size: usize) -> Vec<Fr> {
+#[must_use] pub fn compute_roots_of_unity(size: usize) -> Vec<Fr> {
     let domain = GeneralEvaluationDomain::new(size).unwrap();
     domain.elements().take(size).collect()
 }
@@ -166,7 +166,7 @@ mod test {
             assert_eq!(
                 &bytes[CHUNK_SIZE * i..CHUNK_SIZE * i + CHUNK_SIZE],
                 &point.into_bigint().to_bytes_le()[..CHUNK_SIZE]
-            )
+            );
         }
     }
 

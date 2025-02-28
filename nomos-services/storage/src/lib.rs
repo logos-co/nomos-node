@@ -53,14 +53,14 @@ pub struct StorageReplyReceiver<T, Backend> {
 }
 
 impl<T, Backend> StorageReplyReceiver<T, Backend> {
-    pub fn new(channel: tokio::sync::oneshot::Receiver<T>) -> Self {
+    #[must_use] pub fn new(channel: tokio::sync::oneshot::Receiver<T>) -> Self {
         Self {
             channel,
             _backend: Default::default(),
         }
     }
 
-    pub fn into_inner(self) -> tokio::sync::oneshot::Receiver<T> {
+    #[must_use] pub fn into_inner(self) -> tokio::sync::oneshot::Receiver<T> {
         self.channel
     }
 }

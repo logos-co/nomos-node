@@ -31,7 +31,7 @@ pub enum DispersalError {
 }
 
 impl DispersalError {
-    pub const fn peer_id(&self) -> Option<&PeerId> {
+    #[must_use] pub const fn peer_id(&self) -> Option<&PeerId> {
         match self {
             Self::Io { peer_id, .. } => Some(peer_id),
         }
@@ -60,7 +60,7 @@ pub enum DispersalEvent {
 }
 
 impl DispersalEvent {
-    pub fn blob_size(&self) -> Option<usize> {
+    #[must_use] pub fn blob_size(&self) -> Option<usize> {
         match self {
             Self::IncomingMessage { message } => Some(message.blob.data.column_len()),
             _ => None,
@@ -161,7 +161,7 @@ impl<M: MembershipHandler<Id = PeerId, NetworkId = SubnetworkId> + 'static> Netw
     }
 
     fn on_swarm_event(&mut self, event: FromSwarm) {
-        self.stream_behaviour.on_swarm_event(event)
+        self.stream_behaviour.on_swarm_event(event);
     }
 
     fn on_connection_handler_event(
@@ -172,7 +172,7 @@ impl<M: MembershipHandler<Id = PeerId, NetworkId = SubnetworkId> + 'static> Netw
     ) {
         let Either::Left(event) = event;
         self.stream_behaviour
-            .on_connection_handler_event(peer_id, connection_id, event)
+            .on_connection_handler_event(peer_id, connection_id, event);
     }
 
     fn poll(
