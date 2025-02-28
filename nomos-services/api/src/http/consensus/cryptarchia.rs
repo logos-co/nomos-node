@@ -34,6 +34,9 @@ pub type Cryptarchia<
     SamplingNetworkAdapter,
     SamplingRng,
     SamplingStorage,
+    DaVerifierBackend,
+    DaVerifierNetwork,
+    DaVerifierStorage,
     TimeBackend,
     const SIZE: usize,
 > = CryptarchiaConsensus<
@@ -50,20 +53,27 @@ pub type Cryptarchia<
     SamplingNetworkAdapter,
     SamplingRng,
     SamplingStorage,
+    DaVerifierBackend,
+    DaVerifierNetwork,
+    DaVerifierStorage,
     TimeBackend,
 >;
 
 pub async fn cryptarchia_info<
+    'a,
     Tx,
     SS,
     SamplingBackend,
     SamplingNetworkAdapter,
     SamplingRng,
     SamplingStorage,
+    DaVerifierBackend,
+    DaVerifierNetwork,
+    DaVerifierStorage,
     TimeBackend,
     const SIZE: usize,
 >(
-    handle: &OverwatchHandle,
+    handle: &'a OverwatchHandle,
 ) -> Result<CryptarchiaInfo, DynError>
 where
     Tx: Transaction
@@ -86,6 +96,11 @@ where
     SamplingBackend::BlobId: Debug + 'static,
     SamplingNetworkAdapter: nomos_da_sampling::network::NetworkAdapter,
     SamplingStorage: nomos_da_sampling::storage::DaStorageAdapter,
+    DaVerifierStorage: nomos_da_verifier::storage::DaStorageAdapter,
+    DaVerifierBackend: nomos_da_verifier::backend::VerifierBackend + Send + 'static,
+    DaVerifierBackend::Settings: Clone,
+    DaVerifierNetwork: nomos_da_verifier::network::NetworkAdapter,
+    DaVerifierNetwork::Settings: Clone,
     TimeBackend: nomos_time::backends::TimeBackend,
     TimeBackend::Settings: Clone + Send + Sync,
 {
@@ -97,6 +112,9 @@ where
             SamplingNetworkAdapter,
             SamplingRng,
             SamplingStorage,
+            DaVerifierBackend,
+            DaVerifierNetwork,
+            DaVerifierStorage,
             TimeBackend,
             SIZE,
         >>()
@@ -111,17 +129,22 @@ where
     Ok(receiver.await?)
 }
 
+#[allow(clippy::type_complexity)]
 pub async fn cryptarchia_headers<
+    'a,
     Tx,
     SS,
     SamplingBackend,
     SamplingNetworkAdapter,
     SamplingRng,
     SamplingStorage,
+    DaVerifierBackend,
+    DaVerifierNetwork,
+    DaVerifierStorage,
     TimeBackend,
     const SIZE: usize,
 >(
-    handle: &OverwatchHandle,
+    handle: &'a OverwatchHandle,
     from: Option<HeaderId>,
     to: Option<HeaderId>,
 ) -> Result<Vec<HeaderId>, DynError>
@@ -146,6 +169,11 @@ where
     SamplingBackend::BlobId: Debug + 'static,
     SamplingNetworkAdapter: nomos_da_sampling::network::NetworkAdapter,
     SamplingStorage: nomos_da_sampling::storage::DaStorageAdapter,
+    DaVerifierStorage: nomos_da_verifier::storage::DaStorageAdapter,
+    DaVerifierBackend: nomos_da_verifier::backend::VerifierBackend + Send + 'static,
+    DaVerifierBackend::Settings: Clone,
+    DaVerifierNetwork: nomos_da_verifier::network::NetworkAdapter,
+    DaVerifierNetwork::Settings: Clone,
     TimeBackend: nomos_time::backends::TimeBackend,
     TimeBackend::Settings: Clone + Send + Sync,
 {
@@ -157,6 +185,9 @@ where
             SamplingNetworkAdapter,
             SamplingRng,
             SamplingStorage,
+            DaVerifierBackend,
+            DaVerifierNetwork,
+            DaVerifierStorage,
             TimeBackend,
             SIZE,
         >>()
