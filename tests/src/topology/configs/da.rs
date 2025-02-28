@@ -6,7 +6,6 @@ use std::{
     time::Duration,
 };
 
-use fixed::types::U57F7;
 use nomos_da_network_core::swarm::{DAConnectionMonitorSettings, DAConnectionPolicySettings};
 use nomos_libp2p::{ed25519, Multiaddr, PeerId};
 use nomos_node::NomosDaMembership;

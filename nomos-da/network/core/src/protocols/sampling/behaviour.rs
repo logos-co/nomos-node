@@ -240,11 +240,12 @@ struct ResponseChannel {
     response_receiver: Receiver<BehaviourSampleRes>,
 }
 
-type StreamHandlerFutureSuccess = (BlobId, SubnetworkId, sampling::SampleResponse, SampleStream);
-type StreamHandlerFutureError = (SamplingError, Option<SampleStream>);
+type StreamWriterFutureSuccess = (BlobId, SubnetworkId, sampling::SampleResponse, SampleStream);
+type StreamWriterFutureError = (SamplingError, Option<SampleStream>);
 type OutgoingStreamHandlerFuture =
-    BoxFuture<'static, Result<StreamHandlerFutureSuccess, StreamHandlerFutureError>>;
-type IncomingStreamHandlerFuture = BoxFuture<'static, Result<SampleStream, SamplingError>>;
+    BoxFuture<'static, Result<StreamWriterFutureSuccess, StreamWriterFutureError>>;
+type IncomingStreamHandlerFuture =
+    BoxFuture<'static, Result<SampleStream, (SamplingError, SampleStream)>>;
 /// Executor sampling protocol
 /// Takes care of sending and replying sampling requests
 pub struct SamplingBehaviour<Membership: MembershipHandler> {
@@ -339,7 +340,7 @@ where
         message: sampling::SampleRequest,
         subnetwork_id: SubnetworkId,
         blob_id: BlobId,
-    ) -> Result<StreamHandlerFutureSuccess, StreamHandlerFutureError> {
+    ) -> Result<StreamWriterFutureSuccess, StreamWriterFutureError> {
         if let Err(error) = pack_to_writer(&message, &mut stream.stream).await {
             return Err((
                 SamplingError::Io {
@@ -410,53 +411,81 @@ where
         }
     }
 
-    /// Handler incoming streams
-    /// Pull a request from the stream and replies if possible
+    /// Handler for incoming streams
+    /// Pulls a request from the stream and replies if possible
     async fn handle_incoming_stream(
         mut stream: SampleStream,
         channel: ResponseChannel,
-    ) -> Result<SampleStream, SamplingError> {
-        let request: sampling::SampleRequest = unpack_from_reader(&mut stream.stream)
-            .await
-            .map_err(|error| SamplingError::Io {
-                peer_id: stream.peer_id,
-                error,
-            })?;
-        let request = BehaviourSampleReq::try_from(request).map_err(|blob_id| {
-            SamplingError::InvalidBlobId {
-                peer_id: stream.peer_id,
-                blob_id,
+    ) -> Result<SampleStream, (SamplingError, SampleStream)> {
+        let request: sampling::SampleRequest = match unpack_from_reader(&mut stream.stream).await {
+            Ok(req) => req,
+            Err(error) => {
+                return Err((
+                    SamplingError::Io {
+                        peer_id: stream.peer_id,
+                        error,
+                    },
+                    stream,
+                ))
             }
-        })?;
-        channel
-            .request_sender
-            .send(request)
-            .map_err(|request| SamplingError::RequestChannel {
-                request,
-                peer_id: stream.peer_id,
-            })?;
-        let response: sampling::SampleResponse = channel
-            .response_receiver
-            .await
-            .map_err(|error| SamplingError::ResponseChannel {
-                error,
-                peer_id: stream.peer_id,
-            })?
-            .into();
-        pack_to_writer(&response, &mut stream.stream)
-            .map_err(|error| SamplingError::Io {
-                peer_id: stream.peer_id,
-                error,
-            })
-            .await?;
-        stream
-            .stream
-            .flush()
-            .await
-            .map_err(|error| SamplingError::Io {
-                peer_id: stream.peer_id,
-                error,
-            })?;
+        };
+
+        let request = match BehaviourSampleReq::try_from(request) {
+            Ok(req) => req,
+            Err(blob_id) => {
+                return Err((
+                    SamplingError::InvalidBlobId {
+                        peer_id: stream.peer_id,
+                        blob_id,
+                    },
+                    stream,
+                ))
+            }
+        };
+
+        if let Err(request) = channel.request_sender.send(request) {
+            return Err((
+                SamplingError::RequestChannel {
+                    request,
+                    peer_id: stream.peer_id,
+                },
+                stream,
+            ));
+        }
+
+        let response: sampling::SampleResponse = match channel.response_receiver.await {
+            Ok(resp) => resp.into(),
+            Err(error) => {
+                return Err((
+                    SamplingError::ResponseChannel {
+                        error,
+                        peer_id: stream.peer_id,
+                    },
+                    stream,
+                ))
+            }
+        };
+
+        if let Err(error) = pack_to_writer(&response, &mut stream.stream).await {
+            return Err((
+                SamplingError::Io {
+                    peer_id: stream.peer_id,
+                    error,
+                },
+                stream,
+            ));
+        }
+
+        if let Err(error) = stream.stream.flush().await {
+            return Err((
+                SamplingError::Io {
+                    peer_id: stream.peer_id,
+                    error,
+                },
+                stream,
+            ));
+        }
+
         Ok(stream)
     }
 
@@ -466,6 +495,7 @@ where
     fn schedule_incoming_stream_task(
         incoming_tasks: &FuturesUnordered<IncomingStreamHandlerFuture>,
         sample_stream: SampleStream,
+        cx: &mut Context<'_>,
     ) -> (Receiver<BehaviourSampleReq>, Sender<BehaviourSampleRes>) {
         let (request_sender, request_receiver) = oneshot::channel();
         let (response_sender, response_receiver) = oneshot::channel();
@@ -474,6 +504,8 @@ where
             response_receiver,
         };
         incoming_tasks.push(Self::handle_incoming_stream(sample_stream, channel).boxed());
+        // Scheduled a task, lets poll again.
+        cx.waker().wake_by_ref();
         (request_receiver, response_sender)
     }
 }
@@ -667,9 +699,7 @@ impl<M: MembershipHandler<Id = PeerId, NetworkId = SubnetworkId> + 'static> Netw
         if let Poll::Ready(Some((peer_id, stream))) = incoming_streams.poll_next_unpin(cx) {
             let sample_stream = SampleStream { stream, peer_id };
             let (request_receiver, response_sender) =
-                Self::schedule_incoming_stream_task(incoming_tasks, sample_stream);
-            // Sheduled a task, lets poll again.
-            cx.waker().wake_by_ref();
+                Self::schedule_incoming_stream_task(incoming_tasks, sample_stream, cx);
             return Poll::Ready(ToSwarm::GenerateEvent(SamplingEvent::IncomingSample {
                 request_receiver,
                 response_sender,
@@ -680,22 +710,22 @@ impl<M: MembershipHandler<Id = PeerId, NetworkId = SubnetworkId> + 'static> Netw
             match res {
                 Ok(sample_stream) => {
                     let (request_receiver, response_sender) =
-                        Self::schedule_incoming_stream_task(incoming_tasks, sample_stream);
-                    // Sheduled a task, lets poll again.
-                    cx.waker().wake_by_ref();
+                        Self::schedule_incoming_stream_task(incoming_tasks, sample_stream, cx);
                     return Poll::Ready(ToSwarm::GenerateEvent(SamplingEvent::IncomingSample {
                         request_receiver,
                         response_sender,
                     }));
                 }
-                //  Ignore `UnexpectedEof` errors and continue polling, stream is closeed by the
+                //  Ignore `UnexpectedEof` errors and continue polling, stream is closed by the
                 //  sender after the message is sent.
-                Err(SamplingError::Io { error, .. })
+                Err((SamplingError::Io { error, .. }, stream))
                     if error.kind() == std::io::ErrorKind::UnexpectedEof =>
                 {
+                    to_close.push_back(stream);
+                    cx.waker().wake_by_ref();
                     return Poll::Pending;
                 }
-                Err(error) => {
+                Err((error, _)) => {
                     return Poll::Ready(ToSwarm::GenerateEvent(SamplingEvent::SamplingError {
                         error,
                     }))
@@ -716,10 +746,11 @@ impl<M: MembershipHandler<Id = PeerId, NetworkId = SubnetworkId> + 'static> Netw
                 return Poll::Ready(ToSwarm::Dial { opts });
             }
         }
-        // discard stream, if still pending pushback to close later
+        // Discard stream, if still pending pushback to close later.
         if let Some(mut stream) = to_close.pop_front() {
             if stream.stream.close().poll_unpin(cx).is_pending() {
                 to_close.push_back(stream);
+                cx.waker().wake_by_ref();
             }
         }
 
