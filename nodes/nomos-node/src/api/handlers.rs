@@ -343,7 +343,7 @@ pub async fn libp2p_info(State(handle): State<OverwatchHandle>) -> Response {
     get,
     path = paths::STORAGE_BLOCK,
     responses(
-        (status = 200, description = "Get the block by block id", body = Block<Tx, kzgrs_backend::dispersal::BlobInfo>),
+        (status = 200, description = "Get the block by block id", body = HeaderId),
         (status = 500, description = "Internal server error", body = String),
     )
 )]
@@ -356,6 +356,31 @@ where
     S: StorageSerde + Send + Sync + 'static,
 {
     make_request_and_return_response!(storage::block_req::<S, Tx>(&handle, id))
+}
+
+#[utoipa::path(
+    get,
+    path = paths::DA_GET_SHARED_COMMITMENTS,
+    responses(
+        (status = 200, description = "Get blob shared commitments", body = <DaBlob as Blob>::BlobId),
+        (status = 500, description = "Internal server error", body = String),
+    )
+)]
+pub async fn da_get_commitments<StorageOp, DaBlob>(
+    State(handle): State<OverwatchHandle>,
+    Json(blob_id): Json<<DaBlob as Blob>::BlobId>,
+) -> Response
+where
+    DaBlob: Blob + Serialize + DeserializeOwned + Clone + Send + Sync + 'static,
+    <DaBlob as Blob>::BlobId:
+        AsRef<[u8]> + Serialize + DeserializeOwned + Clone + Send + Sync + 'static,
+    <DaBlob as Blob>::SharedCommitments:
+        serde::Serialize + DeserializeOwned + Send + Sync + 'static,
+    StorageOp: StorageSerde + Send + Sync + 'static,
+{
+    make_request_and_return_response!(storage::get_shared_commitments::<StorageOp, DaBlob>(
+        &handle, blob_id
+    ))
 }
 
 #[utoipa::path(
