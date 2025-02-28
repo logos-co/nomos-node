@@ -45,7 +45,13 @@ pub struct NoteWitness {
 }
 
 impl NoteWitness {
-    pub const fn new(value: u64, unit: Unit, covenant: Covenant, state: [u8; 32], nonce: Nonce) -> Self {
+    pub const fn new(
+        value: u64,
+        unit: Unit,
+        covenant: Covenant,
+        state: [u8; 32],
+        nonce: Nonce,
+    ) -> Self {
         Self {
             value,
             unit,

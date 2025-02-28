@@ -75,9 +75,7 @@ impl From<ReplicationError> for ReplicationEvent {
 impl ReplicationEvent {
     pub fn blob_size(&self) -> Option<usize> {
         match self {
-            Self::IncomingMessage { message, .. } => {
-                Some(message.blob.data.column_len())
-            }
+            Self::IncomingMessage { message, .. } => Some(message.blob.data.column_len()),
             _ => None,
         }
     }

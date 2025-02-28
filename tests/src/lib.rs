@@ -1,13 +1,20 @@
 pub mod nodes;
 pub mod topology;
 
-use std::{env, net::TcpListener, ops::Mul, sync::Mutex, time::Duration};
+use std::{
+    env,
+    net::TcpListener,
+    ops::Mul,
+    sync::atomic::{AtomicU16, Ordering},
+    time::Duration,
+};
 
 use nomos_libp2p::{Multiaddr, PeerId, Swarm};
 use once_cell::sync::Lazy;
 use rand::{thread_rng, Rng};
 
-static NET_PORT: Lazy<Mutex<u16>> = Lazy::new(|| Mutex::new(thread_rng().gen_range(8000..10000)));
+static NET_PORT: Lazy<AtomicU16> =
+    Lazy::new(|| AtomicU16::new(thread_rng().gen_range(8000..10000)));
 
 static IS_SLOW_TEST_ENV: Lazy<bool> =
     Lazy::new(|| env::var("SLOW_TEST_ENV").is_ok_and(|s| s == "true"));
@@ -29,12 +36,12 @@ pub static IS_DEBUG_TRACING: Lazy<bool> =
     Lazy::new(|| env::var("NOMOS_TESTS_TRACING").is_ok_and(|val| val.eq_ignore_ascii_case("true")));
 
 pub fn get_available_port() -> u16 {
-    let mut port = NET_PORT.lock().unwrap();
-    *port += 1;
-    while TcpListener::bind(("127.0.0.1", *port)).is_err() {
-        *port += 1;
+    loop {
+        let port = NET_PORT.fetch_add(1, Ordering::SeqCst);
+        if TcpListener::bind(("127.0.0.1", port)).is_ok() {
+            return port;
+        }
     }
-    *port
 }
 
 /// In slow test environments like Codecov, use 2x timeout.

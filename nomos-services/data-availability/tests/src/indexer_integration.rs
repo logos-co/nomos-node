@@ -253,10 +253,7 @@ fn test_indexer() {
             .unwrap();
         let broadcast_receiver = receiver.await.unwrap();
         let mut broadcast_receiver =
-            BroadcastStream::new(broadcast_receiver).filter_map(|result| match result {
-                Ok(block) => Some(block),
-                Err(_) => None,
-            });
+            BroadcastStream::new(broadcast_receiver).filter_map(|result| result.ok());
 
         // Mock both attested blobs by writting directly into the da storage.
         store_blobs_in_db(blobs, storage_outbound).await;

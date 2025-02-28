@@ -92,7 +92,6 @@ pub fn create_node_configs(
         update_blend_membership(hosts.clone(), blend_configs[0].membership.clone());
 
     let new_peer_addresses: HashMap<PeerId, Multiaddr> = host_da_peer_addresses
-        
         .into_iter()
         .map(|(peer_id, (multiaddr, _))| (peer_id, multiaddr))
         .collect();

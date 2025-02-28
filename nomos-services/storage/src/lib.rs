@@ -90,10 +90,7 @@ impl<Backend: StorageBackend> StorageReplyReceiver<Option<Bytes>, Backend> {
 impl<Backend: StorageBackend> StorageMsg<Backend> {
     pub fn new_load_message<K: Serialize>(
         key: K,
-    ) -> (
-        Self,
-        StorageReplyReceiver<Option<Bytes>, Backend>,
-    ) {
+    ) -> (Self, StorageReplyReceiver<Option<Bytes>, Backend>) {
         let key = Backend::SerdeOperator::serialize(key);
         let (reply_channel, receiver) = tokio::sync::oneshot::channel();
         (
@@ -110,10 +107,7 @@ impl<Backend: StorageBackend> StorageMsg<Backend> {
 
     pub fn new_remove_message<K: Serialize>(
         key: K,
-    ) -> (
-        Self,
-        StorageReplyReceiver<Option<Bytes>, Backend>,
-    ) {
+    ) -> (Self, StorageReplyReceiver<Option<Bytes>, Backend>) {
         let key = Backend::SerdeOperator::serialize(key);
         let (reply_channel, receiver) = tokio::sync::oneshot::channel();
         (

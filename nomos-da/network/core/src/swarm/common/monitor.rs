@@ -70,9 +70,7 @@ impl From<&ReplicationEvent> for MonitorEvent {
     fn from(event: &ReplicationEvent) -> Self {
         match event {
             ReplicationEvent::IncomingMessage { .. } => Self::Noop,
-            ReplicationEvent::ReplicationError { error } => {
-                Self::Replication(error.clone())
-            }
+            ReplicationEvent::ReplicationError { error } => Self::Replication(error.clone()),
         }
     }
 }

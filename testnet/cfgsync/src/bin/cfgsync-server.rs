@@ -96,16 +96,16 @@ async fn validator_config(
     let (reply_tx, reply_rx) = channel();
     config_repo.register(Host::default_validator_from_ip(ip, identifier), reply_tx);
 
-    match reply_rx.await {
-        Ok(config_response) => match config_response {
+    (reply_rx.await).map_or_else(
+        |_| (StatusCode::INTERNAL_SERVER_ERROR, "Error receiving config").into_response(),
+        |config_response| match config_response {
             RepoResponse::Config(config) => {
                 let config = create_validator_config(*config);
                 (StatusCode::OK, Json(config)).into_response()
             }
             RepoResponse::Timeout => (StatusCode::REQUEST_TIMEOUT).into_response(),
         },
-        Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, "Error receiving config").into_response(),
-    }
+    )
 }
 
 async fn executor_config(
@@ -117,16 +117,16 @@ async fn executor_config(
     let (reply_tx, reply_rx) = channel();
     config_repo.register(Host::default_executor_from_ip(ip, identifier), reply_tx);
 
-    match reply_rx.await {
-        Ok(config_response) => match config_response {
+    (reply_rx.await).map_or_else(
+        |_| (StatusCode::INTERNAL_SERVER_ERROR, "Error receiving config").into_response(),
+        |config_response| match config_response {
             RepoResponse::Config(config) => {
                 let config = create_executor_config(*config);
                 (StatusCode::OK, Json(config)).into_response()
             }
             RepoResponse::Timeout => (StatusCode::REQUEST_TIMEOUT).into_response(),
         },
-        Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, "Error receiving config").into_response(),
-    }
+    )
 }
 
 #[tokio::main]

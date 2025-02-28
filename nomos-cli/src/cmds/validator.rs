@@ -54,6 +54,7 @@ pub struct Reconstruct {
 }
 
 impl Retrieve {
+    #[expect(clippy::cognitive_complexity)]
     pub fn run(self) -> Result<(), Box<dyn std::error::Error>> {
         let app_id: [u8; 32] = hex::decode(&self.app_id)?
             .try_into()

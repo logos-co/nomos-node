@@ -87,13 +87,12 @@ where
             .is_some()
         {
             info_with_id!(blob.id().as_ref(), "VerifierBlobExists");
-            Ok(())
         } else {
             info_with_id!(blob.id().as_ref(), "VerifierAddBlob");
             verifier.verify(&blob)?;
             storage_adapter.add_blob(blob).await?;
-            Ok(())
         }
+        Ok(())
     }
 }
 

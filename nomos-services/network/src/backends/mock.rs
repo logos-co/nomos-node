@@ -281,7 +281,13 @@ impl NetworkBackend for Mock {
             }
             MockBackendMessage::Query { topic, tx } => {
                 tracing::info!("processed query");
-                let msgs = self.messages.lock().unwrap().get(&topic).cloned().unwrap_or_default();
+                let msgs = self
+                    .messages
+                    .lock()
+                    .unwrap()
+                    .get(&topic)
+                    .cloned()
+                    .unwrap_or_default();
                 let _ = tx.send(msgs);
             }
         };

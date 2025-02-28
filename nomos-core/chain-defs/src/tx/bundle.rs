@@ -171,7 +171,10 @@ mod test {
 
     use super::*;
 
-    const fn receive_utxo(note: cl::NoteWitness, nf_pk: cl::NullifierCommitment) -> cl::OutputWitness {
+    const fn receive_utxo(
+        note: cl::NoteWitness,
+        nf_pk: cl::NullifierCommitment,
+    ) -> cl::OutputWitness {
         cl::OutputWitness::new(note, nf_pk)
     }
 

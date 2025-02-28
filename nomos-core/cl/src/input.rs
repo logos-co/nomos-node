@@ -25,7 +25,11 @@ pub struct InputWitness {
 }
 
 impl InputWitness {
-    pub const fn new(note: NoteWitness, nf_sk: NullifierSecret, cm_path: Vec<merkle::PathNode>) -> Self {
+    pub const fn new(
+        note: NoteWitness,
+        nf_sk: NullifierSecret,
+        cm_path: Vec<merkle::PathNode>,
+    ) -> Self {
         Self {
             note,
             nf_sk,

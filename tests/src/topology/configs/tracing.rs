@@ -32,8 +32,7 @@ impl GeneralTracingConfig {
                     // Allow events only from modules that matches the regex, if it matches - use
                     // provided tracing level. Libp2p and risc0 related crates are very log
                     // intensive in debug mode.
-                    filters: [("nomos", "debug")]
-                        .iter()
+                    filters: std::iter::once(&("nomos", "debug"))
                         .map(|(k, v)| (k.to_string(), v.to_string()))
                         .collect(),
                 }),

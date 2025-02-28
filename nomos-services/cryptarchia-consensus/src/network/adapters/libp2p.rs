@@ -96,19 +96,18 @@ where
         Ok(Box::new(
             BroadcastStream::new(receiver.await.map_err(Box::new)?).filter_map(|message| {
                 match message {
-                    Ok(Event::Message(message)) => {
-                        if let Ok(msg) = wire::deserialize(&message.data) {
-                            match msg {
-                                NetworkMessage::Block(block) => {
-                                    tracing::debug!("received block {:?}", block.header().id());
-                                    Some(block)
-                                }
-                            }
-                        } else {
+                    Ok(Event::Message(message)) => wire::deserialize(&message.data).map_or_else(
+                        |_| {
                             tracing::debug!("unrecognized gossipsub message");
                             None
-                        }
-                    }
+                        },
+                        |msg| match msg {
+                            NetworkMessage::Block(block) => {
+                                tracing::debug!("received block {:?}", block.header().id());
+                                Some(block)
+                            }
+                        },
+                    ),
                     Err(BroadcastStreamRecvError::Lagged(n)) => {
                         tracing::error!("lagged messages: {n}");
                         None

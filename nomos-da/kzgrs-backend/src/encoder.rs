@@ -583,9 +583,9 @@ pub mod test {
         let encoded_data = encoder.encode(&data).unwrap();
 
         let blobs = (&encoded_data).into_iter();
-        assert_eq!(blobs.len(), 16);
+        assert_eq!(blobs.count(), 16);
 
         let blobs = encoded_data.into_iter();
-        assert_eq!(blobs.len(), 16);
+        assert_eq!(blobs.count(), 16);
     }
 }
