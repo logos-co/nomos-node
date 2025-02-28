@@ -45,8 +45,8 @@ where
             settings,
             epoch_stream,
             slot_stream,
-            selected_slots: Default::default(),
-            _message: Default::default(),
+            selected_slots: HashSet::default(),
+            _message: PhantomData,
         }
     }
 }

@@ -18,7 +18,7 @@ pub enum Error {
 impl Risc0LeaderProof {
     pub fn prove(
         public_inputs: LeaderPublic,
-        private_inputs: LeaderPrivate,
+        private_inputs: &LeaderPrivate,
         prover: &dyn risc0_zkvm::Prover,
     ) -> Result<Self, Error> {
         let env = risc0_zkvm::ExecutorEnv::builder()
@@ -118,8 +118,10 @@ mod test {
     fn note_commitment_leaves(
         note_commitments: &[cl::NoteCommitment],
     ) -> [[u8; 32]; MAX_NOTE_COMMS] {
-        let note_comm_bytes =
-            Vec::from_iter(note_commitments.iter().map(|c| c.as_bytes().to_vec()));
+        let note_comm_bytes = note_commitments
+            .iter()
+            .map(|c| c.as_bytes().to_vec())
+            .collect::<Vec<_>>();
         cl::merkle::padded_leaves::<MAX_NOTE_COMMS>(&note_comm_bytes)
     }
 
@@ -164,7 +166,7 @@ mod test {
 
         let proof = Risc0LeaderProof::prove(
             expected_public_inputs,
-            private_inputs,
+            &private_inputs,
             risc0_zkvm::default_prover().as_ref(),
         )
         .unwrap();

@@ -9,6 +9,7 @@ pub struct CovenantProof {
     pub proof: risc0_zkvm::Receipt,
 }
 
+#[must_use]
 pub fn risc0_covenant(risc0_id: [u32; 8]) -> Covenant {
     // Commit to a RISC0 ID for use as a note constraint
 
@@ -26,6 +27,7 @@ pub fn risc0_covenant(risc0_id: [u32; 8]) -> Covenant {
 }
 
 impl CovenantProof {
+    #[must_use]
     pub fn covenant(&self) -> Covenant {
         risc0_covenant(self.risc0_id)
     }
@@ -34,6 +36,7 @@ impl CovenantProof {
         self.proof.journal.decode()
     }
 
+    #[must_use]
     pub fn nop_constraint() -> Covenant {
         risc0_covenant(nomos_risc0_proofs::COVENANT_NOP_ID)
     }

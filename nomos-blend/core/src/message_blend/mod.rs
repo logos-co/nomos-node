@@ -86,8 +86,8 @@ where
         }
     }
 
-    fn process_incoming_message(self: &Pin<&mut Self>, message: Vec<u8>) {
-        match self.cryptographic_processor.unwrap_message(&message) {
+    fn process_incoming_message(self: &Pin<&mut Self>, message: &[u8]) {
+        match self.cryptographic_processor.unwrap_message(message) {
             Ok((unwrapped_message, fully_unwrapped)) => {
                 let message = if fully_unwrapped {
                     BlendOutgoingMessage::FullyUnwrapped(unwrapped_message)
@@ -120,7 +120,7 @@ where
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         if let Poll::Ready(Some(message)) = self.input_stream.poll_next_unpin(cx) {
-            self.process_incoming_message(message);
+            self.process_incoming_message(&message);
         }
         self.output_stream.poll_next_unpin(cx)
     }

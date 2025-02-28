@@ -173,7 +173,7 @@ impl SwarmHandler {
     fn connect(&mut self, dial: Dial) {
         tracing::debug!("Connecting to {}", dial.addr);
 
-        match self.swarm.connect(dial.addr.clone()) {
+        match self.swarm.connect(&dial.addr) {
             Ok(connection_id) => {
                 // Dialing has been scheduled. The result will be notified as a SwarmEvent.
                 self.pending_dials.insert(connection_id, dial);
@@ -214,7 +214,7 @@ impl SwarmHandler {
         }
     }
 
-    async fn broadcast_and_retry(&mut self, topic: Topic, message: Box<[u8]>, retry_count: usize) {
+    fn broadcast_and_retry(&mut self, topic: Topic, message: Box<[u8]>, retry_count: usize) {
         tracing::debug!("broadcasting message to topic: {topic}");
 
         match self.swarm.broadcast(&topic, message.to_vec()) {

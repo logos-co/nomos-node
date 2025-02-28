@@ -11,7 +11,8 @@ pub type Unit = [u8; 32];
 pub struct Balance([u8; 32]);
 
 impl Balance {
-    #[must_use] pub const fn to_bytes(&self) -> [u8; 32] {
+    #[must_use]
+    pub const fn to_bytes(&self) -> [u8; 32] {
         self.0
     }
 }
@@ -24,7 +25,8 @@ pub struct UnitBalance {
 }
 
 impl UnitBalance {
-    #[must_use] pub const fn is_zero(&self) -> bool {
+    #[must_use]
+    pub const fn is_zero(&self) -> bool {
         self.pos == self.neg
     }
 }
@@ -43,14 +45,16 @@ impl BalanceWitness {
         blinding
     }
 
-    #[must_use] pub fn zero(blinding: [u8; 16]) -> Self {
+    #[must_use]
+    pub fn zero(blinding: [u8; 16]) -> Self {
         Self {
-            balances: Default::default(),
+            balances: Vec::default(),
             blinding,
         }
     }
 
-    #[must_use] pub fn from_ptx(ptx: &PartialTxWitness, blinding: [u8; 16]) -> Self {
+    #[must_use]
+    pub fn from_ptx(ptx: &PartialTxWitness, blinding: [u8; 16]) -> Self {
         let mut balance = Self::zero(blinding);
 
         for input in &ptx.inputs {
@@ -128,11 +132,13 @@ impl BalanceWitness {
         combined
     }
 
-    #[must_use] pub fn is_zero(&self) -> bool {
+    #[must_use]
+    pub fn is_zero(&self) -> bool {
         self.balances.is_empty()
     }
 
-    #[must_use] pub fn commit(&self) -> Balance {
+    #[must_use]
+    pub fn commit(&self) -> Balance {
         let mut hasher = Sha256::new();
         hasher.update(b"NOMOS_CL_BAL_COMMIT");
 

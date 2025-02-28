@@ -8,11 +8,12 @@ use ark_poly::{
 };
 use num_traits::Zero;
 
-/// Extend a polynomial over some factor `polynomial.len()*factor and return the
-/// original points plus the extra ones.
+/// Extend a polynomial over some factor `polynomial.len()*factor` and return
+/// the original points plus the extra ones.
 ///
 /// `factor` need to be `>1`
-#[must_use] pub fn encode(
+#[must_use]
+pub fn encode(
     polynomial: &DensePolynomial<Fr>,
     domain: GeneralEvaluationDomain<Fr>,
 ) -> Evaluations<Fr> {
@@ -25,7 +26,8 @@ use num_traits::Zero;
 /// original evaluations to recover the original data.
 /// `domain` need to be the same domain of the original `evaluations` and
 /// `polynomial` used for encoding.
-#[must_use] pub fn decode(
+#[must_use]
+pub fn decode(
     original_chunks_len: usize,
     points: &[Option<Fr>],
     domain: GeneralEvaluationDomain<Fr>,
@@ -52,7 +54,8 @@ use num_traits::Zero;
 /// intended: A polynomial `f(x)` is derived for `w_x` (root) mapping to `p_x`.
 /// `[(w_1, p_1)..(w_n, p_n)]` even if points are missing it is important to
 /// keep the mapping integrity.
-#[must_use] pub fn lagrange_interpolate(points: &[Fr], roots_of_unity: &[Fr]) -> DensePolynomial<Fr> {
+#[must_use]
+pub fn lagrange_interpolate(points: &[Fr], roots_of_unity: &[Fr]) -> DensePolynomial<Fr> {
     assert_eq!(points.len(), roots_of_unity.len());
     let mut result = DensePolynomial::from_coefficients_vec(vec![Fr::zero()]);
     for i in 0..roots_of_unity.len() {

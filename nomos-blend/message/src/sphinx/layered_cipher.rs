@@ -78,10 +78,10 @@ pub struct Key {
 }
 
 impl<D: ConsistentLengthLayeredCipherData> ConsistentLengthLayeredCipher<D> {
-    pub fn new(max_layers: usize) -> Self {
+    pub const fn new(max_layers: usize) -> Self {
         Self {
             max_layers,
-            _data: Default::default(),
+            _data: PhantomData,
         }
     }
 
@@ -101,13 +101,13 @@ impl<D: ConsistentLengthLayeredCipherData> ConsistentLengthLayeredCipher<D> {
             return Err(Error::InvalidEncryptionParam);
         }
 
-        params
+        Ok(params
             .iter()
             .take(params.len() - 1) // Exclude the last param that will be treated separately below.
             .rev() // Data and keys must be used in reverse order to encrypt the inner-most layer first
-            .try_fold(self.build_last_layer(params)?, |(encrypted, mac), param| {
-                self.build_intermediate_layer(param, mac, encrypted)
-            })
+            .fold(self.build_last_layer(params)?, |(encrypted, mac), param| {
+                self.build_intermediate_layer(param, &mac, &encrypted)
+            }))
     }
 
     /// Build an intermediate layer of encryption that wraps subsequent layers
@@ -117,9 +117,9 @@ impl<D: ConsistentLengthLayeredCipherData> ConsistentLengthLayeredCipher<D> {
     fn build_intermediate_layer(
         &self,
         param: &EncryptionParam<D>,
-        next_mac: HeaderIntegrityMac,
-        next_encrypted_data: Vec<u8>,
-    ) -> Result<(Vec<u8>, HeaderIntegrityMac)> {
+        next_mac: &HeaderIntegrityMac,
+        next_encrypted_data: &[u8],
+    ) -> (Vec<u8>, HeaderIntegrityMac) {
         // Concatenate the data with the encrypted subsequent layers and its MAC.
         let data = param.data.to_bytes();
         let total_data = itertools::chain!(
@@ -137,12 +137,12 @@ impl<D: ConsistentLengthLayeredCipherData> ConsistentLengthLayeredCipher<D> {
         self.apply_streamcipher(
             &mut encrypted,
             &param.key.stream_cipher_key,
-            StreamCipherOption::FromFront,
+            &StreamCipherOption::FromFront,
         );
         let mac = Self::compute_mac(&param.key.integrity_mac_key, &encrypted);
 
         assert_eq!(encrypted.len(), Self::total_size(self.max_layers));
-        Ok((encrypted, mac))
+        (encrypted, mac)
     }
 
     /// Build the last layer of encryption.
@@ -175,7 +175,7 @@ impl<D: ConsistentLengthLayeredCipherData> ConsistentLengthLayeredCipher<D> {
         self.apply_streamcipher(
             &mut encrypted,
             &last_param.key.stream_cipher_key,
-            StreamCipherOption::FromFront,
+            &StreamCipherOption::FromFront,
         );
 
         // Append fillers to the encrypted bytes, and compute MAC.
@@ -198,7 +198,7 @@ impl<D: ConsistentLengthLayeredCipherData> ConsistentLengthLayeredCipher<D> {
                 self.apply_streamcipher(
                     &mut fillers[0..(i + 1) * Self::SINGLE_LAYER_SIZE],
                     key,
-                    StreamCipherOption::FromBack,
+                    &StreamCipherOption::FromBack,
                 );
             });
         fillers
@@ -234,7 +234,7 @@ impl<D: ConsistentLengthLayeredCipherData> ConsistentLengthLayeredCipher<D> {
         self.apply_streamcipher(
             &mut decrypted,
             &key.stream_cipher_key,
-            StreamCipherOption::FromFront,
+            &StreamCipherOption::FromFront,
         );
 
         // Parse the decrypted data into 3 parts: data, MAC, and the next encrypted
@@ -254,7 +254,7 @@ impl<D: ConsistentLengthLayeredCipherData> ConsistentLengthLayeredCipher<D> {
         Ok((data, next_mac, next_encrypted_data))
     }
 
-    fn apply_streamcipher(&self, data: &mut [u8], key: &StreamCipherKey, opt: StreamCipherOption) {
+    fn apply_streamcipher(&self, data: &mut [u8], key: &StreamCipherKey, opt: &StreamCipherOption) {
         let pseudorandom_bytes = sphinx_packet::crypto::generate_pseudorandom_bytes(
             key,
             &STREAM_CIPHER_INIT_VECTOR,

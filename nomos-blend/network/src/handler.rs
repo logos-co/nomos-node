@@ -146,6 +146,7 @@ where
 
     #[expect(deprecated)] // Self::OutboundOpenInfo is deprecated
     #[expect(clippy::cognitive_complexity)]
+    #[expect(clippy::too_many_lines)]
     fn poll(
         &mut self,
         cx: &mut Context<'_>,

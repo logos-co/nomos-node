@@ -20,7 +20,8 @@ impl<'de> Deserializer<'de> {
 /// Return a deserializer for wire format
 ///
 /// We only operator on in-memory slices as to abstract
-/// any underlying protocol. See https://sans-io.readthedocs.io/how-to-sans-io.html
+/// any underlying protocol. See <https://sans-io.readthedocs.io/how-to-sans-io.html>
+#[must_use]
 pub fn deserializer(data: &[u8]) -> Deserializer<'_> {
     Deserializer {
         inner: bincode::de::Deserializer::from_slice(data, *OPTIONS),

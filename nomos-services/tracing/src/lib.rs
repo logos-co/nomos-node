@@ -59,7 +59,8 @@ impl SharedWriter {
         }
     }
 
-    #[must_use] pub fn into_inner(&self) -> Arc<Mutex<dyn Write + Send + Sync>> {
+    #[must_use]
+    pub fn into_inner(&self) -> Arc<Mutex<dyn Write + Send + Sync>> {
         self.inner.clone()
     }
 
@@ -129,7 +130,8 @@ impl Default for TracingSettings {
 
 impl TracingSettings {
     #[inline]
-    #[must_use] pub const fn new(
+    #[must_use]
+    pub const fn new(
         logger: LoggerLayer,
         tracing: TracingLayer,
         filter: FilterLayer,
@@ -174,7 +176,7 @@ impl ServiceCore for Tracing {
         ) = match config.logger {
             LoggerLayer::Gelf(config) => {
                 let gelf_layer =
-                    create_gelf_layer(config, service_state.overwatch_handle.runtime())?;
+                    create_gelf_layer(&config, service_state.overwatch_handle.runtime())?;
                 (Box::new(gelf_layer), None)
             }
             LoggerLayer::File(config) => {
@@ -293,6 +295,7 @@ mod serde_level {
         })
     }
 
+    #[expect(clippy::trivially_copy_pass_by_ref)]
     pub fn serialize<S>(value: &Level, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,

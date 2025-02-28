@@ -19,6 +19,7 @@ pub struct Block<Tx: Clone + Eq + Hash, BlobCertificate: Clone + Eq + Hash> {
 }
 
 impl<Tx: Clone + Eq + Hash, BlobCertificate: Clone + Eq + Hash> Block<Tx, BlobCertificate> {
+    #[must_use]
     pub const fn header(&self) -> &Header {
         &self.header
     }
@@ -38,18 +39,22 @@ impl<
     > Block<Tx, BlobCertificate>
 {
     /// Encode block into bytes
+    #[must_use]
     pub fn as_bytes(&self) -> Bytes {
         wire::serialize(self).unwrap().into()
     }
 
+    #[must_use]
     pub fn from_bytes(bytes: &[u8]) -> Self {
         wire::deserialize(bytes).unwrap()
     }
 
+    #[must_use]
     pub fn cl_transactions_len(&self) -> usize {
         self.cl_transactions.len()
     }
 
+    #[must_use]
     pub fn bl_blobs_len(&self) -> usize {
         self.bl_blobs.len()
     }

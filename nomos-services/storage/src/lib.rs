@@ -53,14 +53,16 @@ pub struct StorageReplyReceiver<T, Backend> {
 }
 
 impl<T, Backend> StorageReplyReceiver<T, Backend> {
-    #[must_use] pub fn new(channel: tokio::sync::oneshot::Receiver<T>) -> Self {
+    #[must_use]
+    pub const fn new(channel: tokio::sync::oneshot::Receiver<T>) -> Self {
         Self {
             channel,
-            _backend: Default::default(),
+            _backend: PhantomData,
         }
     }
 
-    #[must_use] pub fn into_inner(self) -> tokio::sync::oneshot::Receiver<T> {
+    #[must_use]
+    pub fn into_inner(self) -> tokio::sync::oneshot::Receiver<T> {
         self.channel
     }
 }
@@ -313,7 +315,7 @@ impl<Backend: StorageBackend + Send + Sync + 'static> ServiceCore for StorageSer
                     Self::handle_storage_message(msg, backend).await;
                 }
                 Some(msg) = lifecycle_stream.next() => {
-                    if lifecycle::should_stop_service::<Self>(&msg).await {
+                    if lifecycle::should_stop_service::<Self>(&msg) {
                         // TODO: Try to finish pending transactions if any and close connections properly
                         break;
                     }

@@ -6,7 +6,7 @@ use bundler::utils::{
 };
 use clap::{arg, Parser};
 use log::{error, info};
-use tauri_bundler::RpmSettings;
+use tauri_bundler::{AppImageSettings, DebianSettings, DmgSettings, MacOsSettings, RpmSettings, WindowsSettings};
 use tauri_utils::platform::target_triple;
 
 const CRATE_NAME: &str = "nomos-node";
@@ -85,13 +85,13 @@ fn build_package(version: String) {
             bin: None,
             external_bin: None,
             deep_link_protocols: None,
-            deb: Default::default(),
-            appimage: Default::default(),
+            deb: DebianSettings::default(),
+            appimage: AppImageSettings::default(),
             rpm: rpm_settings,
-            dmg: Default::default(),
-            macos: Default::default(),
+            dmg: DmgSettings::default(),
+            macos: MacOsSettings::default(),
             updater: None,
-            windows: Default::default(),
+            windows: WindowsSettings::default(),
         })
         .binaries(vec![tauri_bundler::BundleBinary::new(
             String::from(CRATE_NAME),

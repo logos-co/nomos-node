@@ -11,10 +11,9 @@ pub struct FillSize<const SIZE: usize, B> {
 }
 
 impl<const SIZE: usize, B> FillSize<SIZE, B> {
-    pub fn new() -> Self {
-        Self {
-            _blob: Default::default(),
-        }
+    #[must_use]
+    pub const fn new() -> Self {
+        Self { _blob: PhantomData }
     }
 }
 

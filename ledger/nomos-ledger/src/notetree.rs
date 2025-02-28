@@ -13,12 +13,16 @@ pub struct NoteTree {
 fn note_commitment_leaves(
     commitments: &rpds::VectorSync<NoteCommitment>,
 ) -> [[u8; 32]; MAX_NOTE_COMMS] {
-    let note_comm_bytes = Vec::from_iter(commitments.iter().map(|c| c.as_bytes().to_vec()));
+    let note_comm_bytes = commitments
+        .iter()
+        .map(|c| c.as_bytes().to_vec())
+        .collect::<Vec<_>>();
     cl::merkle::padded_leaves::<MAX_NOTE_COMMS>(&note_comm_bytes)
 }
 
 impl NoteTree {
-    #[must_use] pub fn insert(&self, note: NoteCommitment) -> Self {
+    #[must_use]
+    pub fn insert(&self, note: NoteCommitment) -> Self {
         let commitments = self.commitments.push_back(note);
         let root = cl::merkle::root(note_commitment_leaves(&commitments));
         let roots = self.roots.insert(root);
@@ -26,15 +30,18 @@ impl NoteTree {
     }
 
     // TODO: cache if called frequently
-    #[must_use] pub fn root(&self) -> [u8; 32] {
+    #[must_use]
+    pub fn root(&self) -> [u8; 32] {
         cl::merkle::root(note_commitment_leaves(&self.commitments))
     }
 
-    #[must_use] pub fn is_valid_root(&self, root: &[u8; 32]) -> bool {
+    #[must_use]
+    pub fn is_valid_root(&self, root: &[u8; 32]) -> bool {
         self.roots.contains(root)
     }
 
-    #[must_use] pub fn witness(&self, index: usize) -> Option<Vec<PathNode>> {
+    #[must_use]
+    pub fn witness(&self, index: usize) -> Option<Vec<PathNode>> {
         if index >= self.commitments.len() {
             return None;
         }
@@ -42,7 +49,8 @@ impl NoteTree {
         Some(cl::merkle::path(leaves, index))
     }
 
-    #[must_use] pub const fn commitments(&self) -> &rpds::VectorSync<NoteCommitment> {
+    #[must_use]
+    pub const fn commitments(&self) -> &rpds::VectorSync<NoteCommitment> {
         &self.commitments
     }
 }

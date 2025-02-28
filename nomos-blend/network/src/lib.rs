@@ -67,7 +67,7 @@ mod test {
                     // (It will fail until swarm2 is connected to swarm1 successfully.)
                     _ = publish_try_interval.tick() => {
                         if !msg_published {
-                            msg_published = swarm2.behaviour_mut().publish(msg.clone()).is_ok();
+                            msg_published = swarm2.behaviour_mut().publish(&msg).is_ok();
                         }
                     }
                     // Proceed swarm1
@@ -112,7 +112,7 @@ mod test {
         loop {
             select! {
                 _ = publish_try_interval.tick() => {
-                    assert!(matches!(swarm2.behaviour_mut().publish(msg.clone()), Err(Error::NoPeers)));
+                    assert!(matches!(swarm2.behaviour_mut().publish(&msg), Err(Error::NoPeers)));
                     publish_try_count += 1;
                     if publish_try_count >= 10 {
                         break;
@@ -162,7 +162,7 @@ mod test {
                 select! {
                     _ = publish_try_interval.tick() => {
                         if !msg_published {
-                            msg_published = swarm2.behaviour_mut().publish(vec![1; 10]).is_ok();
+                            msg_published = swarm2.behaviour_mut().publish(&[1; 10]).is_ok();
                         }
                     }
                     event = swarm1.select_next_some() => {

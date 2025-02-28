@@ -1,4 +1,5 @@
 pub trait Next {
+    #[must_use]
     fn next(self) -> Self;
 }
 

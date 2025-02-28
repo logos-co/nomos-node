@@ -104,7 +104,7 @@ impl<SerdeOp: StorageSerde + Send + Sync + 'static> StorageBackend for RocksBack
 
         Ok(Self {
             rocks: Arc::new(db),
-            _serde_op: Default::default(),
+            _serde_op: PhantomData,
         })
     }
 
@@ -113,7 +113,9 @@ impl<SerdeOp: StorageSerde + Send + Sync + 'static> StorageBackend for RocksBack
     }
 
     async fn load(&mut self, key: &[u8]) -> Result<Option<Bytes>, Self::Error> {
-        self.rocks.get(key).map(|opt| opt.map(std::convert::Into::into))
+        self.rocks
+            .get(key)
+            .map(|opt| opt.map(std::convert::Into::into))
     }
 
     async fn load_prefix(&mut self, prefix: &[u8]) -> Result<Vec<Bytes>, Self::Error> {

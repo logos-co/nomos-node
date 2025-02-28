@@ -15,7 +15,7 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::broadcast::{self, Receiver, Sender};
 use tracing::debug;
 
-use super::{Debug, NetworkBackend, OverwatchHandle, StreamExt, fmt, oneshot};
+use super::{fmt, oneshot, Debug, NetworkBackend, OverwatchHandle};
 
 const BROADCAST_CHANNEL_BUF: usize = 16;
 
@@ -29,7 +29,8 @@ pub struct MockContentTopic {
 }
 
 impl MockContentTopic {
-    #[must_use] pub const fn new(
+    #[must_use]
+    pub const fn new(
         application_name: &'static str,
         version: usize,
         content_topic_name: &'static str,
@@ -48,7 +49,8 @@ pub struct MockPubSubTopic {
 }
 
 impl MockPubSubTopic {
-    #[must_use] pub const fn new(topic_name: &'static str) -> Self {
+    #[must_use]
+    pub const fn new(topic_name: &'static str) -> Self {
         Self {
             topic_name: Cow::Borrowed(topic_name),
         }
@@ -69,7 +71,8 @@ pub struct MockMessage {
 }
 
 impl MockMessage {
-    #[must_use] pub const fn new(
+    #[must_use]
+    pub const fn new(
         payload: String,
         content_topic: MockContentTopic,
         version: MockMessageVersion,
@@ -83,11 +86,13 @@ impl MockMessage {
         }
     }
 
-    #[must_use] pub const fn content_topic(&self) -> &MockContentTopic {
+    #[must_use]
+    pub const fn content_topic(&self) -> &MockContentTopic {
         &self.content_topic
     }
 
-    #[must_use] pub fn payload(&self) -> String {
+    #[must_use]
+    pub fn payload(&self) -> String {
         self.payload.clone()
     }
 }
@@ -310,6 +315,7 @@ mod tests {
     use super::*;
 
     #[tokio::test]
+    #[expect(clippy::too_many_lines)]
     async fn test_mock_network() {
         let config = MockConfig {
             predefined_messages: vec![

@@ -135,7 +135,10 @@ where
         let KMSServiceSettings { backend_settings } =
             service_state.settings_reader.get_updated_settings();
         let backend = Backend::new(backend_settings);
-        Ok(Self { backend, service_state })
+        Ok(Self {
+            backend,
+            service_state,
+        })
     }
 
     async fn run(self) -> Result<(), DynError> {
@@ -151,7 +154,7 @@ where
                     Self::handle_kms_message(msg, &mut backend).await;
                 }
                 Some(msg) = lifecycle_stream.next() => {
-                    if lifecycle::should_stop_service::<Self>(&msg).await {
+                    if lifecycle::should_stop_service::<Self>(&msg) {
                         return Ok(());
                     }
                 }

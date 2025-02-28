@@ -1,7 +1,10 @@
 use ark_bls12_381::Fr;
 use ark_poly::{EvaluationDomain, GeneralEvaluationDomain};
 use divan::{black_box, counter::BytesCount, Bencher};
-use kzgrs::{common::bytes_to_polynomial, rs::{decode, encode}};
+use kzgrs::{
+    common::bytes_to_polynomial,
+    rs::{decode, encode},
+};
 use rand::{thread_rng, RngCore};
 
 fn main() {
@@ -25,7 +28,7 @@ fn rs_encode(bencher: Bencher, size: usize) {
         });
 }
 
-#[divan::bench(args = [16399, 32798, 65565, 131099, 262167, 524241, 1048606], sample_size = 10, sample_count = 100)]
+#[divan::bench(args = [16399, 32798, 65565, 131_099, 262_167, 524_241, 1_048_606], sample_size = 10, sample_count = 100)]
 fn rs_decode(bencher: Bencher, size: usize) {
     bencher
         .with_inputs(move || {

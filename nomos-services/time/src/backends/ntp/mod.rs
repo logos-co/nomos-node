@@ -112,7 +112,10 @@ impl Stream for NtpStream {
             let roundtrip = Duration::from_micros(timestamp.roundtrip());
 
             let date = OffsetDateTime::from_unix_timestamp_nanos(
-                (seconds + nanos_fraction + roundtrip).as_nanos() as i128,
+                (seconds + nanos_fraction + roundtrip)
+                    .as_nanos()
+                    .try_into()
+                    .expect("Failed to convert u128 to i128"),
             )
             .expect("Datetime synchronization failed");
             let current_slot = Slot::from_offset_and_config(date, self.slot_config);

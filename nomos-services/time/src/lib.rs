@@ -133,7 +133,7 @@ where
 
                 }
                 Some(lifecycle_msg) = lifecycle_relay.next() => {
-                    if should_stop_service::<Self>(&lifecycle_msg).await {
+                    if should_stop_service::<Self>(&lifecycle_msg) {
                         break;
                     }
                 }

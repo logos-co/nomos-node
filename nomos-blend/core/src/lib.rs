@@ -12,8 +12,7 @@ pub enum BlendOutgoingMessage {
 impl From<BlendOutgoingMessage> for Vec<u8> {
     fn from(value: BlendOutgoingMessage) -> Self {
         match value {
-            BlendOutgoingMessage::FullyUnwrapped(v) => v,
-            BlendOutgoingMessage::Outbound(v) => v,
+            BlendOutgoingMessage::FullyUnwrapped(v) | BlendOutgoingMessage::Outbound(v) => v,
         }
     }
 }

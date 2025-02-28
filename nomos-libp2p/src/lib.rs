@@ -89,7 +89,7 @@ impl Swarm {
     }
 
     /// Initiates a connection attempt to a peer
-    pub fn connect(&mut self, peer_addr: Multiaddr) -> Result<ConnectionId, DialError> {
+    pub fn connect(&mut self, peer_addr: &Multiaddr) -> Result<ConnectionId, DialError> {
         let opt = DialOpts::from(peer_addr.clone());
         let connection_id = opt.connection_id();
 
@@ -146,11 +146,13 @@ impl Swarm {
             .any(|h| h == &topic_hash)
     }
 
-    #[must_use] pub fn topic_hash(topic: &str) -> TopicHash {
+    #[must_use]
+    pub fn topic_hash(topic: &str) -> TopicHash {
         gossipsub::IdentTopic::new(topic).hash()
     }
 
-    #[must_use] pub fn multiaddr(ip: std::net::Ipv4Addr, port: u16) -> Multiaddr {
+    #[must_use]
+    pub fn multiaddr(ip: std::net::Ipv4Addr, port: u16) -> Multiaddr {
         multiaddr!(Ip4(ip), Udp(port), QuicV1)
     }
 }
