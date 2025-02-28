@@ -1,10 +1,12 @@
 pub mod libp2p;
 pub mod mock;
 
-use super::*;
+use std::pin::Pin;
+
 use futures::Stream;
 use overwatch_rs::{overwatch::handle::OverwatchHandle, services::state::ServiceState};
-use std::pin::Pin;
+
+use super::*;
 
 #[async_trait::async_trait]
 pub trait NetworkBackend {

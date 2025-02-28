@@ -1,21 +1,22 @@
-// std
 use std::ops::Div;
-// crates
+
 use ark_ff::{BigInteger, PrimeField};
 use ark_poly::EvaluationDomain;
-use kzgrs::common::bytes_to_polynomial_unchecked;
-use kzgrs::fk20::{fk20_batch_generate_elements_proofs, Toeplitz1Cache};
 use kzgrs::{
-    bytes_to_polynomial, commit_polynomial, encode, Commitment, Evaluations, GlobalParameters,
-    KzgRsError, Polynomial, PolynomialEvaluationDomain, Proof, BYTES_PER_FIELD_ELEMENT,
+    bytes_to_polynomial, commit_polynomial,
+    common::bytes_to_polynomial_unchecked,
+    encode,
+    fk20::{fk20_batch_generate_elements_proofs, Toeplitz1Cache},
+    Commitment, Evaluations, GlobalParameters, KzgRsError, Polynomial, PolynomialEvaluationDomain,
+    Proof, BYTES_PER_FIELD_ELEMENT,
 };
-
 #[cfg(feature = "parallel")]
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
-// internal
-use crate::common::blob::DaBlob;
-use crate::common::{hash_commitment, Chunk, ChunksMatrix, Row};
-use crate::global::GLOBAL_PARAMETERS;
+
+use crate::{
+    common::{blob::DaBlob, hash_commitment, Chunk, ChunksMatrix, Row},
+    global::GLOBAL_PARAMETERS,
+};
 
 #[derive(Clone)]
 pub struct DaEncoderParams {
@@ -172,7 +173,8 @@ impl DaEncoder {
         .map(|r| {
             // Using the unchecked version here. Because during the process of chunkifiying
             // we already make sure to have the chunks of proper elements.
-            // Also, after rs encoding, we are sure all `Fr` elements already fits within modulus.
+            // Also, after rs encoding, we are sure all `Fr` elements already fits within
+            // modulus.
             let (evals, poly) = bytes_to_polynomial_unchecked::<BYTES_PER_FIELD_ELEMENT>(
                 r.as_bytes().as_ref(),
                 polynomial_evaluation_domain,
@@ -338,20 +340,23 @@ impl nomos_core::da::DaEncoder for DaEncoder {
 
 #[cfg(test)]
 pub mod test {
-    use crate::encoder::{DaEncoder, DaEncoderParams};
-    use crate::global::GLOBAL_PARAMETERS;
+    use std::ops::Div;
+
     use ark_ff::PrimeField;
     use ark_poly::{EvaluationDomain, GeneralEvaluationDomain};
     use itertools::izip;
-    use kzgrs::common::bytes_to_polynomial_unchecked;
     use kzgrs::{
-        decode, verify_element_proof, FieldElement, PolynomialEvaluationDomain,
-        BYTES_PER_FIELD_ELEMENT,
+        common::bytes_to_polynomial_unchecked, decode, verify_element_proof, FieldElement,
+        PolynomialEvaluationDomain, BYTES_PER_FIELD_ELEMENT,
     };
     use nomos_core::da::DaEncoder as _;
     use once_cell::sync::Lazy;
     use rand::RngCore;
-    use std::ops::Div;
+
+    use crate::{
+        encoder::{DaEncoder, DaEncoderParams},
+        global::GLOBAL_PARAMETERS,
+    };
 
     pub static DOMAIN_SIZE: usize = 16;
     pub static PARAMS: Lazy<DaEncoderParams> =

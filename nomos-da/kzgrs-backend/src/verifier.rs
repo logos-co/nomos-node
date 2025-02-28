@@ -1,17 +1,16 @@
-// std
-// crates
 use ark_poly::EvaluationDomain;
 use itertools::{izip, Itertools};
-use kzgrs::common::field_element_from_bytes_le;
 use kzgrs::{
-    bytes_to_polynomial, commit_polynomial, verify_element_proof, Commitment, GlobalParameters,
-    PolynomialEvaluationDomain, Proof, BYTES_PER_FIELD_ELEMENT,
+    bytes_to_polynomial, commit_polynomial, common::field_element_from_bytes_le,
+    verify_element_proof, Commitment, GlobalParameters, PolynomialEvaluationDomain, Proof,
+    BYTES_PER_FIELD_ELEMENT,
 };
 use nomos_core::da::blob::Blob;
-// internal
-use crate::common::blob::DaBlob;
-use crate::common::{hash_commitment, Chunk, Column};
-use crate::encoder::DaEncoderParams;
+
+use crate::{
+    common::{blob::DaBlob, hash_commitment, Chunk, Column},
+    encoder::DaEncoderParams,
+};
 
 pub struct DaVerifier {
     global_parameters: GlobalParameters,
@@ -52,7 +51,8 @@ impl DaVerifier {
         let commitment_hash = hash_commitment::<
             { DaEncoderParams::MAX_BLS12_381_ENCODING_CHUNK_SIZE },
         >(column_commitment);
-        // 4. check proof with commitment and proof over the aggregated column commitment
+        // 4. check proof with commitment and proof over the aggregated column
+        //    commitment
         let element = field_element_from_bytes_le(commitment_hash.as_slice());
         verify_element_proof(
             index,
@@ -142,12 +142,6 @@ impl DaVerifier {
 
 #[cfg(test)]
 mod test {
-    use crate::common::blob::DaBlob;
-    use crate::common::{hash_commitment, Chunk, Column};
-    use crate::encoder::test::{rand_data, ENCODER};
-    use crate::encoder::DaEncoderParams;
-    use crate::global::GLOBAL_PARAMETERS;
-    use crate::verifier::DaVerifier;
     use ark_bls12_381::Fr;
     use ark_poly::{EvaluationDomain, GeneralEvaluationDomain};
     use kzgrs::{
@@ -157,6 +151,16 @@ mod test {
     };
     use nomos_core::da::DaEncoder;
     use once_cell::sync::Lazy;
+
+    use crate::{
+        common::{blob::DaBlob, hash_commitment, Chunk, Column},
+        encoder::{
+            test::{rand_data, ENCODER},
+            DaEncoderParams,
+        },
+        global::GLOBAL_PARAMETERS,
+        verifier::DaVerifier,
+    };
 
     pub struct ColumnVerifyData {
         pub column: Column,
@@ -259,7 +263,8 @@ mod test {
             column_data.domain
         ));
 
-        // Test alter GLOBAL_PARAMETERS so that computed_column_commitment != column_commitment
+        // Test alter GLOBAL_PARAMETERS so that computed_column_commitment !=
+        // column_commitment
         let column_data2 = prepare_column(true).unwrap();
 
         assert!(!DaVerifier::verify_column(

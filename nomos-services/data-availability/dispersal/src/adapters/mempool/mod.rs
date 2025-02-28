@@ -1,8 +1,9 @@
 pub mod kzgrs;
 
-use overwatch_rs::services::relay::OutboundRelay;
-use overwatch_rs::services::ServiceData;
-use overwatch_rs::DynError;
+use overwatch_rs::{
+    services::{relay::OutboundRelay, ServiceData},
+    DynError,
+};
 
 #[async_trait::async_trait]
 pub trait DaMempoolAdapter {

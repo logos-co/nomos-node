@@ -1,16 +1,14 @@
-// std
+use std::error::Error;
+
+use opentelemetry::{global, KeyValue};
 use opentelemetry_otlp::{ExportConfig, Protocol, WithExportConfig};
 use opentelemetry_sdk::{runtime, Resource};
 use reqwest::Client;
-use std::error::Error;
-// crates
-use opentelemetry::{global, KeyValue};
 use serde::{Deserialize, Serialize};
 use tracing::Subscriber;
 use tracing_opentelemetry::MetricsLayer;
 use tracing_subscriber::registry::LookupSpan;
 use url::Url;
-// internal
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct OtlpMetricsConfig {

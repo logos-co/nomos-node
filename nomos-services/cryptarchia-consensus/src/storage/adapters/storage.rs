@@ -1,16 +1,10 @@
-// std
-use std::hash::Hash;
-use std::marker::PhantomData;
-// Crates
-use nomos_core::block::Block;
-use nomos_core::header::HeaderId;
-use nomos_storage::backends::StorageBackend;
-use nomos_storage::{StorageMsg, StorageService};
-use overwatch_rs::services::relay::OutboundRelay;
-use overwatch_rs::services::ServiceData;
-use serde::de::DeserializeOwned;
-use serde::Serialize;
-// Internal
+use std::{hash::Hash, marker::PhantomData};
+
+use nomos_core::{block::Block, header::HeaderId};
+use nomos_storage::{backends::StorageBackend, StorageMsg, StorageService};
+use overwatch_rs::services::{relay::OutboundRelay, ServiceData};
+use serde::{de::DeserializeOwned, Serialize};
+
 use crate::storage::StorageAdapter as StorageAdapterTrait;
 
 pub struct StorageAdapter<Storage, Tx, BlobCertificate>
@@ -26,7 +20,8 @@ impl<Storage, Tx, BlobCertificate> StorageAdapter<Storage, Tx, BlobCertificate>
 where
     Storage: StorageBackend + Send + Sync,
 {
-    /// Sends a store message to the storage service to retrieve a value by its key
+    /// Sends a store message to the storage service to retrieve a value by its
+    /// key
     ///
     /// # Arguments
     ///

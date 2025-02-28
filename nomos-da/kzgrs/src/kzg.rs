@@ -1,16 +1,20 @@
-use crate::common::KzgRsError;
-use crate::Evaluations;
+use std::{
+    borrow::Cow,
+    ops::{Mul, Neg},
+};
+
 use ark_bls12_381::{Bls12_381, Fr};
 use ark_ec::pairing::Pairing;
-use ark_poly::univariate::DensePolynomial;
-use ark_poly::{DenseUVPolynomial, EvaluationDomain, GeneralEvaluationDomain};
+use ark_poly::{
+    univariate::DensePolynomial, DenseUVPolynomial, EvaluationDomain, GeneralEvaluationDomain,
+};
 use ark_poly_commit::kzg10::{Commitment, Powers, Proof, UniversalParams, KZG10};
 use num_traits::{One, Zero};
-use std::borrow::Cow;
-use std::ops::{Mul, Neg};
 
-/// Commit to a polynomial where each of the evaluations are over `w(i)` for the degree
-/// of the polynomial being omega (`w`) the root of unity (2^x).
+use crate::{common::KzgRsError, Evaluations};
+
+/// Commit to a polynomial where each of the evaluations are over `w(i)` for the
+/// degree of the polynomial being omega (`w`) the root of unity (2^x).
 pub fn commit_polynomial(
     polynomial: &DensePolynomial<Fr>,
     global_parameters: &UniversalParams<Bls12_381>,
@@ -37,8 +41,8 @@ pub fn generate_element_proof(
         return Err(KzgRsError::DivisionByZeroPolynomial);
     };
 
-    // Instead of evaluating over the polynomial, we can reuse the evaluation points from the rs encoding
-    // let v = polynomial.evaluate(&u);
+    // Instead of evaluating over the polynomial, we can reuse the evaluation points
+    // from the rs encoding let v = polynomial.evaluate(&u);
     let v = evaluations.evals[element_index];
     let f_x_v = polynomial + &DensePolynomial::<Fr>::from_coefficients_vec(vec![-v]);
     let x_u = DensePolynomial::<Fr>::from_coefficients_vec(vec![-u, Fr::one()]);
@@ -71,16 +75,22 @@ pub fn verify_element_proof(
 
 #[cfg(test)]
 mod test {
-    use crate::common::bytes_to_polynomial;
-    use crate::kzg::{commit_polynomial, generate_element_proof, verify_element_proof};
     use ark_bls12_381::{Bls12_381, Fr};
-    use ark_poly::univariate::DensePolynomial;
-    use ark_poly::{DenseUVPolynomial, EvaluationDomain, GeneralEvaluationDomain};
+    use ark_poly::{
+        univariate::DensePolynomial, DenseUVPolynomial, EvaluationDomain, GeneralEvaluationDomain,
+    };
     use ark_poly_commit::kzg10::{UniversalParams, KZG10};
     use once_cell::sync::Lazy;
     use rand::{thread_rng, Fill};
-    use rayon::iter::{IndexedParallelIterator, ParallelIterator};
-    use rayon::prelude::IntoParallelRefIterator;
+    use rayon::{
+        iter::{IndexedParallelIterator, ParallelIterator},
+        prelude::IntoParallelRefIterator,
+    };
+
+    use crate::{
+        common::bytes_to_polynomial,
+        kzg::{commit_polynomial, generate_element_proof, verify_element_proof},
+    };
 
     const COEFFICIENTS_SIZE: usize = 16;
     static GLOBAL_PARAMETERS: Lazy<UniversalParams<Bls12_381>> = Lazy::new(|| {

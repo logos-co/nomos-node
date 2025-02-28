@@ -1,4 +1,3 @@
-// Internal
 use crate::encoder;
 
 const ENCODER_DOMAIN_SIZE: usize = 16;

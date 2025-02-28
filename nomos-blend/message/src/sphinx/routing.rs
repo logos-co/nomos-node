@@ -48,8 +48,9 @@ impl ConsistentLengthLayeredCipherData for RoutingInformation {
 pub struct EncryptedRoutingInformation {
     /// A MAC to verify the integrity of [`Self::encrypted_routing_info`].
     pub mac: HeaderIntegrityMac,
-    /// The actual encrypted routing information produced by [`ConsistentLengthLayeredCipher`].
-    /// Its size should be the same as [`ConsistentLengthLayeredCipher::total_size`].
+    /// The actual encrypted routing information produced by
+    /// [`ConsistentLengthLayeredCipher`]. Its size should be the same as
+    /// [`ConsistentLengthLayeredCipher::total_size`].
     pub encrypted_routing_info: Vec<u8>,
 }
 

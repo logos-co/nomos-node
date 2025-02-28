@@ -5,7 +5,8 @@ use error::Error;
 use crate::BlendMessage;
 
 const NODE_ID_SIZE: usize = 32;
-// TODO: Move MAX_PAYLOAD_SIZE and MAX_LAYERS to the upper layer (service layer).
+// TODO: Move MAX_PAYLOAD_SIZE and MAX_LAYERS to the upper layer (service
+// layer).
 const MAX_PAYLOAD_SIZE: usize = 2048;
 const PAYLOAD_PADDING_SEPARATOR: u8 = 0x01;
 const PAYLOAD_PADDING_SEPARATOR_SIZE: usize = 1;
@@ -25,14 +26,14 @@ impl BlendMessage for MockBlendMessage {
     const DROP_MESSAGE: &'static [u8] = &[0; MESSAGE_SIZE];
 
     /// The length of the encoded message is fixed to [`MESSAGE_SIZE`] bytes.
-    /// The [`MAX_LAYERS`] number of [`NodeId`]s are concatenated in front of the payload.
-    /// The payload is zero-padded to the end.
-    ///
+    /// The [`MAX_LAYERS`] number of [`NodeId`]s are concatenated in front of
+    /// the payload. The payload is zero-padded to the end.
     fn build_message(
         payload: &[u8],
         public_keys: &[Self::PublicKey],
     ) -> Result<Vec<u8>, Self::Error> {
-        // In this mock, we don't encrypt anything. So, we use public key as just a node ID.
+        // In this mock, we don't encrypt anything. So, we use public key as just a node
+        // ID.
         let node_ids = public_keys;
         if node_ids.is_empty() || node_ids.len() > MAX_LAYERS {
             return Err(Error::InvalidNumberOfLayers);
@@ -67,7 +68,8 @@ impl BlendMessage for MockBlendMessage {
             return Err(Error::InvalidBlendMessage);
         }
 
-        // In this mock, we don't decrypt anything. So, we use private key as just a node ID.
+        // In this mock, we don't decrypt anything. So, we use private key as just a
+        // node ID.
         let node_id = private_key;
         if &message[0..NODE_ID_SIZE] != node_id {
             return Err(Error::MsgUnwrapNotAllowed);

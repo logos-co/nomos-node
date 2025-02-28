@@ -1,20 +1,28 @@
-// std
-use std::collections::HashMap;
-use std::time::{Duration, Instant};
-// crates
+use std::{
+    collections::HashMap,
+    time::{Duration, Instant},
+};
+
 use fixed::types::U57F7;
 use libp2p::PeerId;
 use serde::{Deserialize, Serialize};
-// internal
-use crate::maintenance::monitor::{ConnectionMonitor, ConnectionMonitorOutput, PeerStatus};
-use crate::protocols::dispersal::executor::behaviour::{
-    DispersalError as ExecutorDispersalError, DispersalExecutorEvent,
+
+use crate::{
+    maintenance::monitor::{ConnectionMonitor, ConnectionMonitorOutput, PeerStatus},
+    protocols::{
+        dispersal::{
+            executor::behaviour::{
+                DispersalError as ExecutorDispersalError, DispersalExecutorEvent,
+            },
+            validator::behaviour::{
+                DispersalError as ValidatorDispersalError,
+                DispersalEvent as DispersalValidatorEvent,
+            },
+        },
+        replication::behaviour::{ReplicationError, ReplicationEvent},
+        sampling::behaviour::{SamplingError, SamplingEvent},
+    },
 };
-use crate::protocols::dispersal::validator::behaviour::{
-    DispersalError as ValidatorDispersalError, DispersalEvent as DispersalValidatorEvent,
-};
-use crate::protocols::replication::behaviour::{ReplicationError, ReplicationEvent};
-use crate::protocols::sampling::behaviour::{SamplingError, SamplingEvent};
 
 pub enum MonitorEvent {
     ExecutorDispersal(ExecutorDispersalError),
@@ -79,10 +87,12 @@ impl From<&SamplingEvent> for MonitorEvent {
     }
 }
 
-/// Tracks failure rates for different protocols using exponential weighted moving average.
+/// Tracks failure rates for different protocols using exponential weighted
+/// moving average.
 #[derive(Default, Debug)]
 pub struct PeerStats {
-    // Calculated using EWMA to give more weight to recent failures while gradually decaying over time.
+    // Calculated using EWMA to give more weight to recent failures while gradually decaying over
+    // time.
     pub dispersal_failures_rate: U57F7,
     pub sampling_failures_rate: U57F7,
     pub replication_failures_rate: U57F7,
@@ -209,8 +219,8 @@ where
 
     fn evaluate_peer(&self, now: Instant, peer_id: &PeerId) -> PeerStatus {
         if let Some(stats) = self.peer_stats.get(peer_id) {
-            // We need to recompute the failure rate upon the evaluation as time has moved on and
-            // the failure rate must have decayed.
+            // We need to recompute the failure rate upon the evaluation as time has moved
+            // on and the failure rate must have decayed.
             let stats = stats.get_updated_stats(
                 now,
                 self.settings.failure_time_window,
@@ -306,8 +316,9 @@ fn compute_failure_rate(
 
 #[cfg(test)]
 mod tests {
-    use libp2p::PeerId;
     use std::time::Duration;
+
+    use libp2p::PeerId;
     use subnetworks_assignations::versions::v1::FillFromNodeList;
 
     use super::*;

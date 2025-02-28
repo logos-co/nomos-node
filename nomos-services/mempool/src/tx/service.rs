@@ -4,23 +4,21 @@ pub mod openapi {
     pub use crate::backend::Status;
 }
 
-// std
 use std::fmt::Debug;
 
-// crates
 use futures::StreamExt;
-// internal
-use crate::backend::MemPool;
-use crate::network::NetworkAdapter;
-use crate::{MempoolMetrics, MempoolMsg};
 use nomos_network::{NetworkMsg, NetworkService};
-use overwatch_rs::services::{
-    relay::{OutboundRelay, Relay},
-    state::{NoOperator, NoState},
-    ServiceCore, ServiceData, ServiceId,
+use overwatch_rs::{
+    services::{
+        relay::{OutboundRelay, Relay},
+        state::{NoOperator, NoState},
+        ServiceCore, ServiceData, ServiceId,
+    },
+    OpaqueServiceStateHandle,
 };
-use overwatch_rs::OpaqueServiceStateHandle;
 use services_utils::overwatch::lifecycle;
+
+use crate::{backend::MemPool, network::NetworkAdapter, MempoolMetrics, MempoolMsg};
 
 pub struct TxMempoolService<N, P>
 where
@@ -153,7 +151,8 @@ where
                         // Broadcast the item to the network
                         let net = network_relay.clone();
                         let settings = service_state.settings_reader.get_updated_settings().network;
-                        // move sending to a new task so local operations can complete in the meantime
+                        // move sending to a new task so local operations can complete in the
+                        // meantime
                         tokio::spawn(async move {
                             let adapter = N::new(settings, net).await;
                             adapter.send(item).await;

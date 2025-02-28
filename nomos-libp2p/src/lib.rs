@@ -1,29 +1,33 @@
 mod config;
 
-use std::error::Error;
-use std::pin::Pin;
-use std::task::{Context, Poll};
+use std::{
+    error::Error,
+    pin::Pin,
+    task::{Context, Poll},
+    time::Duration,
+};
 
-use std::time::Duration;
-
+use blake2::{
+    digest::{consts::U32, Digest},
+    Blake2b,
+};
 pub use config::{secret_key_serde, SwarmConfig};
-pub use libp2p;
-
-use blake2::digest::{consts::U32, Digest};
-use blake2::Blake2b;
-use libp2p::gossipsub::{Message, MessageId, TopicHash};
-use libp2p::swarm::ConnectionId;
 pub use libp2p::{
+    self,
     core::upgrade,
     gossipsub::{self, PublishError, SubscriptionError},
     identity::{self, ed25519},
     swarm::{dial_opts::DialOpts, DialError, NetworkBehaviour, SwarmEvent},
     PeerId, SwarmBuilder, Transport,
 };
+use libp2p::{
+    gossipsub::{Message, MessageId, TopicHash},
+    swarm::ConnectionId,
+};
 pub use multiaddr::{multiaddr, Multiaddr, Protocol};
 
-// TODO: Risc0 proofs are HUGE (220 Kb) and it's the only reason we need to have this
-// limit so large. Remove this once we transition to smaller proofs.
+// TODO: Risc0 proofs are HUGE (220 Kb) and it's the only reason we need to have
+// this limit so large. Remove this once we transition to smaller proofs.
 const DATA_LIMIT: usize = 1 << 18; // Do not serialize/deserialize more than 256 KiB
 
 /// Wraps [`libp2p::Swarm`], and config it for use within Nomos.
@@ -61,7 +65,8 @@ pub enum SwarmError {
 const IDLE_CONN_TIMEOUT: Duration = Duration::from_secs(300);
 
 impl Swarm {
-    /// Builds a [`Swarm`] configured for use with Nomos on top of a tokio executor.
+    /// Builds a [`Swarm`] configured for use with Nomos on top of a tokio
+    /// executor.
     //
     // TODO: define error types
     pub fn build(config: &SwarmConfig) -> Result<Self, Box<dyn Error>> {
@@ -95,7 +100,8 @@ impl Swarm {
 
     /// Subscribes to a topic
     ///
-    /// Returns true if the topic is newly subscribed or false if already subscribed.
+    /// Returns true if the topic is newly subscribed or false if already
+    /// subscribed.
     pub fn subscribe(&mut self, topic: &str) -> Result<bool, SubscriptionError> {
         self.swarm
             .behaviour_mut()

@@ -1,12 +1,14 @@
-use divan::counter::BytesCount;
-use divan::Bencher;
-use kzgrs_backend::common::blob::DaBlob;
-use kzgrs_backend::encoder::{DaEncoder, DaEncoderParams};
-use kzgrs_backend::global::GLOBAL_PARAMETERS;
-use kzgrs_backend::verifier::DaVerifier;
+use std::hint::black_box;
+
+use divan::{counter::BytesCount, Bencher};
+use kzgrs_backend::{
+    common::blob::DaBlob,
+    encoder::{DaEncoder, DaEncoderParams},
+    global::GLOBAL_PARAMETERS,
+    verifier::DaVerifier,
+};
 use nomos_core::da::DaEncoder as _;
 use rand::{thread_rng, RngCore};
-use std::hint::black_box;
 
 fn main() {
     divan::main()

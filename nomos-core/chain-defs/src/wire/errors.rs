@@ -1,6 +1,6 @@
-//STD
-use crate::wire::bincode::clone_bincode_error;
 use std::io;
+
+use crate::wire::bincode::clone_bincode_error;
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {

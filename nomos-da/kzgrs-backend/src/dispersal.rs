@@ -1,12 +1,10 @@
-// std
 use std::hash::{Hash, Hasher};
-// crates
+
 use nomos_core::da::{
     blob::{self, metadata::Next},
     BlobId,
 };
 use serde::{Deserialize, Serialize};
-// internal
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
 pub struct BlobInfo {

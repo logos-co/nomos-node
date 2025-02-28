@@ -1,7 +1,6 @@
-use nomos_core::block::Block;
 use nomos_core::da::blob::Blob;
-use nomos_core::header::HeaderId;
 use nomos_da_storage::rocksdb::{key_bytes, DA_SHARED_COMMITMENTS_PREFIX};
+use nomos_core::{block::Block, header::HeaderId};
 use nomos_storage::{
     backends::{rocksdb::RocksBackend, StorageSerde},
     StorageMsg, StorageService,

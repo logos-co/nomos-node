@@ -1,12 +1,10 @@
 pub mod kzgrs;
 
-// std
 use std::collections::BTreeSet;
-// crates
+
+use nomos_da_network_core::SubnetworkId;
 use rand::Rng;
 use tokio::time::Interval;
-// internal
-use nomos_da_network_core::SubnetworkId;
 
 pub enum SamplingState {
     Init(Vec<SubnetworkId>),

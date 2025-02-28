@@ -2,6 +2,11 @@ use nomos_core::{
     header::HeaderId,
     tx::mock::{MockTransaction, MockTxId},
 };
+use nomos_mempool::{
+    backend::mockpool::MockPool,
+    network::adapters::mock::{MockAdapter, MOCK_TX_CONTENT_TOPIC},
+    MempoolMsg, TxMempoolService, TxMempoolSettings,
+};
 use nomos_network::{
     backends::mock::{Mock, MockBackendMessage, MockConfig, MockMessage},
     NetworkConfig, NetworkMsg, NetworkService,
@@ -9,12 +14,6 @@ use nomos_network::{
 use nomos_tracing_service::{Tracing, TracingSettings};
 use overwatch_derive::*;
 use overwatch_rs::{overwatch::OverwatchRunner, OpaqueServiceHandle};
-
-use nomos_mempool::{
-    backend::mockpool::MockPool,
-    network::adapters::mock::{MockAdapter, MOCK_TX_CONTENT_TOPIC},
-    MempoolMsg, TxMempoolService, TxMempoolSettings,
-};
 
 #[allow(clippy::type_complexity)]
 #[derive(Services)]

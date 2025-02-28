@@ -1,10 +1,7 @@
-// std
-// crates
-use serde::{de::Error as _, Deserialize, Deserializer, Serialize, Serializer};
-use thiserror::Error;
-// internal
 use nomos_ledger::leader_proof::LeaderProof;
 use nomos_proof_statements::leadership::{LeaderPrivate, LeaderPublic};
+use serde::{de::Error as _, Deserialize, Deserializer, Serialize, Serializer};
+use thiserror::Error;
 
 #[derive(Debug, Clone)]
 pub struct Risc0LeaderProof {
@@ -34,7 +31,8 @@ impl Risc0LeaderProof {
 
         let start_t = std::time::Instant::now();
 
-        // ATTENTION: producing a groth16 proof currently requires x86 with docker support
+        // ATTENTION: producing a groth16 proof currently requires x86 with docker
+        // support
         let opts = risc0_zkvm::ProverOpts::groth16();
         let prove_info =
             prover.prove_with_opts(env, nomos_risc0_proofs::PROOF_OF_LEADERSHIP_ELF, &opts)?;
@@ -104,9 +102,10 @@ impl<'de> Deserialize<'de> for Risc0LeaderProof {
 
 #[cfg(test)]
 mod test {
-    use super::*;
     use cl::{note::NoteWitness, nullifier::NullifierSecret};
     use rand::thread_rng;
+
+    use super::*;
 
     const MAX_NOTE_COMMS: usize = 1 << 8;
 

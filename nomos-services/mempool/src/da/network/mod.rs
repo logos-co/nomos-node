@@ -1,12 +1,9 @@
 use std::marker::PhantomData;
 
 use kzgrs_backend::common::blob::DaBlob;
-// crates
 use nomos_da_network_core::SubnetworkId;
 
-// internal
 pub mod adapters;
-// std
 
 // TODO: remove after using it in the service
 #[allow(dead_code)]

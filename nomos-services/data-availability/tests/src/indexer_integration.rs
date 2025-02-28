@@ -1,4 +1,3 @@
-// std
 use std::{
     str::FromStr,
     sync::{
@@ -7,18 +6,23 @@ use std::{
     },
     time::Duration,
 };
-// crates
+
 use cl::{NoteWitness, NullifierSecret};
 use cryptarchia_consensus::{ConsensusMsg, LeaderConfig, TimeConfig};
 use kzgrs_backend::{
     common::blob::DaBlob,
     dispersal::{BlobInfo, Metadata},
 };
-use nomos_core::da::blob::Blob;
-use nomos_core::da::DaEncoder as _;
-use nomos_core::{da::blob::metadata::Metadata as _, staking::NMO_UNIT};
-use nomos_da_storage::rocksdb::{create_blob_idx, key_bytes};
-use nomos_da_storage::rocksdb::{DA_BLOB_PREFIX, DA_SHARED_COMMITMENTS_PREFIX};
+use nomos_core::{
+    da::{
+        blob::{metadata::Metadata as _, Blob},
+        DaEncoder as _,
+    },
+    staking::NMO_UNIT,
+};
+use nomos_da_storage::rocksdb::{
+    create_blob_idx, key_bytes, DA_BLOB_PREFIX, DA_SHARED_COMMITMENTS_PREFIX,
+};
 use nomos_da_verifier::backend::kzgrs::KzgrsDaVerifierSettings;
 use nomos_ledger::LedgerState;
 use nomos_libp2p::{Multiaddr, SwarmConfig};
@@ -31,10 +35,8 @@ use overwatch_rs::services::relay::OutboundRelay;
 use rand::{thread_rng, Rng};
 use tempfile::{NamedTempFile, TempDir};
 use time::OffsetDateTime;
-use tokio_stream::wrappers::BroadcastStream;
-use tokio_stream::StreamExt;
+use tokio_stream::{wrappers::BroadcastStream, StreamExt};
 
-// internal
 use crate::common::*;
 
 const INDEXER_TEST_MAX_SECONDS: u64 = 60;
@@ -350,8 +352,8 @@ fn test_indexer() {
         app_id_blobs.sort_by(|(a, _), (b, _)| a.partial_cmp(b).unwrap());
         let app_id_blobs = app_id_blobs.iter().map(|(_, b)| b).collect::<Vec<_>>();
 
-        // When Indexer is asked for app_id at index, it will return all blobs that it has for that
-        // blob_id.
+        // When Indexer is asked for app_id at index, it will return all blobs that it
+        // has for that blob_id.
         let columns = app_id_blobs[0];
         if !columns.is_empty() && columns[0] == blob_0 && app_id_blobs[1].is_empty() {
             is_success_tx.store(true, SeqCst);

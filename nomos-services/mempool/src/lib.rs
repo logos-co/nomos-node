@@ -4,12 +4,12 @@ pub mod network;
 pub mod tx;
 pub mod verify;
 
-use backend::Status;
-use overwatch_rs::services::relay::RelayMessage;
 use std::fmt::{Debug, Error, Formatter};
-use tokio::sync::oneshot::Sender;
 
+use backend::Status;
 pub use da::service::{DaMempoolService, DaMempoolSettings};
+use overwatch_rs::services::relay::RelayMessage;
+use tokio::sync::oneshot::Sender;
 pub use tx::service::{TxMempoolService, TxMempoolSettings};
 
 pub enum MempoolMsg<BlockId, Payload, Item, Key> {

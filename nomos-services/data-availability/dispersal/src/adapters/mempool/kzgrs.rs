@@ -1,15 +1,10 @@
-// std
-use std::hash::Hash;
-use std::{fmt::Debug, marker::PhantomData};
-// crates
-use rand::{RngCore, SeedableRng};
-use tokio::sync::oneshot;
-// internal
-use super::DaMempoolAdapter;
+use std::{fmt::Debug, hash::Hash, marker::PhantomData};
+
 use kzgrs_backend::dispersal::{self, BlobInfo};
-use nomos_core::da::blob::info::DispersedBlobInfo;
-use nomos_core::da::BlobId;
-use nomos_core::header::HeaderId;
+use nomos_core::{
+    da::{blob::info::DispersedBlobInfo, BlobId},
+    header::HeaderId,
+};
 use nomos_da_sampling::backend::DaSamplingServiceBackend;
 use nomos_mempool::{
     backend::MemPool, network::NetworkAdapter as MempoolAdapter, DaMempoolService, MempoolMsg,
@@ -18,6 +13,10 @@ use overwatch_rs::{
     services::{relay::OutboundRelay, ServiceData},
     DynError,
 };
+use rand::{RngCore, SeedableRng};
+use tokio::sync::oneshot;
+
+use super::DaMempoolAdapter;
 
 type MempoolRelay<Payload, Item, Key> = OutboundRelay<MempoolMsg<HeaderId, Payload, Item, Key>>;
 

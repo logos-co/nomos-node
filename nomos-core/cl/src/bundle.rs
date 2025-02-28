@@ -2,8 +2,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::{partial_tx::PartialTx, BalanceWitness, PartialTxWitness};
 /// The transaction bundle is a collection of partial transactions.
-/// The goal in bundling transactions is to produce a set of partial transactions
-/// that balance each other.
+/// The goal in bundling transactions is to produce a set of partial
+/// transactions that balance each other.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Bundle {
     partials: Vec<PartialTx>,
@@ -46,6 +46,7 @@ impl BundleWitness {
 
 #[cfg(test)]
 mod test {
+    use super::*;
     use crate::{
         balance::UnitBalance,
         input::InputWitness,
@@ -54,8 +55,6 @@ mod test {
         output::OutputWitness,
         partial_tx::PartialTxWitness,
     };
-
-    use super::*;
 
     #[test]
     fn test_bundle_balance() {

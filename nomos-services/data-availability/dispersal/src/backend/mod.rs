@@ -1,11 +1,11 @@
-use crate::adapters::{mempool::DaMempoolAdapter, network::DispersalNetworkAdapter};
-use std::time::Duration;
+use std::{fmt::Debug, time::Duration};
 
 use nomos_core::da::{blob::metadata, DaDispersal, DaEncoder};
 use nomos_tracing::info_with_id;
 use overwatch_rs::DynError;
-use std::fmt::Debug;
 use tracing::instrument;
+
+use crate::adapters::{mempool::DaMempoolAdapter, network::DispersalNetworkAdapter};
 
 pub mod kzgrs;
 

@@ -1,9 +1,7 @@
-// std
 use std::hash::Hash;
-// crates
-use serde::{Deserialize, Serialize};
-// internal
+
 use nomos_core::block::Block;
+use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize)]
 pub enum NetworkMessage<Tx, Blob>

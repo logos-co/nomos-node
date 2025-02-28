@@ -1,11 +1,9 @@
-// std
 use std::{env, fs, net::Ipv4Addr, process};
-// crates
+
 use nomos_executor::config::Config as ExecutorConfig;
 use nomos_node::Config as ValidatorConfig;
 use reqwest::Client;
 use serde::{de::DeserializeOwned, Serialize};
-// internal
 
 #[derive(Serialize)]
 struct ClientIp {

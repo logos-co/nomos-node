@@ -1,7 +1,6 @@
 //! Serializer for wire formats.
 // TODO: we're using bincode for now, but might need strong guarantees about
 // the underlying format in the future for standardization.
-// Internals
 pub(crate) mod bincode;
 pub mod deserialization;
 pub mod errors;
@@ -14,8 +13,9 @@ pub type Result<T> = std::result::Result<T, Error>;
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use serde::{Deserialize, Serialize};
+
+    use super::*;
 
     #[test]
     fn serialize_deserialize() {

@@ -3,23 +3,22 @@ pub mod validator;
 
 #[cfg(test)]
 pub mod test {
-    use crate::address_book::AddressBook;
-    use crate::protocols::dispersal::executor::behaviour::DispersalExecutorBehaviour;
-    use crate::protocols::dispersal::validator::behaviour::{
-        DispersalEvent, DispersalValidatorBehaviour,
-    };
-    use crate::test_utils::AllNeighbours;
-    use crate::SubnetworkId;
     use futures::StreamExt;
-    use kzgrs_backend::common::blob::DaBlob;
-    use kzgrs_backend::common::Column;
-    use libp2p::identity::Keypair;
-    use libp2p::swarm::SwarmEvent;
-    use libp2p::{quic, Multiaddr, PeerId};
+    use kzgrs_backend::common::{blob::DaBlob, Column};
+    use libp2p::{identity::Keypair, quic, swarm::SwarmEvent, Multiaddr, PeerId};
     use log::info;
     use subnetworks_assignations::MembershipHandler;
-    use tracing_subscriber::fmt::TestWriter;
-    use tracing_subscriber::EnvFilter;
+    use tracing_subscriber::{fmt::TestWriter, EnvFilter};
+
+    use crate::{
+        address_book::AddressBook,
+        protocols::dispersal::{
+            executor::behaviour::DispersalExecutorBehaviour,
+            validator::behaviour::{DispersalEvent, DispersalValidatorBehaviour},
+        },
+        test_utils::AllNeighbours,
+        SubnetworkId,
+    };
 
     pub fn executor_swarm(
         addressbook: AddressBook,

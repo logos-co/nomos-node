@@ -1,7 +1,7 @@
-use crate::common::Blob;
-use crate::SubnetworkId;
 use nomos_core::da::BlobId;
 use serde::{Deserialize, Serialize};
+
+use crate::{common::Blob, SubnetworkId};
 
 #[repr(C)]
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]

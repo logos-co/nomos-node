@@ -99,7 +99,8 @@ pub enum FromBehaviour {
     /// A message to be sent to the connection.
     Message(Vec<u8>),
     /// Close inbound/outbound substreams.
-    /// This happens when [`crate::Behaviour`] determines that one of the followings is true.
+    /// This happens when [`crate::Behaviour`] determines that one of the
+    /// followings is true.
     /// - Max peering degree is reached.
     /// - The peer has been detected as malicious.
     CloseSubstreams,
@@ -107,9 +108,11 @@ pub enum FromBehaviour {
 
 #[derive(Debug)]
 pub enum ToBehaviour {
-    /// An inbound substream has been successfully upgraded for the blend protocol.
+    /// An inbound substream has been successfully upgraded for the blend
+    /// protocol.
     FullyNegotiatedInbound,
-    /// An outbound substream has been successfully upgraded for the blend protocol.
+    /// An outbound substream has been successfully upgraded for the blend
+    /// protocol.
     FullyNegotiatedOutbound,
     /// An outbound substream was failed to be upgraded for the blend protocol.
     DialUpgradeError(DialUpgradeError<(), ReadyUpgrade<StreamProtocol>>),
@@ -233,7 +236,8 @@ where
         tracing::debug!("Processing outbound stream");
         loop {
             match self.outbound_substream.take() {
-                // If the request to open a new outbound substream is still being processed, wait more.
+                // If the request to open a new outbound substream is still being processed, wait
+                // more.
                 Some(OutboundSubstreamState::PendingOpenSubstream) => {
                     self.outbound_substream = Some(OutboundSubstreamState::PendingOpenSubstream);
                     self.waker = Some(cx.waker().clone());

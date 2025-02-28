@@ -1,12 +1,11 @@
-// std
 use std::{error::Error, fs::File};
-// crates
+
 use ark_bls12_381::{fr::Fr, Bls12_381};
 use ark_poly::polynomial::univariate::DensePolynomial;
 use ark_poly_commit::kzg10::{UniversalParams, KZG10};
 use ark_serialize::{CanonicalDeserialize, Read};
 use rand::Rng;
-// internal
+
 use super::GlobalParameters;
 
 pub fn global_parameters_from_randomness<R: Rng>(rng: &mut R) -> GlobalParameters {

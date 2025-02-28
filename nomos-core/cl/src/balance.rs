@@ -102,8 +102,8 @@ impl BalanceWitness {
         while i < self.balances.len() {
             if self.balances[i].is_zero() {
                 self.balances.swap_remove(i);
-                // don't increment `i` since the last element has been swapped into the
-                // `i`'th place
+                // don't increment `i` since the last element has been swapped
+                // into the `i`'th place
             } else {
                 i += 1;
             }

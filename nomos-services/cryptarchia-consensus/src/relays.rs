@@ -1,28 +1,26 @@
-use std::hash::Hash;
-// std
-use std::fmt::Debug;
-// Crates
-use overwatch_rs::services::relay::{OutboundRelay, Relay};
-use rand::{RngCore, SeedableRng};
-use serde::de::DeserializeOwned;
-// Internal
-use crate::storage::adapters::StorageAdapter;
-use crate::storage::StorageAdapter as StorageAdapterTrait;
-use crate::{blend, network, MempoolRelay, SamplingRelay};
-use nomos_blend_service::network::NetworkAdapter as BlendNetworkAdapter;
-use nomos_blend_service::ServiceMessage;
-use nomos_core::da::blob::info::DispersedBlobInfo;
-use nomos_core::da::blob::BlobSelect;
-use nomos_core::header::HeaderId;
-use nomos_core::tx::TxSelect;
-use nomos_da_sampling::backend::DaSamplingServiceBackend;
-use nomos_da_sampling::DaSamplingService;
+use std::{fmt::Debug, hash::Hash};
+
+use nomos_blend_service::{network::NetworkAdapter as BlendNetworkAdapter, ServiceMessage};
+use nomos_core::{
+    da::blob::{info::DispersedBlobInfo, BlobSelect},
+    header::HeaderId,
+    tx::TxSelect,
+};
+use nomos_da_sampling::{backend::DaSamplingServiceBackend, DaSamplingService};
 use nomos_mempool::{
     backend::MemPool, network::NetworkAdapter as MempoolAdapter, DaMempoolService, TxMempoolService,
 };
 use nomos_network::{NetworkMsg, NetworkService};
-use nomos_storage::backends::StorageBackend;
-use nomos_storage::{StorageMsg, StorageService};
+use nomos_storage::{backends::StorageBackend, StorageMsg, StorageService};
+use overwatch_rs::services::relay::{OutboundRelay, Relay};
+use rand::{RngCore, SeedableRng};
+use serde::de::DeserializeOwned;
+
+use crate::{
+    blend, network,
+    storage::{adapters::StorageAdapter, StorageAdapter as StorageAdapterTrait},
+    MempoolRelay, SamplingRelay,
+};
 
 type NetworkRelay<NetworkBackend> = OutboundRelay<NetworkMsg<NetworkBackend>>;
 type BlendRelay<BlendAdapterNetworkBroadcastSettings> =

@@ -1,17 +1,14 @@
-// std
-
-// crates
 use futures::{Stream, StreamExt};
 use nomos_core::tx::mock::{MockTransaction, MockTxId};
-use nomos_network::backends::mock::{
-    EventKind, Mock, MockBackendMessage, MockContentTopic, MockMessage, NetworkEvent,
+use nomos_network::{
+    backends::mock::{
+        EventKind, Mock, MockBackendMessage, MockContentTopic, MockMessage, NetworkEvent,
+    },
+    NetworkMsg, NetworkService,
 };
-use nomos_network::{NetworkMsg, NetworkService};
-use overwatch_rs::services::relay::OutboundRelay;
-use overwatch_rs::services::ServiceData;
+use overwatch_rs::services::{relay::OutboundRelay, ServiceData};
 use tokio_stream::wrappers::BroadcastStream;
 
-// internal
 use crate::network::NetworkAdapter;
 
 pub const MOCK_PUB_SUB_TOPIC: &str = "MockPubSubTopic";

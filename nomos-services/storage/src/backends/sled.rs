@@ -1,13 +1,11 @@
-// std
-use std::marker::PhantomData;
-use std::path::PathBuf;
-// crates
+use std::{marker::PhantomData, path::PathBuf};
+
 use async_trait::async_trait;
 use bytes::Bytes;
 use sled::transaction::{
     ConflictableTransactionResult, TransactionError, TransactionResult, TransactionalTree,
 };
-// internal
+
 use super::{StorageBackend, StorageSerde, StorageTransaction};
 
 #[derive(Debug, thiserror::Error)]
@@ -26,8 +24,8 @@ pub struct SledBackendSettings {
 }
 
 /// Sled transaction type
-/// Function that takes a reference to the transactional tree. No `&mut` needed as sled operations
-/// work over simple `&`.
+/// Function that takes a reference to the transactional tree. No `&mut` needed
+/// as sled operations work over simple `&`.
 pub type SledTransaction = Box<
     dyn Fn(&TransactionalTree) -> ConflictableTransactionResult<Option<Bytes>, sled::Error>
         + Send
@@ -92,9 +90,9 @@ impl<SerdeOp: StorageSerde + Send + Sync + 'static> StorageBackend for SledBacke
 
 #[cfg(test)]
 mod test {
-    use super::super::testing::NoStorageSerde;
-    use super::*;
     use tempfile::TempDir;
+
+    use super::{super::testing::NoStorageSerde, *};
 
     #[tokio::test]
     async fn test_store_load_remove(

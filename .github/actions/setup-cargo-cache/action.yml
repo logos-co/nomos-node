@@ -13,9 +13,6 @@ description: Set up cache read operations for Cargo artifacts
 runs:
   using: composite
   steps:
-    - name: Force toolchain update
-      shell: bash
-      run: rustup update
     - name: Set up Cargo cache
       uses: actions/cache/restore@v4
       with:

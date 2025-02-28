@@ -1,6 +1,5 @@
-// std
 use std::{collections::HashMap, net::Ipv4Addr, str::FromStr};
-// crates
+
 use nomos_blend::membership::Node;
 use nomos_blend_message::{sphinx::SphinxMessage, BlendMessage};
 use nomos_libp2p::{Multiaddr, PeerId};
@@ -230,14 +229,13 @@ fn update_tracing_identifier(
 
 #[cfg(test)]
 mod cfgsync_tests {
+    use std::{net::Ipv4Addr, str::FromStr, time::Duration};
+
     use nomos_libp2p::{Multiaddr, Protocol};
     use nomos_tracing_service::{
         FilterLayer, LoggerLayer, MetricsLayer, TracingLayer, TracingSettings,
     };
-    use std::str::FromStr;
-    use std::{net::Ipv4Addr, time::Duration};
-    use tests::topology::configs::consensus::ConsensusParams;
-    use tests::topology::configs::da::DaParams;
+    use tests::topology::configs::{consensus::ConsensusParams, da::DaParams};
     use tracing::Level;
 
     use super::{create_node_configs, Host, HostKind};

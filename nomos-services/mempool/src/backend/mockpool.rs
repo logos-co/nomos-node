@@ -1,15 +1,16 @@
-// std
+use std::{
+    collections::BTreeMap,
+    hash::Hash,
+    time::{SystemTime, UNIX_EPOCH},
+};
+
 use linked_hash_map::LinkedHashMap;
-use std::hash::Hash;
-use std::time::SystemTime;
-use std::{collections::BTreeMap, time::UNIX_EPOCH};
-// crates
-// internal
-use crate::backend::{MemPool, MempoolError};
 
 use super::Status;
+use crate::backend::{MemPool, MempoolError};
 
-/// A mock mempool implementation that stores all transactions in memory in the order received.
+/// A mock mempool implementation that stores all transactions in memory in the
+/// order received.
 pub struct MockPool<BlockId, Item, Key> {
     pending_items: LinkedHashMap<Key, Item>,
     in_block_items: BTreeMap<BlockId, Vec<Item>>,
@@ -73,7 +74,8 @@ where
     }
 
     fn view(&self, _ancestor_hint: BlockId) -> Box<dyn Iterator<Item = Self::Item> + Send> {
-        // we need to have an owned version of the iterator to bypass adding a lifetime bound to the return iterator type
+        // we need to have an owned version of the iterator to bypass adding a lifetime
+        // bound to the return iterator type
         #[allow(clippy::needless_collect)]
         let pending_items: Vec<Item> = self.pending_items.values().cloned().collect();
         Box::new(pending_items.into_iter())

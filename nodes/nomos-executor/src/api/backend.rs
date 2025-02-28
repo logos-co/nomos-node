@@ -1,25 +1,16 @@
-// std
-use std::error::Error;
-use std::{fmt::Debug, hash::Hash};
-// crates
+use std::{error::Error, fmt::Debug, hash::Hash};
+
 use axum::{http::HeaderValue, routing, Router, Server};
 use hyper::header::{CONTENT_TYPE, USER_AGENT};
-use rand::{RngCore, SeedableRng};
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use tower_http::{
-    cors::{Any, CorsLayer},
-    trace::TraceLayer,
-};
-use utoipa::OpenApi;
-use utoipa_swagger_ui::SwaggerUi;
-// internal
-use super::handlers::disperse_data;
-use crate::api::paths;
 use nomos_api::Backend;
-use nomos_core::da::blob::info::DispersedBlobInfo;
-use nomos_core::da::blob::metadata;
-use nomos_core::da::DaVerifier as CoreDaVerifier;
-use nomos_core::{da::blob::Blob, header::HeaderId, tx::Transaction};
+use nomos_core::{
+    da::{
+        blob::{info::DispersedBlobInfo, metadata, Blob},
+        DaVerifier as CoreDaVerifier,
+    },
+    header::HeaderId,
+    tx::Transaction,
+};
 use nomos_da_dispersal::adapters::mempool::DaMempoolAdapter;
 use nomos_da_network_core::SubnetworkId;
 use nomos_da_sampling::backend::DaSamplingServiceBackend;
@@ -32,7 +23,18 @@ use nomos_node::api::handlers::{
 };
 use nomos_storage::backends::StorageSerde;
 use overwatch_rs::overwatch::handle::OverwatchHandle;
+use rand::{RngCore, SeedableRng};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use subnetworks_assignations::MembershipHandler;
+use tower_http::{
+    cors::{Any, CorsLayer},
+    trace::TraceLayer,
+};
+use utoipa::OpenApi;
+use utoipa_swagger_ui::SwaggerUi;
+
+use super::handlers::disperse_data;
+use crate::api::paths;
 
 /// Configuration for the Http Server
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
