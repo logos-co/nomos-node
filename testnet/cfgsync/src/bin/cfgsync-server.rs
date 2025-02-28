@@ -51,7 +51,7 @@ impl CfgSyncConfig {
             .map_err(|err| format!("Failed to parse config file: {}", err))
     }
 
-    fn to_consensus_params(&self) -> ConsensusParams {
+    const fn to_consensus_params(&self) -> ConsensusParams {
         ConsensusParams {
             n_participants: self.n_hosts,
             security_param: self.security_param,

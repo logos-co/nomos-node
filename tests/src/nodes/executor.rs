@@ -154,7 +154,7 @@ impl Executor {
             .await
     }
 
-    pub fn config(&self) -> &Config {
+    pub const fn config(&self) -> &Config {
         &self.config
     }
 }

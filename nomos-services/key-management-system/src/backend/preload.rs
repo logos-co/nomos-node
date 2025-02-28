@@ -103,7 +103,7 @@ impl SecuredKey for Key {
 }
 
 impl Key {
-    fn key_type(&self) -> SupportedKeyTypes {
+    const fn key_type(&self) -> SupportedKeyTypes {
         match self {
             Self::Ed25519(_) => SupportedKeyTypes::Ed25519,
         }

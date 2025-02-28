@@ -40,7 +40,7 @@ where
         slot_stream: SlotStream,
     ) -> Self {
         let winning_probability = winning_probability(settings.number_of_hops);
-        CoverTraffic {
+        Self {
             winning_probability,
             settings,
             epoch_stream,

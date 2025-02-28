@@ -40,7 +40,7 @@ pub struct SampleRequest {
 }
 
 impl SampleRequest {
-    pub fn new(blob_id: BlobId, column_idx: ColumnIndex) -> Self {
+    pub const fn new(blob_id: BlobId, column_idx: ColumnIndex) -> Self {
         Self {
             blob_id,
             column_idx,

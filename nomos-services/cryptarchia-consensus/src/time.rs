@@ -18,8 +18,8 @@ pub struct Timer {
 }
 
 impl Timer {
-    pub fn new(config: Config) -> Self {
-        Timer { config }
+    pub const fn new(config: Config) -> Self {
+        Self { config }
     }
 
     pub fn current_slot(&self) -> Slot {

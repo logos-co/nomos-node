@@ -61,7 +61,7 @@ enum OutboundSubstreamState {
 }
 
 impl<Msg> BlendConnectionHandler<Msg> {
-    pub fn new(monitor: Option<ConnectionMonitor>) -> Self {
+    pub const fn new(monitor: Option<ConnectionMonitor>) -> Self {
         Self {
             inbound_substream: None,
             outbound_substream: None,

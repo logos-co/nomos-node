@@ -35,7 +35,7 @@ pub enum ReplicationError {
 }
 
 impl ReplicationError {
-    pub fn peer_id(&self) -> Option<&PeerId> {
+    pub const fn peer_id(&self) -> Option<&PeerId> {
         match self {
             Self::Io { peer_id, .. } => Some(peer_id),
         }
@@ -45,7 +45,7 @@ impl ReplicationError {
 impl Clone for ReplicationError {
     fn clone(&self) -> Self {
         match self {
-            ReplicationError::Io { peer_id, error } => ReplicationError::Io {
+            Self::Io { peer_id, error } => Self::Io {
                 peer_id: *peer_id,
                 error: std::io::Error::new(error.kind(), error.to_string()),
             },
@@ -75,7 +75,7 @@ impl From<ReplicationError> for ReplicationEvent {
 impl ReplicationEvent {
     pub fn blob_size(&self) -> Option<usize> {
         match self {
-            ReplicationEvent::IncomingMessage { message, .. } => {
+            Self::IncomingMessage { message, .. } => {
                 Some(message.blob.data.column_len())
             }
             _ => None,

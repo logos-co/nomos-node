@@ -38,7 +38,7 @@ pub enum BehaviourEventToHandler {
 pub(crate) struct ReplicationHandlerConfig {}
 
 impl ReplicationHandlerConfig {
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Self {}
     }
 }

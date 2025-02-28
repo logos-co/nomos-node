@@ -14,7 +14,7 @@ struct MessageTooLargeError(usize);
 
 impl From<MessageTooLargeError> for io::Error {
     fn from(value: MessageTooLargeError) -> Self {
-        io::Error::new(
+        Self::new(
             io::ErrorKind::InvalidData,
             format!(
                 "Message too large. Maximum size is {}. Actual size is {}",

@@ -34,7 +34,7 @@ impl<Membership> DAConnectionPolicy<Membership>
 where
     Membership: Clone,
 {
-    pub fn new(
+    pub const fn new(
         settings: DAConnectionPolicySettings,
         membership: Membership,
         local_peer_id: PeerId,

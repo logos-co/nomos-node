@@ -58,7 +58,7 @@ impl Packet {
             max_payload_size + PAYLOAD_OVERHEAD_SIZE,
         )?;
 
-        Ok(Packet {
+        Ok(Self {
             header: Header {
                 ephemeral_public_key: x25519_dalek::PublicKey::from(&ephemeral_privkey),
                 encrypted_routing_info,
@@ -122,13 +122,13 @@ impl Packet {
         routing_keys: &RoutingKeys,
         next_encrypted_routing_info: EncryptedRoutingInformation,
         payload: Payload,
-    ) -> Packet {
+    ) -> Self {
         // Derive the new ephemeral public key for the next recipient
         let next_ephemeral_pubkey = Self::derive_next_ephemeral_public_key(
             &self.header.ephemeral_public_key,
             &routing_keys.blinding_factor,
         );
-        Packet {
+        Self {
             header: Header {
                 ephemeral_public_key: next_ephemeral_pubkey,
                 encrypted_routing_info: next_encrypted_routing_info,
@@ -177,7 +177,7 @@ impl Packet {
         )
         .map_err(|_| Error::InvalidPacketBytes)?;
 
-        Ok(Packet {
+        Ok(Self {
             header: Header {
                 ephemeral_public_key: {
                     let bytes: [u8; 32] = parsed[0].try_into().unwrap();

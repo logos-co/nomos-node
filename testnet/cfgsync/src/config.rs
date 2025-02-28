@@ -38,7 +38,7 @@ pub struct Host {
 }
 
 impl Host {
-    pub fn default_validator_from_ip(ip: Ipv4Addr, identifier: String) -> Self {
+    pub const fn default_validator_from_ip(ip: Ipv4Addr, identifier: String) -> Self {
         Self {
             kind: HostKind::Validator,
             ip,
@@ -49,7 +49,7 @@ impl Host {
         }
     }
 
-    pub fn default_executor_from_ip(ip: Ipv4Addr, identifier: String) -> Self {
+    pub const fn default_executor_from_ip(ip: Ipv4Addr, identifier: String) -> Self {
         Self {
             kind: HostKind::Executor,
             ip,
@@ -92,7 +92,7 @@ pub fn create_node_configs(
         update_blend_membership(hosts.clone(), blend_configs[0].membership.clone());
 
     let new_peer_addresses: HashMap<PeerId, Multiaddr> = host_da_peer_addresses
-        .clone()
+        
         .into_iter()
         .map(|(peer_id, (multiaddr, _))| (peer_id, multiaddr))
         .collect();
@@ -217,7 +217,7 @@ fn update_tracing_identifier(
             filter: settings.filter,
             metrics: match settings.metrics {
                 MetricsLayer::Otlp(mut config) => {
-                    config.host_identifier = identifier.clone();
+                    config.host_identifier = identifier;
                     MetricsLayer::Otlp(config)
                 }
                 other => other,

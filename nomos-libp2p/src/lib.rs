@@ -85,7 +85,7 @@ impl Swarm {
 
         swarm.listen_on(Self::multiaddr(config.host, config.port))?;
 
-        Ok(Swarm { swarm })
+        Ok(Self { swarm })
     }
 
     /// Initiates a connection attempt to a peer
@@ -131,7 +131,7 @@ impl Swarm {
     }
 
     /// Returns a reference to the underlying [`libp2p::Swarm`]
-    pub fn swarm(&self) -> &libp2p::Swarm<Behaviour> {
+    pub const fn swarm(&self) -> &libp2p::Swarm<Behaviour> {
         &self.swarm
     }
 

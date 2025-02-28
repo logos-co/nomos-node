@@ -17,7 +17,7 @@ pub struct DaVerifier {
 }
 
 impl DaVerifier {
-    pub fn new(global_parameters: GlobalParameters) -> Self {
+    pub const fn new(global_parameters: GlobalParameters) -> Self {
         Self { global_parameters }
     }
 
@@ -98,7 +98,7 @@ impl DaVerifier {
             return false;
         }
         for (chunk, commitment, proof) in izip!(chunks, commitments, proofs) {
-            if !DaVerifier::verify_chunk(global_parameters, chunk, commitment, proof, index, domain)
+            if !Self::verify_chunk(global_parameters, chunk, commitment, proof, index, domain)
             {
                 return false;
             }
@@ -112,7 +112,7 @@ impl DaVerifier {
         let blob_col_idx = &u16::from_be_bytes(blob.column_idx());
         let index = blob_col_idx;
 
-        let is_column_verified = DaVerifier::verify_column(
+        let is_column_verified = Self::verify_column(
             &self.global_parameters,
             &blob.column,
             &blob.column_commitment,
@@ -125,7 +125,7 @@ impl DaVerifier {
             return false;
         }
 
-        let are_chunks_verified = DaVerifier::verify_chunks(
+        let are_chunks_verified = Self::verify_chunks(
             &self.global_parameters,
             blob.column.as_ref(),
             &blob.rows_commitments,

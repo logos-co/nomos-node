@@ -271,7 +271,7 @@ impl CoverTrafficExtSettings {
         }
     }
 
-    fn slots_per_epoch(&self) -> usize {
+    const fn slots_per_epoch(&self) -> usize {
         (self.epoch_duration.as_secs() as usize)
             .checked_div(self.slot_duration.as_secs() as usize)
             .expect("Invalid epoch & slot duration")
@@ -328,6 +328,7 @@ impl<BroadcastSettings> RelayMessage for ServiceMessage<BroadcastSettings> where
 }
 
 /// A message that is sent to the blend network.
+///
 /// To eventually broadcast the message to the network service,
 /// [`BroadcastSettings`] must be included in the [`NetworkMessage`].
 /// [`BroadcastSettings`] is a generic type defined by [`NetworkAdapter`].

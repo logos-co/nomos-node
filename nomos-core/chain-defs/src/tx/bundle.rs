@@ -20,7 +20,7 @@ pub struct Bundle {
 }
 
 impl Bundle {
-    pub fn bundle(&self) -> &cl::Bundle {
+    pub const fn bundle(&self) -> &cl::Bundle {
         &self.bundle
     }
 
@@ -171,7 +171,7 @@ mod test {
 
     use super::*;
 
-    fn receive_utxo(note: cl::NoteWitness, nf_pk: cl::NullifierCommitment) -> cl::OutputWitness {
+    const fn receive_utxo(note: cl::NoteWitness, nf_pk: cl::NullifierCommitment) -> cl::OutputWitness {
         cl::OutputWitness::new(note, nf_pk)
     }
 

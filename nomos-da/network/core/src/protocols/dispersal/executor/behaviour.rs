@@ -64,28 +64,28 @@ pub enum DispersalError {
 }
 
 impl DispersalError {
-    pub fn blob_id(&self) -> Option<BlobId> {
+    pub const fn blob_id(&self) -> Option<BlobId> {
         match self {
-            DispersalError::Io { blob_id, .. } => Some(*blob_id),
-            DispersalError::Serialization { blob_id, .. } => Some(*blob_id),
-            DispersalError::Protocol {
+            Self::Io { blob_id, .. } => Some(*blob_id),
+            Self::Serialization { blob_id, .. } => Some(*blob_id),
+            Self::Protocol {
                 error: dispersal::DispersalError { blob_id, .. },
                 ..
             } => Some(*blob_id),
-            DispersalError::OpenStreamError { .. } => None,
+            Self::OpenStreamError { .. } => None,
         }
     }
 
-    pub fn subnetwork_id(&self) -> Option<SubnetworkId> {
+    pub const fn subnetwork_id(&self) -> Option<SubnetworkId> {
         match self {
-            DispersalError::Io { subnetwork_id, .. } => Some(*subnetwork_id),
-            DispersalError::Serialization { subnetwork_id, .. } => Some(*subnetwork_id),
-            DispersalError::Protocol { subnetwork_id, .. } => Some(*subnetwork_id),
-            DispersalError::OpenStreamError { .. } => None,
+            Self::Io { subnetwork_id, .. } => Some(*subnetwork_id),
+            Self::Serialization { subnetwork_id, .. } => Some(*subnetwork_id),
+            Self::Protocol { subnetwork_id, .. } => Some(*subnetwork_id),
+            Self::OpenStreamError { .. } => None,
         }
     }
 
-    pub fn peer_id(&self) -> Option<&PeerId> {
+    pub const fn peer_id(&self) -> Option<&PeerId> {
         match self {
             Self::Io { peer_id, .. } => Some(peer_id),
             Self::OpenStreamError { peer_id, .. } => Some(peer_id),
@@ -97,34 +97,34 @@ impl DispersalError {
 impl Clone for DispersalError {
     fn clone(&self) -> Self {
         match self {
-            DispersalError::Io {
+            Self::Io {
                 peer_id,
                 error,
                 blob_id,
                 subnetwork_id,
-            } => DispersalError::Io {
+            } => Self::Io {
                 peer_id: *peer_id,
                 error: std::io::Error::new(error.kind(), error.to_string()),
                 blob_id: *blob_id,
                 subnetwork_id: *subnetwork_id,
             },
-            DispersalError::Serialization {
+            Self::Serialization {
                 error,
                 blob_id,
                 subnetwork_id,
-            } => DispersalError::Serialization {
+            } => Self::Serialization {
                 error: error.clone(),
                 blob_id: *blob_id,
                 subnetwork_id: *subnetwork_id,
             },
-            DispersalError::Protocol {
+            Self::Protocol {
                 subnetwork_id,
                 error,
-            } => DispersalError::Protocol {
+            } => Self::Protocol {
                 subnetwork_id: *subnetwork_id,
                 error: error.clone(),
             },
-            DispersalError::OpenStreamError { peer_id, error } => DispersalError::OpenStreamError {
+            Self::OpenStreamError { peer_id, error } => Self::OpenStreamError {
                 peer_id: *peer_id,
                 error: match error {
                     OpenStreamError::UnsupportedProtocol(protocol) => {

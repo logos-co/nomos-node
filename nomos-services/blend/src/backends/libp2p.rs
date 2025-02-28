@@ -118,7 +118,7 @@ struct BlendBehaviour {
 
 impl BlendBehaviour {
     fn new(config: &Libp2pBlendBackendSettings) -> Self {
-        BlendBehaviour {
+        Self {
             blend:
                 nomos_blend_network::Behaviour::<SphinxMessage, TokioIntervalStreamProvider>::new(
                     nomos_blend_network::Config {

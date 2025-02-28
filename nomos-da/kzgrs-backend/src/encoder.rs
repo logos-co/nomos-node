@@ -109,7 +109,7 @@ pub struct EncodedDataIterator<'a> {
 }
 
 impl<'a> EncodedDataIterator<'a> {
-    pub fn new(encoded_data: &'a EncodedData) -> Self {
+    pub const fn new(encoded_data: &'a EncodedData) -> Self {
         Self {
             encoded_data,
             next_index: 0,

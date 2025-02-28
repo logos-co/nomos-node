@@ -98,7 +98,7 @@ struct GossipsubConfigDef {
 }
 
 impl From<GossipsubConfigDef> for gossipsub::Config {
-    fn from(def: GossipsubConfigDef) -> gossipsub::Config {
+    fn from(def: GossipsubConfigDef) -> Self {
         let mut builder = gossipsub::ConfigBuilder::default();
         let mut builder = builder
             .history_length(def.history_length)

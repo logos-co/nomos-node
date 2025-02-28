@@ -33,13 +33,13 @@ pub enum MonitorEvent {
 }
 
 impl MonitorEvent {
-    pub fn peer_id(&self) -> Option<&PeerId> {
+    pub const fn peer_id(&self) -> Option<&PeerId> {
         match self {
-            MonitorEvent::ExecutorDispersal(dispersal_error) => dispersal_error.peer_id(),
-            MonitorEvent::ValidatorDispersal(dispersal_error) => dispersal_error.peer_id(),
-            MonitorEvent::Replication(replication_error) => replication_error.peer_id(),
-            MonitorEvent::Sampling(sampling_error) => sampling_error.peer_id(),
-            MonitorEvent::Noop => None,
+            Self::ExecutorDispersal(dispersal_error) => dispersal_error.peer_id(),
+            Self::ValidatorDispersal(dispersal_error) => dispersal_error.peer_id(),
+            Self::Replication(replication_error) => replication_error.peer_id(),
+            Self::Sampling(sampling_error) => sampling_error.peer_id(),
+            Self::Noop => None,
         }
     }
 }
@@ -47,9 +47,9 @@ impl MonitorEvent {
 impl From<&DispersalExecutorEvent> for MonitorEvent {
     fn from(event: &DispersalExecutorEvent) -> Self {
         match event {
-            DispersalExecutorEvent::DispersalSuccess { .. } => MonitorEvent::Noop,
+            DispersalExecutorEvent::DispersalSuccess { .. } => Self::Noop,
             DispersalExecutorEvent::DispersalError { error } => {
-                MonitorEvent::ExecutorDispersal(error.clone())
+                Self::ExecutorDispersal(error.clone())
             }
         }
     }
@@ -58,9 +58,9 @@ impl From<&DispersalExecutorEvent> for MonitorEvent {
 impl From<&DispersalValidatorEvent> for MonitorEvent {
     fn from(event: &DispersalValidatorEvent) -> Self {
         match event {
-            DispersalValidatorEvent::IncomingMessage { .. } => MonitorEvent::Noop,
+            DispersalValidatorEvent::IncomingMessage { .. } => Self::Noop,
             DispersalValidatorEvent::DispersalError { error } => {
-                MonitorEvent::ValidatorDispersal(error.clone())
+                Self::ValidatorDispersal(error.clone())
             }
         }
     }
@@ -69,9 +69,9 @@ impl From<&DispersalValidatorEvent> for MonitorEvent {
 impl From<&ReplicationEvent> for MonitorEvent {
     fn from(event: &ReplicationEvent) -> Self {
         match event {
-            ReplicationEvent::IncomingMessage { .. } => MonitorEvent::Noop,
+            ReplicationEvent::IncomingMessage { .. } => Self::Noop,
             ReplicationEvent::ReplicationError { error } => {
-                MonitorEvent::Replication(error.clone())
+                Self::Replication(error.clone())
             }
         }
     }
@@ -80,9 +80,9 @@ impl From<&ReplicationEvent> for MonitorEvent {
 impl From<&SamplingEvent> for MonitorEvent {
     fn from(event: &SamplingEvent) -> Self {
         match event {
-            SamplingEvent::SamplingSuccess { .. } => MonitorEvent::Noop,
-            SamplingEvent::IncomingSample { .. } => MonitorEvent::Noop,
-            SamplingEvent::SamplingError { error } => MonitorEvent::Sampling(error.clone()),
+            SamplingEvent::SamplingSuccess { .. } => Self::Noop,
+            SamplingEvent::IncomingSample { .. } => Self::Noop,
+            SamplingEvent::SamplingError { error } => Self::Sampling(error.clone()),
         }
     }
 }

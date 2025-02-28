@@ -23,11 +23,11 @@ impl<M: Serialize> MockTransaction<M> {
         Self { id, content }
     }
 
-    pub fn message(&self) -> &M {
+    pub const fn message(&self) -> &M {
         &self.content
     }
 
-    pub fn id(&self) -> MockTxId {
+    pub const fn id(&self) -> MockTxId {
         self.id
     }
 
@@ -41,11 +41,11 @@ impl<M: Serialize> MockTransaction<M> {
 }
 
 impl<M: Serialize> Transaction for MockTransaction<M> {
-    const HASHER: TransactionHasher<Self> = MockTransaction::id;
+    const HASHER: TransactionHasher<Self> = Self::id;
     type Hash = MockTxId;
 
     fn as_bytes(&self) -> Bytes {
-        MockTransaction::as_bytes(self)
+        Self::as_bytes(self)
     }
 }
 
@@ -82,8 +82,8 @@ impl AsRef<[u8]> for MockTxId {
 }
 
 impl MockTxId {
-    pub fn new(tx_id: [u8; 32]) -> MockTxId {
-        MockTxId(tx_id)
+    pub const fn new(tx_id: [u8; 32]) -> Self {
+        Self(tx_id)
     }
 }
 

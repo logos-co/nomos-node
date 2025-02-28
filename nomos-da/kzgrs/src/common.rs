@@ -32,7 +32,7 @@ impl fmt::Display for BlstError {
 
 impl From<BLST_ERROR> for KzgRsError {
     fn from(err: BLST_ERROR) -> Self {
-        KzgRsError::BlstError(BlstError(err))
+        Self::BlstError(BlstError(err))
     }
 }
 

@@ -18,8 +18,8 @@ pub struct ConsensusParams {
 }
 
 impl ConsensusParams {
-    pub fn default_for_participants(n_participants: usize) -> Self {
-        ConsensusParams {
+    pub const fn default_for_participants(n_participants: usize) -> Self {
+        Self {
             n_participants,
             // by setting the slot coeff to 1, we also increase the probability of multiple blocks
             // (forks) being produced in the same slot (epoch). Setting the security

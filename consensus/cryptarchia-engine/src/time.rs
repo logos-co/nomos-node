@@ -9,11 +9,11 @@ pub struct Slot(u64);
 pub struct Epoch(u32);
 
 impl Slot {
-    pub fn to_be_bytes(&self) -> [u8; 8] {
+    pub const fn to_be_bytes(&self) -> [u8; 8] {
         self.0.to_be_bytes()
     }
 
-    pub fn genesis() -> Self {
+    pub const fn genesis() -> Self {
         Self(0)
     }
 }
@@ -43,17 +43,17 @@ impl From<Slot> for u64 {
 }
 
 impl Add<u64> for Slot {
-    type Output = Slot;
+    type Output = Self;
 
     fn add(self, rhs: u64) -> Self::Output {
-        Slot(self.0 + rhs)
+        Self(self.0 + rhs)
     }
 }
 
 impl Add<u32> for Epoch {
-    type Output = Epoch;
+    type Output = Self;
 
     fn add(self, rhs: u32) -> Self::Output {
-        Epoch(self.0 + rhs)
+        Self(self.0 + rhs)
     }
 }

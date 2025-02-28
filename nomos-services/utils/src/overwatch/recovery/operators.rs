@@ -27,7 +27,7 @@ impl<Backend: RecoveryBackend> RecoveryOperator<Backend>
 where
     Backend: RecoveryBackend,
 {
-    fn new(recovery_backend: Backend) -> Self {
+    const fn new(recovery_backend: Backend) -> Self {
         Self { recovery_backend }
     }
 }

@@ -39,7 +39,7 @@ pub enum DaVerifierMsg<B, A> {
 impl<B: 'static, A: 'static> Debug for DaVerifierMsg<B, A> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            DaVerifierMsg::AddBlob { .. } => {
+            Self::AddBlob { .. } => {
                 write!(f, "DaVerifierMsg::AddBlob")
             }
         }

@@ -252,7 +252,7 @@ impl SwarmHandler {
         }
     }
 
-    fn exp_backoff(retry: usize) -> Duration {
+    const fn exp_backoff(retry: usize) -> Duration {
         std::time::Duration::from_secs(BACKOFF.pow(retry as u32))
     }
 }

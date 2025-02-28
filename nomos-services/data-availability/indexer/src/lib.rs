@@ -150,10 +150,10 @@ pub enum DaMsg<Blob, Meta: Metadata> {
 impl<Blob: 'static, Meta: Metadata + 'static> Debug for DaMsg<Blob, Meta> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            DaMsg::AddIndex { .. } => {
+            Self::AddIndex { .. } => {
                 write!(f, "DaMsg::AddIndex")
             }
-            DaMsg::GetRange { .. } => {
+            Self::GetRange { .. } => {
                 write!(f, "DaMsg::GetRange")
             }
         }

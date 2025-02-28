@@ -74,7 +74,7 @@ struct Cryptarchia {
 }
 
 impl Cryptarchia {
-    fn tip(&self) -> HeaderId {
+    const fn tip(&self) -> HeaderId {
         self.consensus.tip()
     }
 
@@ -84,7 +84,7 @@ impl Cryptarchia {
             .expect("tip state not available")
     }
 
-    fn genesis(&self) -> HeaderId {
+    const fn genesis(&self) -> HeaderId {
         self.consensus.genesis()
     }
 
@@ -893,7 +893,7 @@ pub enum ConsensusMsg<Block> {
 impl<Block: 'static> RelayMessage for ConsensusMsg<Block> {}
 
 #[serde_as]
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct CryptarchiaInfo {
     pub tip: HeaderId,

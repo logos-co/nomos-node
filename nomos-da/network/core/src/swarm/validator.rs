@@ -175,7 +175,7 @@ where
         self.swarm.local_peer_id()
     }
 
-    pub fn protocol_swarm(
+    pub const fn protocol_swarm(
         &self,
     ) -> &Swarm<
         ValidatorBehaviour<

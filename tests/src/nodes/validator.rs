@@ -215,7 +215,7 @@ impl Validator {
             .collect::<String>()
     }
 
-    pub fn config(&self) -> &Config {
+    pub const fn config(&self) -> &Config {
         &self.config
     }
 

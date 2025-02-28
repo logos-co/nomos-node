@@ -99,7 +99,7 @@ pub static PARAMS: Lazy<DaEncoderParams> = Lazy::new(|| {
 });
 pub static ENCODER: Lazy<DaEncoder> = Lazy::new(|| DaEncoder::new(PARAMS.clone()));
 
-pub(crate) type Cryptarchia = cryptarchia_consensus::CryptarchiaConsensus<
+pub type Cryptarchia = cryptarchia_consensus::CryptarchiaConsensus<
     cryptarchia_consensus::network::adapters::libp2p::LibP2pAdapter<Tx, BlobInfo>,
     cryptarchia_consensus::blend::adapters::libp2p::LibP2pAdapter<
         nomos_blend_service::network::libp2p::Libp2pAdapter,
@@ -126,7 +126,7 @@ pub type DaSampling = DaSamplingService<
     SamplingStorageAdapter<DaBlob, Wire>,
 >;
 
-pub(crate) type DaIndexer = DataIndexerService<
+pub type DaIndexer = DataIndexerService<
     // Indexer specific.
     DaBlob,
     IndexerStorageAdapter<Wire, BlobInfo>,
@@ -151,7 +151,7 @@ pub(crate) type DaIndexer = DataIndexerService<
     SamplingStorageAdapter<DaBlob, Wire>,
 >;
 
-pub(crate) type TxMempool = TxMempoolService<
+pub type TxMempool = TxMempoolService<
     MempoolNetworkAdapter<Tx, <Tx as Transaction>::Hash>,
     MockPool<HeaderId, Tx, <Tx as Transaction>::Hash>,
 >;
@@ -165,13 +165,13 @@ pub type DaMempool = DaMempoolService<
     SamplingStorageAdapter<DaBlob, Wire>,
 >;
 
-pub(crate) type DaVerifier = DaVerifierService<
+pub type DaVerifier = DaVerifierService<
     KzgrsDaVerifier,
     Libp2pAdapter<NomosDaMembership>,
     VerifierStorageAdapter<DaBlob, Wire>,
 >;
 
-pub(crate) const MB16: usize = 1024 * 1024 * 16;
+pub const MB16: usize = 1024 * 1024 * 16;
 
 #[derive(Services)]
 pub struct TestNode {
@@ -418,7 +418,7 @@ pub fn create_ed25519_sk_peerid(key: &str) -> (ed25519::SecretKey, PeerId) {
     let ed25519_keypair = Ed25519Keypair::try_from_bytes(&mut b).unwrap();
     let kp = ed25519_keypair.to_bytes();
     println!("sk > {}", hex::encode(kp));
-    let secret_key = ed25519_keypair.secret().clone();
+    let secret_key = ed25519_keypair.secret();
     let libp2p_keypair: Keypair = ed25519_keypair.into();
     let peer_id = PeerId::from_public_key(&libp2p_keypair.public());
 
@@ -429,7 +429,7 @@ pub fn generate_ed25519_sk_peerid() -> (ed25519::SecretKey, PeerId) {
     let ed25519_keypair = Ed25519Keypair::generate();
     let kp = ed25519_keypair.to_bytes();
     println!("sk > {}", hex::encode(kp));
-    let secret_key = ed25519_keypair.secret().clone();
+    let secret_key = ed25519_keypair.secret();
     let libp2p_keypair: Keypair = ed25519_keypair.into();
     let peer_id = PeerId::from_public_key(&libp2p_keypair.public());
 

@@ -76,22 +76,22 @@ pub enum SamplingError {
 }
 
 impl SamplingError {
-    pub fn peer_id(&self) -> Option<&PeerId> {
+    pub const fn peer_id(&self) -> Option<&PeerId> {
         match self {
-            SamplingError::Io { peer_id, .. } => Some(peer_id),
-            SamplingError::Protocol { peer_id, .. } => Some(peer_id),
-            SamplingError::OpenStream { peer_id, .. } => Some(peer_id),
-            SamplingError::Deserialize { peer_id, .. } => Some(peer_id),
-            SamplingError::RequestChannel { peer_id, .. } => Some(peer_id),
-            SamplingError::ResponseChannel { peer_id, .. } => Some(peer_id),
-            SamplingError::InvalidBlobId { peer_id, .. } => Some(peer_id),
-            SamplingError::BlobNotFound { peer_id, .. } => Some(peer_id),
+            Self::Io { peer_id, .. } => Some(peer_id),
+            Self::Protocol { peer_id, .. } => Some(peer_id),
+            Self::OpenStream { peer_id, .. } => Some(peer_id),
+            Self::Deserialize { peer_id, .. } => Some(peer_id),
+            Self::RequestChannel { peer_id, .. } => Some(peer_id),
+            Self::ResponseChannel { peer_id, .. } => Some(peer_id),
+            Self::InvalidBlobId { peer_id, .. } => Some(peer_id),
+            Self::BlobNotFound { peer_id, .. } => Some(peer_id),
         }
     }
 
-    pub fn blob_id(&self) -> Option<&BlobId> {
+    pub const fn blob_id(&self) -> Option<&BlobId> {
         match self {
-            SamplingError::Deserialize { blob_id, .. } => Some(blob_id),
+            Self::Deserialize { blob_id, .. } => Some(blob_id),
             _ => None,
         }
     }
@@ -100,20 +100,20 @@ impl SamplingError {
 impl Clone for SamplingError {
     fn clone(&self) -> Self {
         match self {
-            SamplingError::Io { peer_id, error } => SamplingError::Io {
+            Self::Io { peer_id, error } => Self::Io {
                 peer_id: *peer_id,
                 error: std::io::Error::new(error.kind(), error.to_string()),
             },
-            SamplingError::Protocol {
+            Self::Protocol {
                 subnetwork_id,
                 peer_id,
                 error,
-            } => SamplingError::Protocol {
+            } => Self::Protocol {
                 subnetwork_id: *subnetwork_id,
                 peer_id: *peer_id,
                 error: error.clone(),
             },
-            SamplingError::OpenStream { peer_id, error } => SamplingError::OpenStream {
+            Self::OpenStream { peer_id, error } => Self::OpenStream {
                 peer_id: *peer_id,
                 error: match error {
                     OpenStreamError::UnsupportedProtocol(protocol) => {
@@ -128,30 +128,30 @@ impl Clone for SamplingError {
                     )),
                 },
             },
-            SamplingError::Deserialize {
+            Self::Deserialize {
                 blob_id,
                 subnetwork_id,
                 peer_id,
                 error,
-            } => SamplingError::Deserialize {
+            } => Self::Deserialize {
                 blob_id: *blob_id,
                 subnetwork_id: *subnetwork_id,
                 peer_id: *peer_id,
                 error: error.clone(),
             },
-            SamplingError::RequestChannel { request, peer_id } => SamplingError::RequestChannel {
+            Self::RequestChannel { request, peer_id } => Self::RequestChannel {
                 request: request.clone(),
                 peer_id: *peer_id,
             },
-            SamplingError::ResponseChannel { error, peer_id } => SamplingError::ResponseChannel {
+            Self::ResponseChannel { error, peer_id } => Self::ResponseChannel {
                 peer_id: *peer_id,
                 error: *error,
             },
-            SamplingError::InvalidBlobId { blob_id, peer_id } => SamplingError::InvalidBlobId {
+            Self::InvalidBlobId { blob_id, peer_id } => Self::InvalidBlobId {
                 peer_id: *peer_id,
                 blob_id: blob_id.clone(),
             },
-            SamplingError::BlobNotFound { blob_id, peer_id } => SamplingError::BlobNotFound {
+            Self::BlobNotFound { blob_id, peer_id } => Self::BlobNotFound {
                 peer_id: *peer_id,
                 blob_id: blob_id.clone(),
             },
@@ -197,10 +197,10 @@ impl From<BehaviourSampleRes> for sampling::SampleResponse {
     fn from(res: BehaviourSampleRes) -> Self {
         match res {
             BehaviourSampleRes::SamplingSuccess { blob, blob_id, .. } => {
-                sampling::SampleResponse::Blob(common::Blob::new(blob_id, *blob))
+                Self::Blob(common::Blob::new(blob_id, *blob))
             }
             BehaviourSampleRes::SampleNotFound { blob_id } => {
-                sampling::SampleResponse::Error(sampling::SampleError::new(
+                Self::Error(sampling::SampleError::new(
                     blob_id,
                     sampling::SampleErrorType::NotFound,
                     "Sample not found",
