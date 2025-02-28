@@ -66,14 +66,14 @@ where
 
 impl<Backend, N, S> DaVerifierService<Backend, N, S>
 where
-    Backend: VerifierBackend + Send + 'static,
+    Backend: VerifierBackend + Send + Sync + 'static,
     Backend::DaBlob: Debug + Send,
     Backend::Error: Error + Send + Sync,
     Backend::Settings: Clone,
     <Backend::DaBlob as Blob>::BlobId: AsRef<[u8]>,
     N: NetworkAdapter<Blob = Backend::DaBlob> + Send + 'static,
     N::Settings: Clone,
-    S: DaStorageAdapter<Blob = Backend::DaBlob> + Send + 'static,
+    S: DaStorageAdapter<Blob = Backend::DaBlob> + Send + Sync + 'static,
 {
     #[instrument(skip_all)]
     async fn handle_new_blob(

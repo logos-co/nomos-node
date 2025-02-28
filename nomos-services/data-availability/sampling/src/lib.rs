@@ -76,7 +76,7 @@ where
     Backend::Settings: Clone,
     DaNetwork: NetworkAdapter + Send + 'static,
     DaNetwork::Settings: Clone,
-    DaStorage: DaStorageAdapter<Blob = DaBlob>,
+    DaStorage: DaStorageAdapter<Blob = DaBlob> + Sync,
 {
     #[instrument(skip_all)]
     async fn handle_service_message(

@@ -118,8 +118,8 @@ async fn get_app_data_range_from_node<Metadata>(
 ) -> RetrievalRes<Metadata::Index>
 where
     Metadata: metadata::Metadata + Serialize,
-    <Metadata as metadata::Metadata>::Index: Serialize + DeserializeOwned,
-    <Metadata as metadata::Metadata>::AppId: Serialize + DeserializeOwned,
+    <Metadata as metadata::Metadata>::Index: Serialize + DeserializeOwned + Send + Sync,
+    <Metadata as metadata::Metadata>::AppId: Serialize + DeserializeOwned + Send + Sync,
 {
     let url = url
         .join(paths::DA_GET_RANGE)
