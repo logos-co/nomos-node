@@ -147,6 +147,7 @@ where
             mut backend,
         } = self;
         let mut lifecycle_stream = service_state.lifecycle_handle.message_stream();
+        #[expect(clippy::redundant_pub_crate)]
         loop {
             tokio::select! {
                 Some(msg) = service_state.inbound_relay.recv() => {

@@ -1,3 +1,5 @@
+use std::convert::Infallible;
+
 use blake2::{
     digest::{Update, VariableOutput},
     Blake2bVar,
@@ -89,7 +91,7 @@ impl MockTxId {
 }
 
 impl TryFrom<&[u8]> for MockTxId {
-    type Error = ();
+    type Error = Infallible;
 
     fn try_from(msg: &[u8]) -> Result<Self, Self::Error> {
         let mut hasher = Blake2bVar::new(32).unwrap();

@@ -306,6 +306,7 @@ impl<Backend: StorageBackend + Send + Sync + 'static> ServiceCore for StorageSer
         } = self;
         let mut lifecycle_stream = lifecycle_handle.message_stream();
         let backend = &mut backend;
+        #[expect(clippy::redundant_pub_crate)]
         loop {
             tokio::select! {
                 Some(msg) = inbound_relay.recv() => {

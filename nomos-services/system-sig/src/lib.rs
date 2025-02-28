@@ -42,6 +42,7 @@ impl ServiceCore for SystemSig {
         let Self { service_state } = self;
         let mut ctrlc = async_ctrlc::CtrlC::new()?;
         let mut lifecycle_stream = service_state.lifecycle_handle.message_stream();
+        #[expect(clippy::redundant_pub_crate)]
         loop {
             tokio::select! {
                 _ = &mut ctrlc => {

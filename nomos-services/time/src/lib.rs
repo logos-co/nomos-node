@@ -105,6 +105,7 @@ where
         const SLOTS_BUFFER: usize = 3;
         let (broadcast_sender, broadcast_receiver) = broadcast::channel(SLOTS_BUFFER);
 
+        #[expect(clippy::redundant_pub_crate)]
         loop {
             tokio::select! {
                 Some(service_message) = inbound_relay.recv() => {

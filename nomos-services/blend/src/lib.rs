@@ -161,6 +161,7 @@ where
                 });
 
         let mut lifecycle_stream = service_state.lifecycle_handle.message_stream();
+        #[expect(clippy::redundant_pub_crate)]
         loop {
             tokio::select! {
                 Some(msg) = persistent_transmission_messages.next() => {

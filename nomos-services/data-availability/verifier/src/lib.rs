@@ -169,6 +169,7 @@ where
         let storage_adapter = S::new(storage_relay).await;
 
         let mut lifecycle_stream = service_state.lifecycle_handle.message_stream();
+        #[expect(clippy::redundant_pub_crate)]
         loop {
             tokio::select! {
                 Some(blob) = blob_stream.next() => {

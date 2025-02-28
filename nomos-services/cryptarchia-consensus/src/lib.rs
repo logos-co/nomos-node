@@ -491,6 +491,7 @@ where
         let mut lifecycle_stream = self.service_state.lifecycle_handle.message_stream();
 
         async {
+            #[expect(clippy::redundant_pub_crate)]
             loop {
                 tokio::select! {
                     Some(block) = incoming_blocks.next() => {
