@@ -302,7 +302,7 @@ pub fn create_validator_config(config: GeneralConfig) -> Config {
                 policy_settings: DAConnectionPolicySettings {
                     min_dispersal_peers: 0,
                     min_replication_peers: da_policy_settings.min_replication_peers,
-                    max_dispersal_failures: 0,
+                    max_dispersal_failures: da_policy_settings.max_dispersal_failures,
                     max_sampling_failures: da_policy_settings.max_sampling_failures,
                     max_replication_failures: da_policy_settings.max_replication_failures,
                     malicious_threshold: da_policy_settings.malicious_threshold,

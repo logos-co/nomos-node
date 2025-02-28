@@ -55,10 +55,10 @@ impl TopologyConfig {
                 policy_settings: DAConnectionPolicySettings {
                     min_dispersal_peers: 1,
                     min_replication_peers: 1,
-                    max_dispersal_failures: 0,
-                    max_sampling_failures: 0,
-                    max_replication_failures: 0,
-                    malicious_threshold: 0,
+                    max_dispersal_failures: 1,
+                    max_sampling_failures: 1,
+                    max_replication_failures: 1,
+                    malicious_threshold: 1,
                 },
                 balancer_interval: Duration::from_secs(5),
                 ..Default::default()

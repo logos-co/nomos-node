@@ -163,6 +163,7 @@ impl Executor {
 }
 
 pub fn create_executor_config(config: GeneralConfig) -> Config {
+    let da_policy_settings = config.da_config.policy_settings;
     Config {
         network: NetworkConfig {
             backend: Libp2pConfig {
@@ -214,7 +215,14 @@ pub fn create_executor_config(config: GeneralConfig) -> Config {
                     membership: config.da_config.membership,
                     addresses: config.da_config.addresses,
                     listening_address: config.da_config.listening_address,
-                    policy_settings: config.da_config.policy_settings,
+                    policy_settings: DAConnectionPolicySettings {
+                        min_dispersal_peers: config.da_config.num_subnets as usize,
+                        min_replication_peers: da_policy_settings.min_replication_peers,
+                        max_dispersal_failures: da_policy_settings.max_dispersal_failures,
+                        max_sampling_failures: da_policy_settings.max_sampling_failures,
+                        max_replication_failures: da_policy_settings.max_replication_failures,
+                        malicious_threshold: da_policy_settings.malicious_threshold,
+                    },
                     monitor_settings: config.da_config.monitor_settings,
                     balancer_interval: config.da_config.balancer_interval,
                     redial_cooldown: config.da_config.redial_cooldown,
