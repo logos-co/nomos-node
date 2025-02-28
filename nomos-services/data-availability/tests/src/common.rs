@@ -4,6 +4,7 @@ use std::{
 };
 
 use cryptarchia_consensus::LeaderConfig;
+use cryptarchia_engine::time::SlotConfig;
 use kzgrs_backend::{
     common::blob::DaBlob,
     dispersal::BlobInfo,
@@ -72,6 +73,10 @@ use nomos_network::{
 };
 use nomos_node::{Tx, Wire};
 use nomos_storage::{backends::rocksdb::RocksBackend, StorageService};
+use nomos_time::{
+    backends::system_time::{SystemTimeBackend, SystemTimeBackendSettings},
+    TimeService, TimeServiceSettings,
+};
 use once_cell::sync::Lazy;
 use overwatch_derive::*;
 use overwatch_rs::{

@@ -9,8 +9,8 @@ use std::{
 };
 
 use cl::{NoteWitness, NullifierSecret};
-use cryptarchia_consensus::{LeaderConfig, TimeConfig};
-use cryptarchia_engine::EpochConfig;
+use cryptarchia_consensus::LeaderConfig;
+use cryptarchia_engine::{time::SlotConfig, EpochConfig};
 use kzgrs_backend::common::blob::DaBlob;
 use nomos_core::{da::DaEncoder as _, staking::NMO_UNIT};
 use nomos_da_verifier::backend::kzgrs::KzgrsDaVerifierSettings;

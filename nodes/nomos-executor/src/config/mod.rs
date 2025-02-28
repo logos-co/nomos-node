@@ -12,7 +12,7 @@ use nomos_node::{
         mempool::MempoolConfig, update_blend, update_cryptarchia_consensus, update_network,
         BlendArgs,
     },
-    CryptarchiaArgs, HttpArgs, LogArgs, NetworkArgs, NetworkService, Wire, NomosTimeService
+    CryptarchiaArgs, HttpArgs, LogArgs, NetworkArgs, NetworkService, NomosTimeService, Wire,
 };
 use nomos_storage::backends::rocksdb::RocksBackend;
 use overwatch_rs::services::ServiceData;

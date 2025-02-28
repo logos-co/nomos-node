@@ -1,5 +1,5 @@
-use std::str::FromStr;
-use std::time::Duration;
+use std::{str::FromStr, time::Duration};
+
 use time::OffsetDateTime;
 
 const DEFAULT_SLOT_TIME: u64 = 2;

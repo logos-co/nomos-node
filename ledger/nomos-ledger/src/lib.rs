@@ -420,11 +420,12 @@ impl core::fmt::Debug for LedgerState {
 
 #[cfg(test)]
 pub mod tests {
+    use std::num::NonZero;
+
     use blake2::Digest;
     use cl::{note::NoteWitness as Note, NullifierSecret};
     use cryptarchia_engine::{EpochConfig, Slot};
     use rand::thread_rng;
-    use std::num::NonZero;
 
     use super::*;
     use crate::{crypto::Blake2b, leader_proof::LeaderProof, Config, LedgerError};

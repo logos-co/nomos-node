@@ -1,19 +1,27 @@
 mod async_client;
 
-use crate::backends::common::slot_timer;
-use crate::backends::ntp::async_client::{AsyncNTPClient, NTPClientSettings};
-use crate::backends::TimeBackend;
-use crate::{EpochSlotTickStream, SlotTick};
-use cryptarchia_engine::{EpochConfig, Slot, SlotConfig};
+use std::{
+    num::NonZero,
+    pin::Pin,
+    task::{Context, Poll},
+    time::Duration,
+};
+
+use cryptarchia_engine::{time::SlotConfig, EpochConfig, Slot};
 use futures::{Stream, StreamExt};
 use sntpc::{fraction_to_nanoseconds, NtpResult};
-use std::num::NonZero;
-use std::pin::Pin;
-use std::task::{Context, Poll};
-use std::time::Duration;
 use time::OffsetDateTime;
 use tokio::time::{interval, MissedTickBehavior};
 use tokio_stream::wrappers::IntervalStream;
+
+use crate::{
+    backends::{
+        common::slot_timer,
+        ntp::async_client::{AsyncNTPClient, NTPClientSettings},
+        TimeBackend,
+    },
+    EpochSlotTickStream, SlotTick,
+};
 
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct NtpSettings {
@@ -88,7 +96,8 @@ pub struct NtpStream {
     epoch_config: EpochConfig,
     /// Base period length related to epochs, used to compute epochs as well
     base_period_length: NonZero<u64>,
-    /// `SlotTick` interval stream. This stream is replaced when an internal clock update happens.
+    /// `SlotTick` interval stream. This stream is replaced when an internal
+    /// clock update happens.
     slot_timer: EpochSlotTickStream,
 }
 impl Stream for NtpStream {

@@ -7,13 +7,14 @@ pub mod tracing;
 
 pub mod time;
 
-use crate::topology::configs::time::GeneralTimeConfig;
 use api::GeneralApiConfig;
 use blend::GeneralBlendConfig;
 use consensus::GeneralConsensusConfig;
 use da::GeneralDaConfig;
 use network::GeneralNetworkConfig;
 use tracing::GeneralTracingConfig;
+
+use crate::topology::configs::time::GeneralTimeConfig;
 
 #[derive(Clone)]
 pub struct GeneralConfig {

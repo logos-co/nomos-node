@@ -1,4 +1,4 @@
-use std::{fs, net::Ipv4Addr, path::PathBuf, process, sync::Arc, time::Duration};
+use std::{fs, net::Ipv4Addr, num::NonZero, path::PathBuf, process, sync::Arc, time::Duration};
 
 use axum::{extract::State, http::StatusCode, response::IntoResponse, routing::post, Json, Router};
 use cfgsync::{
@@ -13,8 +13,6 @@ use tests::{
     topology::configs::{consensus::ConsensusParams, da::DaParams},
 };
 use tokio::sync::oneshot::channel;
-use std::num::NonZero;
-
 
 #[derive(Parser, Debug)]
 #[command(about = "CfgSync")]

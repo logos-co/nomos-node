@@ -1,16 +1,24 @@
-use crate::backends::TimeBackend;
+use std::{
+    fmt::{Debug, Formatter},
+    pin::Pin,
+};
+
 use cryptarchia_engine::{Epoch, Slot};
 use futures::{Stream, StreamExt};
 use log::error;
-use overwatch_rs::services::relay::RelayMessage;
-use overwatch_rs::services::state::{NoOperator, NoState};
-use overwatch_rs::services::{ServiceCore, ServiceData, ServiceId};
-use overwatch_rs::{DynError, OpaqueServiceStateHandle};
+use overwatch_rs::{
+    services::{
+        relay::RelayMessage,
+        state::{NoOperator, NoState},
+        ServiceCore, ServiceData, ServiceId,
+    },
+    DynError, OpaqueServiceStateHandle,
+};
 use services_utils::overwatch::lifecycle::should_stop_service;
-use std::fmt::{Debug, Formatter};
-use std::pin::Pin;
 use tokio::sync::{broadcast, oneshot};
 use tokio_stream::wrappers::BroadcastStream;
+
+use crate::backends::TimeBackend;
 
 pub mod backends;
 

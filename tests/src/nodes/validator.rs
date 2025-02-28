@@ -7,6 +7,7 @@ use std::{
 };
 
 use cryptarchia_consensus::{CryptarchiaInfo, CryptarchiaSettings};
+use cryptarchia_engine::time::SlotConfig;
 use kzgrs_backend::common::blob::DaBlob;
 use nomos_blend::message_blend::{
     CryptographicProcessorSettings, MessageBlendSettings, TemporalSchedulerSettings,
@@ -39,11 +40,12 @@ use nomos_node::{
     config::mempool::MempoolConfig,
     BlobInfo, Config, HeaderId, RocksBackendSettings, Tx,
 };
+use nomos_time::{backends::system_time::SystemTimeBackendSettings, TimeServiceSettings};
 use nomos_tracing::logging::local::FileConfig;
 use nomos_tracing_service::LoggerLayer;
 use reqwest::Url;
 use tempfile::NamedTempFile;
-use nomos_time::TimeServiceSettings;
+
 use super::{create_tempdir, persist_tempdir, GetRangeReq, CLIENT};
 use crate::{
     adjust_timeout, nodes::LOGS_PREFIX, topology::configs::GeneralConfig, IS_DEBUG_TRACING,

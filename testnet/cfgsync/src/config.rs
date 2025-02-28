@@ -6,13 +6,13 @@ use nomos_libp2p::{Multiaddr, PeerId};
 use nomos_node::BlendBackend;
 use nomos_tracing_service::{LoggerLayer, MetricsLayer, TracingLayer, TracingSettings};
 use rand::{thread_rng, Rng};
-use tests::topology::configs::time::default_time_config;
 use tests::topology::configs::{
     api::GeneralApiConfig,
     blend::create_blend_configs,
     consensus::{create_consensus_configs, ConsensusParams},
     da::{create_da_configs, DaParams},
     network::create_network_configs,
+    time::default_time_config,
     tracing::GeneralTracingConfig,
     GeneralConfig,
 };
@@ -234,7 +234,7 @@ fn update_tracing_identifier(
 
 #[cfg(test)]
 mod cfgsync_tests {
-    use std::{net::Ipv4Addr, str::FromStr, time::Duration};
+    use std::{net::Ipv4Addr, num::NonZero, str::FromStr, time::Duration};
 
     use nomos_libp2p::{Multiaddr, Protocol};
     use nomos_tracing_service::{

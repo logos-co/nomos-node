@@ -29,7 +29,8 @@ use nomos_mempool::backend::mockpool::MockPool;
 use nomos_node::{
     BlobInfo, Cryptarchia, DaIndexer, DaMempool, DaNetworkService, DaSampling, DaVerifier,
     DispersedBlobInfo, HeaderId, MempoolNetworkAdapter, NetworkBackend, NetworkService,
-    NomosDaMembership, RocksBackend, NomosTimeService, StorageService, SystemSig, Tx, TxMempool, Wire, MB16,
+    NomosDaMembership, NomosTimeService, RocksBackend, StorageService, SystemSig, Tx, TxMempool,
+    Wire, MB16,
 };
 use overwatch_derive::Services;
 use overwatch_rs::OpaqueServiceHandle;

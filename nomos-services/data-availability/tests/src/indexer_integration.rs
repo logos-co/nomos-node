@@ -9,8 +9,8 @@ use std::{
 };
 
 use cl::{NoteWitness, NullifierSecret};
-use cryptarchia_consensus::{ConsensusMsg, LeaderConfig, TimeConfig};
-use cryptarchia_engine::EpochConfig;
+use cryptarchia_consensus::{ConsensusMsg, LeaderConfig};
+use cryptarchia_engine::{time::SlotConfig, EpochConfig};
 use kzgrs_backend::{
     common::blob::DaBlob,
     dispersal::{BlobInfo, Metadata},

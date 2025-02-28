@@ -1,7 +1,8 @@
 pub mod config;
-mod time;
+pub mod time;
 
 use std::collections::{HashMap, HashSet};
+
 pub use config::*;
 use thiserror::Error;
 pub use time::{Epoch, EpochConfig, Slot};
@@ -236,12 +237,13 @@ where
 
 #[cfg(test)]
 pub mod tests {
-    use std::hash::{DefaultHasher, Hash, Hasher};
+    use std::{
+        hash::{DefaultHasher, Hash, Hasher},
+        num::NonZero,
+    };
 
     use super::{Cryptarchia, Slot};
     use crate::Config;
-    use std::hash::{DefaultHasher, Hash, Hasher};
-    use std::num::NonZero;
 
     pub fn config() -> Config {
         Config {

@@ -5,23 +5,23 @@ pub mod network;
 mod relays;
 pub mod storage;
 
-use crate::relays::CryptarchiaConsensusRelays;
 use core::fmt::Debug;
+use std::{collections::BTreeSet, hash::Hash, marker::PhantomData, path::PathBuf};
+
 use cryptarchia_engine::Slot;
 use futures::StreamExt;
 pub use leadership::LeaderConfig;
 use network::NetworkAdapter;
-use nomos_core::da::blob::{
-    info::DispersedBlobInfo, metadata::Metadata as BlobMetadata, BlobSelect,
-};
 use nomos_core::{
     block::{builder::BlockBuilder, Block},
+    da::blob::{info::DispersedBlobInfo, metadata::Metadata as BlobMetadata, BlobSelect},
     header::{Builder, Header, HeaderId},
     proofs::leader_proof::Risc0LeaderProof,
     tx::{Transaction, TxSelect},
 };
-use nomos_da_sampling::backend::DaSamplingServiceBackend;
-use nomos_da_sampling::{DaSamplingService, DaSamplingServiceMsg};
+use nomos_da_sampling::{
+    backend::DaSamplingServiceBackend, DaSamplingService, DaSamplingServiceMsg,
+};
 use nomos_ledger::{leader_proof::LeaderProof, LedgerState};
 use nomos_mempool::{
     backend::{MemPool, RecoverableMempool},
@@ -31,25 +31,26 @@ use nomos_mempool::{
 use nomos_network::NetworkService;
 use nomos_storage::{backends::StorageBackend, StorageMsg, StorageService};
 use nomos_time::{SlotTick, TimeService, TimeServiceMessage};
-use overwatch_rs::services::relay::{OutboundRelay, Relay, RelayMessage};
-use overwatch_rs::services::state::ServiceState;
-use overwatch_rs::services::{ServiceCore, ServiceData, ServiceId};
-use overwatch_rs::{DynError, OpaqueServiceStateHandle};
+use overwatch_rs::{
+    services::{
+        relay::{OutboundRelay, Relay, RelayMessage},
+        state::ServiceState,
+        ServiceCore, ServiceData, ServiceId,
+    },
+    DynError, OpaqueServiceStateHandle,
+};
 use rand::{RngCore, SeedableRng};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_with::serde_as;
-use services_utils::overwatch::lifecycle;
-use services_utils::overwatch::recovery::backends::FileBackendSettings;
-use services_utils::overwatch::{JsonFileBackend, RecoveryOperator};
-use std::collections::BTreeSet;
-use std::hash::Hash;
-use std::marker::PhantomData;
-use std::path::PathBuf;
+use services_utils::overwatch::{
+    lifecycle, recovery::backends::FileBackendSettings, JsonFileBackend, RecoveryOperator,
+};
 use thiserror::Error;
-use tokio::sync::oneshot::Sender;
-use tokio::sync::{broadcast, oneshot};
+use tokio::sync::{broadcast, oneshot, oneshot::Sender};
 use tracing::{error, instrument, span, Level};
 use tracing_futures::Instrument;
+
+use crate::relays::CryptarchiaConsensusRelays;
 
 type MempoolRelay<Payload, Item, Key> = OutboundRelay<MempoolMsg<HeaderId, Payload, Item, Key>>;
 type SamplingRelay<BlobId> = OutboundRelay<DaSamplingServiceMsg<BlobId>>;

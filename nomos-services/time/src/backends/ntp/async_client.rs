@@ -1,12 +1,11 @@
-use futures::stream::FuturesUnordered;
-use futures::{StreamExt, TryStreamExt};
+use std::{net::SocketAddr, time::Duration};
+
+use futures::{stream::FuturesUnordered, StreamExt, TryStreamExt};
 use sntpc::{get_time, Error as SntpError, NtpContext, NtpResult, StdTimestampGen};
-use std::net::SocketAddr;
-use std::time::Duration;
-use tokio::net::ToSocketAddrs;
-use tokio::net::{lookup_host, UdpSocket};
-use tokio::time::error::Elapsed;
-use tokio::time::timeout;
+use tokio::{
+    net::{lookup_host, ToSocketAddrs, UdpSocket},
+    time::{error::Elapsed, timeout},
+};
 
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
