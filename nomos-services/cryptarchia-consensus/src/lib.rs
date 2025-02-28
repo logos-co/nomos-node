@@ -147,6 +147,7 @@ impl<Ts, Bs, NetworkAdapterSettings, BlendAdapterSettings> FileBackendSettings
     }
 }
 
+#[allow(clippy::type_complexity)]
 pub struct CryptarchiaConsensus<
     NetAdapter,
     BlendAdapter,
@@ -161,6 +162,9 @@ pub struct CryptarchiaConsensus<
     SamplingNetworkAdapter,
     SamplingRng,
     SamplingStorage,
+    DaVerifierBackend,
+    DaVerifierNetwork,
+    DaVerifierStorage,
 > where
     NetAdapter: NetworkAdapter,
     NetAdapter::Backend: 'static,
@@ -191,6 +195,11 @@ pub struct CryptarchiaConsensus<
     SamplingNetworkAdapter: nomos_da_sampling::network::NetworkAdapter,
     SamplingRng: SeedableRng + RngCore,
     SamplingStorage: nomos_da_sampling::storage::DaStorageAdapter,
+    DaVerifierStorage: nomos_da_verifier::storage::DaStorageAdapter,
+    DaVerifierBackend: nomos_da_verifier::backend::VerifierBackend + Send + 'static,
+    DaVerifierBackend::Settings: Clone,
+    DaVerifierNetwork: nomos_da_verifier::network::NetworkAdapter,
+    DaVerifierNetwork::Settings: Clone,
 {
     service_state: OpaqueServiceStateHandle<Self>,
     // underlying networking backend. We need this so we can relay and check the types properly
@@ -207,10 +216,21 @@ pub struct CryptarchiaConsensus<
             SamplingNetworkAdapter,
             SamplingRng,
             SamplingStorage,
+            DaVerifierBackend,
+            DaVerifierNetwork,
+            DaVerifierStorage,
         >,
     >,
     sampling_relay: Relay<
-        DaSamplingService<SamplingBackend, SamplingNetworkAdapter, SamplingRng, SamplingStorage>,
+        DaSamplingService<
+            SamplingBackend,
+            SamplingNetworkAdapter,
+            SamplingRng,
+            SamplingStorage,
+            DaVerifierBackend,
+            DaVerifierNetwork,
+            DaVerifierStorage,
+        >,
     >,
     block_subscription_sender: broadcast::Sender<Block<ClPool::Item, DaPool::Item>>,
     storage_relay: Relay<StorageService<Storage>>,
@@ -230,6 +250,9 @@ impl<
         SamplingNetworkAdapter,
         SamplingRng,
         SamplingStorage,
+        DaVerifierBackend,
+        DaVerifierNetwork,
+        DaVerifierStorage,
     > ServiceData
     for CryptarchiaConsensus<
         NetAdapter,
@@ -245,6 +268,9 @@ impl<
         SamplingNetworkAdapter,
         SamplingRng,
         SamplingStorage,
+        DaVerifierBackend,
+        DaVerifierNetwork,
+        DaVerifierStorage,
     >
 where
     NetAdapter: NetworkAdapter,
@@ -275,6 +301,11 @@ where
     SamplingNetworkAdapter: nomos_da_sampling::network::NetworkAdapter,
     SamplingRng: SeedableRng + RngCore,
     SamplingStorage: nomos_da_sampling::storage::DaStorageAdapter,
+    DaVerifierStorage: nomos_da_verifier::storage::DaStorageAdapter,
+    DaVerifierBackend: nomos_da_verifier::backend::VerifierBackend + Send + 'static,
+    DaVerifierBackend::Settings: Clone,
+    DaVerifierNetwork: nomos_da_verifier::network::NetworkAdapter,
+    DaVerifierNetwork::Settings: Clone,
 {
     const SERVICE_ID: ServiceId = CRYPTARCHIA_ID;
     type Settings = CryptarchiaSettings<
@@ -308,6 +339,9 @@ impl<
         SamplingNetworkAdapter,
         SamplingRng,
         SamplingStorage,
+        DaVerifierBackend,
+        DaVerifierNetwork,
+        DaVerifierStorage,
     > ServiceCore
     for CryptarchiaConsensus<
         A,
@@ -323,6 +357,9 @@ impl<
         SamplingNetworkAdapter,
         SamplingRng,
         SamplingStorage,
+        DaVerifierBackend,
+        DaVerifierNetwork,
+        DaVerifierStorage,
     >
 where
     A: NetworkAdapter<Tx = ClPool::Item, BlobCertificate = DaPool::Item>
@@ -382,6 +419,11 @@ where
 
     SamplingNetworkAdapter: nomos_da_sampling::network::NetworkAdapter,
     SamplingStorage: nomos_da_sampling::storage::DaStorageAdapter,
+    DaVerifierStorage: nomos_da_verifier::storage::DaStorageAdapter + Send + Sync,
+    DaVerifierBackend: nomos_da_verifier::backend::VerifierBackend + Send + Sync + 'static,
+    DaVerifierBackend::Settings: Clone,
+    DaVerifierNetwork: nomos_da_verifier::network::NetworkAdapter + Send + Sync,
+    DaVerifierNetwork::Settings: Clone,
 {
     fn init(
         service_state: OpaqueServiceStateHandle<Self>,
@@ -420,6 +462,7 @@ where
             SamplingRng,
             Storage,
             TxS,
+            DaVerifierBackend,
         > = CryptarchiaConsensusRelays::from_relays(
             self.network_relay,
             self.blend_relay,
@@ -591,6 +634,9 @@ impl<
         SamplingNetworkAdapter,
         SamplingRng,
         SamplingStorage,
+        DaVerifierBackend,
+        DaVerifierNetwork,
+        DaVerifierStorage,
     >
     CryptarchiaConsensus<
         A,
@@ -606,6 +652,9 @@ impl<
         SamplingNetworkAdapter,
         SamplingRng,
         SamplingStorage,
+        DaVerifierBackend,
+        DaVerifierNetwork,
+        DaVerifierStorage,
     >
 where
     A: NetworkAdapter + Clone + Send + Sync + 'static,
@@ -655,6 +704,11 @@ where
     SamplingBackend::BlobId: Debug + Ord + Send + Sync + 'static,
     SamplingNetworkAdapter: nomos_da_sampling::network::NetworkAdapter,
     SamplingStorage: nomos_da_sampling::storage::DaStorageAdapter,
+    DaVerifierStorage: nomos_da_verifier::storage::DaStorageAdapter + Send + Sync,
+    DaVerifierBackend: nomos_da_verifier::backend::VerifierBackend + Send + Sync + 'static,
+    DaVerifierBackend::Settings: Clone,
+    DaVerifierNetwork: nomos_da_verifier::network::NetworkAdapter + Send + Sync,
+    DaVerifierNetwork::Settings: Clone,
 {
     fn process_message(
         cryptarchia: &Cryptarchia,
@@ -729,6 +783,7 @@ where
             SamplingRng,
             Storage,
             TxS,
+            DaVerifierBackend,
         >,
         block_broadcaster: &mut broadcast::Sender<Block<ClPool::Item, DaPool::Item>>,
     ) -> Cryptarchia {
@@ -799,6 +854,7 @@ where
     }
 
     #[allow(clippy::too_many_arguments)]
+    #[allow(clippy::type_complexity)]
     #[instrument(level = "debug", skip(tx_selector, blob_selector, relays))]
     async fn propose_block(
         parent: HeaderId,
@@ -818,6 +874,7 @@ where
             SamplingRng,
             Storage,
             TxS,
+            DaVerifierBackend,
         >,
     ) -> Option<Block<ClPool::Item, DaPool::Item>> {
         let mut output = None;

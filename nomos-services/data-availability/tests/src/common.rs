@@ -118,6 +118,9 @@ pub(crate) type Cryptarchia = cryptarchia_consensus::CryptarchiaConsensus<
     SamplingLibp2pAdapter<NomosDaMembership>,
     IntegrationRng,
     SamplingStorageAdapter<DaBlob, Wire>,
+    KzgrsDaVerifier,
+    Libp2pAdapter<NomosDaMembership>,
+    VerifierStorageAdapter<DaBlob, Wire>,
 >;
 
 pub type DaSampling = DaSamplingService<
@@ -125,6 +128,9 @@ pub type DaSampling = DaSamplingService<
     SamplingLibp2pAdapter<NomosDaMembership>,
     IntegrationRng,
     SamplingStorageAdapter<DaBlob, Wire>,
+    KzgrsDaVerifier,
+    Libp2pAdapter<NomosDaMembership>,
+    VerifierStorageAdapter<DaBlob, Wire>,
 >;
 
 pub(crate) type DaIndexer = DataIndexerService<
@@ -150,6 +156,9 @@ pub(crate) type DaIndexer = DataIndexerService<
     SamplingLibp2pAdapter<NomosDaMembership>,
     IntegrationRng,
     SamplingStorageAdapter<DaBlob, Wire>,
+    KzgrsDaVerifier,
+    Libp2pAdapter<NomosDaMembership>,
+    VerifierStorageAdapter<DaBlob, Wire>,
 >;
 
 pub(crate) type TxMempool = TxMempoolService<
@@ -164,6 +173,9 @@ pub type DaMempool = DaMempoolService<
     nomos_da_sampling::network::adapters::validator::Libp2pAdapter<NomosDaMembership>,
     IntegrationRng,
     SamplingStorageAdapter<DaBlob, Wire>,
+    KzgrsDaVerifier,
+    Libp2pAdapter<NomosDaMembership>,
+    VerifierStorageAdapter<DaBlob, Wire>,
 >;
 
 pub(crate) type DaVerifier = DaVerifierService<

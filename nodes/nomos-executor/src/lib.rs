@@ -23,7 +23,8 @@ use nomos_da_sampling::{
 };
 use nomos_da_verifier::{
     backend::kzgrs::KzgrsDaVerifier,
-    network::adapters::executor::Libp2pAdapter as VerifierNetworkAdapter,
+    network::adapters::validator::Libp2pAdapter as VerifierNetworkAdapter,
+    storage::adapters::rocksdb::RocksAdapter as VerifierStorageAdapter,
 };
 use nomos_mempool::backend::mockpool::MockPool;
 use nomos_node::{
@@ -34,6 +35,7 @@ use nomos_node::{
 use overwatch_derive::Services;
 use overwatch_rs::OpaqueServiceHandle;
 use rand_chacha::ChaCha20Rng;
+use subnetworks_assignations::versions::v1::FillFromNodeList;
 
 pub type ExecutorApiService = ApiService<
     AxumBackend<
@@ -43,6 +45,8 @@ pub type ExecutorApiService = ApiService<
         NomosDaMembership,
         BlobInfo,
         KzgrsDaVerifier,
+        VerifierNetworkAdapter<FillFromNodeList>,
+        VerifierStorageAdapter<DaBlob, Wire>,
         Tx,
         Wire,
         DispersalKZGRSBackend<DispersalNetworkAdapter<NomosDaMembership>, DispersalMempoolAdapter>,
@@ -64,6 +68,9 @@ pub type DispersalMempoolAdapter = KzgrsMempoolAdapter<
     nomos_da_sampling::network::adapters::executor::Libp2pAdapter<NomosDaMembership>,
     ChaCha20Rng,
     SamplingStorageAdapter<DaBlob, Wire>,
+    KzgrsDaVerifier,
+    VerifierNetworkAdapter<FillFromNodeList>,
+    VerifierStorageAdapter<DaBlob, Wire>,
 >;
 
 pub type DaDispersal = DispersalService<

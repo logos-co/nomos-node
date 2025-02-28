@@ -9,6 +9,7 @@ use kzgrs_backend::common::blob::DaBlob;
 use network::NetworkAdapter;
 use nomos_core::da::BlobId;
 use nomos_da_network_service::{backends::libp2p::common::SamplingEvent, NetworkService};
+use nomos_da_verifier::DaVerifierService;
 use nomos_storage::StorageService;
 use nomos_tracing::{error_with_id, info_with_id};
 use overwatch_rs::{
@@ -51,25 +52,56 @@ pub struct DaSamplingServiceSettings<BackendSettings, NetworkSettings, StorageSe
 
 impl<B: 'static> RelayMessage for DaSamplingServiceMsg<B> {}
 
-pub struct DaSamplingService<Backend, DaNetwork, SamplingRng, DaStorage>
-where
+pub struct DaSamplingService<
+    Backend,
+    DaNetwork,
+    SamplingRng,
+    DaStorage,
+    DaVerifierBackend,
+    DaVerifierNetwork,
+    DaVerifierStorage,
+> where
     SamplingRng: SeedableRng + RngCore,
     Backend: DaSamplingServiceBackend<SamplingRng> + Send,
     Backend::Settings: Clone,
     Backend::Blob: Debug + 'static,
     Backend::BlobId: Debug + 'static,
+    DaVerifierNetwork: nomos_da_verifier::network::NetworkAdapter,
+    DaVerifierNetwork::Settings: Clone,
+    DaVerifierBackend: nomos_da_verifier::backend::VerifierBackend + Send,
+    DaVerifierBackend::Settings: Clone,
+    DaVerifierStorage: nomos_da_verifier::storage::DaStorageAdapter,
     DaNetwork: NetworkAdapter,
     DaNetwork::Settings: Clone,
     DaStorage: DaStorageAdapter,
+    <DaVerifierBackend as nomos_core::da::DaVerifier>::DaBlob: 'static,
 {
     network_relay: Relay<NetworkService<DaNetwork::Backend>>,
     storage_relay: Relay<StorageService<DaStorage::Backend>>,
+    verifier_relay:
+        Relay<DaVerifierService<DaVerifierBackend, DaVerifierNetwork, DaVerifierStorage>>,
     service_state: OpaqueServiceStateHandle<Self>,
     sampler: Backend,
 }
 
-impl<Backend, DaNetwork, SamplingRng, DaStorage>
-    DaSamplingService<Backend, DaNetwork, SamplingRng, DaStorage>
+impl<
+        Backend,
+        DaNetwork,
+        SamplingRng,
+        DaStorage,
+        DaVerifierBackend,
+        DaVerifierNetwork,
+        DaVerifierStorage,
+    >
+    DaSamplingService<
+        Backend,
+        DaNetwork,
+        SamplingRng,
+        DaStorage,
+        DaVerifierBackend,
+        DaVerifierNetwork,
+        DaVerifierStorage,
+    >
 where
     SamplingRng: SeedableRng + RngCore,
     Backend: DaSamplingServiceBackend<SamplingRng, BlobId = BlobId, Blob = DaBlob> + Send + 'static,
@@ -77,6 +109,11 @@ where
     DaNetwork: NetworkAdapter + Send + 'static,
     DaNetwork::Settings: Clone,
     DaStorage: DaStorageAdapter<Blob = DaBlob>,
+    DaVerifierStorage: nomos_da_verifier::storage::DaStorageAdapter + std::marker::Send,
+    DaVerifierBackend: nomos_da_verifier::backend::VerifierBackend + Send + 'static,
+    DaVerifierBackend::Settings: Clone,
+    DaVerifierNetwork: nomos_da_verifier::network::NetworkAdapter,
+    <DaVerifierNetwork as nomos_da_verifier::network::NetworkAdapter>::Settings: Clone,
 {
     #[instrument(skip_all)]
     async fn handle_service_message(
@@ -154,8 +191,24 @@ where
     }
 }
 
-impl<Backend, DaNetwork, SamplingRng, DaStorage> ServiceData
-    for DaSamplingService<Backend, DaNetwork, SamplingRng, DaStorage>
+impl<
+        Backend,
+        DaNetwork,
+        SamplingRng,
+        DaStorage,
+        DaVerifierBackend,
+        DaVerifierNetwork,
+        DaVerifierStorage,
+    > ServiceData
+    for DaSamplingService<
+        Backend,
+        DaNetwork,
+        SamplingRng,
+        DaStorage,
+        DaVerifierBackend,
+        DaVerifierNetwork,
+        DaVerifierStorage,
+    >
 where
     SamplingRng: SeedableRng + RngCore,
     Backend: DaSamplingServiceBackend<SamplingRng> + Send,
@@ -165,6 +218,11 @@ where
     DaNetwork: NetworkAdapter,
     DaNetwork::Settings: Clone,
     DaStorage: DaStorageAdapter,
+    DaVerifierStorage: nomos_da_verifier::storage::DaStorageAdapter,
+    DaVerifierBackend: nomos_da_verifier::backend::VerifierBackend + Send,
+    DaVerifierBackend::Settings: Clone,
+    DaVerifierNetwork: nomos_da_verifier::network::NetworkAdapter,
+    DaVerifierNetwork::Settings: Clone,
 {
     const SERVICE_ID: ServiceId = DA_SAMPLING_TAG;
     type Settings =
@@ -175,8 +233,24 @@ where
 }
 
 #[async_trait::async_trait]
-impl<Backend, DaNetwork, SamplingRng, DaStorage> ServiceCore
-    for DaSamplingService<Backend, DaNetwork, SamplingRng, DaStorage>
+impl<
+        Backend,
+        DaNetwork,
+        SamplingRng,
+        DaStorage,
+        DaVerifierBackend,
+        DaVerifierNetwork,
+        DaVerifierStorage,
+    > ServiceCore
+    for DaSamplingService<
+        Backend,
+        DaNetwork,
+        SamplingRng,
+        DaStorage,
+        DaVerifierBackend,
+        DaVerifierNetwork,
+        DaVerifierStorage,
+    >
 where
     SamplingRng: SeedableRng + RngCore,
     Backend: DaSamplingServiceBackend<SamplingRng, BlobId = BlobId, Blob = DaBlob>
@@ -187,6 +261,11 @@ where
     DaNetwork: NetworkAdapter + Send + Sync + 'static,
     DaNetwork::Settings: Clone + Send + Sync + 'static,
     DaStorage: DaStorageAdapter<Blob = DaBlob> + Sync + Send,
+    DaVerifierBackend: nomos_da_verifier::backend::VerifierBackend + Send + Sync + 'static,
+    DaVerifierBackend::Settings: Clone,
+    DaVerifierNetwork: nomos_da_verifier::network::NetworkAdapter,
+    DaVerifierNetwork::Settings: Clone,
+    DaVerifierStorage: nomos_da_verifier::storage::DaStorageAdapter + Send + Sync,
 {
     fn init(
         service_state: OpaqueServiceStateHandle<Self>,
@@ -198,11 +277,13 @@ where
 
         let network_relay = service_state.overwatch_handle.relay();
         let storage_relay = service_state.overwatch_handle.relay();
+        let verifier_relay = service_state.overwatch_handle.relay();
         let rng = SamplingRng::from_entropy();
 
         Ok(Self {
             network_relay,
             storage_relay,
+            verifier_relay,
             service_state,
             sampler: Backend::new(sampling_settings, rng),
         })
@@ -217,6 +298,7 @@ where
         let Self {
             network_relay,
             storage_relay,
+            verifier_relay: _verifier_relay,
             mut service_state,
             mut sampler,
         } = self;

@@ -53,7 +53,6 @@ where
     Backend: VerifierBackend,
     Backend::Settings: Clone,
     Backend::DaBlob: 'static,
-    Backend::Error: Error,
     N: NetworkAdapter,
     N::Settings: Clone,
     S: DaStorageAdapter,
@@ -101,7 +100,6 @@ impl<Backend, N, S> ServiceData for DaVerifierService<Backend, N, S>
 where
     Backend: VerifierBackend,
     Backend::Settings: Clone,
-    Backend::Error: Error,
     N: NetworkAdapter,
     N::Settings: Clone,
     S: DaStorageAdapter,

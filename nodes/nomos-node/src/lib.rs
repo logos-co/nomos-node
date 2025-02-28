@@ -72,6 +72,8 @@ pub type NomosApiService = ApiService<
         NomosDaMembership,
         BlobInfo,
         KzgrsDaVerifier,
+        VerifierNetworkAdapter<FillFromNodeList>,
+        VerifierStorageAdapter<DaBlob, Wire>,
         Tx,
         Wire,
         KzgrsSamplingBackend<ChaCha20Rng>,
@@ -105,6 +107,9 @@ pub type Cryptarchia<SamplingAdapter> = cryptarchia_consensus::CryptarchiaConsen
     SamplingAdapter,
     ChaCha20Rng,
     SamplingStorageAdapter<DaBlob, Wire>,
+    KzgrsDaVerifier,
+    VerifierNetworkAdapter<FillFromNodeList>,
+    VerifierStorageAdapter<DaBlob, Wire>,
 >;
 
 pub type NodeCryptarchia =
@@ -122,6 +127,9 @@ pub type DaMempool = DaMempoolService<
     nomos_da_sampling::network::adapters::validator::Libp2pAdapter<NomosDaMembership>,
     ChaCha20Rng,
     SamplingStorageAdapter<DaBlob, Wire>,
+    KzgrsDaVerifier,
+    VerifierNetworkAdapter<FillFromNodeList>,
+    VerifierStorageAdapter<DaBlob, Wire>,
 >;
 
 pub type DaIndexer<SamplingAdapter> = DataIndexerService<
@@ -147,6 +155,9 @@ pub type DaIndexer<SamplingAdapter> = DataIndexerService<
     SamplingAdapter,
     ChaCha20Rng,
     SamplingStorageAdapter<DaBlob, Wire>,
+    KzgrsDaVerifier,
+    VerifierNetworkAdapter<FillFromNodeList>,
+    VerifierStorageAdapter<DaBlob, Wire>,
 >;
 
 pub type NodeDaIndexer =
@@ -157,6 +168,9 @@ pub type DaSampling<SamplingAdapter> = DaSamplingService<
     SamplingAdapter,
     ChaCha20Rng,
     SamplingStorageAdapter<DaBlob, Wire>,
+    KzgrsDaVerifier,
+    VerifierNetworkAdapter<FillFromNodeList>,
+    VerifierStorageAdapter<DaBlob, Wire>,
 >;
 
 pub type NodeDaSampling = DaSampling<SamplingLibp2pAdapter<NomosDaMembership>>;

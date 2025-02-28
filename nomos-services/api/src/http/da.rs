@@ -47,6 +47,9 @@ pub type DaIndexer<
     SamplingNetworkAdapter,
     SamplingRng,
     SamplingStorage,
+    DaVerifierBackend,
+    DaVerifierNetwork,
+    DaVerifierStorage,
     const SIZE: usize,
 > = DataIndexerService<
     // Indexer specific.
@@ -67,6 +70,9 @@ pub type DaIndexer<
     SamplingNetworkAdapter,
     SamplingRng,
     SamplingStorage,
+    DaVerifierBackend,
+    DaVerifierNetwork,
+    DaVerifierStorage,
 >;
 
 pub type DaVerifier<Blob, Membership, VerifierBackend, StorageSerializer> = DaVerifierService<
@@ -122,6 +128,9 @@ pub async fn get_range<
     SamplingNetworkAdapter,
     SamplingRng,
     SamplingStorage,
+    DaVerifierBackend,
+    DaVerifierNetwork,
+    DaVerifierStorage,
     const SIZE: usize,
 >(
     handle: &OverwatchHandle,
@@ -174,6 +183,11 @@ where
     SamplingBackend::BlobId: Debug + 'static,
     SamplingNetworkAdapter: nomos_da_sampling::network::NetworkAdapter,
     SamplingStorage: nomos_da_sampling::storage::DaStorageAdapter,
+    DaVerifierStorage: nomos_da_verifier::storage::DaStorageAdapter,
+    DaVerifierBackend: nomos_da_verifier::backend::VerifierBackend + Send + 'static,
+    DaVerifierBackend::Settings: Clone,
+    DaVerifierNetwork: nomos_da_verifier::network::NetworkAdapter,
+    DaVerifierNetwork::Settings: Clone,
 {
     let relay = handle
         .relay::<DaIndexer<
@@ -185,6 +199,9 @@ where
             SamplingNetworkAdapter,
             SamplingRng,
             SamplingStorage,
+            DaVerifierBackend,
+            DaVerifierNetwork,
+            DaVerifierStorage,
             SIZE,
         >>()
         .connect()

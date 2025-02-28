@@ -12,6 +12,7 @@ use nomos_da_sampling::{
     backend::DaSamplingServiceBackend, network::NetworkAdapter as DaSamplingNetworkAdapter,
     storage::DaStorageAdapter, DaSamplingService, DaSamplingServiceMsg,
 };
+use nomos_da_verifier::backend::VerifierBackend;
 use nomos_network::{NetworkMsg, NetworkService};
 use overwatch_rs::{
     services::{
@@ -26,8 +27,17 @@ use services_utils::overwatch::lifecycle;
 
 use crate::{backend::MemPool, network::NetworkAdapter, MempoolMetrics, MempoolMsg};
 
-pub struct DaMempoolService<N, P, DB, DN, R, SamplingStorage>
-where
+pub struct DaMempoolService<
+    N,
+    P,
+    DB,
+    DN,
+    R,
+    SamplingStorage,
+    DaVerifierBackend,
+    DaVerifierNetwork,
+    DaVerifierStorage,
+> where
     N: NetworkAdapter<Key = P::Key>,
     N::Payload: DispersedBlobInfo + Into<P::Item> + Debug + 'static,
     P: MemPool,
@@ -41,15 +51,43 @@ where
     DB::Settings: Clone,
     DN: DaSamplingNetworkAdapter,
     SamplingStorage: DaStorageAdapter,
+
     R: SeedableRng + RngCore,
+    DaVerifierNetwork: nomos_da_verifier::network::NetworkAdapter,
+    DaVerifierNetwork::Settings: Clone,
+    DaVerifierBackend: VerifierBackend + Send + 'static,
+    DaVerifierBackend::Settings: Clone,
+    DaVerifierStorage: nomos_da_verifier::storage::DaStorageAdapter,
 {
     service_state: OpaqueServiceStateHandle<Self>,
     network_relay: Relay<NetworkService<N::Backend>>,
-    sampling_relay: Relay<DaSamplingService<DB, DN, R, SamplingStorage>>,
+    sampling_relay: Relay<
+        DaSamplingService<
+            DB,
+            DN,
+            R,
+            SamplingStorage,
+            DaVerifierBackend,
+            DaVerifierNetwork,
+            DaVerifierStorage,
+        >,
+    >,
     pool: P,
 }
 
-impl<N, P, DB, DN, R, DaStorage> ServiceData for DaMempoolService<N, P, DB, DN, R, DaStorage>
+impl<N, P, DB, DN, R, DaStorage, DaVerifierBackend, DaVerifierNetwork, DaVerifierStorage>
+    ServiceData
+    for DaMempoolService<
+        N,
+        P,
+        DB,
+        DN,
+        R,
+        DaStorage,
+        DaVerifierBackend,
+        DaVerifierNetwork,
+        DaVerifierStorage,
+    >
 where
     N: NetworkAdapter<Key = P::Key>,
     N::Payload: DispersedBlobInfo + Debug + Into<P::Item> + 'static,
@@ -65,6 +103,11 @@ where
     DN: DaSamplingNetworkAdapter,
     DaStorage: DaStorageAdapter,
     R: SeedableRng + RngCore,
+    DaVerifierStorage: nomos_da_verifier::storage::DaStorageAdapter,
+    DaVerifierBackend: VerifierBackend + Send + 'static,
+    DaVerifierBackend::Settings: Clone,
+    DaVerifierNetwork: nomos_da_verifier::network::NetworkAdapter,
+    DaVerifierNetwork::Settings: Clone,
 {
     const SERVICE_ID: ServiceId = "mempool-da";
     type Settings = DaMempoolSettings<P::Settings, N::Settings>;
@@ -79,7 +122,19 @@ where
 }
 
 #[async_trait::async_trait]
-impl<N, P, DB, DN, R, DaStorage> ServiceCore for DaMempoolService<N, P, DB, DN, R, DaStorage>
+impl<N, P, DB, DN, R, DaStorage, DaVerifierBackend, DaVerifierNetwork, DaVerifierStorage>
+    ServiceCore
+    for DaMempoolService<
+        N,
+        P,
+        DB,
+        DN,
+        R,
+        DaStorage,
+        DaVerifierBackend,
+        DaVerifierNetwork,
+        DaVerifierStorage,
+    >
 where
     P: MemPool + Send + 'static,
     P::Settings: Clone + Send + Sync + 'static,
@@ -96,6 +151,11 @@ where
     DN: DaSamplingNetworkAdapter,
     DaStorage: DaStorageAdapter,
     R: SeedableRng + RngCore,
+    DaVerifierStorage: nomos_da_verifier::storage::DaStorageAdapter + Send + Sync,
+    DaVerifierBackend: nomos_da_verifier::backend::VerifierBackend + Send + 'static,
+    DaVerifierBackend::Settings: Clone,
+    DaVerifierNetwork: nomos_da_verifier::network::NetworkAdapter,
+    DaVerifierNetwork::Settings: Clone,
 {
     fn init(
         service_state: OpaqueServiceStateHandle<Self>,
@@ -164,7 +224,18 @@ where
     }
 }
 
-impl<N, P, DB, DN, R, DaStorage> DaMempoolService<N, P, DB, DN, R, DaStorage>
+impl<N, P, DB, DN, R, DaStorage, DaVerifierBackend, DaVerifierNetwork, DaVerifierStorage>
+    DaMempoolService<
+        N,
+        P,
+        DB,
+        DN,
+        R,
+        DaStorage,
+        DaVerifierBackend,
+        DaVerifierNetwork,
+        DaVerifierStorage,
+    >
 where
     P: MemPool + Send + 'static,
     P::Settings: Clone + Send + Sync + 'static,
@@ -181,6 +252,11 @@ where
     DN: DaSamplingNetworkAdapter,
     DaStorage: DaStorageAdapter,
     R: SeedableRng + RngCore,
+    DaVerifierStorage: nomos_da_verifier::storage::DaStorageAdapter + Send + Sync,
+    DaVerifierBackend: nomos_da_verifier::backend::VerifierBackend + Send + 'static,
+    DaVerifierBackend::Settings: Clone,
+    DaVerifierNetwork: nomos_da_verifier::network::NetworkAdapter,
+    DaVerifierNetwork::Settings: Clone,
 {
     fn handle_mempool_message(
         message: MempoolMsg<P::BlockId, N::Payload, P::Item, P::Key>,
