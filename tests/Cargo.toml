@@ -69,4 +69,3 @@ path = "src/tests/da.rs"
 [[test]]
 name = "test_api_storage"
 path = "src/tests/api/storage.rs"
-

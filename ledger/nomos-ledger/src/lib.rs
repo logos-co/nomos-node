@@ -426,7 +426,6 @@ pub mod tests {
     use cl::{note::NoteWitness as Note, NullifierSecret};
     use cryptarchia_engine::{EpochConfig, Slot};
     use rand::thread_rng;
-    use std::num::NonZero;
 
     use super::*;
     use crate::{crypto::Blake2b, leader_proof::LeaderProof, Config, LedgerError};

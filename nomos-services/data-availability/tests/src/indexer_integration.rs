@@ -1,5 +1,4 @@
 // std
-use std::num::NonZero;
 use std::{
     num::NonZero,
     str::FromStr,
@@ -39,8 +38,7 @@ use overwatch_rs::services::relay::OutboundRelay;
 use rand::{thread_rng, Rng};
 use tempfile::{NamedTempFile, TempDir};
 use time::OffsetDateTime;
-use tokio_stream::wrappers::BroadcastStream;
-use tokio_stream::StreamExt;
+use tokio_stream::{wrappers::BroadcastStream, StreamExt};
 
 use crate::common::*;
 

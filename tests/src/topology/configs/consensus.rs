@@ -1,10 +1,11 @@
+use std::num::NonZero;
+
 use cl::{NoteWitness, NullifierSecret};
 use cryptarchia_consensus::LeaderConfig;
 use cryptarchia_engine::EpochConfig;
 use nomos_core::staking::NMO_UNIT;
 use nomos_ledger::LedgerState;
 use rand::thread_rng;
-use std::num::NonZero;
 
 #[derive(Clone)]
 pub struct ConsensusParams {
@@ -17,9 +18,10 @@ impl ConsensusParams {
     pub fn default_for_participants(n_participants: usize) -> Self {
         ConsensusParams {
             n_participants,
-            // by setting the slot coeff to 1, we also increase the probability of multiple blocks (forks)
-            // being produced in the same slot (epoch). Setting the security parameter to some value > 1
-            // ensures nodes have some time to sync before deciding on the longest chain.
+            // by setting the slot coeff to 1, we also increase the probability of multiple blocks
+            // (forks) being produced in the same slot (epoch). Setting the security
+            // parameter to some value > 1 ensures nodes have some time to sync before
+            // deciding on the longest chain.
             security_param: NonZero::new(10).unwrap(),
             // a block should be produced (on average) every slot
             active_slot_coeff: 0.9,

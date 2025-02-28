@@ -1,6 +1,4 @@
 // std
-use std::num::NonZero;
-use std::time::Duration;
 use std::{
     num::NonZero,
     str::FromStr,
@@ -8,6 +6,7 @@ use std::{
         atomic::{AtomicBool, Ordering::SeqCst},
         Arc,
     },
+    time::Duration,
 };
 
 use cl::{NoteWitness, NullifierSecret};
@@ -21,8 +20,8 @@ use nomos_libp2p::{Multiaddr, SwarmConfig};
 use rand::{thread_rng, Rng};
 use tempfile::{NamedTempFile, TempDir};
 use time::OffsetDateTime;
-use tracing_subscriber::fmt::TestWriter;
-use tracing_subscriber::EnvFilter;
+use tracing_subscriber::{fmt::TestWriter, EnvFilter};
+
 // internal
 use crate::common::*;
 

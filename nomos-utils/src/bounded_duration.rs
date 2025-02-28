@@ -1,13 +1,12 @@
-use serde::de::Error;
-use serde::{Deserialize, Deserializer};
-use std::fmt::Display;
-use std::marker::PhantomData;
+use std::{fmt::Display, marker::PhantomData};
+
+use serde::{de::Error, Deserialize, Deserializer};
 use time::Duration;
 
 // TODO: This type can be fancier once const for generic types is implemented
 // https://doc.rust-lang.org/beta/unstable-book/language-features/adt-const-params.html
-// This means that we could add different bound from a const configuration checked on compile time.
-// This type
+// This means that we could add different bound from a const configuration
+// checked on compile time. This type
 struct MinimalBoundedDuration<const MIN_DURATION: usize, TAG: TimeTag> {
     duration: Duration,
     _tag: PhantomData<*const TAG>,
@@ -85,8 +84,9 @@ impl<const MIN_DURATION: usize, TAG: TimeTag> From<MinimalBoundedDuration<MIN_DU
 
 #[cfg(test)]
 mod test {
-    use crate::bounded_duration::{MinimalBoundedDuration, DAY, SECOND};
     use time::Duration;
+
+    use crate::bounded_duration::{MinimalBoundedDuration, DAY, SECOND};
 
     #[test]
     fn success_deserialize() {

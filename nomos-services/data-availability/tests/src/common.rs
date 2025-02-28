@@ -10,16 +10,6 @@ use kzgrs_backend::{
     dispersal::BlobInfo,
     encoder::{DaEncoder, DaEncoderParams},
 };
-use nomos_blend_message::{sphinx::SphinxMessage, BlendMessage};
-use nomos_da_network_service::backends::libp2p::common::DaNetworkBackendSettings;
-use std::path::{Path, PathBuf};
-use std::time::Duration;
-// crates
-use cryptarchia_engine::SlotConfig;
-use kzgrs_backend::common::blob::DaBlob;
-use kzgrs_backend::dispersal::BlobInfo;
-use kzgrs_backend::encoder::DaEncoder;
-use kzgrs_backend::encoder::DaEncoderParams;
 use libp2p::identity::{
     ed25519::{self, Keypair as Ed25519Keypair},
     Keypair, PeerId,
@@ -82,10 +72,11 @@ use nomos_network::{
     NetworkConfig, NetworkService,
 };
 use nomos_node::{Tx, Wire};
-use nomos_storage::backends::rocksdb::RocksBackend;
-use nomos_storage::StorageService;
-use nomos_time::backends::system_time::{SystemTimeBackend, SystemTimeBackendSettings};
-use nomos_time::{TimeService, TimeServiceSettings};
+use nomos_storage::{backends::rocksdb::RocksBackend, StorageService};
+use nomos_time::{
+    backends::system_time::{SystemTimeBackend, SystemTimeBackendSettings},
+    TimeService, TimeServiceSettings,
+};
 use once_cell::sync::Lazy;
 use overwatch_derive::*;
 use overwatch_rs::{

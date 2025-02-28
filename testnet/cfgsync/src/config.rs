@@ -6,7 +6,6 @@ use nomos_libp2p::{Multiaddr, PeerId};
 use nomos_node::BlendBackend;
 use nomos_tracing_service::{LoggerLayer, MetricsLayer, TracingLayer, TracingSettings};
 use rand::{thread_rng, Rng};
-use tests::topology::configs::time::default_time_config;
 use tests::topology::configs::{
     api::GeneralApiConfig,
     blend::create_blend_configs,
@@ -241,11 +240,7 @@ mod cfgsync_tests {
     use nomos_tracing_service::{
         FilterLayer, LoggerLayer, MetricsLayer, TracingLayer, TracingSettings,
     };
-    use std::num::NonZero;
-    use std::str::FromStr;
-    use std::{net::Ipv4Addr, time::Duration};
-    use tests::topology::configs::consensus::ConsensusParams;
-    use tests::topology::configs::da::DaParams;
+    use tests::topology::configs::{consensus::ConsensusParams, da::DaParams};
     use tracing::Level;
 
     use super::{create_node_configs, Host, HostKind};

@@ -1,7 +1,6 @@
 use std::num::NonZero;
 
 use cryptarchia_engine::{Epoch, Slot};
-use std::num::NonZero;
 
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -44,8 +43,9 @@ impl Config {
 
 #[cfg(test)]
 mod tests {
-    use cryptarchia_engine::EpochConfig;
     use std::num::NonZero;
+
+    use cryptarchia_engine::EpochConfig;
     #[test]
     fn epoch_snapshots() {
         let config = super::Config {

@@ -1,11 +1,11 @@
-use crate::{EpochSlotTickStream, SlotTick};
-use cryptarchia_engine::time::SlotTimer;
-use cryptarchia_engine::{EpochConfig, Slot, SlotConfig};
+use std::{num::NonZero, pin::Pin};
+
+use cryptarchia_engine::{time::SlotTimer, EpochConfig, Slot, SlotConfig};
 use futures::StreamExt;
-use std::num::NonZero;
-use std::pin::Pin;
 use time::OffsetDateTime;
 use tokio_stream::wrappers::IntervalStream;
+
+use crate::{EpochSlotTickStream, SlotTick};
 
 pub(crate) fn slot_timer(
     slot_config: SlotConfig,

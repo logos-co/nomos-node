@@ -1,16 +1,13 @@
 // std
-use std::net::Ipv4Addr;
-use std::num::NonZero;
-use std::path::PathBuf;
-use std::sync::Arc;
-use std::time::Duration;
-use std::{fs, process};
+use std::{fs, net::Ipv4Addr, num::NonZero, path::PathBuf, process, sync::Arc, time::Duration};
+
 // crates
 use axum::extract::State;
-use axum::Json;
-use axum::{http::StatusCode, response::IntoResponse, routing::post, Router};
-use cfgsync::config::Host;
-use cfgsync::repo::{ConfigRepo, RepoResponse};
+use axum::{http::StatusCode, response::IntoResponse, routing::post, Json, Router};
+use cfgsync::{
+    config::Host,
+    repo::{ConfigRepo, RepoResponse},
+};
 use clap::Parser;
 use nomos_tracing_service::TracingSettings;
 use serde::{Deserialize, Serialize};

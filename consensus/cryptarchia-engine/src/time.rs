@@ -1,6 +1,5 @@
-use std::num::NonZero;
-use std::ops::Add;
-use std::time::Duration;
+use std::{num::NonZero, ops::Add, time::Duration};
+
 use time::OffsetDateTime;
 #[cfg(feature = "tokio")]
 use tokio::time::{Interval, MissedTickBehavior};

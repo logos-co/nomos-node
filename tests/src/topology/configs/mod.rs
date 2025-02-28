@@ -7,7 +7,6 @@ pub mod tracing;
 
 pub mod time;
 
-use crate::topology::configs::time::GeneralTimeConfig;
 use api::GeneralApiConfig;
 use blend::GeneralBlendConfig;
 use consensus::GeneralConsensusConfig;

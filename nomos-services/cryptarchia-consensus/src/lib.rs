@@ -31,10 +31,14 @@ use nomos_mempool::{
 use nomos_network::NetworkService;
 use nomos_storage::{backends::StorageBackend, StorageMsg, StorageService};
 use nomos_time::{SlotTick, TimeService, TimeServiceMessage};
-use overwatch_rs::services::relay::{OutboundRelay, Relay, RelayMessage};
-use overwatch_rs::services::state::ServiceState;
-use overwatch_rs::services::{ServiceCore, ServiceData, ServiceId};
-use overwatch_rs::{DynError, OpaqueServiceStateHandle};
+use overwatch_rs::{
+    services::{
+        relay::{OutboundRelay, Relay, RelayMessage},
+        state::ServiceState,
+        ServiceCore, ServiceData, ServiceId,
+    },
+    DynError, OpaqueServiceStateHandle,
+};
 use rand::{RngCore, SeedableRng};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_with::serde_as;
@@ -42,8 +46,7 @@ use services_utils::overwatch::{
     lifecycle, recovery::backends::FileBackendSettings, JsonFileBackend, RecoveryOperator,
 };
 use thiserror::Error;
-use tokio::sync::oneshot::Sender;
-use tokio::sync::{broadcast, oneshot};
+use tokio::sync::{broadcast, oneshot, oneshot::Sender};
 use tracing::{error, instrument, span, Level};
 use tracing_futures::Instrument;
 

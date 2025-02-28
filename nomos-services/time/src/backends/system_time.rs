@@ -1,9 +1,12 @@
-use crate::backends::common::slot_timer;
-use crate::backends::TimeBackend;
-use crate::EpochSlotTickStream;
-use cryptarchia_engine::{EpochConfig, Slot, SlotConfig};
 use std::num::NonZero;
+
+use cryptarchia_engine::{EpochConfig, Slot, SlotConfig};
 use time::OffsetDateTime;
+
+use crate::{
+    backends::{common::slot_timer, TimeBackend},
+    EpochSlotTickStream,
+};
 
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Clone, Debug)]
@@ -39,13 +42,16 @@ impl TimeBackend for SystemTimeBackend {
 
 #[cfg(test)]
 mod test {
-    use crate::backends::system_time::{SystemTimeBackend, SystemTimeBackendSettings};
-    use crate::backends::TimeBackend;
+    use std::{num::NonZero, time::Duration};
+
     use cryptarchia_engine::{EpochConfig, Slot, SlotConfig};
     use futures::StreamExt;
-    use std::num::NonZero;
-    use std::time::Duration;
     use time::OffsetDateTime;
+
+    use crate::backends::{
+        system_time::{SystemTimeBackend, SystemTimeBackendSettings},
+        TimeBackend,
+    };
 
     #[tokio::test]
     async fn test_stream() {

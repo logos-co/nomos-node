@@ -7,7 +7,7 @@ use std::{
 };
 
 use cryptarchia_consensus::{CryptarchiaInfo, CryptarchiaSettings};
-use cryptarchia_engine::SlotConfig;
+use cryptarchia_engine::time::SlotConfig;
 use kzgrs_backend::common::blob::DaBlob;
 use nomos_blend::message_blend::{
     CryptographicProcessorSettings, MessageBlendSettings, TemporalSchedulerSettings,
@@ -40,15 +40,12 @@ use nomos_node::{
     config::mempool::MempoolConfig,
     BlobInfo, Config, HeaderId, RocksBackendSettings, Tx,
 };
-use nomos_node::{api::backend::AxumBackendSettings, Config, RocksBackendSettings};
-use nomos_node::{BlobInfo, HeaderId, Tx};
-use nomos_time::backends::system_time::SystemTimeBackendSettings;
-use nomos_time::TimeServiceSettings;
+use nomos_time::{backends::system_time::SystemTimeBackendSettings, TimeServiceSettings};
 use nomos_tracing::logging::local::FileConfig;
 use nomos_tracing_service::LoggerLayer;
 use reqwest::Url;
 use tempfile::NamedTempFile;
-// Internal
+
 use super::{create_tempdir, persist_tempdir, GetRangeReq, CLIENT};
 use crate::{
     adjust_timeout, nodes::LOGS_PREFIX, topology::configs::GeneralConfig, IS_DEBUG_TRACING,
@@ -354,6 +351,9 @@ pub fn create_validator_config(config: GeneralConfig) -> Config {
                 epoch_config: config.consensus_config.ledger_config.epoch_config,
                 base_period_length: config.consensus_config.ledger_config.base_period_length(),
             },
+        },
+        mempool: MempoolConfig {
+            recovery_path: "./recovery/mempool.json".into(),
         },
     }
 }
