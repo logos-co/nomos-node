@@ -5,3 +5,6 @@ rustflags = [
   "-C",
   "link-args=-framework CoreFoundation -framework Security -framework CoreServices -lresolv",
 ]
+
+[target.'cfg(all())']
+rustflags = ["-Wclippy::nursery"]
