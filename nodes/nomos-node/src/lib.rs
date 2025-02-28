@@ -42,7 +42,6 @@ pub use nomos_mempool::{
     network::adapters::libp2p::{
         Libp2pAdapter as MempoolNetworkAdapter, Settings as MempoolAdapterSettings,
     },
-    TxMempoolSettings,
 };
 pub use nomos_network::{backends::libp2p::Libp2p as NetworkBackend, NetworkService};
 pub use nomos_storage::{

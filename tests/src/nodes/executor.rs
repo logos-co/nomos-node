@@ -39,6 +39,7 @@ use nomos_executor::{api::backend::AxumBackendSettings, config::Config};
 use nomos_network::{backends::libp2p::Libp2pConfig, NetworkConfig};
 use nomos_node::{
     api::paths::{CL_METRICS, DA_GET_RANGE},
+    config::mempool::MempoolConfig,
     RocksBackendSettings,
 };
 use nomos_tracing::logging::local::FileConfig;
@@ -267,6 +268,9 @@ pub fn create_executor_config(config: GeneralConfig) -> Config {
                 },
                 dispersal_timeout: Duration::from_secs(u64::MAX),
             },
+        },
+        mempool: MempoolConfig {
+            recovery_path: "./recovery/mempool.json".into(),
         },
     }
 }

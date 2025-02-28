@@ -36,6 +36,7 @@ use nomos_node::{
         backend::AxumBackendSettings,
         paths::{CL_METRICS, CRYPTARCHIA_HEADERS, CRYPTARCHIA_INFO, DA_GET_RANGE, STORAGE_BLOCK},
     },
+    config::mempool::MempoolConfig,
     BlobInfo, Config, HeaderId, RocksBackendSettings, Tx,
 };
 use nomos_tracing::logging::local::FileConfig;
@@ -339,6 +340,9 @@ pub fn create_validator_config(config: GeneralConfig) -> Config {
             db_path: "./db".into(),
             read_only: false,
             column_family: Some("blocks".into()),
+        },
+        mempool: MempoolConfig {
+            recovery_path: "./recovery/mempool.json".into(),
         },
     }
 }
