@@ -977,8 +977,8 @@ where
 
     /// Retrieves the blocks in the range from `from` to `to` from the storage.
     /// Both `from` and `to` are included in the range.
-    /// This is implemented here, and not as a method of `StorageAdapter`, to simplify the panic
-    /// and error message handling.
+    /// This is implemented here, and not as a method of `StorageAdapter`, to
+    /// simplify the panic and error message handling.
     ///
     /// # Panics
     ///
@@ -986,14 +986,17 @@ where
     ///
     /// # Parameters
     ///
-    /// * `from` - The header id of the first block in the range. Must be a valid header.
-    /// * `to` - The header id of the last block in the range. Must be a valid header.
+    /// * `from` - The header id of the first block in the range. Must be a
+    ///   valid header.
+    /// * `to` - The header id of the last block in the range. Must be a valid
+    ///   header.
     ///
     /// # Returns
     ///
     /// A vector of blocks in the range from `from` to `to`.
     /// If no blocks are found, returns an empty vector.
-    /// If any of the HeaderId are invalid, returns an error with the first invalid header id.
+    /// If any of the HeaderId are invalid, returns an error with the first
+    /// invalid header id.
     async fn get_blocks_in_range(
         from: HeaderId,
         to: HeaderId,
@@ -1015,7 +1018,8 @@ where
             }
         });
 
-        // To avoid confusion, the order is reversed so it fits the natural `from..to` order
+        // To avoid confusion, the order is reversed so it fits the natural `from..to`
+        // order
         blocks.collect::<Vec<_>>().await.into_iter().rev().collect()
     }
 
