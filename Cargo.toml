@@ -92,6 +92,7 @@ tests                    = { path = "./tests" }
 # External
 overwatch-derive = { git = "https://github.com/logos-co/Overwatch", rev = "86c7405" }
 overwatch-rs     = { git = "https://github.com/logos-co/Overwatch", rev = "86c7405" }
+risc0-zkvm       = "1.2.0"
 
 [workspace.package]
 license = "MIT or Apache-2.0"
