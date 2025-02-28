@@ -9,6 +9,7 @@ use tests::topology::configs::{consensus::ConsensusParams, da::DaParams, General
 use tokio::{sync::oneshot::Sender, time::timeout};
 
 use crate::config::{create_node_configs, Host};
+use crate::server::CfgSyncConfig;
 
 pub enum RepoResponse {
     Config(Box<GeneralConfig>),
@@ -22,6 +23,22 @@ pub struct ConfigRepo {
     da_params: DaParams,
     tracing_settings: TracingSettings,
     timeout_duration: Duration,
+}
+
+impl From<CfgSyncConfig> for Arc<ConfigRepo> {
+    fn from(config: CfgSyncConfig) -> Self {
+        let consensus_params = config.to_consensus_params();
+        let da_params = config.to_da_params();
+        let tracing_settings = config.to_tracing_settings();
+
+        ConfigRepo::new(
+            config.n_hosts,
+            consensus_params,
+            da_params,
+            tracing_settings,
+            Duration::from_secs(config.timeout),
+        )
+    }
 }
 
 impl ConfigRepo {
@@ -96,7 +113,7 @@ impl ConfigRepo {
             if self.waiting_hosts.lock().unwrap().len() >= self.n_hosts {
                 break;
             }
-            tokio::time::sleep(tokio::time::Duration::from_secs(9)).await;
+            tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
         }
     }
 }
