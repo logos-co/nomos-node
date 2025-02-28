@@ -6,15 +6,9 @@ mod relays;
 mod states;
 pub mod storage;
 
-use crate::leadership::Leader;
-use crate::relays::CryptarchiaConsensusRelays;
-use crate::states::{
-    CryptarchiaConsensusState, CryptarchiaInitialisationStrategy, GenesisRecoveryStrategy,
-    SecurityRecoveryStrategy,
-};
-use crate::storage::adapters::StorageAdapter;
-use crate::storage::StorageAdapter as _;
 use core::fmt::Debug;
+use std::{collections::BTreeSet, hash::Hash, path::PathBuf};
+
 use cryptarchia_engine::Slot;
 use futures::StreamExt;
 pub use leadership::LeaderConfig;
@@ -51,11 +45,20 @@ use serde_with::serde_as;
 use services_utils::overwatch::{
     lifecycle, recovery::backends::FileBackendSettings, JsonFileBackend, RecoveryOperator,
 };
-use std::{collections::BTreeSet, hash::Hash, path::PathBuf};
 use thiserror::Error;
 use tokio::sync::{broadcast, oneshot, oneshot::Sender};
 use tracing::{error, info, instrument, span, Level};
 use tracing_futures::Instrument;
+
+use crate::{
+    leadership::Leader,
+    relays::CryptarchiaConsensusRelays,
+    states::{
+        CryptarchiaConsensusState, CryptarchiaInitialisationStrategy, GenesisRecoveryStrategy,
+        SecurityRecoveryStrategy,
+    },
+    storage::{adapters::StorageAdapter, StorageAdapter as _},
+};
 
 type MempoolRelay<Payload, Item, Key> = OutboundRelay<MempoolMsg<HeaderId, Payload, Item, Key>>;
 type SamplingRelay<BlobId> = OutboundRelay<DaSamplingServiceMsg<BlobId>>;
@@ -890,8 +893,8 @@ where
 
     /// Retrieves the blocks in the range from `from` to `to` from the storage.
     /// Both `from` and `to` are included in the range.
-    /// This is implemented here, and not as a method of `StorageAdapter`, to simplify the panic
-    /// and error message handling.
+    /// This is implemented here, and not as a method of `StorageAdapter`, to
+    /// simplify the panic and error message handling.
     ///
     /// # Panics
     ///
@@ -899,14 +902,17 @@ where
     ///
     /// # Parameters
     ///
-    /// * `from` - The header id of the first block in the range. Must be a valid header.
-    /// * `to` - The header id of the last block in the range. Must be a valid header.
+    /// * `from` - The header id of the first block in the range. Must be a
+    ///   valid header.
+    /// * `to` - The header id of the last block in the range. Must be a valid
+    ///   header.
     ///
     /// # Returns
     ///
     /// A vector of blocks in the range from `from` to `to`.
     /// If no blocks are found, returns an empty vector.
-    /// If any of the HeaderId are invalid, returns an error with the first invalid header id.
+    /// If any of the HeaderId are invalid, returns an error with the first
+    /// invalid header id.
     async fn get_blocks_in_range(
         from: HeaderId,
         to: HeaderId,
@@ -928,27 +934,30 @@ where
             }
         });
 
-        // To avoid confusion, the order is reversed so it fits the natural `from..to` order
+        // To avoid confusion, the order is reversed so it fits the natural `from..to`
+        // order
         blocks.collect::<Vec<_>>().await.into_iter().rev().collect()
     }
 
     /// Builds cryptarchia
     /// The build process is determined by the initial state passed:
-    /// - If the initial state doesn't contain any recovery information, cryptarchia is built from
-    ///     genesis.
-    /// - If it does, the recovery process is started: Recovery is done from genesis or security
-    ///     depending on the available information.
+    /// - If the initial state doesn't contain any recovery information,
+    ///   cryptarchia is built from genesis.
+    /// - If it does, the recovery process is started: Recovery is done from
+    ///   genesis or security depending on the available information.
     ///
     /// # Arguments
     ///
     /// * `initial_state` - The initial state of cryptarchia.
     /// * `genesis_id` - The genesis block id.
     /// * `genesis_state` - The genesis ledger state.
-    /// * `leader` - The leader instance. It needs to be a Leader initialised to genesis. This
-    ///     function will update the leader if needed.
+    /// * `leader` - The leader instance. It needs to be a Leader initialised to
+    ///   genesis. This function will update the leader if needed.
     /// * `ledger_config` - The ledger configuration.
-    /// * `relays` - The relays object containing all the necessary relays for the consensus.
-    /// * `block_subscription_sender` - The broadcast channel to send the blocks to the services.
+    /// * `relays` - The relays object containing all the necessary relays for
+    ///   the consensus.
+    /// * `block_subscription_sender` - The broadcast channel to send the blocks
+    ///   to the services.
     async fn build_cryptarchia(
         mut initial_state: CryptarchiaConsensusState<
             TxS::Settings,
@@ -1037,15 +1046,19 @@ where
     ///
     /// # Arguments
     ///
-    /// * `from_header_id` - The header id where the recovery should start from. In case none
-    ///   was stored, the genesis block id should be passed.
-    /// * `from_ledger_state` - The ledger state up to the security block. In case none was
-    ///   stored, the genesis ledger state should be passed.
-    /// * `to_header_id` - The header id up to which the ledger state should be restored.
-    /// * `leader` - The leader instance to be used for the recovery. The passed leader needs to be
-    ///   up-to-date with the state of the ledger up to the security block.
-    /// * `relays` - The relays object containing all the necessary relays for the consensus.
-    /// * `block_broadcaster` - The broadcast channel to send the blocks to the services.
+    /// * `from_header_id` - The header id where the recovery should start from.
+    ///   In case none was stored, the genesis block id should be passed.
+    /// * `from_ledger_state` - The ledger state up to the security block. In
+    ///   case none was stored, the genesis ledger state should be passed.
+    /// * `to_header_id` - The header id up to which the ledger state should be
+    ///   restored.
+    /// * `leader` - The leader instance to be used for the recovery. The passed
+    ///   leader needs to be up-to-date with the state of the ledger up to the
+    ///   security block.
+    /// * `relays` - The relays object containing all the necessary relays for
+    ///   the consensus.
+    /// * `block_broadcaster` - The broadcast channel to send the blocks to the
+    ///   services.
     /// * `ledger_config` - The ledger configuration.
     async fn recover_cryptarchia(
         from_header_id: HeaderId,

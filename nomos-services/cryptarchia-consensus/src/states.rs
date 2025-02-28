@@ -1,14 +1,12 @@
-// std
 use std::marker::PhantomData;
-// Crates
+
 use cl::NoteWitness;
-use overwatch_rs::services::state::ServiceState;
-use serde::{Deserialize, Serialize};
-// Internal
-use crate::leadership::Leader;
-use crate::{Cryptarchia, CryptarchiaSettings, Error};
 use nomos_core::header::HeaderId;
 use nomos_ledger::LedgerState;
+use overwatch_rs::services::state::ServiceState;
+use serde::{Deserialize, Serialize};
+
+use crate::{leadership::Leader, Cryptarchia, CryptarchiaSettings, Error};
 
 pub struct GenesisRecoveryStrategy {
     pub tip: HeaderId,
@@ -78,13 +76,14 @@ impl<TxS, BxS, NetworkAdapterSettings, BlendAdapterSettings>
     }
 
     fn can_recover(&self) -> bool {
-        // This only checks whether tip is defined, as that's a state variable that should
-        // always exist. Other attributes might not be present.
+        // This only checks whether tip is defined, as that's a state variable that
+        // should always exist. Other attributes might not be present.
         self.tip.is_some()
     }
 
     fn can_recover_from_security(&self) -> bool {
-        // TODO: Check if one or more (but not all) the security attrs are missing. That's a bug.
+        // TODO: Check if one or more (but not all) the security attrs are missing.
+        // That's a bug.
         self.can_recover()
             && self.security_block.is_some()
             && self.security_ledger_state.is_some()

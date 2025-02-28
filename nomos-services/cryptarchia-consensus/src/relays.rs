@@ -1,14 +1,5 @@
 use std::{fmt::Debug, hash::Hash};
 
-use overwatch_rs::services::relay::{OutboundRelay, Relay};
-use rand::{RngCore, SeedableRng};
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
-
-use crate::{
-    blend, network,
-    storage::{adapters::StorageAdapter, StorageAdapter as StorageAdapterTrait},
-    MempoolRelay, SamplingRelay,
-};
 use nomos_blend_service::{network::NetworkAdapter as BlendNetworkAdapter, ServiceMessage};
 use nomos_core::{
     da::blob::{info::DispersedBlobInfo, BlobSelect},
@@ -23,6 +14,15 @@ use nomos_mempool::{
 };
 use nomos_network::{NetworkMsg, NetworkService};
 use nomos_storage::{backends::StorageBackend, StorageMsg, StorageService};
+use overwatch_rs::services::relay::{OutboundRelay, Relay};
+use rand::{RngCore, SeedableRng};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
+
+use crate::{
+    blend, network,
+    storage::{adapters::StorageAdapter, StorageAdapter as StorageAdapterTrait},
+    MempoolRelay, SamplingRelay,
+};
 
 type NetworkRelay<NetworkBackend> = OutboundRelay<NetworkMsg<NetworkBackend>>;
 type BlendRelay<BlendAdapterNetworkBroadcastSettings> =
