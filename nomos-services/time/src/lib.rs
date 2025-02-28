@@ -41,7 +41,7 @@ pub enum TimeServiceMessage {
 impl Debug for TimeServiceMessage {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            TimeServiceMessage::Subscribe { .. } => f.write_str("New time service subscription"),
+            Self::Subscribe { .. } => f.write_str("New time service subscription"),
         }
     }
 }

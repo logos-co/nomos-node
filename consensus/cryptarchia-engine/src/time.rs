@@ -29,11 +29,11 @@ impl Slot {
         let since_start = offset_date_time - slot_config.chain_start_time;
         if since_start.is_negative() {
             // current slot is behind the start time, so return default 0
-            Slot::genesis()
+            Self::genesis()
         } else {
             // safety: since_start is already checked never negative in this case
             // division panics if `slot_duration` is less than a second.
-            Slot::from(
+            Self::from(
                 (since_start.whole_seconds() as u64)
                     .checked_div(slot_config.slot_duration.as_secs())
                     .expect("slots tick should be at least a second"),
@@ -91,7 +91,7 @@ impl Add<u32> for Epoch {
 }
 
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct EpochConfig {
     // The stake distribution is always taken at the beginning of the previous epoch.
     // This parameters controls how many slots to wait for it to be stabilized
@@ -141,8 +141,8 @@ pub struct SlotTimer {
 
 #[cfg(feature = "tokio")]
 impl SlotTimer {
-    pub fn new(config: SlotConfig) -> Self {
-        SlotTimer { config }
+    pub const fn new(config: SlotConfig) -> Self {
+        Self { config }
     }
 
     pub fn current_slot(&self, now: OffsetDateTime) -> Slot {

@@ -181,3 +181,4 @@ storage:
   column_family: blocks
 mempool:
   recovery_path: ./recovery/mempool.json
+  
