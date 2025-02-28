@@ -1,0 +1,55 @@
+name: Check for a new Rust version
+
+on:
+  schedule:
+    - cron: "0 3 * * *"
+
+jobs:
+  check-latest-version:
+    name: Fetch and compare latest Rust release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Fetch latest Rust release
+        id: latest-version
+        run: |
+          LATEST=$(curl -s https://api.github.com/repos/rust-lang/rust/releases/latest | jq -r .tag_name)
+          echo "Latest Rust version: $LATEST"
+          echo "VERSION=$LATEST" >> $GITHUB_OUTPUT
+      - name: Retrieve local Rust version
+        id: installed-version
+        run: |
+          INSTALLED=$(cargo --version | awk '{print $2}')
+          echo "Installed Rust version: $INSTALLED"
+          echo "VERSION=$INSTALLED" >> $GITHUB_OUTPUT
+      - name: Compare latest and local Rust versions
+        id: compare-versions
+        run: |
+          if [ "${{ steps.latest-version.outputs.VERSION }}" != "${{ steps.installed-version.outputs.VERSION }}" ]; then
+            NEW_VERSION_AVAILABLE=true
+          else
+            NEW_VERSION_AVAILABLE=false
+          fi
+          echo "NEW_VERSION_AVAILABLE=$NEW_VERSION_AVAILABLE" >> $GITHUB_OUTPUT
+    outputs:
+      new-version-available: ${{ steps.compare-versions.outputs.NEW_VERSION_AVAILABLE }}
+      new-version: ${{ steps.latest-version.outputs.VERSION }}
+  notify-new-version:
+    name: Notify of new Rust version
+    runs-on: ubuntu-latest
+    needs: check-latest-version
+    if: ${{ needs.check-latest-version.outputs.new-version-available == 'true' }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Create a GH issue (if it does not exist)
+        uses: JasonEtco/create-an-issue@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RUST_VERSION: ${{ needs.check-latest-version.outputs.new-version }}
+        with:
+          assignees: danielSanchezQ, ntn-x2
+          filename: ./.github/rust_update_issue_template.md
+          update_existing: false
+          search_existing: all
