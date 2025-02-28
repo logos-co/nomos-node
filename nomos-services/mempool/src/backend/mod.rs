@@ -12,7 +12,7 @@ pub enum MempoolError {
 }
 
 pub trait MemPool {
-    type Settings: Clone;
+    type Settings;
     type Item;
     type Key;
     type BlockId;
@@ -57,6 +57,18 @@ pub trait MemPool {
     // This is a best effort attempt, and implementations are free to return
     // `Unknown` for all of them.
     fn status(&self, items: &[Self::Key]) -> Vec<Status<Self::BlockId>>;
+}
+
+/// A mempool with recovery capabilities.
+pub trait RecoverableMempool: MemPool {
+    /// The state that is serialized and deserialized and from which the pool
+    /// state is recreated.
+    type RecoveryState;
+
+    /// Restore the mempool from the provided settings and state.
+    fn recover(settings: Self::Settings, state: Self::RecoveryState) -> Self;
+    /// Save some state for later recovery.
+    fn save(&self) -> Self::RecoveryState;
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]

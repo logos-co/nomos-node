@@ -25,7 +25,9 @@ use serde::{Deserialize, Serialize};
 use subnetworks_assignations::versions::v1::FillFromNodeList;
 use tracing::Level;
 
-use crate::{NomosApiService, NomosDaMembership, Wire};
+use crate::{config::mempool::MempoolConfig, NomosApiService, NomosDaMembership, Wire};
+
+pub mod mempool;
 
 #[derive(ValueEnum, Clone, Debug, Default)]
 pub enum LoggerLayerType {
@@ -141,6 +143,7 @@ pub struct Config {
         nomos_da_sampling::network::adapters::validator::Libp2pAdapter<NomosDaMembership>,
     > as ServiceData>::Settings,
     pub storage: <crate::StorageService<RocksBackend<Wire>> as ServiceData>::Settings,
+    pub mempool: MempoolConfig,
 }
 
 impl Config {

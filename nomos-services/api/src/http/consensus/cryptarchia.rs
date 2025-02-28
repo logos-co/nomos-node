@@ -22,7 +22,7 @@ use nomos_mempool::{
 use nomos_storage::backends::{rocksdb::RocksBackend, StorageSerde};
 use overwatch_rs::overwatch::handle::OverwatchHandle;
 use rand::{RngCore, SeedableRng};
-use serde::{de::DeserializeOwned, Serialize};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use tokio::sync::oneshot;
 
 use crate::http::DynError;
@@ -73,7 +73,8 @@ where
         + Send
         + Sync
         + 'static,
-    <Tx as Transaction>::Hash: std::cmp::Ord + Debug + Send + Sync + 'static,
+    <Tx as Transaction>::Hash:
+        std::cmp::Ord + Debug + Send + Sync + Serialize + for<'de> Deserialize<'de> + 'static,
     SS: StorageSerde + Send + Sync + 'static,
     SamplingRng: SeedableRng + RngCore,
     SamplingBackend: DaSamplingServiceBackend<SamplingRng, BlobId = BlobId> + Send,
@@ -128,7 +129,8 @@ where
         + Send
         + Sync
         + 'static,
-    <Tx as Transaction>::Hash: std::cmp::Ord + Debug + Send + Sync + 'static,
+    <Tx as Transaction>::Hash:
+        std::cmp::Ord + Debug + Send + Sync + Serialize + for<'de> Deserialize<'de> + 'static,
     SS: StorageSerde + Send + Sync + 'static,
     SamplingRng: SeedableRng + RngCore,
     SamplingBackend: DaSamplingServiceBackend<SamplingRng, BlobId = BlobId> + Send,

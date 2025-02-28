@@ -1,2 +1,2 @@
 pub mod overwatch;
-mod traits;
+pub mod traits;

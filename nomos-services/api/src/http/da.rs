@@ -34,7 +34,7 @@ use nomos_mempool::{
 use nomos_storage::backends::{rocksdb::RocksBackend, StorageSerde};
 use overwatch_rs::{overwatch::handle::OverwatchHandle, DynError};
 use rand::{RngCore, SeedableRng};
-use serde::{de::DeserializeOwned, Serialize};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use subnetworks_assignations::MembershipHandler;
 use tokio::sync::oneshot;
 
@@ -139,7 +139,8 @@ where
         + Send
         + Sync
         + 'static,
-    <Tx as Transaction>::Hash: std::cmp::Ord + Debug + Send + Sync + 'static,
+    <Tx as Transaction>::Hash:
+        std::cmp::Ord + Debug + Send + Sync + Serialize + for<'de> Deserialize<'de> + 'static,
     C: DispersedBlobInfo<BlobId = [u8; 32]>
         + Clone
         + Debug

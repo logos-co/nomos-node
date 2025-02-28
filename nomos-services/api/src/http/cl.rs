@@ -26,7 +26,8 @@ where
         + Send
         + Sync
         + 'static,
-    <T as nomos_core::tx::Transaction>::Hash: std::cmp::Ord + Debug + Send + Sync + 'static,
+    <T as nomos_core::tx::Transaction>::Hash:
+        std::cmp::Ord + Debug + Send + Sync + Serialize + for<'de> Deserialize<'de> + 'static,
 {
     let relay = handle.relay::<ClMempoolService<T>>().connect().await?;
     let (sender, receiver) = oneshot::channel();
@@ -54,7 +55,8 @@ where
         + Send
         + Sync
         + 'static,
-    <T as nomos_core::tx::Transaction>::Hash: std::cmp::Ord + Debug + Send + Sync + 'static,
+    <T as nomos_core::tx::Transaction>::Hash:
+        std::cmp::Ord + Debug + Send + Sync + Serialize + for<'de> Deserialize<'de> + 'static,
 {
     let relay = handle.relay::<ClMempoolService<T>>().connect().await?;
     let (sender, receiver) = oneshot::channel();

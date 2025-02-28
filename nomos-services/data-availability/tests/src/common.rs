@@ -63,7 +63,8 @@ use nomos_mempool::{
     network::adapters::libp2p::{
         Libp2pAdapter as MempoolNetworkAdapter, Settings as AdapterSettings,
     },
-    DaMempoolSettings, TxMempoolService, TxMempoolSettings,
+    tx::settings::TxMempoolSettings,
+    DaMempoolSettings, TxMempoolService,
 };
 use nomos_network::{
     backends::libp2p::{Libp2p as NetworkBackend, Libp2pConfig},
@@ -272,11 +273,12 @@ pub fn new_node(
                 },
             },
             cl_mempool: TxMempoolSettings {
-                backend: (),
-                network: AdapterSettings {
+                pool: (),
+                network_adapter: AdapterSettings {
                     topic: String::from(nomos_node::CL_TOPIC),
                     id: <Tx as Transaction>::hash,
                 },
+                recovery_path: "./recovery/txmempool.json".into(),
             },
             da_mempool: DaMempoolSettings {
                 backend: (),
