@@ -1,4 +1,5 @@
 pub mod behaviour;
+pub mod behaviour_v2;
 pub mod handler;
 
 #[cfg(test)]
@@ -15,10 +16,7 @@ mod test {
     use tracing_subscriber::{fmt::TestWriter, EnvFilter};
 
     use crate::{
-        protocols::replication::{
-            behaviour::{ReplicationBehaviour, ReplicationEvent},
-            handler::DaMessage,
-        },
+        protocols::replication::behaviour_v2::{DaMessage, ReplicationBehaviour, ReplicationEvent},
         test_utils::AllNeighbours,
     };
 
@@ -28,6 +26,7 @@ mod test {
             key: Keypair,
             all_neighbours: AllNeighbours,
         ) -> Swarm<ReplicationBehaviour<AllNeighbours>> {
+            // TODO use libp2p_swarm_test
             libp2p::SwarmBuilder::with_existing_identity(key)
                 .with_tokio()
                 .with_other_transport(|keypair| {
@@ -42,7 +41,9 @@ mod test {
                 })
                 .unwrap()
                 .with_swarm_config(|cfg| {
-                    cfg.with_idle_connection_timeout(std::time::Duration::from_secs(u64::MAX))
+                    // To avoid: libp2p_swarm::connection: start + duration cannot be presented,
+                    // halving duration
+                    cfg.with_idle_connection_timeout(std::time::Duration::from_secs(u64::MAX / 4))
                 })
                 .build()
         }
