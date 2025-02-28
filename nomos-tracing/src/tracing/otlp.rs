@@ -27,9 +27,6 @@ pub fn create_otlp_tracing_layer<S>(
 where
     S: Subscriber + for<'span> LookupSpan<'span>,
 {
-    let otel_exporter = opentelemetry_otlp::new_exporter()
-        .tonic()
-        .with_endpoint(config.endpoint);
     let resource = Resource::new(vec![KeyValue::new(SERVICE_NAME, config.service_name)]);
     let tracer_provider = opentelemetry_otlp::new_pipeline()
         .tracing()
@@ -41,7 +38,11 @@ where
                 .with_resource(resource),
         )
         .with_batch_config(BatchConfig::default())
-        .with_exporter(otel_exporter)
+        .with_exporter(
+            opentelemetry_otlp::new_exporter()
+                .tonic()
+                .with_endpoint(config.endpoint),
+        )
         .install_batch(opentelemetry_sdk::runtime::Tokio)?;
 
     global::set_text_map_propagator(TraceContextPropagator::new());

@@ -78,6 +78,7 @@ impl SwarmHandler {
         }
     }
 
+    #[expect(clippy::cognitive_complexity)]
     fn handle_event(&mut self, event: SwarmEvent<BehaviourEvent>) {
         match event {
             SwarmEvent::Behaviour(BehaviourEvent::Gossipsub(gossipsub::Event::Message {

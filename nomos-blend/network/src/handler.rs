@@ -147,6 +147,7 @@ where
     }
 
     #[allow(deprecated)] // Self::OutboundOpenInfo is deprecated
+    #[expect(clippy::cognitive_complexity)]
     fn poll(
         &mut self,
         cx: &mut Context<'_>,
@@ -310,6 +311,7 @@ where
     }
 
     #[allow(deprecated)] // Self::InboundOpenInfo and Self::OutboundOpenInfo are deprecated
+    #[expect(clippy::cognitive_complexity)]
     fn on_connection_event(
         &mut self,
         event: ConnectionEvent<

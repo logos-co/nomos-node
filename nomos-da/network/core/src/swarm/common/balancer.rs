@@ -95,12 +95,10 @@ where
         let candidates = self.membership.members_of(subnetwork_id);
         let available_peers: Vec<_> = candidates
             .into_iter()
-            .filter(|peer| !self.connected_peers.contains(peer) && *peer != self.local_peer_id)
-            .collect();
+            .filter(|peer| !self.connected_peers.contains(peer) && *peer != self.local_peer_id);
 
         available_peers
-            .into_iter()
-            .choose_multiple(&mut rand::thread_rng(), missing_count)
+            .choose_multiple(&mut rand::thread_rng(), missing_count).collect()
     }
 }
 

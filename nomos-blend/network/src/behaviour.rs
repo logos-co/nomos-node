@@ -120,10 +120,7 @@ where
         let mut num_peers = 0;
         self.negotiated_peers
             .keys()
-            .filter(|peer_id| match excluded_peer {
-                Some(excluded_peer) => **peer_id != excluded_peer,
-                None => true,
-            })
+            .filter(|peer_id| (excluded_peer != Some(**peer_id)))
             .for_each(|peer_id| {
                 tracing::debug!("Registering event for peer {:?} to send msg", peer_id);
                 self.events.push_back(ToSwarm::NotifyHandler {

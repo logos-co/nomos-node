@@ -16,14 +16,11 @@ pub trait RecoveryBackend {
 }
 
 #[derive(Debug, Clone)]
-pub struct RecoveryOperator<Backend>
-where
-    Backend: RecoveryBackend,
-{
+pub struct RecoveryOperator<Backend> {
     recovery_backend: Backend,
 }
 
-impl<Backend: RecoveryBackend> RecoveryOperator<Backend>
+impl<Backend> RecoveryOperator<Backend>
 where
     Backend: RecoveryBackend,
 {

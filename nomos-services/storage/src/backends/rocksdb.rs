@@ -197,10 +197,10 @@ mod test {
             db.put(key, value)?;
             let result = db.get(key)?;
             db.delete(key)?;
-            Ok(result.map(|ivec| ivec.to_vec().into()))
+            Ok(result.map(std::convert::Into::into))
         });
         let result = db.execute(txn).await??;
-        assert_eq!(result, Some("bar".as_bytes().into()));
+        assert_eq!(result, Some(b"bar".as_ref().into()));
 
         Ok(())
     }

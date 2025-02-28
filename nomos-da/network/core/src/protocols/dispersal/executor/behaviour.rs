@@ -313,7 +313,7 @@ where
     /// Run when a stream gets free, if there is a pending task for the stream
     /// it will get scheduled to run otherwise it is parked as idle.
     fn handle_stream(
-        tasks: &mut FuturesUnordered<StreamHandlerFuture>,
+        tasks: &FuturesUnordered<StreamHandlerFuture>,
         to_disperse: &mut HashMap<PeerId, VecDeque<(SubnetworkId, DaBlob)>>,
         idle_streams: &mut HashMap<PeerId, DispersalStream>,
         stream: DispersalStream,
@@ -346,7 +346,7 @@ impl<Membership: MembershipHandler<Id = PeerId, NetworkId = SubnetworkId> + 'sta
     /// Schedule a new task for sending the blob, if stream is not available
     /// queue messages for later processing.
     fn disperse_blob(
-        tasks: &mut FuturesUnordered<StreamHandlerFuture>,
+        tasks: &FuturesUnordered<StreamHandlerFuture>,
         idle_streams: &mut HashMap<Membership::Id, DispersalStream>,
         membership: &Membership,
         connected_peers: &HashMap<PeerId, ConnectionId>,
@@ -426,7 +426,7 @@ impl<Membership: MembershipHandler<Id = PeerId, NetworkId = SubnetworkId> + 'sta
         }
         peers
     }
-    fn open_streams_for_disconnected_subnetworks_selected_peer(&mut self, peer_id: PeerId) {
+    fn open_streams_for_disconnected_subnetworks_selected_peer(&self, peer_id: PeerId) {
         let subnetworks = self.membership.membership(&peer_id);
         // open stream will result in dialing if we are not yet connected to the peer
         for peer in self.find_subnetworks_candidates_excluding_peer(peer_id, &subnetworks) {
@@ -453,7 +453,7 @@ impl<Membership: MembershipHandler<Id = PeerId, NetworkId = SubnetworkId> + 'sta
 
     fn try_ensure_stream_from_missing_subnetwork(
         local_peer_id: &PeerId,
-        pending_out_streams_sender: &mut UnboundedSender<PeerId>,
+        pending_out_streams_sender: &UnboundedSender<PeerId>,
         membership: &Membership,
         subnetwork_id: &SubnetworkId,
     ) {

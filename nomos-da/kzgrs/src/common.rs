@@ -80,11 +80,12 @@ pub fn bytes_to_evaluations<const CHUNK_SIZE: usize>(
 }
 
 /// Transform chunks of bytes (of size `CHUNK_SIZE`) into `Fr` which are
-/// considered evaluations of a polynomial. Then use FFT to transform that
-/// polynomial into coefficient form. `CHUNK_SIZE` needs to be 31 (bytes) or
-/// less, otherwise it cannot be encoded. The input data need to be padded, so
-/// it fits in a len modulus of `CHUNK_SIZE`. Returns the polynomial in
-/// evaluation form and in coefficient form
+/// considered evaluations of a polynomial.
+/// Then use FFT to transform that polynomial into coefficient form.
+/// `CHUNK_SIZE` needs to be 31 (bytes) or less, otherwise it cannot be encoded.
+/// The input data need to be padded, so it fits in a len modulus of
+/// `CHUNK_SIZE`. Returns the polynomial in evaluation form and in coefficient
+/// form
 pub fn bytes_to_polynomial<const CHUNK_SIZE: usize>(
     data: &[u8],
     domain: GeneralEvaluationDomain<Fr>,

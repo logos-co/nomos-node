@@ -582,10 +582,10 @@ pub mod test {
         ];
         let encoded_data = encoder.encode(&data).unwrap();
 
-        let blobs: Vec<_> = (&encoded_data).into_iter().collect();
+        let blobs = (&encoded_data).into_iter();
         assert_eq!(blobs.len(), 16);
 
-        let blobs: Vec<_> = encoded_data.into_iter().collect();
+        let blobs = encoded_data.into_iter();
         assert_eq!(blobs.len(), 16);
     }
 }

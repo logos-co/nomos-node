@@ -223,6 +223,7 @@ where
         }
     }
 
+    #[expect(clippy::cognitive_complexity)]
     fn handle_event(&mut self, event: SwarmEvent<BlendBehaviourEvent>) {
         match event {
             SwarmEvent::Behaviour(BlendBehaviourEvent::Blend(

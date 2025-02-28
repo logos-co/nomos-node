@@ -679,9 +679,9 @@ where
             }
             ConsensusMsg::GetHeaders { from, to, tx } => {
                 // default to tip block if not present
-                let from = from.unwrap_or(cryptarchia.tip());
+                let from = from.unwrap_or_else(|| cryptarchia.tip());
                 // default to genesis block if not present
-                let to = to.unwrap_or(cryptarchia.genesis());
+                let to = to.unwrap_or_else(|| cryptarchia.genesis());
 
                 let mut res = Vec::new();
                 let mut cur = from;

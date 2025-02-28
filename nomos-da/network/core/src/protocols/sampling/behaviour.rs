@@ -369,7 +369,7 @@ where
     /// Handle outgoing stream
     /// Schedule a new task if its available or drop the stream if not
     fn handle_outgoing_stream(
-        outgoing_tasks: &mut FuturesUnordered<OutgoingStreamHandlerFuture>,
+        outgoing_tasks: &FuturesUnordered<OutgoingStreamHandlerFuture>,
         to_sample: &mut HashMap<PeerId, VecDeque<(SubnetworkId, BlobId)>>,
         connected_peers: &mut HashSet<PeerId>,
         mut stream: SampleStream,
@@ -446,7 +446,7 @@ where
     /// Creates the necessary channels so requests can be replied from outside
     /// of this behaviour from whoever that takes the channels
     fn schedule_incoming_stream_task(
-        incoming_tasks: &mut FuturesUnordered<IncomingStreamHandlerFuture>,
+        incoming_tasks: &FuturesUnordered<IncomingStreamHandlerFuture>,
         sample_stream: SampleStream,
     ) -> (Receiver<BehaviourSampleReq>, Sender<BehaviourSampleRes>) {
         let (request_sender, request_receiver) = oneshot::channel();
@@ -468,8 +468,8 @@ impl<Membership: MembershipHandler<Id = PeerId, NetworkId = SubnetworkId> + 'sta
     #[allow(clippy::too_many_arguments)]
     fn sample(
         peer_id: PeerId,
-        outgoing_tasks: &mut FuturesUnordered<OutgoingStreamHandlerFuture>,
-        membership: &mut Membership,
+        outgoing_tasks: &FuturesUnordered<OutgoingStreamHandlerFuture>,
+        membership: &Membership,
         connected_peers: &mut HashSet<PeerId>,
         to_sample: &mut HashMap<PeerId, VecDeque<(Membership::NetworkId, BlobId)>>,
         subnetwork_id: SubnetworkId,

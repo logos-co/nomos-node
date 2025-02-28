@@ -98,8 +98,7 @@ impl DaVerifier {
             return false;
         }
         for (chunk, commitment, proof) in izip!(chunks, commitments, proofs) {
-            if !Self::verify_chunk(global_parameters, chunk, commitment, proof, index, domain)
-            {
+            if !Self::verify_chunk(global_parameters, chunk, commitment, proof, index, domain) {
                 return false;
             }
         }
@@ -178,10 +177,11 @@ mod test {
             global_parameters_from_randomness(&mut rng)
         });
 
-        let mut global_params = &GLOBAL_PARAMETERS;
-        if with_new_global_params {
-            global_params = &NEW_GLOBAL_PARAMETERS;
-        }
+        let global_params = if with_new_global_params {
+            &NEW_GLOBAL_PARAMETERS
+        } else {
+            &GLOBAL_PARAMETERS
+        };
 
         let column: Column = (0..10).map(|i| Chunk(vec![i; 32])).collect();
         let domain = GeneralEvaluationDomain::new(10).unwrap();

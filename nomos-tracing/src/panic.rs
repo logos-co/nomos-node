@@ -7,13 +7,10 @@ pub fn panic_hook(panic_info: &PanicHookInfo) {
     let payload = panic_info.payload();
 
     #[allow(clippy::manual_map)]
-    let payload = if let Some(s) = payload.downcast_ref::<&str>() {
-        Some(&**s)
-    } else if let Some(s) = payload.downcast_ref::<String>() {
-        Some(s.as_str())
-    } else {
-        None
-    };
+    let payload = payload.downcast_ref::<&str>().map_or_else(
+        || payload.downcast_ref::<String>().map(|s| s.as_str()),
+        |s| Some(&**s),
+    );
 
     let location = panic_info.location().map(|l| l.to_string());
     let backtrace = Backtrace::capture();

@@ -19,7 +19,7 @@ pub struct MockTransaction<M> {
 
 impl<M: Serialize> MockTransaction<M> {
     pub fn new(content: M) -> Self {
-        let id = MockTxId::from(serialize(&content).unwrap().as_slice());
+        let id = MockTxId::try_from(serialize(&content).unwrap().as_slice()).unwrap();
         Self { id, content }
     }
 
@@ -51,7 +51,7 @@ impl<M: Serialize> Transaction for MockTransaction<M> {
 
 impl<M: Serialize> From<M> for MockTransaction<M> {
     fn from(msg: M) -> Self {
-        let id = MockTxId::from(serialize(&msg).unwrap().as_slice());
+        let id = MockTxId::try_from(serialize(&msg).unwrap().as_slice()).unwrap();
         Self { id, content: msg }
     }
 }
@@ -87,13 +87,15 @@ impl MockTxId {
     }
 }
 
-impl From<&[u8]> for MockTxId {
-    fn from(msg: &[u8]) -> Self {
+impl TryFrom<&[u8]> for MockTxId {
+    type Error = ();
+
+    fn try_from(msg: &[u8]) -> Result<Self, Self::Error> {
         let mut hasher = Blake2bVar::new(32).unwrap();
         hasher.update(msg);
         let mut id = [0u8; 32];
         hasher.finalize_variable(&mut id).unwrap();
-        Self(id)
+        Ok(Self(id))
     }
 }
 

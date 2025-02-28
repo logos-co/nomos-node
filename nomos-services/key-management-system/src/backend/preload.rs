@@ -44,7 +44,7 @@ impl KMSBackend for PreloadKMSBackend {
         let key = self
             .keys
             .get(&key_id)
-            .ok_or(Error::KeyNotRegistered(key_id.clone()))?;
+            .ok_or_else(|| Error::KeyNotRegistered(key_id.clone()))?;
         if key.key_type() != key_type {
             return Err(Error::KeyTypeMismatch(key.key_type(), key_type).into());
         }

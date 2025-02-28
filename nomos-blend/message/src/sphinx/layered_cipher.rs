@@ -322,10 +322,8 @@ mod tests {
 
         let (encrypted, mac) = cipher.encrypt(&params).unwrap();
 
-        let next_encrypted = encrypted.clone();
-        let (data, next_mac, next_encrypted) = cipher
-            .unpack(&mac, &next_encrypted, &params[0].key)
-            .unwrap();
+        let (data, next_mac, next_encrypted) =
+            cipher.unpack(&mac, &encrypted, &params[0].key).unwrap();
         assert_eq!(data, params[0].data);
         assert_eq!(next_encrypted.len(), encrypted.len());
 

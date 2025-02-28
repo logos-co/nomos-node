@@ -234,11 +234,8 @@ where
             if self.policy.is_peer_unhealthy(&stats) {
                 return PeerStatus::Unhealthy;
             }
-
-            PeerStatus::Healthy
-        } else {
-            PeerStatus::Healthy
         }
+        PeerStatus::Healthy
     }
 }
 

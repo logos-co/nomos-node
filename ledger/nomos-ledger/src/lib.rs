@@ -95,7 +95,7 @@ where
 {
     pub fn from_genesis(id: Id, state: LedgerState, config: Config) -> Self {
         Self {
-            states: [(id, state)].into_iter().collect(),
+            states: std::iter::once((id, state)).collect(),
             config,
         }
     }

@@ -111,7 +111,7 @@ impl ReplicationHandler {
     }
 
     fn read_message(
-        &mut self,
+        &self,
         mut stream: Stream,
     ) -> impl Future<Output = Result<(DaMessage, Stream), Error>> {
         trace!("Reading messages");
