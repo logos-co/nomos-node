@@ -12,6 +12,7 @@ use tests::topology::configs::{
     consensus::{create_consensus_configs, ConsensusParams},
     da::{create_da_configs, DaParams},
     network::create_network_configs,
+    time::default_time_config,
     tracing::GeneralTracingConfig,
     GeneralConfig,
 };
@@ -125,6 +126,9 @@ pub fn create_node_configs(
         let tracing_config =
             update_tracing_identifier(tracing_settings.clone(), host.identifier.clone());
 
+        // Time config
+        let time_config = default_time_config();
+
         configured_hosts.insert(
             host.clone(),
             GeneralConfig {
@@ -134,6 +138,7 @@ pub fn create_node_configs(
                 blend_config,
                 api_config,
                 tracing_config,
+                time_config,
             },
         );
     }
@@ -228,7 +233,7 @@ fn update_tracing_identifier(
 
 #[cfg(test)]
 mod cfgsync_tests {
-    use std::{net::Ipv4Addr, str::FromStr, time::Duration};
+    use std::{net::Ipv4Addr, num::NonZero, str::FromStr, time::Duration};
 
     use nomos_libp2p::{Multiaddr, Protocol};
     use nomos_tracing_service::{
@@ -255,7 +260,7 @@ mod cfgsync_tests {
         let configs = create_node_configs(
             ConsensusParams {
                 n_participants: 10,
-                security_param: 10,
+                security_param: NonZero::new(10).unwrap(),
                 active_slot_coeff: 0.9,
             },
             DaParams {

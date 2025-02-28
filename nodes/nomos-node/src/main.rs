@@ -2,7 +2,9 @@ use clap::Parser;
 use color_eyre::eyre::{eyre, Result};
 use kzgrs_backend::dispersal::BlobInfo;
 use nomos_core::{da::blob::info::DispersedBlobInfo, tx::Transaction};
-use nomos_mempool::network::adapters::libp2p::Settings as AdapterSettings;
+use nomos_mempool::{
+    network::adapters::libp2p::Settings as AdapterSettings, tx::settings::TxMempoolSettings,
+};
 use nomos_node::{
     config::BlendArgs, Config, CryptarchiaArgs, HttpArgs, LogArgs, NetworkArgs, Nomos,
     NomosServiceSettings, Tx,
@@ -55,12 +57,13 @@ fn main() -> Result<()> {
             #[cfg(feature = "tracing")]
             tracing: config.tracing,
             http: config.http,
-            cl_mempool: nomos_mempool::TxMempoolSettings {
-                backend: (),
-                network: AdapterSettings {
+            cl_mempool: TxMempoolSettings {
+                pool: (),
+                network_adapter: AdapterSettings {
                     topic: String::from(nomos_node::CL_TOPIC),
                     id: <Tx as Transaction>::hash,
                 },
+                recovery_path: config.mempool.recovery_path,
             },
             da_mempool: nomos_mempool::DaMempoolSettings {
                 backend: (),
@@ -74,6 +77,7 @@ fn main() -> Result<()> {
             da_sampling: config.da_sampling,
             da_verifier: config.da_verifier,
             cryptarchia: config.cryptarchia,
+            time: config.time,
             storage: config.storage,
             system_sig: (),
         },

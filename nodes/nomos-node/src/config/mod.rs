@@ -18,6 +18,7 @@ use nomos_da_network_service::{
 use nomos_libp2p::{ed25519::SecretKey, Multiaddr};
 use nomos_network::{backends::libp2p::Libp2p as NetworkBackend, NetworkService};
 use nomos_storage::backends::rocksdb::RocksBackend;
+use nomos_time::TimeService;
 use nomos_tracing::logging::{gelf::GelfConfig, local::FileConfig};
 use nomos_tracing_service::{LoggerLayer, Tracing};
 use overwatch_rs::services::ServiceData;
@@ -25,7 +26,9 @@ use serde::{Deserialize, Serialize};
 use subnetworks_assignations::versions::v1::FillFromNodeList;
 use tracing::Level;
 
-use crate::{NomosApiService, NomosDaMembership, Wire};
+use crate::{config::mempool::MempoolConfig, NomosApiService, NomosDaMembership, Wire};
+
+pub mod mempool;
 
 #[derive(ValueEnum, Clone, Debug, Default)]
 pub enum LoggerLayerType {
@@ -98,12 +101,6 @@ pub struct HttpArgs {
 
 #[derive(Parser, Debug, Clone)]
 pub struct CryptarchiaArgs {
-    #[clap(long = "consensus-chain-start", env = "CONSENSUS_CHAIN_START")]
-    chain_start_time: Option<i64>,
-
-    #[clap(long = "consensus-slot-duration", env = "CONSENSUS_SLOT_DURATION")]
-    slot_duration: Option<u64>,
-
     #[clap(
         long = "consensus-note-sk",
         env = "CONSENSUS_NOTE_SK",
@@ -126,6 +123,15 @@ pub struct CryptarchiaArgs {
     note_nonce: Option<String>,
 }
 
+#[derive(Parser, Debug, Clone)]
+pub struct TimeArgs {
+    #[clap(long = "consensus-chain-start", env = "CONSENSUS_CHAIN_START")]
+    chain_start_time: Option<i64>,
+
+    #[clap(long = "consensus-slot-duration", env = "CONSENSUS_SLOT_DURATION")]
+    slot_duration: Option<u64>,
+}
+
 #[derive(Deserialize, Debug, Clone, Serialize)]
 pub struct Config {
     pub tracing: <Tracing as ServiceData>::Settings,
@@ -140,7 +146,11 @@ pub struct Config {
     pub cryptarchia: <crate::Cryptarchia<
         nomos_da_sampling::network::adapters::validator::Libp2pAdapter<NomosDaMembership>,
     > as ServiceData>::Settings,
+    pub time: nomos_time::TimeServiceSettings<
+        nomos_time::backends::system_time::SystemTimeBackendSettings,
+    >,
     pub storage: <crate::StorageService<RocksBackend<Wire>> as ServiceData>::Settings,
+    pub mempool: MempoolConfig,
 }
 
 impl Config {
@@ -288,20 +298,10 @@ pub fn update_cryptarchia_consensus(
     consensus_args: CryptarchiaArgs,
 ) -> Result<()> {
     let CryptarchiaArgs {
-        chain_start_time,
-        slot_duration,
         note_secret_key,
         note_value,
         note_nonce,
     } = consensus_args;
-
-    if let Some(start_time) = chain_start_time {
-        cryptarchia.time.chain_start_time = time::OffsetDateTime::from_unix_timestamp(start_time)?;
-    }
-
-    if let Some(duration) = slot_duration {
-        cryptarchia.time.slot_duration = std::time::Duration::from_secs(duration);
-    }
 
     if let (Some(value), Some(nonce)) = (note_value, note_nonce) {
         let nonce = Nonce::from_bytes(<[u8; 32]>::from_hex(nonce)?);
@@ -319,5 +319,24 @@ pub fn update_cryptarchia_consensus(
         cryptarchia.leader_config.nf_sk = NullifierSecret::from_bytes(sk);
     }
 
+    Ok(())
+}
+
+pub fn update_time(
+    time: &mut <TimeService<nomos_time::backends::system_time::SystemTimeBackend> as ServiceData>::Settings,
+    time_args: TimeArgs,
+) -> Result<()> {
+    let TimeArgs {
+        chain_start_time,
+        slot_duration,
+    } = time_args;
+    if let Some(start_time) = chain_start_time {
+        time.backend_settings.slot_config.chain_start_time =
+            time::OffsetDateTime::from_unix_timestamp(start_time)?;
+    }
+
+    if let Some(duration) = slot_duration {
+        time.backend_settings.slot_config.slot_duration = std::time::Duration::from_secs(duration);
+    }
     Ok(())
 }

@@ -22,7 +22,7 @@ use nomos_mempool::{
 use nomos_storage::backends::{rocksdb::RocksBackend, StorageSerde};
 use overwatch_rs::overwatch::handle::OverwatchHandle;
 use rand::{RngCore, SeedableRng};
-use serde::{de::DeserializeOwned, Serialize};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use tokio::sync::oneshot;
 
 use crate::http::DynError;
@@ -34,6 +34,7 @@ pub type Cryptarchia<
     SamplingNetworkAdapter,
     SamplingRng,
     SamplingStorage,
+    TimeBackend,
     const SIZE: usize,
 > = CryptarchiaConsensus<
     ConsensusNetworkAdapter<Tx, BlobInfo>,
@@ -49,6 +50,7 @@ pub type Cryptarchia<
     SamplingNetworkAdapter,
     SamplingRng,
     SamplingStorage,
+    TimeBackend,
 >;
 
 pub async fn cryptarchia_info<
@@ -58,6 +60,7 @@ pub async fn cryptarchia_info<
     SamplingNetworkAdapter,
     SamplingRng,
     SamplingStorage,
+    TimeBackend,
     const SIZE: usize,
 >(
     handle: &OverwatchHandle,
@@ -73,7 +76,8 @@ where
         + Send
         + Sync
         + 'static,
-    <Tx as Transaction>::Hash: std::cmp::Ord + Debug + Send + Sync + 'static,
+    <Tx as Transaction>::Hash:
+        std::cmp::Ord + Debug + Send + Sync + Serialize + for<'de> Deserialize<'de> + 'static,
     SS: StorageSerde + Send + Sync + 'static,
     SamplingRng: SeedableRng + RngCore,
     SamplingBackend: DaSamplingServiceBackend<SamplingRng, BlobId = BlobId> + Send,
@@ -82,6 +86,8 @@ where
     SamplingBackend::BlobId: Debug + 'static,
     SamplingNetworkAdapter: nomos_da_sampling::network::NetworkAdapter,
     SamplingStorage: nomos_da_sampling::storage::DaStorageAdapter,
+    TimeBackend: nomos_time::backends::TimeBackend,
+    TimeBackend::Settings: Clone + Send + Sync,
 {
     let relay = handle
         .relay::<Cryptarchia<
@@ -91,6 +97,7 @@ where
             SamplingNetworkAdapter,
             SamplingRng,
             SamplingStorage,
+            TimeBackend,
             SIZE,
         >>()
         .connect()
@@ -111,6 +118,7 @@ pub async fn cryptarchia_headers<
     SamplingNetworkAdapter,
     SamplingRng,
     SamplingStorage,
+    TimeBackend,
     const SIZE: usize,
 >(
     handle: &OverwatchHandle,
@@ -128,7 +136,8 @@ where
         + Send
         + Sync
         + 'static,
-    <Tx as Transaction>::Hash: std::cmp::Ord + Debug + Send + Sync + 'static,
+    <Tx as Transaction>::Hash:
+        std::cmp::Ord + Debug + Send + Sync + Serialize + for<'de> Deserialize<'de> + 'static,
     SS: StorageSerde + Send + Sync + 'static,
     SamplingRng: SeedableRng + RngCore,
     SamplingBackend: DaSamplingServiceBackend<SamplingRng, BlobId = BlobId> + Send,
@@ -137,6 +146,8 @@ where
     SamplingBackend::BlobId: Debug + 'static,
     SamplingNetworkAdapter: nomos_da_sampling::network::NetworkAdapter,
     SamplingStorage: nomos_da_sampling::storage::DaStorageAdapter,
+    TimeBackend: nomos_time::backends::TimeBackend,
+    TimeBackend::Settings: Clone + Send + Sync,
 {
     let relay = handle
         .relay::<Cryptarchia<
@@ -146,6 +157,7 @@ where
             SamplingNetworkAdapter,
             SamplingRng,
             SamplingStorage,
+            TimeBackend,
             SIZE,
         >>()
         .connect()

@@ -63,7 +63,8 @@ where
         + Send
         + Sync
         + 'static,
-    <T as nomos_core::tx::Transaction>::Hash: std::cmp::Ord + Debug + Send + Sync + 'static,
+    <T as nomos_core::tx::Transaction>::Hash:
+        std::cmp::Ord + Debug + Send + Sync + Serialize + for<'de> Deserialize<'de> + 'static,
 {
     make_request_and_return_response!(cl::cl_mempool_metrics::<T>(&handle))
 }
@@ -108,6 +109,7 @@ pub async fn cryptarchia_info<
     SamplingNetworkAdapter,
     SamplingRng,
     SamplingStorage,
+    TimeBackend,
     const SIZE: usize,
 >(
     State(handle): State<OverwatchHandle>,
@@ -123,7 +125,8 @@ where
         + Send
         + Sync
         + 'static,
-    <Tx as Transaction>::Hash: std::cmp::Ord + Debug + Send + Sync + 'static,
+    <Tx as Transaction>::Hash:
+        std::cmp::Ord + Debug + Send + Sync + Serialize + for<'de> Deserialize<'de> + 'static,
     SS: StorageSerde + Send + Sync + 'static,
     SamplingRng: SeedableRng + RngCore,
     SamplingBackend: DaSamplingServiceBackend<SamplingRng, BlobId = BlobId> + Send,
@@ -132,6 +135,8 @@ where
     SamplingBackend::BlobId: Debug + 'static,
     SamplingNetworkAdapter: nomos_da_sampling::network::NetworkAdapter,
     SamplingStorage: nomos_da_sampling::storage::DaStorageAdapter,
+    TimeBackend: nomos_time::backends::TimeBackend,
+    TimeBackend::Settings: Clone + Send + Sync,
 {
     make_request_and_return_response!(consensus::cryptarchia_info::<
         Tx,
@@ -140,6 +145,7 @@ where
         SamplingNetworkAdapter,
         SamplingRng,
         SamplingStorage,
+        TimeBackend,
         SIZE,
     >(&handle))
 }
@@ -159,6 +165,7 @@ pub async fn cryptarchia_headers<
     SamplingNetworkAdapter,
     SamplingRng,
     SamplingStorage,
+    TimeBackend,
     const SIZE: usize,
 >(
     State(store): State<OverwatchHandle>,
@@ -175,7 +182,8 @@ where
         + Send
         + Sync
         + 'static,
-    <Tx as Transaction>::Hash: std::cmp::Ord + Debug + Send + Sync + 'static,
+    <Tx as Transaction>::Hash:
+        std::cmp::Ord + Debug + Send + Sync + Serialize + for<'de> Deserialize<'de> + 'static,
     SS: StorageSerde + Send + Sync + 'static,
     SamplingRng: SeedableRng + RngCore,
     SamplingBackend: DaSamplingServiceBackend<SamplingRng, BlobId = BlobId> + Send,
@@ -184,6 +192,8 @@ where
     SamplingBackend::BlobId: Debug + 'static,
     SamplingNetworkAdapter: nomos_da_sampling::network::NetworkAdapter,
     SamplingStorage: nomos_da_sampling::storage::DaStorageAdapter,
+    TimeBackend: nomos_time::backends::TimeBackend,
+    TimeBackend::Settings: Clone + Send + Sync,
 {
     let CryptarchiaInfoQuery { from, to } = query;
     make_request_and_return_response!(consensus::cryptarchia_headers::<
@@ -193,6 +203,7 @@ where
         SamplingNetworkAdapter,
         SamplingRng,
         SamplingStorage,
+        TimeBackend,
         SIZE,
     >(&store, from, to))
 }
@@ -257,6 +268,7 @@ pub async fn get_range<
     SamplingNetworkAdapter,
     SamplingRng,
     SamplingStorage,
+    TimeBackend,
     const SIZE: usize,
 >(
     State(handle): State<OverwatchHandle>,
@@ -273,7 +285,8 @@ where
         + Send
         + Sync
         + 'static,
-    <Tx as Transaction>::Hash: std::cmp::Ord + Debug + Send + Sync + 'static,
+    <Tx as Transaction>::Hash:
+        std::cmp::Ord + Debug + Send + Sync + Serialize + for<'de> Deserialize<'de> + 'static,
     C: DispersedBlobInfo<BlobId = [u8; 32]>
         + Clone
         + Debug
@@ -308,6 +321,8 @@ where
     SamplingBackend::BlobId: Debug + 'static,
     SamplingNetworkAdapter: nomos_da_sampling::network::NetworkAdapter,
     SamplingStorage: nomos_da_sampling::storage::DaStorageAdapter,
+    TimeBackend: nomos_time::backends::TimeBackend,
+    TimeBackend::Settings: Clone + Send + Sync,
 {
     make_request_and_return_response!(da::get_range::<
         Tx,
@@ -318,6 +333,7 @@ where
         SamplingNetworkAdapter,
         SamplingRng,
         SamplingStorage,
+        TimeBackend,
         SIZE,
     >(&handle, app_id, range))
 }
@@ -338,7 +354,7 @@ pub async fn libp2p_info(State(handle): State<OverwatchHandle>) -> Response {
     get,
     path = paths::STORAGE_BLOCK,
     responses(
-        (status = 200, description = "Get the block by block id", body = Block<Tx, kzgrs_backend::dispersal::BlobInfo>),
+        (status = 200, description = "Get the block by block id", body = HeaderId),
         (status = 500, description = "Internal server error", body = String),
     )
 )]
@@ -354,6 +370,31 @@ where
 }
 
 #[utoipa::path(
+    get,
+    path = paths::DA_GET_SHARED_COMMITMENTS,
+    responses(
+        (status = 200, description = "Get blob shared commitments", body = <DaBlob as Blob>::BlobId),
+        (status = 500, description = "Internal server error", body = String),
+    )
+)]
+pub async fn da_get_commitments<StorageOp, DaBlob>(
+    State(handle): State<OverwatchHandle>,
+    Json(blob_id): Json<<DaBlob as Blob>::BlobId>,
+) -> Response
+where
+    DaBlob: Blob + Serialize + DeserializeOwned + Clone + Send + Sync + 'static,
+    <DaBlob as Blob>::BlobId:
+        AsRef<[u8]> + Serialize + DeserializeOwned + Clone + Send + Sync + 'static,
+    <DaBlob as Blob>::SharedCommitments:
+        serde::Serialize + DeserializeOwned + Send + Sync + 'static,
+    StorageOp: StorageSerde + Send + Sync + 'static,
+{
+    make_request_and_return_response!(storage::get_shared_commitments::<StorageOp, DaBlob>(
+        &handle, blob_id
+    ))
+}
+
+#[utoipa::path(
     post,
     path = paths::MEMPOOL_ADD_TX,
     responses(
@@ -364,7 +405,8 @@ where
 pub async fn add_tx<Tx>(State(handle): State<OverwatchHandle>, Json(tx): Json<Tx>) -> Response
 where
     Tx: Transaction + Clone + Debug + Hash + Serialize + DeserializeOwned + Send + Sync + 'static,
-    <Tx as Transaction>::Hash: std::cmp::Ord + Debug + Send + Sync + 'static,
+    <Tx as Transaction>::Hash:
+        std::cmp::Ord + Debug + Send + Sync + Serialize + for<'de> Deserialize<'de> + 'static,
 {
     make_request_and_return_response!(mempool::add_tx::<
         NetworkBackend,

@@ -3,10 +3,10 @@ use color_eyre::eyre::{eyre, Result};
 use nomos_executor::{
     config::Config as ExecutorConfig, NomosExecutor, NomosExecutorServiceSettings,
 };
+use nomos_mempool::tx::settings::TxMempoolSettings;
 use nomos_node::{
     config::BlendArgs, BlobInfo, CryptarchiaArgs, DaMempoolSettings, DispersedBlobInfo, HttpArgs,
-    LogArgs, MempoolAdapterSettings, NetworkArgs, Transaction, Tx, TxMempoolSettings, CL_TOPIC,
-    DA_TOPIC,
+    LogArgs, MempoolAdapterSettings, NetworkArgs, Transaction, Tx, CL_TOPIC, DA_TOPIC,
 };
 use overwatch_rs::overwatch::*;
 
@@ -57,11 +57,12 @@ fn main() -> Result<()> {
             tracing: config.tracing,
             http: config.http,
             cl_mempool: TxMempoolSettings {
-                backend: (),
-                network: MempoolAdapterSettings {
+                pool: (),
+                network_adapter: MempoolAdapterSettings {
                     topic: String::from(CL_TOPIC),
                     id: <Tx as Transaction>::hash,
                 },
+                recovery_path: config.mempool.recovery_path,
             },
             da_mempool: DaMempoolSettings {
                 backend: (),
@@ -76,6 +77,7 @@ fn main() -> Result<()> {
             da_sampling: config.da_sampling,
             da_verifier: config.da_verifier,
             cryptarchia: config.cryptarchia,
+            time: config.time,
             storage: config.storage,
             system_sig: (),
         },

@@ -42,7 +42,6 @@ pub use nomos_mempool::{
     network::adapters::libp2p::{
         Libp2pAdapter as MempoolNetworkAdapter, Settings as MempoolAdapterSettings,
     },
-    TxMempoolSettings,
 };
 pub use nomos_network::{backends::libp2p::Libp2p as NetworkBackend, NetworkService};
 pub use nomos_storage::{
@@ -53,6 +52,7 @@ pub use nomos_storage::{
     StorageService,
 };
 pub use nomos_system_sig::SystemSig;
+use nomos_time::{backends::system_time::SystemTimeBackend, TimeService};
 #[cfg(feature = "tracing")]
 pub use nomos_tracing_service::Tracing;
 use overwatch_derive::*;
@@ -79,6 +79,7 @@ pub type NomosApiService = ApiService<
         nomos_da_sampling::network::adapters::validator::Libp2pAdapter<NomosDaMembership>,
         ChaCha20Rng,
         SamplingStorageAdapter<DaBlob, Wire>,
+        nomos_time::backends::system_time::SystemTimeBackend,
         MB16,
     >,
 >;
@@ -106,6 +107,7 @@ pub type Cryptarchia<SamplingAdapter> = cryptarchia_consensus::CryptarchiaConsen
     SamplingAdapter,
     ChaCha20Rng,
     SamplingStorageAdapter<DaBlob, Wire>,
+    nomos_time::backends::system_time::SystemTimeBackend,
 >;
 
 pub type NodeCryptarchia =
@@ -148,6 +150,7 @@ pub type DaIndexer<SamplingAdapter> = DataIndexerService<
     SamplingAdapter,
     ChaCha20Rng,
     SamplingStorageAdapter<DaBlob, Wire>,
+    nomos_time::backends::system_time::SystemTimeBackend,
 >;
 
 pub type NodeDaIndexer =
@@ -167,6 +170,8 @@ pub type DaVerifier<VerifierAdapter> =
 
 pub type NodeDaVerifier = DaVerifier<VerifierNetworkAdapter<FillFromNodeList>>;
 
+pub type NomosTimeService = TimeService<SystemTimeBackend>;
+
 #[derive(Services)]
 pub struct Nomos {
     #[cfg(feature = "tracing")]
@@ -180,6 +185,7 @@ pub struct Nomos {
     cl_mempool: OpaqueServiceHandle<TxMempool>,
     da_mempool: OpaqueServiceHandle<DaMempool>,
     cryptarchia: OpaqueServiceHandle<NodeCryptarchia>,
+    time: OpaqueServiceHandle<NomosTimeService>,
     http: OpaqueServiceHandle<NomosApiService>,
     storage: OpaqueServiceHandle<StorageService<RocksBackend<Wire>>>,
     system_sig: OpaqueServiceHandle<SystemSig>,

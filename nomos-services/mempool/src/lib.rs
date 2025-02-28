@@ -10,7 +10,7 @@ use backend::Status;
 pub use da::service::{DaMempoolService, DaMempoolSettings};
 use overwatch_rs::services::relay::RelayMessage;
 use tokio::sync::oneshot::Sender;
-pub use tx::service::{TxMempoolService, TxMempoolSettings};
+pub use tx::{service::TxMempoolService, settings::TxMempoolSettings};
 
 pub enum MempoolMsg<BlockId, Payload, Item, Key> {
     Add {

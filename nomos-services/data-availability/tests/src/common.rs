@@ -3,7 +3,8 @@ use std::{
     time::Duration,
 };
 
-use cryptarchia_consensus::{LeaderConfig, TimeConfig};
+use cryptarchia_consensus::LeaderConfig;
+use cryptarchia_engine::time::SlotConfig;
 use kzgrs_backend::{
     common::blob::DaBlob,
     dispersal::BlobInfo,
@@ -63,7 +64,8 @@ use nomos_mempool::{
     network::adapters::libp2p::{
         Libp2pAdapter as MempoolNetworkAdapter, Settings as AdapterSettings,
     },
-    DaMempoolSettings, TxMempoolService, TxMempoolSettings,
+    tx::settings::TxMempoolSettings,
+    DaMempoolSettings, TxMempoolService,
 };
 use nomos_network::{
     backends::libp2p::{Libp2p as NetworkBackend, Libp2pConfig},
@@ -71,6 +73,10 @@ use nomos_network::{
 };
 use nomos_node::{Tx, Wire};
 use nomos_storage::{backends::rocksdb::RocksBackend, StorageService};
+use nomos_time::{
+    backends::system_time::{SystemTimeBackend, SystemTimeBackendSettings},
+    TimeService, TimeServiceSettings,
+};
 use once_cell::sync::Lazy;
 use overwatch_derive::*;
 use overwatch_rs::{
@@ -117,6 +123,7 @@ pub type Cryptarchia = cryptarchia_consensus::CryptarchiaConsensus<
     SamplingLibp2pAdapter<NomosDaMembership>,
     IntegrationRng,
     SamplingStorageAdapter<DaBlob, Wire>,
+    SystemTimeBackend,
 >;
 
 pub type DaSampling = DaSamplingService<
@@ -149,6 +156,7 @@ pub type DaIndexer = DataIndexerService<
     SamplingLibp2pAdapter<NomosDaMembership>,
     IntegrationRng,
     SamplingStorageAdapter<DaBlob, Wire>,
+    SystemTimeBackend,
 >;
 
 pub type TxMempool = TxMempoolService<
@@ -175,7 +183,7 @@ pub const MB16: usize = 1024 * 1024 * 16;
 
 #[derive(Services)]
 pub struct TestNode {
-    //logging: OpaqueServiceHandle<Logger>,
+    // logging: OpaqueServiceHandle<Logger>,
     network: OpaqueServiceHandle<NetworkService<NetworkBackend>>,
     blend: OpaqueServiceHandle<
         BlendService<BlendBackend, nomos_blend_service::network::libp2p::Libp2pAdapter>,
@@ -188,6 +196,7 @@ pub struct TestNode {
     indexer: OpaqueServiceHandle<DaIndexer>,
     verifier: OpaqueServiceHandle<DaVerifier>,
     da_sampling: OpaqueServiceHandle<DaSampling>,
+    time: OpaqueServiceHandle<TimeService<SystemTimeBackend>>,
 }
 
 pub struct TestDaNetworkSettings {
@@ -215,7 +224,7 @@ pub fn new_node(
     leader_config: &LeaderConfig,
     ledger_config: &nomos_ledger::Config,
     genesis_state: &LedgerState,
-    time_config: &TimeConfig,
+    slot_config: &SlotConfig,
     swarm_config: &SwarmConfig,
     blend_config: &TestBlendSettings,
     db_path: PathBuf,
@@ -226,7 +235,7 @@ pub fn new_node(
 ) -> Overwatch {
     OverwatchRunner::<TestNode>::run(
         TestNodeServiceSettings {
-            //logging: Default::default(),
+            // logging: Default::default(),
             network: NetworkConfig {
                 backend: Libp2pConfig {
                     inner: swarm_config.clone(),
@@ -272,11 +281,12 @@ pub fn new_node(
                 },
             },
             cl_mempool: TxMempoolSettings {
-                backend: (),
-                network: AdapterSettings {
+                pool: (),
+                network_adapter: AdapterSettings {
                     topic: String::from(nomos_node::CL_TOPIC),
                     id: <Tx as Transaction>::hash,
                 },
+                recovery_path: "./recovery/txmempool.json".into(),
             },
             da_mempool: DaMempoolSettings {
                 backend: (),
@@ -298,9 +308,8 @@ pub fn new_node(
             cryptarchia: cryptarchia_consensus::CryptarchiaSettings {
                 transaction_selector_settings: (),
                 blob_selector_settings: (),
-                config: ledger_config.clone(),
+                config: *ledger_config,
                 genesis_state: genesis_state.clone(),
-                time: time_config.clone(),
                 leader_config: leader_config.clone(),
                 network_adapter_settings:
                     cryptarchia_consensus::network::adapters::libp2p::LibP2pAdapterSettings {
@@ -334,6 +343,13 @@ pub fn new_node(
                 network_adapter_settings: (),
                 storage_adapter_settings: SamplingStorageSettings {
                     blob_storage_directory: blobs_dir.to_path_buf(),
+                },
+            },
+            time: TimeServiceSettings {
+                backend_settings: SystemTimeBackendSettings {
+                    slot_config: *slot_config,
+                    epoch_config: ledger_config.epoch_config,
+                    base_period_length: ledger_config.consensus_config.base_period_length(),
                 },
             },
         },

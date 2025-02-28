@@ -30,6 +30,7 @@ nomos-da-indexer         = { workspace = true }
 nomos-da-network-core    = { workspace = true }
 nomos-da-network-service = { workspace = true }
 nomos-da-sampling        = { workspace = true }
+nomos-da-storage         = { workspace = true }
 nomos-da-verifier        = { workspace = true }
 nomos-executor           = { workspace = true, default-features = false, features = ["tracing"] }
 nomos-ledger             = { workspace = true, features = ["serde"] }
@@ -38,6 +39,7 @@ nomos-mempool            = { workspace = true, features = ["libp2p", "mock"] }
 nomos-network            = { workspace = true, features = ["libp2p"] }
 nomos-node               = { workspace = true, default-features = false }
 nomos-storage            = { workspace = true }
+nomos-time               = { workspace = true }
 nomos-tracing            = { workspace = true }
 nomos-tracing-service    = { workspace = true }
 ntest                    = "0.9.0"
@@ -63,3 +65,8 @@ path = "src/tests/cryptarchia/happy.rs"
 [[test]]
 name = "test_da"
 path = "src/tests/da.rs"
+
+[[test]]
+name = "test_api_storage"
+path = "src/tests/api/storage.rs"
+

@@ -8,13 +8,15 @@ use nomos_core::{
 };
 use nomos_da_sampling::{backend::DaSamplingServiceBackend, DaSamplingService};
 use nomos_mempool::{
-    backend::MemPool, network::NetworkAdapter as MempoolAdapter, DaMempoolService, TxMempoolService,
+    backend::{MemPool, RecoverableMempool},
+    network::NetworkAdapter as MempoolAdapter,
+    DaMempoolService, TxMempoolService,
 };
 use nomos_network::{NetworkMsg, NetworkService};
 use nomos_storage::{backends::StorageBackend, StorageMsg, StorageService};
 use overwatch_rs::services::relay::{OutboundRelay, Relay};
 use rand::{RngCore, SeedableRng};
-use serde::de::DeserializeOwned;
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use crate::{
     blend, network,
@@ -101,15 +103,18 @@ impl<
 where
     BlendAdapter: blend::BlendAdapter<Network: BlendNetworkAdapter>,
     BS: BlobSelect<BlobId = DaPool::Item> + Clone,
-    ClPool: MemPool<BlockId = HeaderId>,
+    ClPool: RecoverableMempool<BlockId = HeaderId>,
+    ClPool::RecoveryState: Serialize + for<'de> Deserialize<'de>,
     ClPool::BlockId: Debug,
-    ClPool::Item: Debug + DeserializeOwned + Eq + Hash + Clone + Send + Sync,
-    ClPool::Key: Debug,
+    ClPool::Item: Debug + DeserializeOwned + Eq + Hash + Clone + Send + Sync + 'static,
+    ClPool::Key: Debug + 'static,
+    ClPool::Settings: Clone,
     ClPoolAdapter: MempoolAdapter<Payload = ClPool::Item, Key = ClPool::Key>,
     DaPool: MemPool<BlockId = HeaderId>,
     DaPool::BlockId: Debug,
     DaPool::Item: Debug + DeserializeOwned + Eq + Hash + Clone + Send + Sync,
     DaPool::Key: Debug,
+    DaPool::Settings: Clone,
     DaPoolAdapter: MempoolAdapter<Key = DaPool::Key>,
     DaPoolAdapter::Payload: DispersedBlobInfo + Into<DaPool::Item> + Debug,
     NetworkAdapter: network::NetworkAdapter,

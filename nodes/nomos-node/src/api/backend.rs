@@ -30,7 +30,7 @@ use utoipa_swagger_ui::SwaggerUi;
 
 use super::handlers::{
     add_blob, add_blob_info, add_tx, block, cl_metrics, cl_status, cryptarchia_headers,
-    cryptarchia_info, get_range, libp2p_info,
+    cryptarchia_info, da_get_commitments, get_range, libp2p_info,
 };
 use crate::api::paths;
 
@@ -56,6 +56,7 @@ pub struct AxumBackend<
     SamplingNetworkAdapter,
     SamplingRng,
     SamplingStorage,
+    TimeBackend,
     const SIZE: usize,
 > {
     settings: AxumBackendSettings,
@@ -71,6 +72,7 @@ pub struct AxumBackend<
     _sampling_network_adapter: core::marker::PhantomData<SamplingNetworkAdapter>,
     _sampling_rng: core::marker::PhantomData<SamplingRng>,
     _sampling_storage: core::marker::PhantomData<SamplingStorage>,
+    _time_backend: core::marker::PhantomData<TimeBackend>,
 }
 
 #[derive(OpenApi)]
@@ -100,6 +102,7 @@ impl<
         SamplingNetworkAdapter,
         SamplingRng,
         SamplingStorage,
+        TimeBackend,
         const SIZE: usize,
     > Backend
     for AxumBackend<
@@ -115,12 +118,14 @@ impl<
         SamplingNetworkAdapter,
         SamplingRng,
         SamplingStorage,
+        TimeBackend,
         SIZE,
     >
 where
     DaAttestation: Serialize + DeserializeOwned + Clone + Send + Sync + 'static,
     DaBlob: Blob + Serialize + DeserializeOwned + Clone + Send + Sync + 'static,
-    <DaBlob as Blob>::BlobId: AsRef<[u8]> + Send + Sync + 'static,
+    <DaBlob as Blob>::BlobId:
+        AsRef<[u8]> + Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
     <DaBlob as Blob>::ColumnIndex: AsRef<[u8]> + Send + Sync + 'static,
     DaBlob::LightBlob: Serialize + DeserializeOwned + Clone + Send + Sync + 'static,
     DaBlob::SharedCommitments: Serialize + DeserializeOwned + Clone + Send + Sync + 'static,
@@ -183,6 +188,8 @@ where
     SamplingBackend::BlobId: Debug + 'static,
     SamplingNetworkAdapter: nomos_da_sampling::network::NetworkAdapter + Send + 'static,
     SamplingStorage: nomos_da_sampling::storage::DaStorageAdapter + Send + 'static,
+    TimeBackend: nomos_time::backends::TimeBackend + Send + 'static,
+    TimeBackend::Settings: Clone + Send + Sync,
 {
     type Error = hyper::Error;
     type Settings = AxumBackendSettings;
@@ -205,6 +212,7 @@ where
             _sampling_network_adapter: core::marker::PhantomData,
             _sampling_rng: core::marker::PhantomData,
             _sampling_storage: core::marker::PhantomData,
+            _time_backend: core::marker::PhantomData,
         })
     }
 
@@ -243,6 +251,7 @@ where
                         SamplingNetworkAdapter,
                         SamplingRng,
                         SamplingStorage,
+                        TimeBackend,
                         SIZE,
                     >,
                 ),
@@ -257,6 +266,7 @@ where
                         SamplingNetworkAdapter,
                         SamplingRng,
                         SamplingStorage,
+                        TimeBackend,
                         SIZE,
                     >,
                 ),
@@ -285,6 +295,7 @@ where
                         SamplingNetworkAdapter,
                         SamplingRng,
                         SamplingStorage,
+                        TimeBackend,
                         SIZE,
                     >,
                 ),
@@ -306,6 +317,10 @@ where
                         SamplingStorage,
                     >,
                 ),
+            )
+            .route(
+                paths::DA_GET_SHARED_COMMITMENTS,
+                routing::get(da_get_commitments::<DaStorageSerializer, DaBlob>),
             )
             .with_state(handle);
 

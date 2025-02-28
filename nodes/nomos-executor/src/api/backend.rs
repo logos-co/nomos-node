@@ -19,7 +19,7 @@ use nomos_libp2p::PeerId;
 use nomos_mempool::{tx::service::openapi::Status, MempoolMetrics};
 use nomos_node::api::handlers::{
     add_blob, add_blob_info, add_tx, block, cl_metrics, cl_status, cryptarchia_headers,
-    cryptarchia_info, get_range, libp2p_info,
+    cryptarchia_info, da_get_commitments, get_range, libp2p_info,
 };
 use nomos_storage::backends::StorageSerde;
 use overwatch_rs::overwatch::handle::OverwatchHandle;
@@ -62,6 +62,7 @@ pub struct AxumBackend<
     SamplingNetworkAdapter,
     SamplingRng,
     SamplingStorage,
+    TimeBackend,
     const SIZE: usize,
 > {
     settings: AxumBackendSettings,
@@ -83,6 +84,7 @@ pub struct AxumBackend<
         SamplingNetworkAdapter,
         SamplingRng,
         SamplingStorage,
+        TimeBackend,
     )>,
 }
 
@@ -117,6 +119,7 @@ impl<
         SamplingNetworkAdapter,
         SamplingRng,
         SamplingStorage,
+        TimeBackend,
         const SIZE: usize,
     > Backend
     for AxumBackend<
@@ -136,12 +139,14 @@ impl<
         SamplingNetworkAdapter,
         SamplingRng,
         SamplingStorage,
+        TimeBackend,
         SIZE,
     >
 where
     DaAttestation: Serialize + DeserializeOwned + Clone + Send + Sync + 'static,
     DaBlob: Blob + Serialize + DeserializeOwned + Clone + Send + Sync + 'static,
-    <DaBlob as Blob>::BlobId: AsRef<[u8]> + Send + Sync + 'static,
+    <DaBlob as Blob>::BlobId:
+        AsRef<[u8]> + Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
     <DaBlob as Blob>::ColumnIndex: AsRef<[u8]> + Send + Sync + 'static,
     <DaBlob as Blob>::LightBlob: Serialize + DeserializeOwned + Clone + Send + Sync + 'static,
     <DaBlob as Blob>::SharedCommitments:
@@ -219,6 +224,8 @@ where
     SamplingBackend::BlobId: Debug + 'static,
     SamplingNetworkAdapter: nomos_da_sampling::network::NetworkAdapter + Send + 'static,
     SamplingStorage: nomos_da_sampling::storage::DaStorageAdapter + Send + 'static,
+    TimeBackend: nomos_time::backends::TimeBackend + Send + 'static,
+    TimeBackend::Settings: Clone + Send + Sync,
 {
     type Error = hyper::Error;
     type Settings = AxumBackendSettings;
@@ -268,6 +275,7 @@ where
                         SamplingNetworkAdapter,
                         SamplingRng,
                         SamplingStorage,
+                        TimeBackend,
                         SIZE,
                     >,
                 ),
@@ -282,6 +290,7 @@ where
                         SamplingNetworkAdapter,
                         SamplingRng,
                         SamplingStorage,
+                        TimeBackend,
                         SIZE,
                     >,
                 ),
@@ -310,6 +319,7 @@ where
                         SamplingNetworkAdapter,
                         SamplingRng,
                         SamplingStorage,
+                        TimeBackend,
                         SIZE,
                     >,
                 ),
@@ -343,6 +353,10 @@ where
                         Metadata,
                     >,
                 ),
+            )
+            .route(
+                paths::DA_GET_SHARED_COMMITMENTS,
+                routing::get(da_get_commitments::<DaStorageSerializer, DaBlob>),
             )
             .with_state(handle);
 
