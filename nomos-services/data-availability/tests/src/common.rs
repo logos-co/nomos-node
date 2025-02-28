@@ -3,7 +3,8 @@ use std::{
     time::Duration,
 };
 
-use cryptarchia_consensus::{LeaderConfig, TimeConfig};
+use cryptarchia_consensus::LeaderConfig;
+use cryptarchia_engine::time::SlotConfig;
 use kzgrs_backend::{
     common::blob::DaBlob,
     dispersal::BlobInfo,
@@ -72,6 +73,10 @@ use nomos_network::{
 };
 use nomos_node::{Tx, Wire};
 use nomos_storage::{backends::rocksdb::RocksBackend, StorageService};
+use nomos_time::{
+    backends::system_time::{SystemTimeBackend, SystemTimeBackendSettings},
+    TimeService, TimeServiceSettings,
+};
 use once_cell::sync::Lazy;
 use overwatch_derive::*;
 use overwatch_rs::{
@@ -118,6 +123,7 @@ pub(crate) type Cryptarchia = cryptarchia_consensus::CryptarchiaConsensus<
     SamplingLibp2pAdapter<NomosDaMembership>,
     IntegrationRng,
     SamplingStorageAdapter<DaBlob, Wire>,
+    SystemTimeBackend,
 >;
 
 pub type DaSampling = DaSamplingService<
@@ -150,6 +156,7 @@ pub(crate) type DaIndexer = DataIndexerService<
     SamplingLibp2pAdapter<NomosDaMembership>,
     IntegrationRng,
     SamplingStorageAdapter<DaBlob, Wire>,
+    SystemTimeBackend,
 >;
 
 pub(crate) type TxMempool = TxMempoolService<
@@ -176,7 +183,7 @@ pub(crate) const MB16: usize = 1024 * 1024 * 16;
 
 #[derive(Services)]
 pub struct TestNode {
-    //logging: OpaqueServiceHandle<Logger>,
+    // logging: OpaqueServiceHandle<Logger>,
     network: OpaqueServiceHandle<NetworkService<NetworkBackend>>,
     blend: OpaqueServiceHandle<
         BlendService<BlendBackend, nomos_blend_service::network::libp2p::Libp2pAdapter>,
@@ -189,6 +196,7 @@ pub struct TestNode {
     indexer: OpaqueServiceHandle<DaIndexer>,
     verifier: OpaqueServiceHandle<DaVerifier>,
     da_sampling: OpaqueServiceHandle<DaSampling>,
+    time: OpaqueServiceHandle<TimeService<SystemTimeBackend>>,
 }
 
 pub struct TestDaNetworkSettings {
@@ -216,7 +224,7 @@ pub fn new_node(
     leader_config: &LeaderConfig,
     ledger_config: &nomos_ledger::Config,
     genesis_state: &LedgerState,
-    time_config: &TimeConfig,
+    slot_config: &SlotConfig,
     swarm_config: &SwarmConfig,
     blend_config: &TestBlendSettings,
     db_path: PathBuf,
@@ -227,7 +235,7 @@ pub fn new_node(
 ) -> Overwatch {
     OverwatchRunner::<TestNode>::run(
         TestNodeServiceSettings {
-            //logging: Default::default(),
+            // logging: Default::default(),
             network: NetworkConfig {
                 backend: Libp2pConfig {
                     inner: swarm_config.clone(),
@@ -300,9 +308,8 @@ pub fn new_node(
             cryptarchia: cryptarchia_consensus::CryptarchiaSettings {
                 transaction_selector_settings: (),
                 blob_selector_settings: (),
-                config: ledger_config.clone(),
+                config: *ledger_config,
                 genesis_state: genesis_state.clone(),
-                time: time_config.clone(),
                 leader_config: leader_config.clone(),
                 network_adapter_settings:
                     cryptarchia_consensus::network::adapters::libp2p::LibP2pAdapterSettings {
@@ -336,6 +343,13 @@ pub fn new_node(
                 network_adapter_settings: (),
                 storage_adapter_settings: SamplingStorageSettings {
                     blob_storage_directory: blobs_dir.to_path_buf(),
+                },
+            },
+            time: TimeServiceSettings {
+                backend_settings: SystemTimeBackendSettings {
+                    slot_config: *slot_config,
+                    epoch_config: ledger_config.epoch_config,
+                    base_period_length: ledger_config.consensus_config.base_period_length(),
                 },
             },
         },

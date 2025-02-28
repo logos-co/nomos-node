@@ -77,6 +77,7 @@ fn main() -> Result<()> {
             da_sampling: config.da_sampling,
             da_verifier: config.da_verifier,
             cryptarchia: config.cryptarchia,
+            time: config.time,
             storage: config.storage,
             system_sig: (),
         },

@@ -4,7 +4,6 @@ mod messages;
 pub mod network;
 mod relays;
 pub mod storage;
-mod time;
 
 use core::fmt::Debug;
 use std::{collections::BTreeSet, hash::Hash, marker::PhantomData, path::PathBuf};
@@ -31,6 +30,7 @@ use nomos_mempool::{
 };
 use nomos_network::NetworkService;
 use nomos_storage::{backends::StorageBackend, StorageMsg, StorageService};
+use nomos_time::{SlotTick, TimeService, TimeServiceMessage};
 use overwatch_rs::{
     services::{
         relay::{OutboundRelay, Relay, RelayMessage},
@@ -46,9 +46,7 @@ use services_utils::overwatch::{
     lifecycle, recovery::backends::FileBackendSettings, JsonFileBackend, RecoveryOperator,
 };
 use thiserror::Error;
-pub use time::Config as TimeConfig;
 use tokio::sync::{broadcast, oneshot, oneshot::Sender};
-use tokio_stream::wrappers::IntervalStream;
 use tracing::{error, instrument, span, Level};
 use tracing_futures::Instrument;
 
@@ -132,7 +130,6 @@ pub struct CryptarchiaSettings<Ts, Bs, NetworkAdapterSettings, BlendAdapterSetti
     pub blob_selector_settings: Bs,
     pub config: nomos_ledger::Config,
     pub genesis_state: LedgerState,
-    pub time: TimeConfig,
     pub leader_config: LeaderConfig,
     pub network_adapter_settings: NetworkAdapterSettings,
     pub blend_adapter_settings: BlendAdapterSettings,
@@ -161,6 +158,7 @@ pub struct CryptarchiaConsensus<
     SamplingNetworkAdapter,
     SamplingRng,
     SamplingStorage,
+    TimeBackend,
 > where
     NetAdapter: NetworkAdapter,
     NetAdapter::Backend: 'static,
@@ -191,6 +189,8 @@ pub struct CryptarchiaConsensus<
     SamplingNetworkAdapter: nomos_da_sampling::network::NetworkAdapter,
     SamplingRng: SeedableRng + RngCore,
     SamplingStorage: nomos_da_sampling::storage::DaStorageAdapter,
+    TimeBackend: nomos_time::backends::TimeBackend,
+    TimeBackend::Settings: Clone + Send + Sync,
 {
     service_state: OpaqueServiceStateHandle<Self>,
     // underlying networking backend. We need this so we can relay and check the types properly
@@ -214,6 +214,7 @@ pub struct CryptarchiaConsensus<
     >,
     block_subscription_sender: broadcast::Sender<Block<ClPool::Item, DaPool::Item>>,
     storage_relay: Relay<StorageService<Storage>>,
+    time_relay: Relay<TimeService<TimeBackend>>,
 }
 
 impl<
@@ -230,6 +231,7 @@ impl<
         SamplingNetworkAdapter,
         SamplingRng,
         SamplingStorage,
+        TimeBackend,
     > ServiceData
     for CryptarchiaConsensus<
         NetAdapter,
@@ -245,6 +247,7 @@ impl<
         SamplingNetworkAdapter,
         SamplingRng,
         SamplingStorage,
+        TimeBackend,
     >
 where
     NetAdapter: NetworkAdapter,
@@ -275,6 +278,8 @@ where
     SamplingNetworkAdapter: nomos_da_sampling::network::NetworkAdapter,
     SamplingRng: SeedableRng + RngCore,
     SamplingStorage: nomos_da_sampling::storage::DaStorageAdapter,
+    TimeBackend: nomos_time::backends::TimeBackend,
+    TimeBackend::Settings: Clone + Send + Sync,
 {
     const SERVICE_ID: ServiceId = CRYPTARCHIA_ID;
     type Settings = CryptarchiaSettings<
@@ -288,6 +293,7 @@ where
         BS::Settings,
         NetAdapter::Settings,
         BlendAdapter::Settings,
+        TimeBackend::Settings,
     >;
     type StateOperator = RecoveryOperator<JsonFileBackend<Self::State, Self::Settings>>;
     type Message = ConsensusMsg<Block<ClPool::Item, DaPool::Item>>;
@@ -308,6 +314,7 @@ impl<
         SamplingNetworkAdapter,
         SamplingRng,
         SamplingStorage,
+        TimeBackend,
     > ServiceCore
     for CryptarchiaConsensus<
         A,
@@ -323,6 +330,7 @@ impl<
         SamplingNetworkAdapter,
         SamplingRng,
         SamplingStorage,
+        TimeBackend,
     >
 where
     A: NetworkAdapter<Tx = ClPool::Item, BlobCertificate = DaPool::Item>
@@ -382,6 +390,8 @@ where
 
     SamplingNetworkAdapter: nomos_da_sampling::network::NetworkAdapter,
     SamplingStorage: nomos_da_sampling::storage::DaStorageAdapter,
+    TimeBackend: nomos_time::backends::TimeBackend,
+    TimeBackend::Settings: Clone + Send + Sync,
 {
     fn init(
         service_state: OpaqueServiceStateHandle<Self>,
@@ -393,6 +403,7 @@ where
         let da_mempool_relay = service_state.overwatch_handle.relay();
         let storage_relay = service_state.overwatch_handle.relay();
         let sampling_relay = service_state.overwatch_handle.relay();
+        let time_relay = service_state.overwatch_handle.relay();
         let (block_subscription_sender, _) = broadcast::channel(16);
 
         Ok(Self {
@@ -404,6 +415,7 @@ where
             block_subscription_sender,
             storage_relay,
             sampling_relay,
+            time_relay,
         })
     }
 
@@ -430,12 +442,17 @@ where
         )
         .await;
 
+        let time_relay: OutboundRelay<_> = self
+            .time_relay
+            .connect()
+            .await
+            .expect("Relay conneciton with TimeService should succeed.");
+
         let CryptarchiaSettings {
             config,
             genesis_state,
             transaction_selector_settings,
             blob_selector_settings,
-            time,
             leader_config,
             network_adapter_settings,
             blend_adapter_settings,
@@ -446,13 +463,9 @@ where
         let mut cryptarchia = Cryptarchia {
             consensus: <cryptarchia_engine::Cryptarchia<_>>::from_genesis(
                 genesis_id,
-                config.consensus_config.clone(),
+                config.consensus_config,
             ),
-            ledger: <nomos_ledger::Ledger<_>>::from_genesis(
-                genesis_id,
-                genesis_state,
-                config.clone(),
-            ),
+            ledger: <nomos_ledger::Ledger<_>>::from_genesis(genesis_id, genesis_state, config),
         };
 
         let network_adapter =
@@ -462,9 +475,15 @@ where
 
         let mut incoming_blocks = network_adapter.blocks_stream().await?;
         let mut leader = leadership::Leader::new(genesis_id, leader_config, config);
-        let timer = time::Timer::new(time);
 
-        let mut slot_timer = IntervalStream::new(timer.slot_interval());
+        let mut slot_timer = {
+            let (sender, receiver) = oneshot::channel();
+            time_relay
+                .send(TimeServiceMessage::Subscribe { sender })
+                .await
+                .expect("Request time subscription to time service should succeed");
+            receiver.await?
+        };
 
         let blend_adapter =
             BlendAdapter::new(blend_adapter_settings, relays.blend_relay().clone()).await;
@@ -495,8 +514,7 @@ where
                         tracing::info!(counter.consensus_processed_blocks = 1);
                     }
 
-                    _ = slot_timer.next() => {
-                        let slot = timer.current_slot();
+                    Some(SlotTick { slot, .. }) = slot_timer.next() => {
                         let parent = cryptarchia.tip();
                         let note_tree = cryptarchia.tip_state().lead_commitments();
                         tracing::debug!("ticking for slot {}", u64::from(slot));
@@ -542,17 +560,30 @@ where
 }
 
 #[derive(Clone, Serialize, Deserialize)]
-pub struct CryptarchiaConsensusState<TxS, BxS, NetworkAdapterSettings, BlendAdapterSettings> {
+pub struct CryptarchiaConsensusState<
+    TxS,
+    BxS,
+    NetworkAdapterSettings,
+    BlendAdapterSettings,
+    TimeBackendSettings,
+> {
     tip: Option<HeaderId>,
     security_block: Option<HeaderId>,
     _txs: PhantomData<TxS>,
     _bxs: PhantomData<BxS>,
     _network_adapter_settings: PhantomData<NetworkAdapterSettings>,
     _blend_adapter_settings: PhantomData<BlendAdapterSettings>,
+    _time_backend_settings: PhantomData<TimeBackendSettings>,
 }
 
-impl<TxS, BxS, NetworkAdapterSettings, BlendAdapterSettings>
-    CryptarchiaConsensusState<TxS, BxS, NetworkAdapterSettings, BlendAdapterSettings>
+impl<TxS, BxS, NetworkAdapterSettings, BlendAdapterSettings, TimeBackendSettings>
+    CryptarchiaConsensusState<
+        TxS,
+        BxS,
+        NetworkAdapterSettings,
+        BlendAdapterSettings,
+        TimeBackendSettings,
+    >
 {
     pub fn new(tip: Option<HeaderId>, security_block: Option<HeaderId>) -> Self {
         Self {
@@ -562,12 +593,19 @@ impl<TxS, BxS, NetworkAdapterSettings, BlendAdapterSettings>
             _bxs: Default::default(),
             _network_adapter_settings: Default::default(),
             _blend_adapter_settings: Default::default(),
+            _time_backend_settings: Default::default(),
         }
     }
 }
 
-impl<TxS, BxS, NetworkAdapterSettings, BlendAdapterSettings> ServiceState
-    for CryptarchiaConsensusState<TxS, BxS, NetworkAdapterSettings, BlendAdapterSettings>
+impl<TxS, BxS, NetworkAdapterSettings, BlendAdapterSettings, TimeBackendSettings> ServiceState
+    for CryptarchiaConsensusState<
+        TxS,
+        BxS,
+        NetworkAdapterSettings,
+        BlendAdapterSettings,
+        TimeBackendSettings,
+    >
 {
     type Settings = CryptarchiaSettings<TxS, BxS, NetworkAdapterSettings, BlendAdapterSettings>;
     type Error = Error;
@@ -591,6 +629,7 @@ impl<
         SamplingNetworkAdapter,
         SamplingRng,
         SamplingStorage,
+        TimeBackend,
     >
     CryptarchiaConsensus<
         A,
@@ -606,6 +645,7 @@ impl<
         SamplingNetworkAdapter,
         SamplingRng,
         SamplingStorage,
+        TimeBackend,
     >
 where
     A: NetworkAdapter + Clone + Send + Sync + 'static,
@@ -655,6 +695,8 @@ where
     SamplingBackend::BlobId: Debug + Ord + Send + Sync + 'static,
     SamplingNetworkAdapter: nomos_da_sampling::network::NetworkAdapter,
     SamplingStorage: nomos_da_sampling::storage::DaStorageAdapter,
+    TimeBackend: nomos_time::backends::TimeBackend,
+    TimeBackend::Settings: Clone + Send + Sync,
 {
     fn process_message(
         cryptarchia: &Cryptarchia,
