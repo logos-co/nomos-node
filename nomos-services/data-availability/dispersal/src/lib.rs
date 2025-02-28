@@ -1,21 +1,24 @@
-// std
-use std::fmt::Debug;
-use std::marker::PhantomData;
-// crates
-use serde::{Deserialize, Serialize};
-use tokio::sync::oneshot;
-use tracing::error;
-// internal
-use crate::adapters::mempool::DaMempoolAdapter;
-use crate::adapters::network::DispersalNetworkAdapter;
-use crate::backend::DispersalBackend;
+use std::{fmt::Debug, marker::PhantomData};
+
 use nomos_core::da::blob::metadata;
 use nomos_da_network_core::{PeerId, SubnetworkId};
-use overwatch_rs::services::relay::{Relay, RelayMessage};
-use overwatch_rs::services::state::{NoOperator, NoState};
-use overwatch_rs::services::{ServiceCore, ServiceData, ServiceId};
-use overwatch_rs::{DynError, OpaqueServiceStateHandle};
+use overwatch_rs::{
+    services::{
+        relay::{Relay, RelayMessage},
+        state::{NoOperator, NoState},
+        ServiceCore, ServiceData, ServiceId,
+    },
+    DynError, OpaqueServiceStateHandle,
+};
+use serde::{Deserialize, Serialize};
 use subnetworks_assignations::MembershipHandler;
+use tokio::sync::oneshot;
+use tracing::error;
+
+use crate::{
+    adapters::{mempool::DaMempoolAdapter, network::DispersalNetworkAdapter},
+    backend::DispersalBackend,
+};
 
 pub mod adapters;
 pub mod backend;

@@ -1,39 +1,40 @@
 use core::ops::Range;
+use std::{error::Error, fmt::Debug, hash::Hash};
+
 use kzgrs_backend::common::blob::DaBlob;
 use nomos_blend_service::network::libp2p::Libp2pAdapter as BlendNetworkAdapter;
-use nomos_core::da::blob::info::DispersedBlobInfo;
-use nomos_core::da::blob::{metadata, select::FillSize as FillSizeWithBlobs, Blob};
-use nomos_core::da::{BlobId, DaVerifier as CoreDaVerifier};
-use nomos_core::header::HeaderId;
-use nomos_core::tx::{select::FillSize as FillSizeWithTx, Transaction};
-use nomos_da_dispersal::adapters::mempool::DaMempoolAdapter;
-use nomos_da_dispersal::adapters::network::DispersalNetworkAdapter;
-use nomos_da_dispersal::backend::DispersalBackend;
-use nomos_da_dispersal::{DaDispersalMsg, DispersalService};
-use nomos_da_indexer::storage::adapters::rocksdb::RocksAdapter as IndexerStorageAdapter;
-use nomos_da_indexer::DaMsg;
+use nomos_core::{
+    da::{
+        blob::{info::DispersedBlobInfo, metadata, select::FillSize as FillSizeWithBlobs, Blob},
+        BlobId, DaVerifier as CoreDaVerifier,
+    },
+    header::HeaderId,
+    tx::{select::FillSize as FillSizeWithTx, Transaction},
+};
+use nomos_da_dispersal::{
+    adapters::{mempool::DaMempoolAdapter, network::DispersalNetworkAdapter},
+    backend::DispersalBackend,
+    DaDispersalMsg, DispersalService,
+};
 use nomos_da_indexer::{
-    consensus::adapters::cryptarchia::CryptarchiaConsensusAdapter, DataIndexerService,
+    consensus::adapters::cryptarchia::CryptarchiaConsensusAdapter,
+    storage::adapters::rocksdb::RocksAdapter as IndexerStorageAdapter, DaMsg, DataIndexerService,
 };
 use nomos_da_network_core::SubnetworkId;
 use nomos_da_sampling::backend::DaSamplingServiceBackend;
-use nomos_da_verifier::backend::VerifierBackend;
-use nomos_da_verifier::network::adapters::validator::Libp2pAdapter;
-use nomos_da_verifier::storage::adapters::rocksdb::RocksAdapter as VerifierStorageAdapter;
-use nomos_da_verifier::{DaVerifierMsg, DaVerifierService};
+use nomos_da_verifier::{
+    backend::VerifierBackend, network::adapters::validator::Libp2pAdapter,
+    storage::adapters::rocksdb::RocksAdapter as VerifierStorageAdapter, DaVerifierMsg,
+    DaVerifierService,
+};
 use nomos_libp2p::PeerId;
-use nomos_mempool::backend::mockpool::MockPool;
-use nomos_mempool::network::adapters::libp2p::Libp2pAdapter as MempoolNetworkAdapter;
-use nomos_storage::backends::rocksdb::RocksBackend;
-use nomos_storage::backends::StorageSerde;
-use overwatch_rs::overwatch::handle::OverwatchHandle;
-use overwatch_rs::DynError;
+use nomos_mempool::{
+    backend::mockpool::MockPool, network::adapters::libp2p::Libp2pAdapter as MempoolNetworkAdapter,
+};
+use nomos_storage::backends::{rocksdb::RocksBackend, StorageSerde};
+use overwatch_rs::{overwatch::handle::OverwatchHandle, DynError};
 use rand::{RngCore, SeedableRng};
-use serde::de::DeserializeOwned;
-use serde::{Deserialize, Serialize};
-use std::error::Error;
-use std::fmt::Debug;
-use std::hash::Hash;
+use serde::{de::DeserializeOwned, Serialize};
 use subnetworks_assignations::MembershipHandler;
 use tokio::sync::oneshot;
 
@@ -68,12 +69,11 @@ pub type DaIndexer<
     SamplingStorage,
 >;
 
-pub type DaVerifier<Attestation, Blob, Membership, VerifierBackend, StorageSerializer> =
-    DaVerifierService<
-        VerifierBackend,
-        Libp2pAdapter<Membership>,
-        VerifierStorageAdapter<Attestation, Blob, StorageSerializer>,
-    >;
+pub type DaVerifier<Blob, Membership, VerifierBackend, StorageSerializer> = DaVerifierService<
+    VerifierBackend,
+    Libp2pAdapter<Membership>,
+    VerifierStorageAdapter<Blob, StorageSerializer>,
+>;
 
 pub type DaDispersal<Backend, NetworkAdapter, MempoolAdapter, Membership, Metadata> =
     DispersalService<Backend, NetworkAdapter, MempoolAdapter, Membership, Metadata>;
@@ -87,6 +87,8 @@ where
     B: Blob + Serialize + DeserializeOwned + Clone + Send + Sync + 'static,
     <B as Blob>::BlobId: AsRef<[u8]> + Send + Sync + 'static,
     <B as Blob>::ColumnIndex: AsRef<[u8]> + Send + Sync + 'static,
+    <B as Blob>::LightBlob: Serialize + DeserializeOwned + Clone + Send + Sync + 'static,
+    <B as Blob>::SharedCommitments: Serialize + DeserializeOwned + Clone + Send + Sync + 'static,
     M: MembershipHandler<NetworkId = SubnetworkId, Id = PeerId>
         + Clone
         + Debug
@@ -98,10 +100,7 @@ where
     <VB as CoreDaVerifier>::Error: Error,
     SS: StorageSerde + Send + Sync + 'static,
 {
-    let relay = handle
-        .relay::<DaVerifier<A, B, M, VB, SS>>()
-        .connect()
-        .await?;
+    let relay = handle.relay::<DaVerifier<B, M, VB, SS>>().connect().await?;
     let (sender, receiver) = oneshot::channel();
     relay
         .send(DaVerifierMsg::AddBlob {

@@ -2,30 +2,30 @@ pub mod backend;
 pub mod network;
 pub mod storage;
 
-// std
-use std::collections::BTreeSet;
-use std::fmt::Debug;
-// crates
+use std::{collections::BTreeSet, fmt::Debug};
+
+use backend::{DaSamplingServiceBackend, SamplingState};
 use kzgrs_backend::common::blob::DaBlob;
 use network::NetworkAdapter;
 use nomos_core::da::BlobId;
-use nomos_da_network_service::backends::libp2p::common::SamplingEvent;
-use nomos_da_network_service::NetworkService;
+use nomos_da_network_service::{backends::libp2p::common::SamplingEvent, NetworkService};
 use nomos_storage::StorageService;
-use overwatch_rs::services::relay::{Relay, RelayMessage};
-use overwatch_rs::services::state::{NoOperator, NoState};
-use overwatch_rs::services::{ServiceCore, ServiceData, ServiceId};
-use overwatch_rs::{DynError, OpaqueServiceStateHandle};
+use nomos_tracing::{error_with_id, info_with_id};
+use overwatch_rs::{
+    services::{
+        relay::{Relay, RelayMessage},
+        state::{NoOperator, NoState},
+        ServiceCore, ServiceData, ServiceId,
+    },
+    DynError, OpaqueServiceStateHandle,
+};
 use rand::{RngCore, SeedableRng};
 use serde::{Deserialize, Serialize};
+use services_utils::overwatch::lifecycle;
+use storage::DaStorageAdapter;
 use tokio::sync::oneshot;
 use tokio_stream::StreamExt;
 use tracing::{error, instrument};
-// internal
-use backend::{DaSamplingServiceBackend, SamplingState};
-use nomos_tracing::{error_with_id, info_with_id};
-use services_utils::overwatch::lifecycle;
-use storage::DaStorageAdapter;
 
 const DA_SAMPLING_TAG: ServiceId = "DA-Sampling";
 
@@ -210,20 +210,16 @@ where
 
     async fn run(self) -> Result<(), DynError> {
         // This service will likely have to be modified later on.
-        // Most probably the verifier itself need to be constructed/update for every message with
-        // an updated list of the available nodes list, as it needs his own index coming from the
-        // position of his bls public key landing in the above-mentioned list.
+        // Most probably the verifier itself need to be constructed/update for every
+        // message with an updated list of the available nodes list, as it needs
+        // his own index coming from the position of his bls public key landing
+        // in the above-mentioned list.
         let Self {
             network_relay,
             storage_relay,
             mut service_state,
             mut sampler,
         } = self;
-
-        let DaSamplingServiceSettings {
-            storage_adapter_settings,
-            ..
-        } = service_state.settings_reader.get_updated_settings();
 
         let network_relay = network_relay.connect().await?;
         let mut network_adapter = DaNetwork::new(network_relay).await;
@@ -232,7 +228,7 @@ where
         let mut next_prune_tick = sampler.prune_interval();
 
         let storage_relay = storage_relay.connect().await?;
-        let storage_adapter = DaStorage::new(storage_adapter_settings, storage_relay).await;
+        let storage_adapter = DaStorage::new(storage_relay).await;
 
         let mut lifecycle_stream = service_state.lifecycle_handle.message_stream();
         loop {

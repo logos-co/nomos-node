@@ -1,14 +1,16 @@
-use blake2::digest::consts::U4;
-use blake2::Digest;
+use std::{
+    collections::HashSet,
+    hash::Hash,
+    marker::PhantomData,
+    ops::{DerefMut, Div},
+    pin::Pin,
+    task::{Context, Poll},
+};
+
+use blake2::{digest::consts::U4, Digest};
 use futures::{Stream, StreamExt};
 use nomos_blend_message::BlendMessage;
 use serde::Deserialize;
-use std::collections::HashSet;
-use std::hash::Hash;
-use std::marker::PhantomData;
-use std::ops::{DerefMut, Div};
-use std::pin::Pin;
-use std::task::{Context, Poll};
 
 #[derive(Copy, Clone, Deserialize)]
 pub struct CoverTrafficSettings {

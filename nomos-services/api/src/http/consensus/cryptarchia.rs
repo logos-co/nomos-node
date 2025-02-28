@@ -1,11 +1,5 @@
 use std::{fmt::Debug, hash::Hash};
 
-use overwatch_rs::overwatch::handle::OverwatchHandle;
-use rand::{RngCore, SeedableRng};
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use tokio::sync::oneshot;
-
-use crate::http::DynError;
 use cryptarchia_consensus::{
     blend::adapters::libp2p::LibP2pAdapter as BlendAdapter,
     network::adapters::libp2p::LibP2pAdapter as ConsensusNetworkAdapter, ConsensusMsg,
@@ -26,6 +20,12 @@ use nomos_mempool::{
     backend::mockpool::MockPool, network::adapters::libp2p::Libp2pAdapter as MempoolNetworkAdapter,
 };
 use nomos_storage::backends::{rocksdb::RocksBackend, StorageSerde};
+use overwatch_rs::overwatch::handle::OverwatchHandle;
+use rand::{RngCore, SeedableRng};
+use serde::{de::DeserializeOwned, Serialize};
+use tokio::sync::oneshot;
+
+use crate::http::DynError;
 
 pub type Cryptarchia<
     Tx,

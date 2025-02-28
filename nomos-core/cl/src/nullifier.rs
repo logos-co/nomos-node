@@ -84,9 +84,8 @@ impl Nullifier {
 
 #[cfg(test)]
 mod test {
-    use crate::{note::derive_unit, Covenant, Nonce, NoteWitness};
-
     use super::*;
+    use crate::{note::derive_unit, Covenant, Nonce, NoteWitness};
 
     #[ignore = "nullifier test vectors not stable yet"]
     #[test]

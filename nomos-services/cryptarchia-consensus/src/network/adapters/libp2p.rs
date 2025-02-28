@@ -1,22 +1,24 @@
-// std
-use overwatch_rs::DynError;
-use std::hash::Hash;
-use std::marker::PhantomData;
-// crates
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use tokio_stream::{wrappers::BroadcastStream, StreamExt};
-// internal
-use crate::{
-    messages::NetworkMessage,
-    network::{BoxedStream, NetworkAdapter},
-};
+use std::{hash::Hash, marker::PhantomData};
+
 use nomos_core::{block::Block, wire};
 use nomos_network::{
     backends::libp2p::{Command, Event, EventKind, Libp2p},
     NetworkMsg, NetworkService,
 };
-use overwatch_rs::services::{relay::OutboundRelay, ServiceData};
-use tokio_stream::wrappers::errors::BroadcastStreamRecvError;
+use overwatch_rs::{
+    services::{relay::OutboundRelay, ServiceData},
+    DynError,
+};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use tokio_stream::{
+    wrappers::{errors::BroadcastStreamRecvError, BroadcastStream},
+    StreamExt,
+};
+
+use crate::{
+    messages::NetworkMessage,
+    network::{BoxedStream, NetworkAdapter},
+};
 
 type Relay<T> = OutboundRelay<<NetworkService<T> as ServiceData>::Message>;
 

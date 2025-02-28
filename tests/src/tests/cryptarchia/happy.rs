@@ -1,14 +1,16 @@
+use std::{collections::HashSet, time::Duration};
+
 use futures::stream::{self, StreamExt};
-use std::collections::HashSet;
-use std::time::Duration;
 use tests::{
     adjust_timeout,
     topology::{Topology, TopologyConfig},
 };
 
-// how many times more than the expected time to produce a predefined number of blocks we wait before timing out
+// how many times more than the expected time to produce a predefined number of
+// blocks we wait before timing out
 const TIMEOUT_MULTIPLIER: f64 = 3.0;
-// how long we let the chain grow before checking the block at tip - k is the same in all chains
+// how long we let the chain grow before checking the block at tip - k is the
+// same in all chains
 const CHAIN_LENGTH_MULTIPLIER: u32 = 2;
 
 async fn happy_test(topology: &Topology) {

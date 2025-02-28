@@ -10,12 +10,12 @@ pub mod prelude {
     pub use tracing::Span;
     pub use tracing_opentelemetry::OpenTelemetrySpanExt;
 
-    // In some places it makes sense to use third party ids such as blob_id or tx_id as a tracing
-    // id. This allows to track the time during which the entity is propagated throughout the
-    // system.
+    // In some places it makes sense to use third party ids such as blob_id or tx_id
+    // as a tracing id. This allows to track the time during which the entity is
+    // propagated throughout the system.
     //
-    // Opentelemetry tracing standard has a specific remote context format which is supported by
-    // most tracing software.
+    // Opentelemetry tracing standard has a specific remote context format which is
+    // supported by most tracing software.
     // More information at https://www.w3.org/TR/trace-context/#traceparent-header
     pub fn set_remote_context(trace_id: TraceId, span_id: SpanId) -> HashMap<String, String> {
         let mut carrier = HashMap::new();

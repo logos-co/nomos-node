@@ -1,11 +1,12 @@
-use crate::{GlobalParameters, Polynomial, Proof};
+use std::{borrow::Cow, ops::Mul};
+
 use ark_bls12_381::{Fr, G1Affine, G1Projective};
 use ark_ec::CurveGroup;
 use ark_ff::Field;
 use ark_poly::{EvaluationDomain, GeneralEvaluationDomain};
 use num_traits::Zero;
-use std::borrow::Cow;
-use std::ops::Mul;
+
+use crate::{GlobalParameters, Polynomial, Proof};
 
 fn toeplitz1(global_parameters: &[G1Affine], polynomial_degree: usize) -> Vec<G1Projective> {
     debug_assert_eq!(global_parameters.len(), polynomial_degree);
@@ -98,17 +99,18 @@ impl Toeplitz1Cache {
 
 #[cfg(test)]
 mod test {
-    use crate::fk20::{fk20_batch_generate_elements_proofs, Toeplitz1Cache};
-    use crate::{
-        common::bytes_to_polynomial, kzg::generate_element_proof, GlobalParameters, Proof,
-        BYTES_PER_FIELD_ELEMENT,
-    };
     use ark_bls12_381::{Bls12_381, Fr};
-    use ark_poly::univariate::DensePolynomial;
-    use ark_poly::{EvaluationDomain, GeneralEvaluationDomain};
+    use ark_poly::{univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain};
     use ark_poly_commit::kzg10::KZG10;
     use once_cell::sync::Lazy;
     use rand::SeedableRng;
+
+    use crate::{
+        common::bytes_to_polynomial,
+        fk20::{fk20_batch_generate_elements_proofs, Toeplitz1Cache},
+        kzg::generate_element_proof,
+        GlobalParameters, Proof, BYTES_PER_FIELD_ELEMENT,
+    };
 
     static GLOBAL_PARAMETERS: Lazy<GlobalParameters> = Lazy::new(|| {
         let mut rng = rand::rngs::StdRng::seed_from_u64(1987);

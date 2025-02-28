@@ -83,7 +83,8 @@ impl NoteWitness {
         // COMMIT TO BALANCE
         hasher.update(self.value.to_le_bytes());
         hasher.update(self.unit);
-        // Important! we don't commit to the balance blinding factor as that may make the notes linkable.
+        // Important! we don't commit to the balance blinding factor as that may make
+        // the notes linkable.
 
         // COMMIT TO STATE
         hasher.update(self.state);
@@ -164,7 +165,8 @@ mod test {
             assert_ne!(n.commit(nf_pk), reference_note.commit(nf_pk));
         }
 
-        // commitment to same note with different nullifiers produce different commitments
+        // commitment to same note with different nullifiers produce different
+        // commitments
 
         let other_nf_pk = NullifierSecret::random(&mut rng).commit();
 

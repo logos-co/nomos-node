@@ -1,9 +1,10 @@
 #[cfg(feature = "preload")]
 pub mod preload;
 
-use crate::KMSOperator;
 use bytes::Bytes;
 use overwatch_rs::DynError;
+
+use crate::KMSOperator;
 
 #[async_trait::async_trait]
 pub trait KMSBackend {

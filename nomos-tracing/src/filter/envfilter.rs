@@ -1,15 +1,12 @@
-// std
-use std::collections::HashMap;
-use std::error::Error;
-// crates
+use std::{collections::HashMap, error::Error};
+
 use serde::{Deserialize, Serialize};
 use tracing_subscriber::EnvFilter;
-// internal
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct EnvFilterConfig {
-    /// HashMap where the key is the crate/module name, and the value is the desired log level.
-    /// More: https://docs.rs/tracing-subscriber/latest/tracing_subscriber/filter/struct.EnvFilter.html#directives
+    /// HashMap where the key is the crate/module name, and the value is the
+    /// desired log level. More: https://docs.rs/tracing-subscriber/latest/tracing_subscriber/filter/struct.EnvFilter.html#directives
     pub filters: HashMap<String, String>,
 }
 

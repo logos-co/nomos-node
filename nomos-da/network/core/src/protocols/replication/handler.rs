@@ -1,18 +1,21 @@
-// std
-use std::io::Error;
-use std::task::{Context, Poll};
-// crates
-use futures::future::BoxFuture;
-use futures::prelude::*;
-use futures::Future;
-use libp2p::core::upgrade::ReadyUpgrade;
-use libp2p::swarm::handler::{ConnectionEvent, FullyNegotiatedInbound, FullyNegotiatedOutbound};
-use libp2p::swarm::{ConnectionHandler, ConnectionHandlerEvent, SubstreamProtocol};
-use libp2p::{Stream, StreamProtocol};
+use std::{
+    io::Error,
+    task::{Context, Poll},
+};
+
+use futures::{future::BoxFuture, prelude::*, Future};
+use libp2p::{
+    core::upgrade::ReadyUpgrade,
+    swarm::{
+        handler::{ConnectionEvent, FullyNegotiatedInbound, FullyNegotiatedOutbound},
+        ConnectionHandler, ConnectionHandlerEvent, SubstreamProtocol,
+    },
+    Stream, StreamProtocol,
+};
 use log::trace;
 use nomos_da_messages::packing::{pack_to_writer, unpack_from_reader};
 use tracing::error;
-// internal
+
 use crate::protocol::REPLICATION_PROTOCOL;
 
 pub type DaMessage = nomos_da_messages::replication::ReplicationRequest;

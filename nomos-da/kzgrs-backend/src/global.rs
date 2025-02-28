@@ -1,8 +1,7 @@
-use kzgrs::{global_parameters_from_randomness, GlobalParameters};
-use once_cell::sync::Lazy;
-
 // Reexport global parameters loading from file.
 pub use kzgrs::global_parameters_from_file;
+use kzgrs::{global_parameters_from_randomness, GlobalParameters};
+use once_cell::sync::Lazy;
 
 pub static GLOBAL_PARAMETERS: Lazy<GlobalParameters> = Lazy::new(|| {
     println!("WARNING: Global parameters are randomly generated. Use for development only.");

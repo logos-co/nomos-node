@@ -1,12 +1,12 @@
-use executor_http_client::ExecutorHttpClient;
-
-use kzgrs_backend::reconstruction::reconstruct_without_missing_data;
-use reqwest::ClientBuilder;
-use reqwest::Url;
 use std::time::Duration;
-use tests::nodes::executor::Executor;
-use tests::topology::Topology;
-use tests::topology::TopologyConfig;
+
+use executor_http_client::ExecutorHttpClient;
+use kzgrs_backend::reconstruction::reconstruct_without_missing_data;
+use reqwest::{ClientBuilder, Url};
+use tests::{
+    nodes::executor::Executor,
+    topology::{Topology, TopologyConfig},
+};
 
 const APP_ID: &str = "fd3384e132ad02a56c78f45547ee40038dc79002b90d29ed90e08eee762ae715";
 
@@ -65,8 +65,8 @@ async fn disseminate_and_retrieve() {
         .flat_map(|(_, blobs)| blobs)
         .collect();
 
-    // Index zero shouldn't be empty, validator replicated both blobs to executor because they both
-    // are in the same subnetwork.
+    // Index zero shouldn't be empty, validator replicated both blobs to executor
+    // because they both are in the same subnetwork.
     assert!(executor_idx_0_blobs.len() == 2);
     assert!(validator_idx_0_blobs.len() == 2);
 }

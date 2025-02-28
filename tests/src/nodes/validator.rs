@@ -1,41 +1,52 @@
-// STD
-use std::ops::Range;
-use std::path::PathBuf;
-use std::process::{Command, Stdio};
-use std::time::Duration;
-use std::{net::SocketAddr, process::Child};
-// Crates
+use std::{
+    net::SocketAddr,
+    ops::Range,
+    path::PathBuf,
+    process::{Child, Command, Stdio},
+    time::Duration,
+};
+
 use cryptarchia_consensus::{CryptarchiaInfo, CryptarchiaSettings};
 use kzgrs_backend::common::blob::DaBlob;
 use nomos_blend::message_blend::{
     CryptographicProcessorSettings, MessageBlendSettings, TemporalSchedulerSettings,
 };
 use nomos_core::block::Block;
-use nomos_da_indexer::storage::adapters::rocksdb::RocksAdapterSettings as IndexerStorageAdapterSettings;
-use nomos_da_indexer::IndexerSettings;
-use nomos_da_network_service::backends::libp2p::common::DaNetworkBackendSettings;
-use nomos_da_network_service::NetworkConfig as DaNetworkConfig;
-use nomos_da_sampling::storage::adapters::rocksdb::RocksAdapterSettings as SamplingStorageAdapterSettings;
-use nomos_da_sampling::{backend::kzgrs::KzgrsSamplingBackendSettings, DaSamplingServiceSettings};
-use nomos_da_verifier::storage::adapters::rocksdb::RocksAdapterSettings as VerifierStorageAdapterSettings;
-use nomos_da_verifier::{backend::kzgrs::KzgrsDaVerifierSettings, DaVerifierServiceSettings};
+use nomos_da_indexer::{
+    storage::adapters::rocksdb::RocksAdapterSettings as IndexerStorageAdapterSettings,
+    IndexerSettings,
+};
+use nomos_da_network_service::{
+    backends::libp2p::common::DaNetworkBackendSettings, NetworkConfig as DaNetworkConfig,
+};
+use nomos_da_sampling::{
+    backend::kzgrs::KzgrsSamplingBackendSettings,
+    storage::adapters::rocksdb::RocksAdapterSettings as SamplingStorageAdapterSettings,
+    DaSamplingServiceSettings,
+};
+use nomos_da_verifier::{
+    backend::kzgrs::KzgrsDaVerifierSettings,
+    storage::adapters::rocksdb::RocksAdapterSettings as VerifierStorageAdapterSettings,
+    DaVerifierServiceSettings,
+};
 use nomos_mempool::MempoolMetrics;
 use nomos_network::{backends::libp2p::Libp2pConfig, NetworkConfig};
-use nomos_node::api::paths::{
-    CL_METRICS, CRYPTARCHIA_HEADERS, CRYPTARCHIA_INFO, DA_GET_RANGE, STORAGE_BLOCK,
+use nomos_node::{
+    api::{
+        backend::AxumBackendSettings,
+        paths::{CL_METRICS, CRYPTARCHIA_HEADERS, CRYPTARCHIA_INFO, DA_GET_RANGE, STORAGE_BLOCK},
+    },
+    BlobInfo, Config, HeaderId, RocksBackendSettings, Tx,
 };
-use nomos_node::config::mempool::MempoolConfig;
-use nomos_node::{api::backend::AxumBackendSettings, Config, RocksBackendSettings};
-use nomos_node::{BlobInfo, HeaderId, Tx};
 use nomos_tracing::logging::local::FileConfig;
 use nomos_tracing_service::LoggerLayer;
 use reqwest::Url;
 use tempfile::NamedTempFile;
-// Internal
+
 use super::{create_tempdir, persist_tempdir, GetRangeReq, CLIENT};
-use crate::nodes::LOGS_PREFIX;
-use crate::topology::configs::GeneralConfig;
-use crate::{adjust_timeout, IS_DEBUG_TRACING};
+use crate::{
+    adjust_timeout, nodes::LOGS_PREFIX, topology::configs::GeneralConfig, IS_DEBUG_TRACING,
+};
 
 const BIN_PATH: &str = "../target/debug/nomos-node";
 
@@ -298,8 +309,6 @@ pub fn create_validator_config(config: GeneralConfig) -> Config {
         },
         da_verifier: DaVerifierServiceSettings {
             verifier_settings: KzgrsDaVerifierSettings {
-                sk: config.da_config.verifier_sk,
-                index: config.da_config.verifier_index,
                 global_params_path: config.da_config.global_params_path,
             },
             network_adapter_settings: (),

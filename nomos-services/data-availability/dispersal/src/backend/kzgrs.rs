@@ -1,18 +1,19 @@
-// std
-use std::sync::Arc;
-use std::time::Duration;
-// crates
+use std::{sync::Arc, time::Duration};
+
 use futures::StreamExt;
-use serde::{Deserialize, Serialize};
-// internal
-use crate::adapters::mempool::DaMempoolAdapter;
-use crate::adapters::network::DispersalNetworkAdapter;
-use crate::backend::DispersalBackend;
-use kzgrs_backend::common::build_blob_id;
-use kzgrs_backend::encoder::{DaEncoderParams, EncodedData};
-use kzgrs_backend::{dispersal, encoder};
+use kzgrs_backend::{
+    common::build_blob_id,
+    dispersal, encoder,
+    encoder::{DaEncoderParams, EncodedData},
+};
 use nomos_core::da::{BlobId, DaDispersal, DaEncoder};
 use overwatch_rs::DynError;
+use serde::{Deserialize, Serialize};
+
+use crate::{
+    adapters::{mempool::DaMempoolAdapter, network::DispersalNetworkAdapter},
+    backend::DispersalBackend,
+};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct EncoderSettings {
@@ -38,7 +39,8 @@ pub struct DispersalFromAdapter<Adapter> {
     timeout: Duration,
 }
 
-// remove if solved, this occurs in the timeout method below (out of our handling)
+// remove if solved, this occurs in the timeout method below (out of our
+// handling)
 #[allow(dependency_on_unit_never_type_fallback)]
 #[async_trait::async_trait]
 impl<Adapter> DaDispersal for DispersalFromAdapter<Adapter>

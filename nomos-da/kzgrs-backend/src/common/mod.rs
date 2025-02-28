@@ -1,17 +1,14 @@
 pub mod blob;
 
-// std
-use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
-use serde::ser::SerializeSeq;
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::io::Cursor;
-// crates
+
+use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use blake2::digest::{Update, VariableOutput};
+use kzgrs::Commitment;
 #[cfg(feature = "parallel")]
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
+use serde::{ser::SerializeSeq, Deserialize, Deserializer, Serialize, Serializer};
 use sha3::{Digest, Sha3_256};
-// internal
-use kzgrs::Commitment;
 
 #[derive(Clone, Eq, PartialEq, Debug, Serialize, Deserialize)]
 pub struct Chunk(pub Vec<u8>);

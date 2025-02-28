@@ -1,7 +1,6 @@
 pub mod versions;
 
-use std::collections::HashSet;
-use std::hash::Hash;
+use std::{collections::HashSet, hash::Hash};
 
 pub trait MembershipHandler {
     /// Subnetworks Id type

@@ -1,11 +1,11 @@
-// std
 use std::hash::{Hash, Hasher};
-// crates
+
 use bytes::Bytes;
-use nomos_core::da::blob::info::DispersedBlobInfo;
-use nomos_core::da::blob::metadata::{self, Next};
+use nomos_core::da::blob::{
+    info::DispersedBlobInfo,
+    metadata::{self, Next},
+};
 use serde::{Deserialize, Serialize};
-// internal
 
 #[derive(Copy, Clone, Default, Debug, PartialEq, PartialOrd, Ord, Eq, Serialize, Deserialize)]
 pub struct Index([u8; 8]);

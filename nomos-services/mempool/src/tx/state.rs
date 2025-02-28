@@ -1,7 +1,7 @@
-use serde::{Deserialize, Serialize};
 use std::{convert::Infallible, marker::PhantomData};
 
 use overwatch_rs::services::state::ServiceState;
+use serde::{Deserialize, Serialize};
 
 use crate::TxMempoolSettings;
 

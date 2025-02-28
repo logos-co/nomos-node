@@ -1,10 +1,7 @@
-use crate::backends::libp2p::common::{
-    dial_validator_subnetwork_peers, handle_sample_request, handle_validator_events_stream,
-    DaNetworkBackendSettings, SamplingEvent, BROADCAST_CHANNEL_SIZE,
-};
-use crate::backends::NetworkBackend;
-use futures::future::Aborted;
+use std::{collections::HashSet, fmt::Debug, marker::PhantomData, pin::Pin, time::Duration};
+
 use futures::{
+    future::Aborted,
     stream::{AbortHandle, Abortable},
     Stream, StreamExt,
 };
@@ -12,25 +9,29 @@ use kzgrs_backend::common::blob::DaBlob;
 use libp2p::PeerId;
 use log::error;
 use nomos_core::da::BlobId;
-use nomos_da_network_core::protocols::dispersal::executor::behaviour::DispersalExecutorEvent;
-use nomos_da_network_core::swarm::executor::ExecutorSwarm;
-use nomos_da_network_core::SubnetworkId;
+use nomos_da_network_core::{
+    protocols::dispersal::executor::behaviour::DispersalExecutorEvent,
+    swarm::executor::ExecutorSwarm, SubnetworkId,
+};
 use nomos_libp2p::ed25519;
 use nomos_tracing::info_with_id;
-use overwatch_rs::overwatch::handle::OverwatchHandle;
-use overwatch_rs::services::state::NoState;
+use overwatch_rs::{overwatch::handle::OverwatchHandle, services::state::NoState};
 use serde::{Deserialize, Serialize};
-use std::collections::HashSet;
-use std::fmt::Debug;
-use std::marker::PhantomData;
-use std::pin::Pin;
-use std::time::Duration;
 use subnetworks_assignations::MembershipHandler;
-use tokio::sync::broadcast;
-use tokio::sync::mpsc::UnboundedSender;
-use tokio::task::JoinHandle;
+use tokio::{
+    sync::{broadcast, mpsc::UnboundedSender},
+    task::JoinHandle,
+};
 use tokio_stream::wrappers::{BroadcastStream, UnboundedReceiverStream};
 use tracing::instrument;
+
+use crate::backends::{
+    libp2p::common::{
+        dial_validator_subnetwork_peers, handle_sample_request, handle_validator_events_stream,
+        DaNetworkBackendSettings, SamplingEvent, BROADCAST_CHANNEL_SIZE,
+    },
+    NetworkBackend,
+};
 
 /// Message that the backend replies to
 #[derive(Debug)]
@@ -72,7 +73,8 @@ pub struct DaNetworkExecutorBackendSettings<Membership> {
 
 /// DA network backend for validators
 /// Internally uses a libp2p swarm composed of the [`ExecutorBehaviour`]
-/// It forwards network messages to the corresponding subscription channels/streams
+/// It forwards network messages to the corresponding subscription
+/// channels/streams
 pub struct DaNetworkExecutorBackend<Membership>
 where
     Membership: MembershipHandler,

@@ -1,9 +1,8 @@
 use ark_bls12_381::{Bls12_381, Fr};
-use ark_poly::univariate::DensePolynomial;
-use ark_poly::{EvaluationDomain, GeneralEvaluationDomain};
+use ark_poly::{univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain};
 use ark_poly_commit::kzg10::{UniversalParams, KZG10};
-use divan::counter::ItemsCount;
-use divan::{black_box, Bencher};
+use divan::{black_box, counter::ItemsCount, Bencher};
+use kzgrs::{common::bytes_to_polynomial_unchecked, kzg::*};
 use once_cell::sync::Lazy;
 use rand::RngCore;
 #[cfg(feature = "parallel")]
@@ -11,14 +10,12 @@ use rayon::iter::IntoParallelIterator;
 #[cfg(feature = "parallel")]
 use rayon::iter::ParallelIterator;
 
-use kzgrs::{common::bytes_to_polynomial_unchecked, kzg::*};
-
 fn main() {
     divan::main()
 }
 
-// This allocator setting seems like it doesn't work on windows. Disable for now, but letting
-// it here in case it's needed at some specific point.
+// This allocator setting seems like it doesn't work on windows. Disable for
+// now, but letting it here in case it's needed at some specific point.
 // #[global_allocator]
 // static ALLOC: AllocProfiler = AllocProfiler::system();
 
@@ -114,9 +111,10 @@ fn compute_batch_proofs(bencher: Bencher, element_count: usize) {
         });
 }
 
-// This is a test on how will perform by having a wrapping rayon on top of the proof computation
-// ark libraries already use rayon underneath so no great improvements are probably come up from this.
-// But it should help reusing the same thread pool for all jobs saving a little time.
+// This is a test on how will perform by having a wrapping rayon on top of the
+// proof computation ark libraries already use rayon underneath so no great
+// improvements are probably come up from this. But it should help reusing the
+// same thread pool for all jobs saving a little time.
 #[cfg(feature = "parallel")]
 #[allow(non_snake_case)]
 #[divan::bench(args = [128, 256, 512, 1024], sample_count = 3, sample_size = 5)]

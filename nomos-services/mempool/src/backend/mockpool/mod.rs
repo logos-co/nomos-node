@@ -1,23 +1,18 @@
-use overwatch_rs::services::state::ServiceState;
-// std
-use ::serde::{Deserialize, Serialize};
+use std::{
+    collections::BTreeMap,
+    hash::Hash,
+    time::{SystemTime, UNIX_EPOCH},
+};
+
 use linked_hash_map::LinkedHashMap;
-use std::convert::Infallible;
-use std::fmt::Debug;
-use std::hash::Hash;
-use std::time::SystemTime;
-use std::{collections::BTreeMap, time::UNIX_EPOCH};
-// crates
-// internal
-use crate::backend::{MemPool, MempoolError, RecoverableMempool};
-use crate::TxMempoolSettings;
 
 use super::Status;
+use crate::backend::{MemPool, MempoolError};
 
 mod serde;
 
-/// A mock mempool implementation that stores all transactions in memory in the order received.
-#[derive(Serialize, Deserialize)]
+/// A mock mempool implementation that stores all transactions in memory in the
+/// order received.
 pub struct MockPool<BlockId, Item, Key> {
     #[serde(
         serialize_with = "serde::serialize_pending_items",
@@ -143,7 +138,8 @@ where
     }
 
     fn view(&self, _ancestor_hint: BlockId) -> Box<dyn Iterator<Item = Self::Item> + Send> {
-        // we need to have an owned version of the iterator to bypass adding a lifetime bound to the return iterator type
+        // we need to have an owned version of the iterator to bypass adding a lifetime
+        // bound to the return iterator type
         #[allow(clippy::needless_collect)]
         let pending_items: Vec<Item> = self.pending_items.values().cloned().collect();
         Box::new(pending_items.into_iter())

@@ -1,11 +1,10 @@
-// std
-use blake2::Digest;
 use std::hash::Hash;
-// crates
-use crate::crypto::Blake2b;
+
+use blake2::Digest;
 use bytes::Bytes;
 use thiserror::Error;
-// internal
+
+use crate::crypto::Blake2b;
 
 pub mod bundle;
 #[cfg(feature = "mock")]

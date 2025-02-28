@@ -2,23 +2,23 @@ pub mod behaviour;
 
 #[cfg(test)]
 mod test {
-    use crate::address_book::AddressBook;
-    use crate::protocols::sampling::behaviour::{
-        BehaviourSampleRes, SamplingBehaviour, SamplingEvent,
-    };
-    use crate::test_utils::AllNeighbours;
-    use crate::SubnetworkId;
-    use futures::StreamExt;
-    use kzgrs_backend::common::blob::DaBlob;
-    use kzgrs_backend::common::Column;
-    use libp2p::identity::Keypair;
-    use libp2p::swarm::SwarmEvent;
-    use libp2p::{quic, Multiaddr, PeerId, Swarm, SwarmBuilder};
-    use log::debug;
     use std::time::Duration;
+
+    use futures::StreamExt;
+    use kzgrs_backend::common::{blob::DaBlob, Column};
+    use libp2p::{
+        identity::Keypair, quic, swarm::SwarmEvent, Multiaddr, PeerId, Swarm, SwarmBuilder,
+    };
+    use log::debug;
     use subnetworks_assignations::MembershipHandler;
-    use tracing_subscriber::fmt::TestWriter;
-    use tracing_subscriber::EnvFilter;
+    use tracing_subscriber::{fmt::TestWriter, EnvFilter};
+
+    use crate::{
+        address_book::AddressBook,
+        protocols::sampling::behaviour::{BehaviourSampleRes, SamplingBehaviour, SamplingEvent},
+        test_utils::AllNeighbours,
+        SubnetworkId,
+    };
 
     pub fn sampling_swarm(
         key: Keypair,

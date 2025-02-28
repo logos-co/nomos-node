@@ -1,22 +1,19 @@
-// std
-use std::error::Error;
-use std::ops::Range;
-use std::{fmt::Debug, hash::Hash};
-// crates
+use std::{error::Error, fmt::Debug, hash::Hash, ops::Range};
+
 use axum::{
     extract::{Query, State},
     response::Response,
     Json,
 };
-use rand::{RngCore, SeedableRng};
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
-// internal
-use super::paths;
 use nomos_api::http::{cl, consensus, da, libp2p, mempool, storage};
-use nomos_core::da::blob::info::DispersedBlobInfo;
-use nomos_core::da::blob::metadata::Metadata;
-use nomos_core::da::{BlobId, DaVerifier as CoreDaVerifier};
-use nomos_core::{da::blob::Blob, header::HeaderId, tx::Transaction};
+use nomos_core::{
+    da::{
+        blob::{info::DispersedBlobInfo, metadata::Metadata, Blob},
+        BlobId, DaVerifier as CoreDaVerifier,
+    },
+    header::HeaderId,
+    tx::Transaction,
+};
 use nomos_da_network_core::SubnetworkId;
 use nomos_da_sampling::backend::DaSamplingServiceBackend;
 use nomos_da_verifier::backend::VerifierBackend;
@@ -25,7 +22,11 @@ use nomos_mempool::network::adapters::libp2p::Libp2pAdapter as MempoolNetworkAda
 use nomos_network::backends::libp2p::Libp2p as NetworkBackend;
 use nomos_storage::backends::StorageSerde;
 use overwatch_rs::overwatch::handle::OverwatchHandle;
+use rand::{RngCore, SeedableRng};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use subnetworks_assignations::MembershipHandler;
+
+use super::paths;
 
 #[macro_export]
 macro_rules! make_request_and_return_response {
@@ -217,6 +218,8 @@ where
     B: Blob + Serialize + DeserializeOwned + Clone + Send + Sync + 'static,
     <B as Blob>::BlobId: AsRef<[u8]> + Send + Sync + 'static,
     <B as Blob>::ColumnIndex: AsRef<[u8]> + Send + Sync + 'static,
+    <B as Blob>::LightBlob: Serialize + DeserializeOwned + Clone + Send + Sync + 'static,
+    <B as Blob>::SharedCommitments: Serialize + DeserializeOwned + Clone + Send + Sync + 'static,
     M: MembershipHandler<NetworkId = SubnetworkId, Id = PeerId>
         + Clone
         + Debug

@@ -1,10 +1,10 @@
 use bincode::Options;
-// STD
-// Crates
 use serde::Serialize;
-// Internal
-use crate::wire::bincode::{BincodeSerializer, OPTIONS};
-use crate::wire::{Error, Result};
+
+use crate::wire::{
+    bincode::{BincodeSerializer, OPTIONS},
+    Error, Result,
+};
 
 pub struct Serializer<T> {
     inner: BincodeSerializer<T>,
@@ -33,8 +33,8 @@ pub fn serializer(buffer: &mut Vec<u8>) -> Serializer<&'_ mut Vec<u8>> {
     }
 }
 
-/// Return a serializer for wire format that overwrites (but now grow) the provided
-/// buffer.
+/// Return a serializer for wire format that overwrites (but now grow) the
+/// provided buffer.
 ///
 /// We only operator on in-memory slices as to abstract
 /// any underlying protocol. See https://sans-io.readthedocs.io/how-to-sans-io.html

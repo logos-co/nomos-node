@@ -1,13 +1,13 @@
-// STD
 use std::fmt::Debug;
-// Crates
+
 use log::error;
 use overwatch_rs::services::state::{ServiceState, StateOperator};
 use serde::{de::DeserializeOwned, Serialize};
-// Internal
-use crate::overwatch::recovery::errors::RecoveryError;
-use crate::overwatch::recovery::RecoveryResult;
-use crate::traits::FromSettings;
+
+use crate::{
+    overwatch::recovery::{errors::RecoveryError, RecoveryResult},
+    traits::FromSettings,
+};
 
 pub trait RecoveryBackend {
     type State: ServiceState;

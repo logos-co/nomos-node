@@ -1,6 +1,4 @@
-// STD
-use std::path::PathBuf;
-use std::process::Command;
+use std::{path::PathBuf, process::Command};
 
 fn cargo_metadata() -> serde_json::Value {
     let output = Command::new("cargo")
@@ -42,8 +40,9 @@ pub fn get_workspace_root() -> PathBuf {
     PathBuf::from(workspace_root)
 }
 
-/// * `target_triple` - The target triple of the current build. Needs to follow the standard format.
-///     E.g.: x86_64-unknown-linux-gnu, aarch64-apple-darwin, etc.
+/// * `target_triple` - The target triple of the current build. Needs to follow
+///   the standard format. E.g.: x86_64-unknown-linux-gnu, aarch64-apple-darwin,
+///   etc.
 pub fn get_target_directory_for_current_profile(target_triple: &str) -> Result<PathBuf, String> {
     let target_directory = get_target_directory();
     let profile = get_profile();

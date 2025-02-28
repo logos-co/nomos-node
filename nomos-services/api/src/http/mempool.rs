@@ -1,4 +1,5 @@
 use core::{fmt::Debug, hash::Hash};
+
 use nomos_core::{da::blob::info::DispersedBlobInfo, header::HeaderId};
 use nomos_da_sampling::{
     backend::DaSamplingServiceBackend, network::NetworkAdapter as DaSamplingNetworkAdapter,

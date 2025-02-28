@@ -1,15 +1,12 @@
-// std
+use std::{
+    collections::HashMap,
+    sync::{Arc, Mutex},
+    time::Duration,
+};
+
 use nomos_tracing_service::TracingSettings;
-use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
-use std::time::Duration;
-// crates
-use tests::topology::configs::consensus::ConsensusParams;
-use tests::topology::configs::da::DaParams;
-use tests::topology::configs::GeneralConfig;
-use tokio::sync::oneshot::Sender;
-use tokio::time::timeout;
-// internal
+use tests::topology::configs::{consensus::ConsensusParams, da::DaParams, GeneralConfig};
+use tokio::{sync::oneshot::Sender, time::timeout};
 
 use crate::config::{create_node_configs, Host};
 

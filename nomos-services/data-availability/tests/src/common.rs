@@ -1,75 +1,85 @@
-use cryptarchia_consensus::LeaderConfig;
-// std
-use nomos_blend::membership::Node;
-use nomos_blend::message_blend::{
-    CryptographicProcessorSettings, MessageBlendSettings, TemporalSchedulerSettings,
+use std::{
+    path::{Path, PathBuf},
+    time::Duration,
 };
-use nomos_blend_message::{sphinx::SphinxMessage, BlendMessage};
-use nomos_da_network_service::backends::libp2p::common::DaNetworkBackendSettings;
-use std::path::{Path, PathBuf};
-use std::time::Duration;
-// crates
-use cryptarchia_consensus::TimeConfig;
-use kzgrs_backend::common::blob::DaBlob;
-use kzgrs_backend::dispersal::BlobInfo;
-use kzgrs_backend::encoder::DaEncoder;
-use kzgrs_backend::encoder::DaEncoderParams;
+
+use cryptarchia_consensus::{LeaderConfig, TimeConfig};
+use kzgrs_backend::{
+    common::blob::DaBlob,
+    dispersal::BlobInfo,
+    encoder::{DaEncoder, DaEncoderParams},
+};
 use libp2p::identity::{
     ed25519::{self, Keypair as Ed25519Keypair},
     Keypair, PeerId,
 };
-use nomos_blend_service::backends::libp2p::{
-    Libp2pBlendBackend as BlendBackend, Libp2pBlendBackendSettings,
+use nomos_blend::{
+    membership::Node,
+    message_blend::{
+        CryptographicProcessorSettings, MessageBlendSettings, TemporalSchedulerSettings,
+    },
 };
-use nomos_blend_service::{BlendConfig, BlendService};
+use nomos_blend_message::{sphinx::SphinxMessage, BlendMessage};
+use nomos_blend_service::{
+    backends::libp2p::{Libp2pBlendBackend as BlendBackend, Libp2pBlendBackendSettings},
+    BlendConfig, BlendService,
+};
 use nomos_core::{da::blob::info::DispersedBlobInfo, header::HeaderId, tx::Transaction};
 pub use nomos_core::{
     da::blob::select::FillSize as FillSizeWithBlobs, tx::select::FillSize as FillSizeWithTx,
 };
-use nomos_da_indexer::consensus::adapters::cryptarchia::CryptarchiaConsensusAdapter;
-use nomos_da_indexer::storage::adapters::rocksdb::RocksAdapter as IndexerStorageAdapter;
-use nomos_da_indexer::storage::adapters::rocksdb::RocksAdapterSettings as IndexerStorageSettings;
-use nomos_da_indexer::DataIndexerService;
-use nomos_da_indexer::IndexerSettings;
-use nomos_da_network_service::backends::libp2p::validator::DaNetworkValidatorBackend;
-use nomos_da_network_service::NetworkConfig as DaNetworkConfig;
-use nomos_da_network_service::NetworkService as DaNetworkService;
-use nomos_da_sampling::backend::kzgrs::KzgrsSamplingBackendSettings;
-use nomos_da_sampling::storage::adapters::rocksdb::RocksAdapter as SamplingStorageAdapter;
-use nomos_da_sampling::storage::adapters::rocksdb::RocksAdapterSettings as SamplingStorageSettings;
-use nomos_da_sampling::DaSamplingService;
-use nomos_da_sampling::DaSamplingServiceSettings;
-use nomos_da_sampling::{
-    backend::kzgrs::KzgrsSamplingBackend,
-    network::adapters::validator::Libp2pAdapter as SamplingLibp2pAdapter,
+use nomos_da_indexer::{
+    consensus::adapters::cryptarchia::CryptarchiaConsensusAdapter,
+    storage::adapters::rocksdb::{
+        RocksAdapter as IndexerStorageAdapter, RocksAdapterSettings as IndexerStorageSettings,
+    },
+    DataIndexerService, IndexerSettings,
 };
-use nomos_da_verifier::backend::kzgrs::KzgrsDaVerifier;
-use nomos_da_verifier::backend::kzgrs::KzgrsDaVerifierSettings;
-use nomos_da_verifier::network::adapters::validator::Libp2pAdapter;
-use nomos_da_verifier::storage::adapters::rocksdb::RocksAdapter as VerifierStorageAdapter;
-use nomos_da_verifier::storage::adapters::rocksdb::RocksAdapterSettings as VerifierStorageSettings;
-use nomos_da_verifier::DaVerifierService;
-use nomos_da_verifier::DaVerifierServiceSettings;
+use nomos_da_network_service::{
+    backends::libp2p::{common::DaNetworkBackendSettings, validator::DaNetworkValidatorBackend},
+    NetworkConfig as DaNetworkConfig, NetworkService as DaNetworkService,
+};
+use nomos_da_sampling::{
+    backend::kzgrs::{KzgrsSamplingBackend, KzgrsSamplingBackendSettings},
+    network::adapters::validator::Libp2pAdapter as SamplingLibp2pAdapter,
+    storage::adapters::rocksdb::{
+        RocksAdapter as SamplingStorageAdapter, RocksAdapterSettings as SamplingStorageSettings,
+    },
+    DaSamplingService, DaSamplingServiceSettings,
+};
+use nomos_da_verifier::{
+    backend::kzgrs::{KzgrsDaVerifier, KzgrsDaVerifierSettings},
+    network::adapters::validator::Libp2pAdapter,
+    storage::adapters::rocksdb::{
+        RocksAdapter as VerifierStorageAdapter, RocksAdapterSettings as VerifierStorageSettings,
+    },
+    DaVerifierService, DaVerifierServiceSettings,
+};
 use nomos_ledger::LedgerState;
 use nomos_libp2p::{Multiaddr, Swarm, SwarmConfig};
-use nomos_mempool::da::service::DaMempoolService;
-use nomos_mempool::network::adapters::libp2p::Libp2pAdapter as MempoolNetworkAdapter;
-use nomos_mempool::network::adapters::libp2p::Settings as AdapterSettings;
-use nomos_mempool::{backend::mockpool::MockPool, TxMempoolService};
-use nomos_mempool::{DaMempoolSettings, TxMempoolSettings};
-use nomos_network::backends::libp2p::{Libp2p as NetworkBackend, Libp2pConfig};
-use nomos_network::NetworkConfig;
-use nomos_network::NetworkService;
+use nomos_mempool::{
+    backend::mockpool::MockPool,
+    da::service::DaMempoolService,
+    network::adapters::libp2p::{
+        Libp2pAdapter as MempoolNetworkAdapter, Settings as AdapterSettings,
+    },
+    DaMempoolSettings, TxMempoolService, TxMempoolSettings,
+};
+use nomos_network::{
+    backends::libp2p::{Libp2p as NetworkBackend, Libp2pConfig},
+    NetworkConfig, NetworkService,
+};
 use nomos_node::{Tx, Wire};
-use nomos_storage::backends::rocksdb::RocksBackend;
-use nomos_storage::StorageService;
+use nomos_storage::{backends::rocksdb::RocksBackend, StorageService};
 use once_cell::sync::Lazy;
 use overwatch_derive::*;
-use overwatch_rs::overwatch::{Overwatch, OverwatchRunner};
-use overwatch_rs::OpaqueServiceHandle;
-use rand::{Rng, RngCore};
+use overwatch_rs::{
+    overwatch::{Overwatch, OverwatchRunner},
+    OpaqueServiceHandle,
+};
+use rand::RngCore;
 use subnetworks_assignations::versions::v1::FillFromNodeList;
-// internal
+
 use crate::rng::TestRng;
 
 type IntegrationRng = TestRng;
@@ -158,7 +168,7 @@ pub type DaMempool = DaMempoolService<
 pub(crate) type DaVerifier = DaVerifierService<
     KzgrsDaVerifier,
     Libp2pAdapter<NomosDaMembership>,
-    VerifierStorageAdapter<(), DaBlob, Wire>,
+    VerifierStorageAdapter<DaBlob, Wire>,
 >;
 
 pub(crate) const MB16: usize = 1024 * 1024 * 16;
@@ -375,15 +385,16 @@ pub fn new_blend_configs(listening_addresses: Vec<Multiaddr>) -> Vec<TestBlendSe
         .collect()
 }
 
-// Client node is only created for asyncroniously interact with nodes in the test.
-// The services defined in it are not used.
+// Client node is only created for asyncroniously interact with nodes in the
+// test. The services defined in it are not used.
 #[derive(Services)]
 pub struct TestClient {
     storage: OpaqueServiceHandle<StorageService<RocksBackend<Wire>>>,
 }
 
-// Client node is just an empty overwatch service to spawn a task that could communicate with other
-// nodes and manage the data availability cycle during tests.
+// Client node is just an empty overwatch service to spawn a task that could
+// communicate with other nodes and manage the data availability cycle during
+// tests.
 pub fn new_client(db_path: PathBuf) -> Overwatch {
     OverwatchRunner::<TestClient>::run(
         TestClientServiceSettings {
@@ -401,15 +412,6 @@ pub fn new_client(db_path: PathBuf) -> Overwatch {
 
 pub fn node_address(config: &SwarmConfig) -> Multiaddr {
     Swarm::multiaddr(std::net::Ipv4Addr::new(127, 0, 0, 1), config.port)
-}
-
-pub fn generate_blst_hex_keys() -> (String, String) {
-    let mut rng = rand::thread_rng();
-    let sk_bytes: [u8; 32] = rng.gen();
-    let sk = blst::min_sig::SecretKey::key_gen(&sk_bytes, &[]).unwrap();
-
-    let pk = sk.sk_to_pk();
-    (hex::encode(sk.to_bytes()), hex::encode(pk.to_bytes()))
 }
 
 pub fn create_ed25519_sk_peerid(key: &str) -> (ed25519::SecretKey, PeerId) {

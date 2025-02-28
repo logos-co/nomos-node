@@ -28,8 +28,8 @@ impl Default for SwarmConfig {
     }
 }
 
-// A partial copy of gossipsub::Config for deriving Serialize/Deserialize remotely
-// https://serde.rs/remote-derive.html
+// A partial copy of gossipsub::Config for deriving Serialize/Deserialize
+// remotely https://serde.rs/remote-derive.html
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(remote = "gossipsub::Config")]
 struct GossipsubConfigDef {
@@ -144,8 +144,7 @@ impl From<GossipsubConfigDef> for gossipsub::Config {
 
 pub mod secret_key_serde {
     use libp2p::identity::ed25519;
-    use serde::de::Error;
-    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+    use serde::{de::Error, Deserialize, Deserializer, Serialize, Serializer};
 
     pub fn serialize<S>(key: &ed25519::SecretKey, serializer: S) -> Result<S::Ok, S::Error>
     where

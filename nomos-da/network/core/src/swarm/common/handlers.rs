@@ -1,14 +1,19 @@
-use crate::maintenance::monitor::{ConnectionMonitor, ConnectionMonitorBehaviour};
-use crate::protocols::dispersal::validator::behaviour::DispersalEvent;
-use crate::protocols::replication::behaviour::{ReplicationBehaviour, ReplicationEvent};
-use crate::protocols::sampling::behaviour::SamplingEvent;
-use crate::SubnetworkId;
 use kzgrs_backend::common::blob::DaBlob;
 use libp2p::PeerId;
 use log::{debug, error};
 use nomos_da_messages::replication;
 use subnetworks_assignations::MembershipHandler;
 use tokio::sync::mpsc::UnboundedSender;
+
+use crate::{
+    maintenance::monitor::{ConnectionMonitor, ConnectionMonitorBehaviour},
+    protocols::{
+        dispersal::validator::behaviour::DispersalEvent,
+        replication::behaviour::{ReplicationBehaviour, ReplicationEvent},
+        sampling::behaviour::SamplingEvent,
+    },
+    SubnetworkId,
+};
 
 pub async fn handle_validator_dispersal_event<Membership>(
     validation_events_sender: &mut UnboundedSender<DaBlob>,

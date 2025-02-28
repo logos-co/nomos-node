@@ -1,16 +1,11 @@
 pub mod adapters;
 
-// std
-use nomos_core::block::Block;
 use std::hash::Hash;
-// crates
-use nomos_blend_service::network::NetworkAdapter;
-use nomos_blend_service::{backends::BlendBackend, BlendService};
-// internal
-use overwatch_rs::services::relay::OutboundRelay;
-use overwatch_rs::services::ServiceData;
-use serde::de::DeserializeOwned;
-use serde::Serialize;
+
+use nomos_blend_service::{backends::BlendBackend, network::NetworkAdapter, BlendService};
+use nomos_core::block::Block;
+use overwatch_rs::services::{relay::OutboundRelay, ServiceData};
+use serde::{de::DeserializeOwned, Serialize};
 
 #[async_trait::async_trait]
 pub trait BlendAdapter {

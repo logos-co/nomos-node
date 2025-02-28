@@ -1,13 +1,11 @@
-// std
-use std::path::PathBuf;
-use std::{marker::PhantomData, sync::Arc};
-// crates
+use std::{marker::PhantomData, path::PathBuf, sync::Arc};
+
 use async_trait::async_trait;
 use bytes::Bytes;
 pub use rocksdb::Error;
 use rocksdb::{Options, DB};
 use serde::{Deserialize, Serialize};
-// internal
+
 use super::{StorageBackend, StorageSerde, StorageTransaction};
 
 /// Rocks backend setting
@@ -20,8 +18,9 @@ pub struct RocksBackendSettings {
 }
 
 /// Rocks transaction type
-// Do not use `TransactionDB` here, because rocksdb's `TransactionDB` does not support open by read-only mode.
-// Thus, we cannot open the same db in two or more processes.
+// Do not use `TransactionDB` here, because rocksdb's `TransactionDB` does not
+// support open by read-only mode. Thus, we cannot open the same db in two or
+// more processes.
 pub struct Transaction {
     rocks: Arc<DB>,
     #[allow(clippy::type_complexity)]
@@ -153,9 +152,9 @@ impl<SerdeOp: StorageSerde + Send + Sync + 'static> StorageBackend for RocksBack
 
 #[cfg(test)]
 mod test {
-    use super::super::testing::NoStorageSerde;
-    use super::*;
     use tempfile::TempDir;
+
+    use super::{super::testing::NoStorageSerde, *};
 
     #[tokio::test]
     async fn test_store_load_remove(

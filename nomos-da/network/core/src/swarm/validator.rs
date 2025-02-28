@@ -1,37 +1,43 @@
-// std
-use std::io;
-use std::time::Duration;
-// crates
+use std::{io, time::Duration};
+
 use futures::{stream, StreamExt};
 use kzgrs_backend::common::blob::DaBlob;
-use libp2p::core::transport::ListenerId;
-use libp2p::identity::Keypair;
-use libp2p::swarm::{DialError, SwarmEvent};
-use libp2p::{Multiaddr, PeerId, Swarm, SwarmBuilder, TransportError};
+use libp2p::{
+    core::transport::ListenerId,
+    identity::Keypair,
+    swarm::{DialError, SwarmEvent},
+    Multiaddr, PeerId, Swarm, SwarmBuilder, TransportError,
+};
 use log::debug;
 use nomos_core::da::BlobId;
-use tokio::sync::mpsc::{unbounded_channel, UnboundedSender};
-use tokio::time::interval;
+use subnetworks_assignations::MembershipHandler;
+use tokio::{
+    sync::mpsc::{unbounded_channel, UnboundedSender},
+    time::interval,
+};
 use tokio_stream::wrappers::{IntervalStream, UnboundedReceiverStream};
-// internal
+
 use super::ConnectionBalancer;
-use crate::address_book::AddressBook;
-use crate::behaviour::validator::{ValidatorBehaviour, ValidatorBehaviourEvent};
-use crate::protocols::{
-    dispersal::validator::behaviour::DispersalEvent, replication::behaviour::ReplicationEvent,
-    sampling::behaviour::SamplingEvent,
-};
-use crate::swarm::common::handlers::monitor_event;
-use crate::swarm::common::handlers::{
-    handle_replication_event, handle_sampling_event, handle_validator_dispersal_event,
-};
-use crate::swarm::common::monitor::{DAConnectionMonitorSettings, MonitorEvent};
-use crate::swarm::common::policy::DAConnectionPolicy;
 use crate::{
-    swarm::{ConnectionMonitor, DAConnectionPolicySettings},
+    address_book::AddressBook,
+    behaviour::validator::{ValidatorBehaviour, ValidatorBehaviourEvent},
+    protocols::{
+        dispersal::validator::behaviour::DispersalEvent, replication::behaviour::ReplicationEvent,
+        sampling::behaviour::SamplingEvent,
+    },
+    swarm::{
+        common::{
+            handlers::{
+                handle_replication_event, handle_sampling_event, handle_validator_dispersal_event,
+                monitor_event,
+            },
+            monitor::{DAConnectionMonitorSettings, MonitorEvent},
+            policy::DAConnectionPolicy,
+        },
+        ConnectionMonitor, DAConnectionPolicySettings,
+    },
     SubnetworkId,
 };
-use subnetworks_assignations::MembershipHandler;
 
 // Metrics
 const EVENT_SAMPLING: &str = "sampling";

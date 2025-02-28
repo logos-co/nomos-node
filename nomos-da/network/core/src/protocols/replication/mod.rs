@@ -3,22 +3,24 @@ pub mod handler;
 
 #[cfg(test)]
 mod test {
-    use crate::protocols::replication::behaviour::{ReplicationBehaviour, ReplicationEvent};
-    use crate::protocols::replication::handler::DaMessage;
-    use crate::test_utils::AllNeighbours;
+    use std::time::Duration;
+
     use blake2::{Blake2s256, Digest};
     use futures::StreamExt;
-
     use kzgrs_backend::testutils::get_da_blob;
-    use libp2p::identity::Keypair;
-    use libp2p::swarm::SwarmEvent;
-    use libp2p::{quic, Multiaddr, PeerId, Swarm};
+    use libp2p::{identity::Keypair, quic, swarm::SwarmEvent, Multiaddr, PeerId, Swarm};
     use log::info;
     use nomos_core::da::BlobId;
     use nomos_da_messages::common::Blob;
-    use std::time::Duration;
-    use tracing_subscriber::fmt::TestWriter;
-    use tracing_subscriber::EnvFilter;
+    use tracing_subscriber::{fmt::TestWriter, EnvFilter};
+
+    use crate::{
+        protocols::replication::{
+            behaviour::{ReplicationBehaviour, ReplicationEvent},
+            handler::DaMessage,
+        },
+        test_utils::AllNeighbours,
+    };
 
     #[tokio::test]
     async fn test_connects_and_receives_replication_messages() {
@@ -66,7 +68,8 @@ mod test {
         let msg_count = 10usize;
         let addr: Multiaddr = "/ip4/127.0.0.1/udp/5053/quic-v1".parse().unwrap();
         let addr2 = addr.clone();
-        // future that listens for messages and collects `msg_count` of them, then returns them
+        // future that listens for messages and collects `msg_count` of them, then
+        // returns them
         let task_1 = async move {
             swarm_1.listen_on(addr.clone()).unwrap();
             swarm_1

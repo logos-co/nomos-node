@@ -1,16 +1,14 @@
 pub mod adapters;
 
-// std
 use std::hash::Hash;
-// crates
+
 use futures::Stream;
 use nomos_core::block::Block;
-use overwatch_rs::DynError;
-// internal
-use nomos_network::backends::NetworkBackend;
-use nomos_network::NetworkService;
-use overwatch_rs::services::relay::OutboundRelay;
-use overwatch_rs::services::ServiceData;
+use nomos_network::{backends::NetworkBackend, NetworkService};
+use overwatch_rs::{
+    services::{relay::OutboundRelay, ServiceData},
+    DynError,
+};
 use serde::{de::DeserializeOwned, Serialize};
 
 type BoxedStream<T> = Box<dyn Stream<Item = T> + Send + Sync + Unpin>;

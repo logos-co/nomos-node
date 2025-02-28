@@ -1,7 +1,9 @@
-use crate::MembershipHandler;
+use std::collections::HashSet;
+
 use libp2p_identity::PeerId;
 use serde::{Deserialize, Serialize};
-use std::collections::HashSet;
+
+use crate::MembershipHandler;
 
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
 pub struct FillWithOriginalReplication {
@@ -50,7 +52,8 @@ impl FillWithOriginalReplication {
         (0..subnetwork_size)
             .map(|subnetwork| {
                 (0..{
-                    // choose factor depending on if it is in the original size of the encoding or not
+                    // choose factor depending on if it is in the original size of the encoding or
+                    // not
                     if subnetwork < pivot as usize {
                         original_replication
                     } else {
@@ -104,8 +107,9 @@ impl MembershipHandler for FillWithOriginalReplication {
 
 #[cfg(test)]
 mod test {
-    use crate::versions::v2::FillWithOriginalReplication;
     use libp2p_identity::PeerId;
+
+    use crate::versions::v2::FillWithOriginalReplication;
 
     #[test]
     fn test_distribution_fill_with_original_replication_from_node_list() {

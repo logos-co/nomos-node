@@ -4,26 +4,30 @@ pub mod openapi {
     pub use crate::backend::Status;
 }
 
-// std
-use std::fmt::Debug;
-use std::marker::PhantomData;
+use std::{fmt::Debug, marker::PhantomData};
 
-// crates
-use crate::network::NetworkAdapter as NetworkAdapterTrait;
-use crate::tx::state::TxMempoolState;
 use futures::StreamExt;
-use overwatch_rs::services::handle::ServiceStateHandle;
-use services_utils::overwatch::recovery::operators::RecoveryBackend as RecoveryBackendTrait;
-// internal
-use crate::backend::{MemPool, RecoverableMempool};
-use crate::tx::settings::TxMempoolSettings;
-use crate::{MempoolMetrics, MempoolMsg};
 use nomos_network::{NetworkMsg, NetworkService};
-use overwatch_rs::services::{relay::OutboundRelay, ServiceCore, ServiceData, ServiceId};
-use overwatch_rs::OpaqueServiceStateHandle;
-use services_utils::overwatch::{lifecycle, JsonFileBackend, RecoveryOperator};
+use overwatch_rs::{
+    services::{
+        handle::ServiceStateHandle, relay::OutboundRelay, ServiceCore, ServiceData, ServiceId,
+    },
+    OpaqueServiceStateHandle,
+};
+use services_utils::overwatch::{
+    lifecycle, recovery::operators::RecoveryBackend as RecoveryBackendTrait, JsonFileBackend,
+    RecoveryOperator,
+};
 
-/// A tx mempool service that uses a [`JsonFileBackend`] as a recovery mechanism.
+use crate::{
+    backend::{MemPool, RecoverableMempool},
+    network::NetworkAdapter as NetworkAdapterTrait,
+    tx::{settings::TxMempoolSettings, state::TxMempoolState},
+    MempoolMetrics, MempoolMsg,
+};
+
+/// A tx mempool service that uses a [`JsonFileBackend`] as a recovery
+/// mechanism.
 pub type TxMempoolService<NetworkAdapter, Pool> = GenericTxMempoolService<
     Pool,
     NetworkAdapter,
@@ -40,7 +44,8 @@ pub type TxMempoolService<NetworkAdapter, Pool> = GenericTxMempoolService<
     >,
 >;
 
-/// A generic tx mempool service which wraps around a mempool, a network adapter, and a recovery backend.
+/// A generic tx mempool service which wraps around a mempool, a network
+/// adapter, and a recovery backend.
 pub struct GenericTxMempoolService<Pool, NetworkAdapter, RecoveryBackend>
 where
     Pool: RecoverableMempool,
@@ -198,7 +203,8 @@ where
                         self.service_state_handle
                             .state_updater
                             .update(self.pool.save().into());
-                        // move sending to a new task so local operations can complete in the meantime
+                        // move sending to a new task so local operations can complete in the
+                        // meantime
                         tokio::spawn(async {
                             let adapter = NetworkAdapter::new(settings, network_relay).await;
                             adapter.send(item).await;

@@ -1,7 +1,5 @@
 pub mod blob;
 
-// crates
-// internal
 use blob::Blob;
 
 pub type BlobId = [u8; 32];

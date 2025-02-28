@@ -1,17 +1,15 @@
+use std::{collections::HashSet, hint::black_box};
+
 use ark_bls12_381::Fr;
 use ark_poly::{EvaluationDomain, GeneralEvaluationDomain};
-use divan::counter::BytesCount;
-use divan::Bencher;
-use kzgrs::common::field_element_from_bytes_le;
-use kzgrs::decode;
-use kzgrs::rs::points_to_bytes;
-use kzgrs_backend::encoder::{DaEncoder, DaEncoderParams};
-use kzgrs_backend::global::GLOBAL_PARAMETERS;
+use divan::{counter::BytesCount, Bencher};
+use kzgrs::{common::field_element_from_bytes_le, decode, rs::points_to_bytes};
+use kzgrs_backend::{
+    encoder::{DaEncoder, DaEncoderParams},
+    global::GLOBAL_PARAMETERS,
+};
 use nomos_core::da::DaEncoder as _;
-use rand::prelude::IteratorRandom;
-use rand::{thread_rng, RngCore};
-use std::collections::HashSet;
-use std::hint::black_box;
+use rand::{prelude::IteratorRandom, thread_rng, RngCore};
 
 fn main() {
     divan::main()

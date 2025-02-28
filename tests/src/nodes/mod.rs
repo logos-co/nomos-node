@@ -12,9 +12,9 @@ const LOGS_PREFIX: &str = "__logs";
 static CLIENT: Lazy<Client> = Lazy::new(Client::new);
 
 fn create_tempdir() -> std::io::Result<TempDir> {
-    // It's easier to use the current location instead of OS-default tempfile location
-    // because Github Actions can easily access files in the current location using wildcard
-    // to upload them as artifacts.
+    // It's easier to use the current location instead of OS-default tempfile
+    // location because Github Actions can easily access files in the current
+    // location using wildcard to upload them as artifacts.
     tempfile::TempDir::new_in(std::env::current_dir()?)
 }
 

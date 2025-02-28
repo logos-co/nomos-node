@@ -1,4 +1,3 @@
-// std
 use std::{
     str::FromStr,
     sync::{
@@ -7,34 +6,37 @@ use std::{
     },
     time::Duration,
 };
-// crates
-use bytes::Bytes;
+
 use cl::{NoteWitness, NullifierSecret};
 use cryptarchia_consensus::{ConsensusMsg, LeaderConfig, TimeConfig};
 use kzgrs_backend::{
     common::blob::DaBlob,
     dispersal::{BlobInfo, Metadata},
 };
-use nomos_core::da::blob::Blob;
-use nomos_core::da::DaEncoder as _;
-use nomos_core::{da::blob::metadata::Metadata as _, staking::NMO_UNIT};
-use nomos_da_storage::rocksdb::DA_VERIFIED_KEY_PREFIX;
-use nomos_da_storage::{fs::write_blob, rocksdb::key_bytes};
+use nomos_core::{
+    da::{
+        blob::{metadata::Metadata as _, Blob},
+        DaEncoder as _,
+    },
+    staking::NMO_UNIT,
+};
+use nomos_da_storage::rocksdb::{
+    create_blob_idx, key_bytes, DA_BLOB_PREFIX, DA_SHARED_COMMITMENTS_PREFIX,
+};
 use nomos_da_verifier::backend::kzgrs::KzgrsDaVerifierSettings;
 use nomos_ledger::LedgerState;
 use nomos_libp2p::{Multiaddr, SwarmConfig};
 use nomos_node::Wire;
 use nomos_storage::{
     backends::{rocksdb::RocksBackend, StorageSerde},
-    StorageService,
+    StorageMsg, StorageService,
 };
+use overwatch_rs::services::relay::OutboundRelay;
 use rand::{thread_rng, Rng};
 use tempfile::{NamedTempFile, TempDir};
 use time::OffsetDateTime;
-use tokio_stream::wrappers::BroadcastStream;
-use tokio_stream::StreamExt;
+use tokio_stream::{wrappers::BroadcastStream, StreamExt};
 
-// internal
 use crate::common::*;
 
 const INDEXER_TEST_MAX_SECONDS: u64 = 60;
@@ -99,9 +101,6 @@ fn test_indexer() {
 
     let blobs_dir = TempDir::new().unwrap().path().to_path_buf();
 
-    let (node1_sk, _) = generate_blst_hex_keys();
-    let (node2_sk, _) = generate_blst_hex_keys();
-
     let (peer_sk_1, peer_id_1) = create_ed25519_sk_peerid(SK1);
     let (peer_sk_2, peer_id_2) = create_ed25519_sk_peerid(SK2);
 
@@ -128,8 +127,6 @@ fn test_indexer() {
         &blobs_dir,
         vec![node_address(&swarm_config2)],
         KzgrsDaVerifierSettings {
-            sk: node1_sk.clone(),
-            index: [0].into(),
             global_params_path: GLOBAL_PARAMS_PATH.into(),
         },
         TestDaNetworkSettings {
@@ -156,8 +153,6 @@ fn test_indexer() {
         &blobs_dir,
         vec![node_address(&swarm_config1)],
         KzgrsDaVerifierSettings {
-            sk: node2_sk.clone(),
-            index: [1].into(),
             global_params_path: GLOBAL_PARAMS_PATH.into(),
         },
         TestDaNetworkSettings {
@@ -185,9 +180,6 @@ fn test_indexer() {
     let encoded_data = encoder.encode(&data).unwrap();
     let columns: Vec<_> = encoded_data.extended_data.columns().collect();
 
-    // Mock attestation step where blob is persisted in nodes blob storage.
-    let rt = tokio::runtime::Runtime::new().unwrap();
-
     let mut blobs = vec![];
     for (i, column) in columns.iter().enumerate() {
         let da_blob = DaBlob {
@@ -206,16 +198,11 @@ fn test_indexer() {
                 .collect(),
         };
 
-        rt.block_on(write_blob(
-            blobs_dir.clone(),
-            da_blob.id().as_ref(),
-            da_blob.column_idx().as_ref(),
-            &Wire::serialize(da_blob.clone()),
-        ))
-        .unwrap();
-
         blobs.push(da_blob);
     }
+
+    let blob_0 = blobs[0].clone();
+    let blobs_node_2 = blobs.clone();
 
     // Test generate hash for Certificate with default Hasher
     // let mut default_hasher = DefaultHasher::new();
@@ -240,18 +227,6 @@ fn test_indexer() {
 
     let orphan_blob_info = BlobInfo::new(orphan_blob_hash, orphan_meta);
 
-    // Prepare indexes for blobs
-    let mut node_1_blob_0_idx = Vec::new();
-    node_1_blob_0_idx.extend_from_slice(&blob_hash);
-    node_1_blob_0_idx.extend_from_slice(&0u16.to_be_bytes());
-
-    let mut node_1_blob_1_idx = Vec::new();
-    node_1_blob_1_idx.extend_from_slice(&blob_hash);
-    node_1_blob_1_idx.extend_from_slice(&1u16.to_be_bytes());
-
-    let node_2_blob_0_idx = node_1_blob_0_idx.clone();
-    let node_2_blob_1_idx = node_1_blob_1_idx.clone();
-
     // Test get Metadata for Certificate
     let (app_id2, index2) = blob_info.metadata();
 
@@ -262,22 +237,7 @@ fn test_indexer() {
 
     node2.spawn(async move {
         let storage_outbound = node2_storage.connect().await.unwrap();
-
-        // Mock both attested blobs by writting directly into the da storage.
-        storage_outbound
-            .send(nomos_storage::StorageMsg::Store {
-                key: key_bytes(DA_VERIFIED_KEY_PREFIX, node_2_blob_0_idx),
-                value: Bytes::new(),
-            })
-            .await
-            .unwrap();
-        storage_outbound
-            .send(nomos_storage::StorageMsg::Store {
-                key: key_bytes(DA_VERIFIED_KEY_PREFIX, node_2_blob_1_idx),
-                value: Bytes::new(),
-            })
-            .await
-            .unwrap();
+        store_blobs_in_db(blobs_node_2, storage_outbound).await;
     });
 
     node1.spawn(async move {
@@ -299,20 +259,7 @@ fn test_indexer() {
             });
 
         // Mock both attested blobs by writting directly into the da storage.
-        storage_outbound
-            .send(nomos_storage::StorageMsg::Store {
-                key: key_bytes(DA_VERIFIED_KEY_PREFIX, node_1_blob_0_idx),
-                value: Bytes::new(),
-            })
-            .await
-            .unwrap();
-        storage_outbound
-            .send(nomos_storage::StorageMsg::Store {
-                key: key_bytes(DA_VERIFIED_KEY_PREFIX, node_1_blob_1_idx),
-                value: Bytes::new(),
-            })
-            .await
-            .unwrap();
+        store_blobs_in_db(blobs, storage_outbound).await;
 
         // Put blob_info into the mempool.
         let (mempool_tx, mempool_rx) = tokio::sync::oneshot::channel();
@@ -405,10 +352,10 @@ fn test_indexer() {
         app_id_blobs.sort_by(|(a, _), (b, _)| a.partial_cmp(b).unwrap());
         let app_id_blobs = app_id_blobs.iter().map(|(_, b)| b).collect::<Vec<_>>();
 
-        // When Indexer is asked for app_id at index, it will return all blobs that it has for that
-        // blob_id.
+        // When Indexer is asked for app_id at index, it will return all blobs that it
+        // has for that blob_id.
         let columns = app_id_blobs[0];
-        if !columns.is_empty() && columns[0] == blobs[0] && app_id_blobs[1].is_empty() {
+        if !columns.is_empty() && columns[0] == blob_0 && app_id_blobs[1].is_empty() {
             is_success_tx.store(true, SeqCst);
         }
 
@@ -416,7 +363,38 @@ fn test_indexer() {
     });
 
     while !performed_rx.load(SeqCst) {
-        std::thread::sleep(std::time::Duration::from_millis(200));
+        std::thread::sleep(Duration::from_millis(200));
     }
     assert!(is_success_rx.load(SeqCst));
+}
+
+async fn store_blobs_in_db(
+    blobs: Vec<DaBlob>,
+    storage_outbound: OutboundRelay<StorageMsg<RocksBackend<Wire>>>,
+) {
+    // Also all blobs in RocksDb
+    for blob in blobs {
+        let id = blob.id();
+        let idx = create_blob_idx(id.as_ref(), blob.column_idx().as_ref());
+
+        let (light_blob, shared_commitments) = blob.into_blob_and_shared_commitments();
+        let blob_key = key_bytes(DA_BLOB_PREFIX, idx);
+        storage_outbound
+            .send(StorageMsg::Store {
+                key: blob_key,
+                value: Wire::serialize(light_blob),
+            })
+            .await
+            .unwrap();
+
+        let shared_commitments_key = key_bytes(DA_SHARED_COMMITMENTS_PREFIX, &id);
+        let bytes = Wire::serialize(shared_commitments);
+        storage_outbound
+            .send(StorageMsg::Store {
+                key: shared_commitments_key,
+                value: bytes,
+            })
+            .await
+            .unwrap();
+    }
 }

@@ -7,8 +7,8 @@ pub trait LeaderProof {
     // The evolved commitment for the coin used in the proof
     fn evolved_commitment(&self) -> cl::NoteCommitment;
     // The merkle root used for the proof
-    // This is needed here because the proof could be using an old merkle root, and we don't want a verifying
-    // node to have to guess which one it's using.
+    // This is needed here because the proof could be using an old merkle root, and
+    // we don't want a verifying node to have to guess which one it's using.
     fn merke_root(&self) -> [u8; 32];
 
     fn to_orphan_proof(&self) -> OrphanProof {

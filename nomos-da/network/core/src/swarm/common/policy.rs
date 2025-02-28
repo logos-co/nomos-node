@@ -1,9 +1,7 @@
-// std
-// crates
 use libp2p::PeerId;
 use serde::{Deserialize, Serialize};
 use subnetworks_assignations::MembershipHandler;
-// internal
+
 use super::balancer::{
     ConnectionDeviation, SubnetworkConnectionPolicy, SubnetworkDeviation, SubnetworkStats,
 };
@@ -89,7 +87,8 @@ where
             self.settings.min_dispersal_peers
         };
 
-        // Current implementation doesn't differenciate and combine inbound and outbound stats.
+        // Current implementation doesn't differenciate and combine inbound and outbound
+        // stats.
         let total_missing = required_connections.saturating_sub(stats.inbound + stats.outbound);
 
         SubnetworkDeviation {

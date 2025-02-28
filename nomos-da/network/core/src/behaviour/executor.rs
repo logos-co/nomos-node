@@ -1,31 +1,34 @@
-// std
 use std::time::Duration;
-// crates
-use libp2p::identity::Keypair;
-use libp2p::swarm::NetworkBehaviour;
-use libp2p::PeerId;
-// internal
-use crate::address_book::AddressBook;
-use crate::maintenance::balancer::{ConnectionBalancer, ConnectionBalancerBehaviour};
-use crate::maintenance::monitor::{ConnectionMonitor, ConnectionMonitorBehaviour};
-use crate::{
-    protocols::dispersal::executor::behaviour::DispersalExecutorBehaviour,
-    protocols::dispersal::validator::behaviour::DispersalValidatorBehaviour,
-    protocols::replication::behaviour::ReplicationBehaviour,
-    protocols::sampling::behaviour::SamplingBehaviour,
-};
+
+use libp2p::{identity::Keypair, swarm::NetworkBehaviour, PeerId};
 use subnetworks_assignations::MembershipHandler;
+
+use crate::{
+    address_book::AddressBook,
+    maintenance::{
+        balancer::{ConnectionBalancer, ConnectionBalancerBehaviour},
+        monitor::{ConnectionMonitor, ConnectionMonitorBehaviour},
+    },
+    protocols::{
+        dispersal::{
+            executor::behaviour::DispersalExecutorBehaviour,
+            validator::behaviour::DispersalValidatorBehaviour,
+        },
+        replication::behaviour::ReplicationBehaviour,
+        sampling::behaviour::SamplingBehaviour,
+    },
+};
 
 /// Aggregated `NetworkBehaviour` composed of:
 /// * Sampling
 /// * Executor dispersal
 /// * Validator dispersal
-/// * Replication
-///     WARNING: Order of internal protocols matters as the first one will be polled first until return
-///     a `Poll::Pending`.
+/// * Replication WARNING: Order of internal protocols matters as the first one
+///   will be polled first until return a `Poll::Pending`.
 /// 1) Sampling is the crucial one as we have to be responsive for consensus.
 /// 2) Dispersal so we do not bottleneck executors.
-/// 3) Replication is the least important (and probably the least used), it is also dependant of dispersal.
+/// 3) Replication is the least important (and probably the least used), it is
+///    also dependant of dispersal.
 #[derive(NetworkBehaviour)]
 pub struct ExecutorBehaviour<Balancer, Monitor, Membership>
 where

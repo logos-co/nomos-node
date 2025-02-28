@@ -1,4 +1,3 @@
-// std
 use std::{
     str::FromStr,
     sync::{
@@ -7,21 +6,19 @@ use std::{
     },
     time::Duration,
 };
-// crates
+
 use cl::{NoteWitness, NullifierSecret};
 use cryptarchia_consensus::{LeaderConfig, TimeConfig};
 use kzgrs_backend::common::blob::DaBlob;
 use nomos_core::{da::DaEncoder as _, staking::NMO_UNIT};
 use nomos_da_verifier::backend::kzgrs::KzgrsDaVerifierSettings;
 use nomos_ledger::LedgerState;
-use nomos_libp2p::Multiaddr;
-use nomos_libp2p::SwarmConfig;
+use nomos_libp2p::{Multiaddr, SwarmConfig};
 use rand::{thread_rng, Rng};
 use tempfile::{NamedTempFile, TempDir};
 use time::OffsetDateTime;
-use tracing_subscriber::fmt::TestWriter;
-use tracing_subscriber::EnvFilter;
-// internal
+use tracing_subscriber::{fmt::TestWriter, EnvFilter};
+
 use crate::common::*;
 
 #[test]
@@ -91,10 +88,6 @@ fn test_verifier() {
 
     let blobs_dir = TempDir::new().unwrap().path().to_path_buf();
 
-    let (node1_sk, _) = generate_blst_hex_keys();
-    let (node2_sk, _) = generate_blst_hex_keys();
-    let (node3_sk, _) = generate_blst_hex_keys();
-
     let client_zone = new_client(NamedTempFile::new().unwrap().path().to_path_buf());
 
     let (peer_sk_1, peer_id_1) = generate_ed25519_sk_peerid();
@@ -129,8 +122,6 @@ fn test_verifier() {
         &blobs_dir,
         vec![node_address(&swarm_config2)],
         KzgrsDaVerifierSettings {
-            sk: node1_sk.clone(),
-            index: [0].into(),
             global_params_path: GLOBAL_PARAMS_PATH.into(),
         },
         TestDaNetworkSettings {
@@ -157,8 +148,6 @@ fn test_verifier() {
         &blobs_dir,
         vec![node_address(&swarm_config1)],
         KzgrsDaVerifierSettings {
-            sk: node2_sk,
-            index: [1].into(),
             global_params_path: GLOBAL_PARAMS_PATH.into(),
         },
         TestDaNetworkSettings {
@@ -185,8 +174,6 @@ fn test_verifier() {
         &blobs_dir,
         vec![node_address(&swarm_config2)],
         KzgrsDaVerifierSettings {
-            sk: node3_sk,
-            index: [2].into(),
             global_params_path: GLOBAL_PARAMS_PATH.into(),
         },
         TestDaNetworkSettings {

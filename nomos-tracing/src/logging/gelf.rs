@@ -1,9 +1,7 @@
-// std
 use std::{error::Error, net::SocketAddr, time::Duration};
-// crates
+
 use serde::{Deserialize, Serialize};
 use tokio::runtime::Handle;
-// internal
 
 const GELF_RECONNECT_INTERVAL: u64 = 10;
 

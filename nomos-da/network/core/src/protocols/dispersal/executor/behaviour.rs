@@ -1,39 +1,40 @@
-// std
-use std::collections::{HashMap, HashSet, VecDeque};
-use std::task::{Context, Poll};
-// crates
-use either::Either;
-use futures::future::BoxFuture;
-use futures::stream::{BoxStream, FuturesUnordered};
-use futures::{AsyncWriteExt, FutureExt, StreamExt, TryFutureExt};
-use libp2p::core::transport::PortUse;
-use libp2p::core::Endpoint;
-use libp2p::swarm::behaviour::{ConnectionClosed, ConnectionEstablished};
-use libp2p::swarm::dial_opts::DialOpts;
-use libp2p::swarm::{
-    ConnectionDenied, ConnectionId, FromSwarm, NetworkBehaviour, THandler, THandlerInEvent,
-    THandlerOutEvent, ToSwarm,
+use std::{
+    collections::{HashMap, HashSet, VecDeque},
+    task::{Context, Poll},
 };
-use libp2p::{Multiaddr, PeerId, Stream};
+
+use either::Either;
+use futures::{
+    future::BoxFuture,
+    stream::{BoxStream, FuturesUnordered},
+    AsyncWriteExt, FutureExt, StreamExt, TryFutureExt,
+};
+use kzgrs_backend::common::blob::DaBlob;
+use libp2p::{
+    core::{transport::PortUse, Endpoint},
+    swarm::{
+        behaviour::{ConnectionClosed, ConnectionEstablished},
+        dial_opts::DialOpts,
+        ConnectionDenied, ConnectionId, FromSwarm, NetworkBehaviour, THandler, THandlerInEvent,
+        THandlerOutEvent, ToSwarm,
+    },
+    Multiaddr, PeerId, Stream,
+};
 use libp2p_stream::{Control, OpenStreamError};
-use rand::prelude::IteratorRandom;
-use rand::SeedableRng;
+use nomos_core::{da::BlobId, wire};
+use nomos_da_messages::{
+    common::Blob,
+    dispersal,
+    packing::{pack_to_writer, unpack_from_reader},
+};
+use rand::{prelude::IteratorRandom, SeedableRng};
+use subnetworks_assignations::MembershipHandler;
 use thiserror::Error;
-use tokio::sync::mpsc;
-use tokio::sync::mpsc::UnboundedSender;
+use tokio::sync::{mpsc, mpsc::UnboundedSender};
 use tokio_stream::wrappers::UnboundedReceiverStream;
 use tracing::error;
-// internal
-use crate::address_book::AddressBook;
-use crate::protocol::DISPERSAL_PROTOCOL;
-use crate::SubnetworkId;
-use kzgrs_backend::common::blob::DaBlob;
-use nomos_core::da::BlobId;
-use nomos_core::wire;
-use nomos_da_messages::common::Blob;
-use nomos_da_messages::dispersal;
-use nomos_da_messages::packing::{pack_to_writer, unpack_from_reader};
-use subnetworks_assignations::MembershipHandler;
+
+use crate::{address_book::AddressBook, protocol::DISPERSAL_PROTOCOL, SubnetworkId};
 
 #[derive(Debug, Error)]
 pub enum DispersalError {
@@ -309,8 +310,8 @@ where
         Ok((blob_id, subnetwork_id, response, stream))
     }
 
-    /// Run when a stream gets free, if there is a pending task for the stream it will get scheduled to run
-    /// otherwise it is parked as idle.
+    /// Run when a stream gets free, if there is a pending task for the stream
+    /// it will get scheduled to run otherwise it is parked as idle.
     fn handle_stream(
         tasks: &mut FuturesUnordered<StreamHandlerFuture>,
         to_disperse: &mut HashMap<PeerId, VecDeque<(SubnetworkId, DaBlob)>>,
@@ -342,8 +343,8 @@ where
 impl<Membership: MembershipHandler<Id = PeerId, NetworkId = SubnetworkId> + 'static>
     DispersalExecutorBehaviour<Membership>
 {
-    /// Schedule a new task for sending the blob, if stream is not available queue messages for later
-    /// processing.
+    /// Schedule a new task for sending the blob, if stream is not available
+    /// queue messages for later processing.
     fn disperse_blob(
         tasks: &mut FuturesUnordered<StreamHandlerFuture>,
         idle_streams: &mut HashMap<Membership::Id, DispersalStream>,
@@ -358,8 +359,8 @@ impl<Membership: MembershipHandler<Id = PeerId, NetworkId = SubnetworkId> + 'sta
             .iter()
             .filter(|peer_id| connected_peers.contains_key(peer_id));
 
-        // We may be connected to more than a single node. Usually will be one, but that is an
-        // internal decision of the executor itself.
+        // We may be connected to more than a single node. Usually will be one, but that
+        // is an internal decision of the executor itself.
         for peer in peers {
             if let Some(stream) = idle_streams.remove(peer) {
                 // push a task if the stream is immediately available
@@ -415,7 +416,8 @@ impl<Membership: MembershipHandler<Id = PeerId, NetworkId = SubnetworkId> + 'sta
             .filter_peers_for_subnetworks(peer_id, subnetworks.iter().copied())
             .reduce(|h1, h2| h1.intersection(&h2).copied().collect())
             .unwrap_or_default();
-        // we didn't find a single shared peer for all subnetworks, so we take the smallest subset
+        // we didn't find a single shared peer for all subnetworks, so we take the
+        // smallest subset
         if peers.is_empty() {
             peers = self
                 .filter_peers_for_subnetworks(peer_id, subnetworks.iter().copied())
