@@ -1,19 +1,18 @@
-use kzgrs_backend::common::blob::DaBlobSharedCommitments;
-use kzgrs_backend::encoder::DaEncoderParams;
+use std::net::{Ipv4Addr, SocketAddr};
+
+use kzgrs_backend::{common::blob::DaBlobSharedCommitments, encoder::DaEncoderParams};
 use nomos_api::ApiServiceSettings;
 use nomos_core::da::DaEncoder;
 use nomos_da_storage::rocksdb::{key_bytes, DA_SHARED_COMMITMENTS_PREFIX};
-use nomos_node::api::backend::AxumBackendSettings;
-use nomos_node::{NomosApiService, Wire};
-use nomos_storage::backends::rocksdb::RocksBackend;
-use nomos_storage::backends::StorageSerde;
-use nomos_storage::{StorageMsg, StorageService};
+use nomos_node::{api::backend::AxumBackendSettings, NomosApiService, Wire};
+use nomos_storage::{
+    backends::{rocksdb::RocksBackend, StorageSerde},
+    StorageMsg, StorageService,
+};
 use nomos_tracing_service::{Tracing, TracingSettings};
-use overwatch_rs::overwatch::OverwatchRunner;
-use overwatch_rs::{OpaqueServiceHandle, Services};
+use overwatch_rs::{overwatch::OverwatchRunner, OpaqueServiceHandle, Services};
 use rand::RngCore;
 use reqwest::Url;
-use std::net::{Ipv4Addr, SocketAddr};
 use tests::{get_available_port, GLOBAL_PARAMS_PATH};
 
 // Probably temporary solution until can be integrated into integration tests
