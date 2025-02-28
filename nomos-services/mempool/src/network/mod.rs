@@ -1,15 +1,9 @@
 pub mod adapters;
 mod messages;
 
-// std
-
-// crates
 use futures::Stream;
-// internal
-use nomos_network::backends::NetworkBackend;
-use nomos_network::NetworkService;
-use overwatch_rs::services::relay::OutboundRelay;
-use overwatch_rs::services::ServiceData;
+use nomos_network::{backends::NetworkBackend, NetworkService};
+use overwatch_rs::services::{relay::OutboundRelay, ServiceData};
 
 #[async_trait::async_trait]
 pub trait NetworkAdapter {

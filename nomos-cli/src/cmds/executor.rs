@@ -1,12 +1,9 @@
-// std
-use std::path::PathBuf;
-use std::sync::mpsc::Sender;
-// crates
+use std::{path::PathBuf, sync::mpsc::Sender};
+
 use clap::Args;
-use reqwest::Url;
-// internal
 use executor_http_client::{BasicAuthCredentials, ExecutorHttpClient};
 use kzgrs_backend::{dispersal::Metadata, encoder::DaEncoderParams};
+use reqwest::Url;
 
 #[derive(Args, Debug)]
 pub struct Disseminate {

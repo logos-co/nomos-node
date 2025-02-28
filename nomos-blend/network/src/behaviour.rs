@@ -1,7 +1,10 @@
-use crate::{
-    error::Error,
-    handler::{BlendConnectionHandler, FromBehaviour, ToBehaviour},
+use std::{
+    collections::{HashMap, VecDeque},
+    marker::PhantomData,
+    task::{Context, Poll, Waker},
+    time::Duration,
 };
+
 use cached::{Cached, TimedCache};
 use libp2p::{
     core::{transport::PortUse, Endpoint},
@@ -14,11 +17,11 @@ use libp2p::{
 use nomos_blend::conn_maintenance::{ConnectionMonitor, ConnectionMonitorSettings};
 use nomos_blend_message::BlendMessage;
 use sha2::{Digest, Sha256};
-use std::{
-    collections::{HashMap, VecDeque},
-    task::{Context, Poll, Waker},
+
+use crate::{
+    error::Error,
+    handler::{BlendConnectionHandler, FromBehaviour, ToBehaviour},
 };
-use std::{marker::PhantomData, time::Duration};
 
 /// A [`NetworkBehaviour`]:
 /// - forwards messages to all connected peers with deduplication.
@@ -34,8 +37,8 @@ where
     events: VecDeque<ToSwarm<Event, FromBehaviour>>,
     /// Waker that handles polling
     waker: Option<Waker>,
-    /// An LRU time cache for storing seen messages (based on their ID). This cache prevents
-    /// duplicates from being propagated on the network.
+    /// An LRU time cache for storing seen messages (based on their ID). This
+    /// cache prevents duplicates from being propagated on the network.
     duplicate_cache: TimedCache<Vec<u8>, ()>,
     _blend_message: PhantomData<M>,
     _interval_provider: PhantomData<IntervalProvider>,
@@ -97,7 +100,8 @@ where
         }
 
         let result = self.forward_message(message, None);
-        // Add the message to the cache only if the forwarding was successfully triggered
+        // Add the message to the cache only if the forwarding was successfully
+        // triggered
         if result.is_ok() {
             self.duplicate_cache.cache_set(msg_id, ());
         }
@@ -106,7 +110,8 @@ where
 
     /// Forwards a message to all connected peers except the excluded peer.
     ///
-    /// Returns [`Error::NoPeers`] if there are no connected peers that support the blend protocol.
+    /// Returns [`Error::NoPeers`] if there are no connected peers that support
+    /// the blend protocol.
     fn forward_message(
         &mut self,
         message: Vec<u8>,
@@ -231,7 +236,8 @@ where
             // A message was forwarded from the peer.
             ToBehaviour::Message(message) => {
                 // Ignore drop message
-                // TODO: move this check into ConnectionHandler since it now has access to the message type
+                // TODO: move this check into ConnectionHandler since it now has access to the
+                // message type
                 if M::is_drop_message(&message) {
                     return;
                 }
@@ -273,7 +279,8 @@ where
             }
             ToBehaviour::UnhealthyPeer => {
                 tracing::debug!("Peer {:?} has been detected as unhealthy", peer_id);
-                // TODO: Still the algorithm to revert the peer to healthy state is not defined yet.
+                // TODO: Still the algorithm to revert the peer to healthy state is not defined
+                // yet.
                 self.negotiated_peers
                     .insert(peer_id, NegotiatedPeerState::Unhealthy);
                 self.events

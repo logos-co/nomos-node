@@ -45,7 +45,8 @@ where
     ) -> Self {
         // this wait seems to be helpful in some cases since we give the time
         // to the network to establish connections before we start sending messages
-        // TODO: Remove this once we have the status system to await for service readiness
+        // TODO: Remove this once we have the status system to await for service
+        // readiness
         tokio::time::sleep(std::time::Duration::from_secs(1)).await;
 
         Self {

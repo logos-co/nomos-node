@@ -1,10 +1,9 @@
-// std
 use std::marker::PhantomData;
-// crates
 
-// internal
-use crate::da::blob::{info::DispersedBlobInfo, BlobSelect};
-use crate::utils;
+use crate::{
+    da::blob::{info::DispersedBlobInfo, BlobSelect},
+    utils,
+};
 
 #[derive(Default, Clone, Copy)]
 pub struct FillSize<const SIZE: usize, B> {

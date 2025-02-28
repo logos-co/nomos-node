@@ -2,17 +2,16 @@ mod command;
 mod config;
 pub(crate) mod swarm;
 
-// std
-pub use self::command::{Command, Dial, Libp2pInfo, Topic};
-pub use self::config::Libp2pConfig;
-use self::swarm::SwarmHandler;
-
-// internal
-use super::NetworkBackend;
 pub use nomos_libp2p::libp2p::gossipsub::{Message, TopicHash};
-// crates
 use overwatch_rs::{overwatch::handle::OverwatchHandle, services::state::NoState};
 use tokio::sync::{broadcast, mpsc};
+
+use self::swarm::SwarmHandler;
+pub use self::{
+    command::{Command, Dial, Libp2pInfo, Topic},
+    config::Libp2pConfig,
+};
+use super::NetworkBackend;
 
 pub struct Libp2p {
     events_tx: broadcast::Sender<Event>,

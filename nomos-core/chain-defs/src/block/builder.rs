@@ -1,20 +1,20 @@
-// std
-use indexmap::IndexSet;
 use std::hash::Hash;
-// crates
-use serde::de::DeserializeOwned;
-use serde::Serialize;
-// internal
-use crate::block::Block;
-use crate::crypto::Blake2b;
-use crate::da::blob::{info::DispersedBlobInfo, BlobSelect};
-use crate::header::Builder;
-use crate::tx::{Transaction, TxSelect};
-use crate::wire;
+
 use blake2::digest::Digest;
-/// Wrapper over a block building `new` method than holds intermediary state and can be
-/// passed around. It also compounds the transaction selection and blob selection heuristics to be
-/// used for transaction and blob selection.
+use indexmap::IndexSet;
+use serde::{de::DeserializeOwned, Serialize};
+
+use crate::{
+    block::Block,
+    crypto::Blake2b,
+    da::blob::{info::DispersedBlobInfo, BlobSelect},
+    header::Builder,
+    tx::{Transaction, TxSelect},
+    wire,
+};
+/// Wrapper over a block building `new` method than holds intermediary state and
+/// can be passed around. It also compounds the transaction selection and blob
+/// selection heuristics to be used for transaction and blob selection.
 ///
 /// Example:
 /// ``` ignore

@@ -1,6 +1,6 @@
-use crate::common::Blob;
-use crate::SubnetworkId;
 use serde::{Deserialize, Serialize};
+
+use crate::{common::Blob, SubnetworkId};
 
 #[repr(C)]
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]

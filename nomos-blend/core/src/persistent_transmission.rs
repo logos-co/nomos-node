@@ -1,8 +1,11 @@
+use std::{
+    pin::{pin, Pin},
+    task::{Context, Poll},
+};
+
 use futures::{Stream, StreamExt};
 use rand::{distributions::Uniform, prelude::Distribution, Rng, RngCore};
 use serde::{Deserialize, Serialize};
-use std::pin::{pin, Pin};
-use std::task::{Context, Poll};
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize)]
 pub struct PersistentTransmissionSettings {
@@ -144,16 +147,16 @@ enum CoinError {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use std::time::Duration;
+
     use futures::StreamExt;
-    use nomos_blend_message::mock::MockBlendMessage;
-    use nomos_blend_message::BlendMessage;
+    use nomos_blend_message::{mock::MockBlendMessage, BlendMessage};
     use rand::SeedableRng;
     use rand_chacha::ChaCha8Rng;
-    use std::time::Duration;
-    use tokio::sync::mpsc;
-    use tokio::time;
+    use tokio::{sync::mpsc, time};
     use tokio_stream::wrappers::IntervalStream;
+
+    use super::*;
 
     macro_rules! assert_interval {
         ($last_time:expr, $lower_bound:expr, $upper_bound:expr) => {

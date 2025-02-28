@@ -1,7 +1,9 @@
-use crate::MembershipHandler;
+use std::collections::HashSet;
+
 use libp2p_identity::PeerId;
 use serde::{Deserialize, Serialize};
-use std::collections::HashSet;
+
+use crate::MembershipHandler;
 
 /// Fill a `N` sized set of "subnetworks" from a list of peer ids members
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
@@ -81,8 +83,9 @@ impl MembershipHandler for FillFromNodeList {
 
 #[cfg(test)]
 mod test {
-    use crate::versions::v1::FillFromNodeList;
     use libp2p_identity::PeerId;
+
+    use crate::versions::v1::FillFromNodeList;
 
     #[test]
     fn test_distribution_fill_from_node_list() {

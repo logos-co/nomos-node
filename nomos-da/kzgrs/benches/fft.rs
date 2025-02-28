@@ -2,8 +2,7 @@ use ark_bls12_381::{Fr, G1Affine, G1Projective};
 use ark_ec::AffineRepr;
 use ark_ff::BigInt;
 use ark_poly::{EvaluationDomain, GeneralEvaluationDomain};
-use divan::counter::ItemsCount;
-use divan::{black_box, Bencher};
+use divan::{black_box, counter::ItemsCount, Bencher};
 fn main() {
     divan::main()
 }

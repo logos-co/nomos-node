@@ -1,6 +1,7 @@
+use std::time::Duration;
+
 use cryptarchia_engine::Slot;
 use serde::{Deserialize, Serialize};
-use std::time::Duration;
 use time::OffsetDateTime;
 use tokio::time::{Interval, MissedTickBehavior};
 

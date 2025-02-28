@@ -1,18 +1,15 @@
-// std
 use std::collections::HashMap;
-// crates
-use serde::{Deserialize, Serialize};
-// internal
+
 use cl::{
     note::NoteWitness,
     nullifier::{Nullifier, NullifierSecret},
     InputWitness,
 };
 use cryptarchia_engine::Slot;
-use nomos_core::header::HeaderId;
-use nomos_core::proofs::leader_proof::Risc0LeaderProof;
+use nomos_core::{header::HeaderId, proofs::leader_proof::Risc0LeaderProof};
 use nomos_ledger::{Config, EpochState, NoteTree};
 use nomos_proof_statements::leadership::{LeaderPrivate, LeaderPublic};
+use serde::{Deserialize, Serialize};
 
 pub struct Leader {
     // for each block, the indexes in the note tree of the notes we control
@@ -41,9 +38,10 @@ impl Leader {
         }
     }
 
-    // Signal that the chain extended with a new header, possibly evolving a leader notes in the process
-    // FIXME: this implementation does not delete old coins and will attempt to re-use a note in different forks,
-    //        we should use the orphan proofs mechanism to handle this.
+    // Signal that the chain extended with a new header, possibly evolving a leader
+    // notes in the process FIXME: this implementation does not delete old coins
+    // and will attempt to re-use a note in different forks,        we should
+    // use the orphan proofs mechanism to handle this.
     pub fn follow_chain(&mut self, parent_id: HeaderId, id: HeaderId, to_evolve: Nullifier) {
         if let Some(notes) = self.notes.get(&parent_id) {
             let notes = notes

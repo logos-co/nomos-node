@@ -1,6 +1,5 @@
-// std
 use std::error::Error;
-// crates
+
 use opentelemetry::{global, trace::TracerProvider as _, KeyValue};
 use opentelemetry_otlp::WithExportConfig;
 use opentelemetry_sdk::{
@@ -14,7 +13,6 @@ use tracing::Subscriber;
 use tracing_opentelemetry::OpenTelemetryLayer;
 use tracing_subscriber::registry::LookupSpan;
 use url::Url;
-// internal
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct OtlpTracingConfig {

@@ -1,5 +1,4 @@
-use std::str::FromStr;
-use std::time::Duration;
+use std::{str::FromStr, time::Duration};
 
 use cl::{NoteWitness, NullifierSecret};
 use cryptarchia_consensus::{LeaderConfig, TimeConfig};
@@ -22,9 +21,10 @@ impl ConsensusParams {
     pub fn default_for_participants(n_participants: usize) -> Self {
         ConsensusParams {
             n_participants,
-            // by setting the slot coeff to 1, we also increase the probability of multiple blocks (forks)
-            // being produced in the same slot (epoch). Setting the security parameter to some value > 1
-            // ensures nodes have some time to sync before deciding on the longest chain.
+            // by setting the slot coeff to 1, we also increase the probability of multiple blocks
+            // (forks) being produced in the same slot (epoch). Setting the security
+            // parameter to some value > 1 ensures nodes have some time to sync before
+            // deciding on the longest chain.
             security_param: 10,
             // a block should be produced (on average) every slot
             active_slot_coeff: 0.9,
@@ -32,8 +32,8 @@ impl ConsensusParams {
     }
 }
 
-/// General consensus configuration for a chosen participant, that later could be converted into a
-/// specific service or services configuration.
+/// General consensus configuration for a chosen participant, that later could
+/// be converted into a specific service or services configuration.
 #[derive(Clone)]
 pub struct GeneralConsensusConfig {
     pub leader_config: LeaderConfig,

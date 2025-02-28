@@ -5,17 +5,17 @@ use overwatch_rs::DynError;
 use serde::{Deserialize, Serialize};
 use zeroize::ZeroizeOnDrop;
 
-use crate::{keys::ed25519::Ed25519Key, secure_key::SecuredKey, KMSOperator};
-
 use super::KMSBackend;
+use crate::{keys::ed25519::Ed25519Key, secure_key::SecuredKey, KMSOperator};
 
 pub struct PreloadKMSBackend {
     keys: HashMap<String, Key>,
 }
 
-/// This settings contain all [`Key`]s to be loaded into the [`PreloadKMSBackend`].
-/// This implements [`serde::Serialize`] for users to populate the settings from bytes.
-/// The [`Key`] also implements [`zeroize::ZeroizeOnDrop`] for security.
+/// This settings contain all [`Key`]s to be loaded into the
+/// [`PreloadKMSBackend`]. This implements [`serde::Serialize`] for users to
+/// populate the settings from bytes. The [`Key`] also implements
+/// [`zeroize::ZeroizeOnDrop`] for security.
 #[derive(Serialize, Deserialize)]
 pub struct PreloadKMSBackendSettings {
     keys: HashMap<String, Key>,
@@ -34,7 +34,8 @@ impl KMSBackend for PreloadKMSBackend {
     }
 
     /// This function just checks if the key_id was preloaded successfully.
-    /// It returns the `key_id` if the key was preloaded and the key type matches.
+    /// It returns the `key_id` if the key was preloaded and the key type
+    /// matches.
     fn register(
         &mut self,
         key_id: Self::KeyId,

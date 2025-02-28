@@ -1,17 +1,16 @@
-// std
-use std::path::PathBuf;
-use std::sync::mpsc::Sender;
-use std::{error::Error, ops::Range};
-// crates
+use std::{error::Error, ops::Range, path::PathBuf, sync::mpsc::Sender};
+
 use clap::Args;
+use kzgrs_backend::{
+    common::blob::DaBlob, dispersal::Index, reconstruction::reconstruct_without_missing_data,
+};
+use nomos_core::da::blob::metadata;
+use nomos_node::{
+    api::{handlers::GetRangeReq, paths},
+    wire,
+};
 use reqwest::{Client, Url};
 use serde::{de::DeserializeOwned, Serialize};
-// internal
-use kzgrs_backend::reconstruction::reconstruct_without_missing_data;
-use kzgrs_backend::{common::blob::DaBlob, dispersal::Index};
-use nomos_core::da::blob::metadata;
-use nomos_node::api::{handlers::GetRangeReq, paths};
-use nomos_node::wire;
 
 type RetrievalRes<Index> = Result<Vec<(Index, Vec<Vec<u8>>)>, Box<dyn Error + Send + Sync>>;
 
@@ -39,7 +38,8 @@ fn parse_app_blobs(val: &str) -> Result<Vec<(Index, Vec<DaBlob>)>, String> {
 
 #[derive(Args, Debug)]
 pub struct Reconstruct {
-    /// DaBlobs to use for reconstruction. Half of the blobs per index is expected.
+    /// DaBlobs to use for reconstruction. Half of the blobs per index is
+    /// expected.
     #[clap(
         short,
         long,

@@ -1,22 +1,24 @@
 pub mod backends;
 
-// crates
+use std::{
+    fmt::{Debug, Formatter},
+    marker::PhantomData,
+};
+
 use async_trait::async_trait;
-// internal
-use backends::StorageBackend;
-use backends::{StorageSerde, StorageTransaction};
+use backends::{StorageBackend, StorageSerde, StorageTransaction};
 use bytes::Bytes;
 use futures::StreamExt;
-use overwatch_rs::services::relay::RelayMessage;
-use overwatch_rs::services::state::{NoOperator, NoState};
-use overwatch_rs::services::{ServiceCore, ServiceData, ServiceId};
-use overwatch_rs::OpaqueServiceStateHandle;
-use serde::de::DeserializeOwned;
-use serde::Serialize;
-// std
+use overwatch_rs::{
+    services::{
+        relay::RelayMessage,
+        state::{NoOperator, NoState},
+        ServiceCore, ServiceData, ServiceId,
+    },
+    OpaqueServiceStateHandle,
+};
+use serde::{de::DeserializeOwned, Serialize};
 use services_utils::overwatch::lifecycle;
-use std::fmt::{Debug, Formatter};
-use std::marker::PhantomData;
 use tracing::error;
 
 /// Storage message that maps to [`StorageBackend`] trait
@@ -74,7 +76,8 @@ impl<Backend: StorageBackend> StorageReplyReceiver<Option<Bytes>, Backend> {
     {
         self.channel
             .await
-            // TODO: This should probably just return a result anyway. But for now we can consider in infallible.
+            // TODO: This should probably just return a result anyway. But for now we can consider
+            // in infallible.
             .map(|maybe_bytes| {
                 maybe_bytes.map(|bytes| {
                     Backend::SerdeOperator::deserialize(bytes)

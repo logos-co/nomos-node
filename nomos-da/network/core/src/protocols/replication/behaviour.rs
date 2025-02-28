@@ -1,28 +1,27 @@
-// std
-use std::collections::{HashMap, HashSet, VecDeque};
-use std::convert::Infallible;
-use std::task::{Context, Poll, Waker};
+use std::{
+    collections::{HashMap, HashSet, VecDeque},
+    convert::Infallible,
+    task::{Context, Poll, Waker},
+};
 
-// crates
 use either::Either;
 use indexmap::IndexSet;
-use libp2p::core::transport::PortUse;
-use libp2p::core::Endpoint;
-use libp2p::swarm::{
-    ConnectionClosed, ConnectionDenied, ConnectionId, FromSwarm, NetworkBehaviour, NotifyHandler,
-    THandler, THandlerInEvent, THandlerOutEvent, ToSwarm,
+use libp2p::{
+    core::{transport::PortUse, Endpoint},
+    swarm::{
+        ConnectionClosed, ConnectionDenied, ConnectionId, FromSwarm, NetworkBehaviour,
+        NotifyHandler, THandler, THandlerInEvent, THandlerOutEvent, ToSwarm,
+    },
+    Multiaddr, PeerId,
 };
-use libp2p::{Multiaddr, PeerId};
 use log::{error, trace};
 use subnetworks_assignations::MembershipHandler;
 use thiserror::Error;
 
-use crate::SubnetworkId;
-
-// internal
 use super::handler::{
     BehaviourEventToHandler, DaMessage, HandlerEventToBehaviour, ReplicationHandler,
 };
+use crate::SubnetworkId;
 
 type SwarmEvent = ToSwarm<ReplicationEvent, Either<BehaviourEventToHandler, Infallible>>;
 
@@ -87,20 +86,21 @@ impl ReplicationEvent {
 /// Nomos DA broadcas network behaviour
 /// This item handles the logic of the nomos da subnetworks broadcasting
 /// DA subnetworks are a logical distribution of subsets.
-/// A node just connects and accepts connections to other nodes that are in the same subsets.
-/// A node forwards messages to all connected peers which are member of the addressed `SubnetworkId`.
+/// A node just connects and accepts connections to other nodes that are in the
+/// same subsets. A node forwards messages to all connected peers which are
+/// member of the addressed `SubnetworkId`.
 pub struct ReplicationBehaviour<Membership> {
     /// Local peer Id, related to the libp2p public key
     local_peer_id: PeerId,
-    /// Membership handler, membership handles the subsets logics on who is where in the
-    /// nomos DA subnetworks
+    /// Membership handler, membership handles the subsets logics on who is
+    /// where in the nomos DA subnetworks
     membership: Membership,
     /// Relation of connected peers of replication subnetworks
     connected: HashMap<PeerId, ConnectionId>,
     /// Outgoing event queue
     outgoing_events: VecDeque<SwarmEvent>,
-    /// Seen messages cache holds a record of seen messages, messages will be removed from this
-    /// set after some time to keep it
+    /// Seen messages cache holds a record of seen messages, messages will be
+    /// removed from this set after some time to keep it
     seen_message_cache: IndexSet<(Vec<u8>, SubnetworkId)>,
     /// Waker that handles polling
     waker: Option<Waker>,
@@ -127,8 +127,8 @@ impl<M> ReplicationBehaviour<M>
 where
     M: MembershipHandler<NetworkId = SubnetworkId, Id = PeerId>,
 {
-    /// Check if some peer membership lies in at least a single subnetwork that the local peer is a
-    /// member too.
+    /// Check if some peer membership lies in at least a single subnetwork that
+    /// the local peer is a member too.
     fn is_neighbour(&self, peer_id: &PeerId) -> bool {
         self.membership
             .membership(&self.local_peer_id)
@@ -154,8 +154,8 @@ where
     }
 
     pub fn send_message(&mut self, message: DaMessage) {
-        // push a message in the queue for every single peer connected that is a member of the
-        // selected subnetwork_id
+        // push a message in the queue for every single peer connected that is a member
+        // of the selected subnetwork_id
         let peers = self.no_loopback_member_peers_of(&message.subnetwork_id);
 
         let connected_peers: Vec<_> = self
@@ -269,15 +269,19 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use std::{
+        collections::HashSet,
+        sync::Arc,
+        task::{Context, Poll},
+    };
+
     use futures::task::{waker_ref, ArcWake};
     use kzgrs_backend::testutils::get_da_blob;
     use libp2p::{identity, PeerId};
     use nomos_core::da::BlobId;
     use nomos_da_messages::common::Blob;
-    use std::collections::HashSet;
-    use std::sync::Arc;
-    use std::task::{Context, Poll};
+
+    use super::*;
 
     #[derive(Clone, Debug)]
     struct MockMembershipHandler {
@@ -486,7 +490,8 @@ mod tests {
             });
         }
 
-        // Verify that all peers in subnet 0 have received the message, and others have not.
+        // Verify that all peers in subnet 0 have received the message, and others have
+        // not.
         let (subnet_0_behaviours, other_behaviours): (Vec<_>, Vec<_>) =
             all_behaviours.iter().partition(|behaviour| {
                 behaviour

@@ -12,20 +12,20 @@ pub type RecoveryResult<T> = Result<T, RecoveryError>;
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::overwatch::recovery::backends::FileBackendSettings;
-    use crate::traits::FromSettings;
+    use std::{env::temp_dir, path::PathBuf};
+
     use async_trait::async_trait;
     use overwatch_derive::Services;
-    use overwatch_rs::overwatch::OverwatchRunner;
-    use overwatch_rs::services::relay::RelayMessage;
-    use overwatch_rs::services::state::ServiceState;
-    use overwatch_rs::services::{ServiceCore, ServiceData, ServiceId};
-    use overwatch_rs::{DynError, OpaqueServiceHandle, OpaqueServiceStateHandle};
+    use overwatch_rs::{
+        overwatch::OverwatchRunner,
+        services::{relay::RelayMessage, state::ServiceState, ServiceCore, ServiceData, ServiceId},
+        DynError, OpaqueServiceHandle, OpaqueServiceStateHandle,
+    };
     use serde::{Deserialize, Serialize};
-    use std::env::temp_dir;
-    use std::path::PathBuf;
     use tracing;
+
+    use super::*;
+    use crate::{overwatch::recovery::backends::FileBackendSettings, traits::FromSettings};
 
     #[derive(Debug, Clone, Default, Serialize, Deserialize)]
     struct MyState {

@@ -1,27 +1,31 @@
+use std::{
+    collections::{HashMap, HashSet},
+    fmt::Debug,
+    time::Duration,
+};
+
 use futures::StreamExt;
-use kzgrs_backend::common::blob::DaBlob;
-use kzgrs_backend::common::ColumnIndex;
-use libp2p::swarm::NetworkBehaviour;
-use libp2p::Swarm;
+use kzgrs_backend::common::{blob::DaBlob, ColumnIndex};
+use libp2p::{swarm::NetworkBehaviour, Swarm};
 use log::error;
 use nomos_core::da::BlobId;
-use nomos_da_network_core::protocols::sampling;
-use nomos_da_network_core::protocols::sampling::behaviour::{
-    BehaviourSampleReq, BehaviourSampleRes, SamplingError,
+use nomos_da_network_core::{
+    protocols::{
+        sampling,
+        sampling::behaviour::{BehaviourSampleReq, BehaviourSampleRes, SamplingError},
+    },
+    swarm::{
+        validator::ValidatorEventsStream, DAConnectionMonitorSettings, DAConnectionPolicySettings,
+    },
+    SubnetworkId,
 };
-use nomos_da_network_core::swarm::validator::ValidatorEventsStream;
-use nomos_da_network_core::swarm::{DAConnectionMonitorSettings, DAConnectionPolicySettings};
-use nomos_da_network_core::SubnetworkId;
-use nomos_libp2p::secret_key_serde;
-use nomos_libp2p::{ed25519, Multiaddr, PeerId};
+use nomos_libp2p::{ed25519, secret_key_serde, Multiaddr, PeerId};
 use serde::{Deserialize, Serialize};
-use std::collections::{HashMap, HashSet};
-use std::fmt::Debug;
-use std::time::Duration;
 use subnetworks_assignations::MembershipHandler;
-use tokio::sync::mpsc::error::SendError;
-use tokio::sync::mpsc::UnboundedSender;
-use tokio::sync::{broadcast, mpsc};
+use tokio::sync::{
+    broadcast, mpsc,
+    mpsc::{error::SendError, UnboundedSender},
+};
 
 pub(crate) const BROADCAST_CHANNEL_SIZE: usize = 128;
 
@@ -101,8 +105,8 @@ pub(crate) async fn handle_validator_events_stream(
     #[allow(clippy::never_loop)]
     loop {
         // WARNING: `StreamExt::next` is cancellation safe.
-        // If adding more branches check if such methods are within the cancellation safe set:
-        // https://docs.rs/tokio/latest/tokio/macro.select.html#cancellation-safety
+        // If adding more branches check if such methods are within the cancellation
+        // safe set: https://docs.rs/tokio/latest/tokio/macro.select.html#cancellation-safety
         tokio::select! {
             Some(sampling_event) = StreamExt::next(&mut sampling_events_receiver) => {
                 match sampling_event {

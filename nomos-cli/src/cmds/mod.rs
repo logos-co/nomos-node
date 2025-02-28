@@ -1,10 +1,7 @@
 pub mod executor;
 pub mod validator;
 
-// std
-// crates
 use clap::Subcommand;
-// internal
 
 #[derive(Debug, Subcommand)]
 pub enum Command {

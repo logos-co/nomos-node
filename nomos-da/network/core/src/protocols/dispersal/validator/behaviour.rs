@@ -1,23 +1,25 @@
-use crate::protocol::DISPERSAL_PROTOCOL;
-use crate::SubnetworkId;
+use std::task::{Context, Poll};
+
 use either::Either;
-use futures::future::BoxFuture;
-use futures::stream::FuturesUnordered;
-use futures::{AsyncWriteExt, FutureExt, StreamExt};
-use libp2p::core::transport::PortUse;
-use libp2p::core::Endpoint;
-use libp2p::swarm::{
-    ConnectionDenied, ConnectionId, FromSwarm, NetworkBehaviour, THandler, THandlerInEvent,
-    THandlerOutEvent, ToSwarm,
+use futures::{future::BoxFuture, stream::FuturesUnordered, AsyncWriteExt, FutureExt, StreamExt};
+use libp2p::{
+    core::{transport::PortUse, Endpoint},
+    swarm::{
+        ConnectionDenied, ConnectionId, FromSwarm, NetworkBehaviour, THandler, THandlerInEvent,
+        THandlerOutEvent, ToSwarm,
+    },
+    Multiaddr, PeerId, Stream,
 };
-use libp2p::{Multiaddr, PeerId, Stream};
 use libp2p_stream::IncomingStreams;
 use log::debug;
-use nomos_da_messages::dispersal;
-use nomos_da_messages::packing::{pack_to_writer, unpack_from_reader};
-use std::task::{Context, Poll};
+use nomos_da_messages::{
+    dispersal,
+    packing::{pack_to_writer, unpack_from_reader},
+};
 use subnetworks_assignations::MembershipHandler;
 use thiserror::Error;
+
+use crate::{protocol::DISPERSAL_PROTOCOL, SubnetworkId};
 
 #[derive(Debug, Error)]
 pub enum DispersalError {
@@ -97,8 +99,8 @@ impl<Membership: MembershipHandler> DispersalValidatorBehaviour<Membership> {
     }
 
     /// Stream handling messages task.
-    /// This task handles a single message receive. Then it writes up the acknowledgment into the same
-    /// stream as response and finish.
+    /// This task handles a single message receive. Then it writes up the
+    /// acknowledgment into the same stream as response and finish.
     async fn handle_new_stream(
         peer_id: PeerId,
         mut stream: Stream,

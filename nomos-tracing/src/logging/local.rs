@@ -1,13 +1,11 @@
-// std
 use std::{io::Write, path::PathBuf};
-// crates
+
 use serde::{Deserialize, Serialize};
 use tracing_appender::non_blocking::WorkerGuard;
 use tracing_subscriber::fmt::{
     format::{DefaultFields, Format},
     Layer,
 };
-// internal
 
 pub type FmtLayer<S> = Layer<S, DefaultFields, Format, tracing_appender::non_blocking::NonBlocking>;
 

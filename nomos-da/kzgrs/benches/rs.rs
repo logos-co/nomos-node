@@ -1,10 +1,7 @@
 use ark_bls12_381::Fr;
 use ark_poly::{EvaluationDomain, GeneralEvaluationDomain};
-use kzgrs::common::bytes_to_polynomial;
-use kzgrs::rs::*;
-
-use divan::counter::BytesCount;
-use divan::{black_box, Bencher};
+use divan::{black_box, counter::BytesCount, Bencher};
+use kzgrs::{common::bytes_to_polynomial, rs::*};
 use rand::{thread_rng, RngCore};
 
 fn main() {

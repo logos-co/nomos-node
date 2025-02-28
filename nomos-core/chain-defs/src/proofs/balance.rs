@@ -1,9 +1,6 @@
-// std
-// crates
+use nomos_proof_statements::bundle::{BundlePrivate, BundlePublic};
 use risc0_zkvm::Prover;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
-// internal
-use nomos_proof_statements::bundle::{BundlePrivate, BundlePublic};
 
 #[derive(Debug, Clone)]
 pub struct BalanceProof {

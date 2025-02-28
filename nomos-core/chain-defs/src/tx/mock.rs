@@ -1,12 +1,15 @@
-use crate::tx::{Transaction, TransactionHasher};
-use crate::wire;
-use crate::wire::serialize;
 use blake2::{
     digest::{Update, VariableOutput},
     Blake2bVar,
 };
 use bytes::{Bytes, BytesMut};
 use serde::Serialize;
+
+use crate::{
+    tx::{Transaction, TransactionHasher},
+    wire,
+    wire::serialize,
+};
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct MockTransaction<M> {

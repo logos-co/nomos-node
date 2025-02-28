@@ -20,7 +20,8 @@ pub trait MemPool {
     /// Construct a new empty pool
     fn new(settings: Self::Settings) -> Self;
 
-    /// Add a new item to the mempool, for example because we received it from the network
+    /// Add a new item to the mempool, for example because we received it from
+    /// the network
     fn add_item<I: Into<Self::Item>>(
         &mut self,
         key: Self::Key,
@@ -28,10 +29,11 @@ pub trait MemPool {
     ) -> Result<(), MempoolError>;
 
     /// Return a view over items contained in the mempool.
-    /// Implementations should provide *at least* all the items which have not been marked as
-    /// in a block.
-    /// The hint on the ancestor *can* be used by the implementation to display additional
-    /// items that were not included up to that point if available.
+    /// Implementations should provide *at least* all the items which have not
+    /// been marked as in a block.
+    /// The hint on the ancestor *can* be used by the implementation to display
+    /// additional items that were not included up to that point if
+    /// available.
     fn view(&self, ancestor_hint: Self::BlockId) -> Box<dyn Iterator<Item = Self::Item> + Send>;
 
     /// Record that a set of items were included in a block
@@ -44,15 +46,16 @@ pub trait MemPool {
         block: Self::BlockId,
     ) -> Option<Box<dyn Iterator<Item = Self::Item> + Send>>;
 
-    /// Signal that a set of transactions can't be possibly requested anymore and can be
-    /// discarded.
+    /// Signal that a set of transactions can't be possibly requested anymore
+    /// and can be discarded.
     fn prune(&mut self, items: &[Self::Key]);
 
     fn pending_item_count(&self) -> usize;
     fn last_item_timestamp(&self) -> u64;
 
     // Return the status of a set of items.
-    // This is a best effort attempt, and implementations are free to return `Unknown` for all of them.
+    // This is a best effort attempt, and implementations are free to return
+    // `Unknown` for all of them.
     fn status(&self, items: &[Self::Key]) -> Vec<Status<Self::BlockId>>;
 }
 

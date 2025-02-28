@@ -1,14 +1,8 @@
 pub mod nodes;
 pub mod topology;
 
-// std
-use std::env;
-use std::net::TcpListener;
-use std::ops::Mul;
-use std::sync::Mutex;
-use std::time::Duration;
+use std::{env, net::TcpListener, ops::Mul, sync::Mutex, time::Duration};
 
-//crates
 use nomos_libp2p::{Multiaddr, PeerId, Swarm};
 use once_cell::sync::Lazy;
 use rand::{thread_rng, Rng};
@@ -29,8 +23,8 @@ pub static GLOBAL_PARAMS_PATH: Lazy<String> = Lazy::new(|| {
         .to_string()
 });
 
-/// Global flag indicating whether debug tracing configuration is enabled to send traces to local
-/// grafana stack.
+/// Global flag indicating whether debug tracing configuration is enabled to
+/// send traces to local grafana stack.
 pub static IS_DEBUG_TRACING: Lazy<bool> =
     Lazy::new(|| env::var("NOMOS_TESTS_TRACING").is_ok_and(|val| val.eq_ignore_ascii_case("true")));
 

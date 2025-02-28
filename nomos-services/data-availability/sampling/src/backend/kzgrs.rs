@@ -1,24 +1,20 @@
-// std
-use std::collections::{BTreeSet, HashMap, HashSet};
-use std::fmt::Debug;
-use std::time::{Duration, Instant};
+use std::{
+    collections::{BTreeSet, HashMap, HashSet},
+    fmt::Debug,
+    time::{Duration, Instant},
+};
 
-// crates
 use hex;
-use rand::prelude::*;
-use serde::{Deserialize, Serialize};
-use tokio::time;
-use tokio::time::Interval;
-use tracing::instrument;
-
 use kzgrs_backend::common::blob::DaBlob;
-use nomos_tracing::info_with_id;
-
-//
-// internal
-use crate::{backend::SamplingState, DaSamplingServiceBackend};
 use nomos_core::da::BlobId;
 use nomos_da_network_core::SubnetworkId;
+use nomos_tracing::info_with_id;
+use rand::prelude::*;
+use serde::{Deserialize, Serialize};
+use tokio::{time, time::Interval};
+use tracing::instrument;
+
+use crate::{backend::SamplingState, DaSamplingServiceBackend};
 
 #[derive(Clone)]
 pub struct SamplingContext {
@@ -106,8 +102,8 @@ impl<R: Rng + Sync + Send> DaSamplingServiceBackend<R> for KzgrsSamplingBackend<
 
     async fn handle_sampling_error(&mut self, blob_id: Self::BlobId) {
         // If it fails a single time we consider it failed.
-        // We may want to abstract the sampling policies somewhere else at some point if we
-        // need to get fancier than this
+        // We may want to abstract the sampling policies somewhere else at some point if
+        // we need to get fancier than this
         self.pending_sampling_blobs.remove(&blob_id);
         self.validated_blobs.remove(&blob_id);
     }
@@ -139,18 +135,19 @@ impl<R: Rng + Sync + Send> DaSamplingServiceBackend<R> for KzgrsSamplingBackend<
 #[cfg(test)]
 mod test {
 
-    use std::collections::HashSet;
-    use std::time::{Duration, Instant};
+    use std::{
+        collections::HashSet,
+        time::{Duration, Instant},
+    };
 
-    use rand::prelude::*;
-    use rand::rngs::StdRng;
+    use kzgrs_backend::common::{blob::DaBlob, Column};
+    use nomos_core::da::BlobId;
+    use rand::{prelude::*, rngs::StdRng};
 
     use crate::backend::kzgrs::{
         DaSamplingServiceBackend, KzgrsSamplingBackend, KzgrsSamplingBackendSettings,
         SamplingContext, SamplingState,
     };
-    use kzgrs_backend::common::{blob::DaBlob, Column};
-    use nomos_core::da::BlobId;
 
     fn create_sampler(num_samples: usize, num_subnets: usize) -> KzgrsSamplingBackend<StdRng> {
         let settings = KzgrsSamplingBackendSettings {

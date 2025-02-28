@@ -1,11 +1,9 @@
-// STD
-use futures::{AsyncReadExt, AsyncWriteExt};
 use std::io;
-// Crates
+
+use futures::{AsyncReadExt, AsyncWriteExt};
 use nomos_core::wire;
-use serde::de::DeserializeOwned;
-use serde::Serialize;
-// Internal
+use serde::{de::DeserializeOwned, Serialize};
+
 use crate::Result;
 
 type LenType = u16;
@@ -86,12 +84,15 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::common::Blob;
-    use crate::dispersal::{DispersalError, DispersalErrorType, DispersalRequest};
     use futures::io::BufReader;
     use kzgrs_backend::testutils::get_da_blob;
     use nomos_core::da::BlobId;
+
+    use super::*;
+    use crate::{
+        common::Blob,
+        dispersal::{DispersalError, DispersalErrorType, DispersalRequest},
+    };
 
     #[tokio::test]
     async fn pack_and_unpack() -> Result<()> {

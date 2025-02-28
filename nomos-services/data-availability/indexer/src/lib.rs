@@ -1,30 +1,35 @@
 pub mod consensus;
 pub mod storage;
 
-use std::fmt::{Debug, Formatter};
-use std::hash::Hash;
-use std::ops::Range;
+use std::{
+    fmt::{Debug, Formatter},
+    hash::Hash,
+    ops::Range,
+};
 
 use consensus::ConsensusAdapter;
-use cryptarchia_consensus::network::NetworkAdapter;
-use cryptarchia_consensus::CryptarchiaConsensus;
+use cryptarchia_consensus::{network::NetworkAdapter, CryptarchiaConsensus};
 use futures::StreamExt;
-use nomos_core::block::Block;
-use nomos_core::da::blob::{info::DispersedBlobInfo, metadata::Metadata, BlobSelect};
-use nomos_core::header::HeaderId;
-use nomos_core::tx::{Transaction, TxSelect};
+use nomos_core::{
+    block::Block,
+    da::blob::{info::DispersedBlobInfo, metadata::Metadata, BlobSelect},
+    header::HeaderId,
+    tx::{Transaction, TxSelect},
+};
 use nomos_da_sampling::backend::DaSamplingServiceBackend;
 use nomos_mempool::{backend::MemPool, network::NetworkAdapter as MempoolAdapter};
-use nomos_storage::backends::StorageBackend;
-use nomos_storage::StorageService;
+use nomos_storage::{backends::StorageBackend, StorageService};
 use nomos_tracing::info_with_id;
-use overwatch_rs::services::relay::{Relay, RelayMessage};
-use overwatch_rs::services::state::{NoOperator, NoState};
-use overwatch_rs::services::{ServiceCore, ServiceData, ServiceId};
-use overwatch_rs::{DynError, OpaqueServiceStateHandle};
+use overwatch_rs::{
+    services::{
+        relay::{Relay, RelayMessage},
+        state::{NoOperator, NoState},
+        ServiceCore, ServiceData, ServiceId,
+    },
+    DynError, OpaqueServiceStateHandle,
+};
 use rand::{RngCore, SeedableRng};
-use serde::de::DeserializeOwned;
-use serde::{Deserialize, Serialize};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use services_utils::overwatch::lifecycle;
 use storage::DaStorageAdapter;
 use tokio::sync::oneshot::Sender;

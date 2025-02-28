@@ -13,7 +13,8 @@ pub struct Libp2pAdapter {
     network_relay: OutboundRelay<<NetworkService<Libp2p> as ServiceData>::Message>,
 }
 
-/// Settings used to broadcast messages to the network service that uses libp2p backend.
+/// Settings used to broadcast messages to the network service that uses libp2p
+/// backend.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Libp2pBroadcastSettings {
     pub topic: String,

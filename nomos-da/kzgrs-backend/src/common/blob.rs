@@ -1,16 +1,12 @@
-// std
-// crates
 use kzgrs::Proof;
 use nomos_core::da::blob;
 use serde::{Deserialize, Serialize};
 use sha3::{Digest, Sha3_256};
-// internal
-use super::build_blob_id;
-use super::ColumnIndex;
-use crate::common::Column;
-use crate::common::Commitment;
+
+use super::{build_blob_id, ColumnIndex};
 use crate::common::{
     deserialize_canonical, deserialize_vec_canonical, serialize_canonical, serialize_vec_canonical,
+    Column, Commitment,
 };
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]

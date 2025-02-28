@@ -1,7 +1,8 @@
+use std::hash::Hash;
+
 use bytes::Bytes;
 use nomos_core::tx::{Transaction, TransactionHasher};
 use serde::{Deserialize, Serialize};
-use std::hash::Hash;
 
 #[derive(Clone, Debug, Serialize, Deserialize, Hash, PartialEq, Eq)]
 pub struct Tx(pub String);

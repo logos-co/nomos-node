@@ -1,15 +1,14 @@
-// crates
 use futures::Stream;
-use serde::{de::DeserializeOwned, Serialize};
-use tokio_stream::wrappers::BroadcastStream;
-use tokio_stream::StreamExt;
-// internal
-use crate::network::NetworkAdapter;
 use nomos_core::wire;
-use nomos_network::backends::libp2p::{Command, Event, EventKind, Libp2p, Message, TopicHash};
-use nomos_network::{NetworkMsg, NetworkService};
-use overwatch_rs::services::relay::OutboundRelay;
-use overwatch_rs::services::ServiceData;
+use nomos_network::{
+    backends::libp2p::{Command, Event, EventKind, Libp2p, Message, TopicHash},
+    NetworkMsg, NetworkService,
+};
+use overwatch_rs::services::{relay::OutboundRelay, ServiceData};
+use serde::{de::DeserializeOwned, Serialize};
+use tokio_stream::{wrappers::BroadcastStream, StreamExt};
+
+use crate::network::NetworkAdapter;
 
 pub struct Libp2pAdapter<Item, Key> {
     network_relay: OutboundRelay<<NetworkService<Libp2p> as ServiceData>::Message>,

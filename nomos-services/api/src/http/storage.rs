@@ -1,5 +1,4 @@
-use nomos_core::block::Block;
-use nomos_core::header::HeaderId;
+use nomos_core::{block::Block, header::HeaderId};
 use nomos_storage::{
     backends::{rocksdb::RocksBackend, StorageSerde},
     StorageMsg, StorageService,

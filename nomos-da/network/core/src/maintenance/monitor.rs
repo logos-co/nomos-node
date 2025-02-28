@@ -1,11 +1,10 @@
-// std
 use std::{
     collections::{HashMap, HashSet, VecDeque},
     convert::Infallible,
     task::{Context, Poll, Waker},
     time::{Duration, Instant},
 };
-// crates
+
 use libp2p::{
     core::{transport::PortUse, Endpoint},
     swarm::{
@@ -15,7 +14,6 @@ use libp2p::{
     Multiaddr, PeerId,
 };
 use thiserror::Error;
-// internal
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum PeerStatus {
@@ -36,8 +34,8 @@ pub trait ConnectionMonitor {
     fn reset_peer(&mut self, peer_id: &PeerId);
 }
 
-/// A `NetworkBehaviour` that block connections to malicious peers or temporarily disconnects from
-/// unhealthy peers.
+/// A `NetworkBehaviour` that block connections to malicious peers or
+/// temporarily disconnects from unhealthy peers.
 #[derive(Debug)]
 pub struct ConnectionMonitorBehaviour<Monitor> {
     monitor: Monitor,
@@ -73,8 +71,8 @@ where
     ///
     /// All active connections to this peer will be closed immediately.
     ///
-    /// Returns whether the peer was newly inserted. Does nothing if the peer was already present in
-    /// the set.
+    /// Returns whether the peer was newly inserted. Does nothing if the peer
+    /// was already present in the set.
     pub fn block_peer(&mut self, peer: PeerId) -> bool {
         let inserted = self.malicous_peers.insert(peer);
         if inserted {
@@ -86,8 +84,9 @@ where
 
     /// **Temporarily blocks a peer** due to unhealthy behavior.
     ///
-    /// The peer is added to `unhealthy_peers`, and after `redial_cooldown`, it will be allowed to reconnect.
-    /// The existing connections to this peer are **closed immediately**.
+    /// The peer is added to `unhealthy_peers`, and after `redial_cooldown`, it
+    /// will be allowed to reconnect. The existing connections to this peer
+    /// are **closed immediately**.
     pub fn temporarily_block_peer(&mut self, peer: PeerId) {
         let until = Instant::now() + self.redial_cooldown;
         self.unhealthy_peers.insert(peer, until);
@@ -98,8 +97,8 @@ where
 
     /// Unblock connections to a given peer.
     ///
-    /// Returns whether the peer was present in the set. Does nothing if the peer
-    /// was not present in the set.
+    /// Returns whether the peer was present in the set. Does nothing if the
+    /// peer was not present in the set.
     pub fn unblock_peer(&mut self, peer: PeerId) -> bool {
         let removed =
             self.malicous_peers.remove(&peer) || self.unhealthy_peers.remove(&peer).is_some();

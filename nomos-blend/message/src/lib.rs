@@ -13,11 +13,12 @@ pub trait BlendMessage {
     ) -> Result<Vec<u8>, Self::Error>;
     /// Unwrap the message one layer.
     ///
-    /// This function returns the unwrapped message and a boolean indicating whether the message was fully unwrapped.
-    /// (False if the message still has layers to be unwrapped, true otherwise)
+    /// This function returns the unwrapped message and a boolean indicating
+    /// whether the message was fully unwrapped. (False if the message still
+    /// has layers to be unwrapped, true otherwise)
     ///
-    /// If the input message was already fully unwrapped, or if its format is invalid,
-    /// this function returns `[Error::InvalidBlendMessage]`.
+    /// If the input message was already fully unwrapped, or if its format is
+    /// invalid, this function returns `[Error::InvalidBlendMessage]`.
     fn unwrap_message(
         message: &[u8],
         private_key: &Self::PrivateKey,

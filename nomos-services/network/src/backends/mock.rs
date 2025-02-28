@@ -1,8 +1,10 @@
-// internal
-use super::*;
+use std::{
+    borrow::Cow,
+    collections::{HashMap, HashSet},
+    sync::{Arc, Mutex},
+};
 
 use futures::future::BoxFuture;
-// crates
 use overwatch_rs::services::state::NoState;
 use rand::{
     distributions::{Distribution, WeightedIndex},
@@ -10,13 +12,10 @@ use rand::{
     SeedableRng,
 };
 use serde::{Deserialize, Serialize};
-use std::{
-    borrow::Cow,
-    collections::{HashMap, HashSet},
-    sync::{Arc, Mutex},
-};
 use tokio::sync::broadcast::{self, Receiver, Sender};
 use tracing::debug;
+
+use super::*;
 
 const BROADCAST_CHANNEL_BUF: usize = 16;
 
@@ -168,9 +167,11 @@ impl Mock {
     /// Run producer message handler
     pub async fn run_producer_handler(&self) -> Result<(), overwatch_rs::DynError> {
         match &self.config.weights {
-            // if user provides weights, then we send the predefined messages according to the weights endlessly
+            // if user provides weights, then we send the predefined messages according to the
+            // weights endlessly
             Some(weights) => self.run_endless_producer(weights).await,
-            // if user do not provide weights, then we just send the predefined messages one by one in order
+            // if user do not provide weights, then we just send the predefined messages one by one
+            // in order
             None => self.run_in_order_producer().await,
         }
     }

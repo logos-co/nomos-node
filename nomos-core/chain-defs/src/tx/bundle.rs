@@ -1,8 +1,6 @@
-// std
-//crates
 use bytes::{Bytes, BytesMut};
 use risc0_zkvm::Prover;
-//internal
+
 use super::Error;
 use crate::{
     proofs::{balance::BalanceProof, covenant::CovenantProof, ptx::PtxProof},
@@ -74,12 +72,13 @@ impl Bundle {
 }
 
 mod serde {
-    use crate::proofs::{balance::BalanceProof, covenant::CovenantProof, ptx::PtxProof};
+    use std::collections::HashSet;
 
-    use super::Bundle;
     use nomos_proof_statements::{bundle::BundlePublic, ptx::PtxPublic};
     use serde::{de::Error as _, Deserialize, Deserializer, Serialize, Serializer};
-    use std::collections::HashSet;
+
+    use super::Bundle;
+    use crate::proofs::{balance::BalanceProof, covenant::CovenantProof, ptx::PtxProof};
 
     #[derive(Serialize, Deserialize)]
     struct BundleInner {
@@ -168,8 +167,9 @@ mod serde {
 
 #[cfg(test)]
 mod test {
-    use super::*;
     use cl::{note::derive_unit, *};
+
+    use super::*;
 
     fn receive_utxo(note: cl::NoteWitness, nf_pk: cl::NullifierCommitment) -> cl::OutputWitness {
         cl::OutputWitness::new(note, nf_pk)
@@ -203,8 +203,9 @@ mod test {
             balance_blinding: BalanceWitness::random_blinding(&mut rng),
         };
 
-        // ATTENTION: building a valid proof requires a x86 machine with docker installed
-        // if you don't have one, you can run this test with RISC0_DEV_MODE=1 or skip the test
+        // ATTENTION: building a valid proof requires a x86 machine with docker
+        // installed if you don't have one, you can run this test with
+        // RISC0_DEV_MODE=1 or skip the test
         let prover = risc0_zkvm::default_prover();
         let no_op = CovenantProof::prove_nop(
             ptx_witness.inputs[0].nullifier(),

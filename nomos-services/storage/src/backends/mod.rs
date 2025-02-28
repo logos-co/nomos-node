@@ -6,15 +6,14 @@ pub mod sled;
 #[cfg(feature = "rocksdb")]
 pub mod rocksdb;
 
-// std
 use std::error::Error;
-// crates
+
 use async_trait::async_trait;
 use bytes::Bytes;
 use serde::{de::DeserializeOwned, Serialize};
-// internal
 
-/// Trait that defines how to translate from user types to the storage buffer type
+/// Trait that defines how to translate from user types to the storage buffer
+/// type
 pub trait StorageSerde {
     type Error: Error;
     /// Dump a type as [`Bytes`]
@@ -37,10 +36,11 @@ pub trait StorageBackend: Sized {
     /// Backend operations error type
     type Error: Error + 'static + Send + Sync;
     /// Backend transaction type
-    /// Usually it will be some function that modifies the storage directly or operates
-    /// over the backend as per the backend specification.
+    /// Usually it will be some function that modifies the storage directly or
+    /// operates over the backend as per the backend specification.
     type Transaction: StorageTransaction;
-    /// Operator to dump/load custom types into the defined backend store type [`Bytes`]
+    /// Operator to dump/load custom types into the defined backend store type
+    /// [`Bytes`]
     type SerdeOperator: StorageSerde + Send + Sync + 'static;
     fn new(config: Self::Settings) -> Result<Self, Self::Error>;
     async fn store(&mut self, key: Bytes, value: Bytes) -> Result<(), Self::Error>;
@@ -57,11 +57,11 @@ pub trait StorageBackend: Sized {
 
 #[cfg(test)]
 pub mod testing {
-    use super::StorageSerde;
     use bytes::Bytes;
-    use serde::de::DeserializeOwned;
-    use serde::Serialize;
+    use serde::{de::DeserializeOwned, Serialize};
     use thiserror::Error;
+
+    use super::StorageSerde;
 
     pub struct NoStorageSerde;
 

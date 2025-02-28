@@ -1,12 +1,13 @@
 use std::hash::Hash;
 
-use crate::membership::Membership;
 use nomos_blend_message::BlendMessage;
 use rand::RngCore;
 use serde::{Deserialize, Serialize};
 
-/// [`CryptographicProcessor`] is responsible for wrapping and unwrapping messages
-/// for the message indistinguishability.
+use crate::membership::Membership;
+
+/// [`CryptographicProcessor`] is responsible for wrapping and unwrapping
+/// messages for the message indistinguishability.
 pub struct CryptographicProcessor<NodeId, R, M>
 where
     M: BlendMessage,
