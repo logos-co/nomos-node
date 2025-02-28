@@ -34,6 +34,7 @@ pub type Cryptarchia<
     SamplingNetworkAdapter,
     SamplingRng,
     SamplingStorage,
+    TimeBackend,
     DaVerifierBackend,
     DaVerifierNetwork,
     DaVerifierStorage,
@@ -52,6 +53,7 @@ pub type Cryptarchia<
     SamplingNetworkAdapter,
     SamplingRng,
     SamplingStorage,
+    TimeBackend,
     DaVerifierBackend,
     DaVerifierNetwork,
     DaVerifierStorage,
@@ -68,6 +70,7 @@ pub async fn cryptarchia_info<
     DaVerifierBackend,
     DaVerifierNetwork,
     DaVerifierStorage,
+    TimeBackend,
     const SIZE: usize,
 >(
     handle: &'a OverwatchHandle,
@@ -98,6 +101,8 @@ where
     DaVerifierBackend::Settings: Clone,
     DaVerifierNetwork: nomos_da_verifier::network::NetworkAdapter,
     DaVerifierNetwork::Settings: Clone,
+    TimeBackend: nomos_time::backends::TimeBackend,
+    TimeBackend::Settings: Clone + Send + Sync,
 {
     let relay = handle
         .relay::<Cryptarchia<
@@ -110,6 +115,7 @@ where
             DaVerifierBackend,
             DaVerifierNetwork,
             DaVerifierStorage,
+            TimeBackend,
             SIZE,
         >>()
         .connect()
@@ -135,6 +141,7 @@ pub async fn cryptarchia_headers<
     DaVerifierBackend,
     DaVerifierNetwork,
     DaVerifierStorage,
+    TimeBackend,
     const SIZE: usize,
 >(
     handle: &'a OverwatchHandle,
@@ -167,6 +174,8 @@ where
     DaVerifierBackend::Settings: Clone,
     DaVerifierNetwork: nomos_da_verifier::network::NetworkAdapter,
     DaVerifierNetwork::Settings: Clone,
+    TimeBackend: nomos_time::backends::TimeBackend,
+    TimeBackend::Settings: Clone + Send + Sync,
 {
     let relay = handle
         .relay::<Cryptarchia<
@@ -179,6 +188,7 @@ where
             DaVerifierBackend,
             DaVerifierNetwork,
             DaVerifierStorage,
+            TimeBackend,
             SIZE,
         >>()
         .connect()

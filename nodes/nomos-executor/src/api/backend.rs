@@ -64,6 +64,7 @@ pub struct AxumBackend<
     SamplingNetworkAdapter,
     SamplingRng,
     SamplingStorage,
+    TimeBackend,
     const SIZE: usize,
 > {
     settings: AxumBackendSettings,
@@ -87,6 +88,7 @@ pub struct AxumBackend<
         SamplingNetworkAdapter,
         SamplingRng,
         SamplingStorage,
+        TimeBackend,
     )>,
 }
 
@@ -123,6 +125,7 @@ impl<
         SamplingNetworkAdapter,
         SamplingRng,
         SamplingStorage,
+        TimeBackend,
         const SIZE: usize,
     > Backend
     for AxumBackend<
@@ -144,6 +147,7 @@ impl<
         SamplingNetworkAdapter,
         SamplingRng,
         SamplingStorage,
+        TimeBackend,
         SIZE,
     >
 where
@@ -232,6 +236,8 @@ where
     SamplingBackend::BlobId: Debug + 'static,
     SamplingNetworkAdapter: nomos_da_sampling::network::NetworkAdapter + Send + 'static,
     SamplingStorage: nomos_da_sampling::storage::DaStorageAdapter + Send + 'static,
+    TimeBackend: nomos_time::backends::TimeBackend + Send + 'static,
+    TimeBackend::Settings: Clone + Send + Sync,
 {
     type Error = hyper::Error;
     type Settings = AxumBackendSettings;
@@ -284,6 +290,7 @@ where
                         DaVerifierBackend,
                         DaVerifierNetwork,
                         DaVerifierStorage,
+                        TimeBackend,
                         SIZE,
                     >,
                 ),
@@ -301,6 +308,7 @@ where
                         DaVerifierBackend,
                         DaVerifierNetwork,
                         DaVerifierStorage,
+                        TimeBackend,
                         SIZE,
                     >,
                 ),
@@ -332,6 +340,7 @@ where
                         DaVerifierBackend,
                         DaVerifierNetwork,
                         DaVerifierStorage,
+                        TimeBackend,
                         SIZE,
                     >,
                 ),

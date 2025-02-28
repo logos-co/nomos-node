@@ -113,6 +113,7 @@ pub async fn cryptarchia_info<
     DaVerifierBackend,
     DaVerifierNetwork,
     DaVerifierStorage,
+    TimeBackend,
     const SIZE: usize,
 >(
     State(handle): State<OverwatchHandle>,
@@ -143,6 +144,8 @@ where
     DaVerifierBackend::Settings: Clone,
     DaVerifierNetwork: nomos_da_verifier::network::NetworkAdapter,
     DaVerifierNetwork::Settings: Clone,
+    TimeBackend: nomos_time::backends::TimeBackend,
+    TimeBackend::Settings: Clone + Send + Sync,
 {
     make_request_and_return_response!(consensus::cryptarchia_info::<
         Tx,
@@ -154,6 +157,7 @@ where
         DaVerifierBackend,
         DaVerifierNetwork,
         DaVerifierStorage,
+        TimeBackend,
         SIZE,
     >(&handle))
 }
@@ -176,6 +180,7 @@ pub async fn cryptarchia_headers<
     DaVerifierBackend,
     DaVerifierNetwork,
     DaVerifierStorage,
+    TimeBackend,
     const SIZE: usize,
 >(
     State(store): State<OverwatchHandle>,
@@ -207,6 +212,8 @@ where
     DaVerifierBackend::Settings: Clone,
     DaVerifierNetwork: nomos_da_verifier::network::NetworkAdapter,
     DaVerifierNetwork::Settings: Clone,
+    TimeBackend: nomos_time::backends::TimeBackend,
+    TimeBackend::Settings: Clone + Send + Sync,
 {
     let CryptarchiaInfoQuery { from, to } = query;
     make_request_and_return_response!(consensus::cryptarchia_headers::<
@@ -219,6 +226,7 @@ where
         DaVerifierBackend,
         DaVerifierNetwork,
         DaVerifierStorage,
+        TimeBackend,
         SIZE,
     >(&store, from, to))
 }
@@ -286,6 +294,7 @@ pub async fn get_range<
     DaVerifierBackend,
     DaVerifierNetwork,
     DaVerifierStorage,
+    TimeBackend,
     const SIZE: usize,
 >(
     State(handle): State<OverwatchHandle>,
@@ -343,6 +352,8 @@ where
     DaVerifierBackend::Settings: Clone,
     DaVerifierNetwork: nomos_da_verifier::network::NetworkAdapter,
     DaVerifierNetwork::Settings: Clone,
+    TimeBackend: nomos_time::backends::TimeBackend,
+    TimeBackend::Settings: Clone + Send + Sync,
 {
     make_request_and_return_response!(da::get_range::<
         Tx,
@@ -356,6 +367,7 @@ where
         DaVerifierBackend,
         DaVerifierNetwork,
         DaVerifierStorage,
+        TimeBackend,
         SIZE,
     >(&handle, app_id, range))
 }

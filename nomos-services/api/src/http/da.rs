@@ -50,6 +50,7 @@ pub type DaIndexer<
     DaVerifierBackend,
     DaVerifierNetwork,
     DaVerifierStorage,
+    TimeBackend,
     const SIZE: usize,
 > = DataIndexerService<
     // Indexer specific.
@@ -73,6 +74,7 @@ pub type DaIndexer<
     DaVerifierBackend,
     DaVerifierNetwork,
     DaVerifierStorage,
+    TimeBackend,
 >;
 
 pub type DaVerifier<Blob, Membership, VerifierBackend, StorageSerializer> = DaVerifierService<
@@ -131,6 +133,7 @@ pub async fn get_range<
     DaVerifierBackend,
     DaVerifierNetwork,
     DaVerifierStorage,
+    TimeBackend,
     const SIZE: usize,
 >(
     handle: &OverwatchHandle,
@@ -188,6 +191,8 @@ where
     DaVerifierBackend::Settings: Clone,
     DaVerifierNetwork: nomos_da_verifier::network::NetworkAdapter,
     DaVerifierNetwork::Settings: Clone,
+    TimeBackend: nomos_time::backends::TimeBackend,
+    TimeBackend::Settings: Clone + Send + Sync,
 {
     let relay = handle
         .relay::<DaIndexer<
@@ -202,6 +207,7 @@ where
             DaVerifierBackend,
             DaVerifierNetwork,
             DaVerifierStorage,
+            TimeBackend,
             SIZE,
         >>()
         .connect()

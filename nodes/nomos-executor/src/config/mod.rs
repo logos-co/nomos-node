@@ -12,7 +12,7 @@ use nomos_node::{
         mempool::MempoolConfig, update_blend, update_cryptarchia_consensus, update_network,
         BlendArgs,
     },
-    CryptarchiaArgs, HttpArgs, LogArgs, NetworkArgs, NetworkService, Wire,
+    CryptarchiaArgs, HttpArgs, LogArgs, NetworkArgs, NetworkService, NomosTimeService, Wire,
 };
 use nomos_storage::backends::rocksdb::RocksBackend;
 use overwatch_rs::services::ServiceData;
@@ -35,6 +35,7 @@ pub struct Config {
     pub da_sampling: <crate::ExecutorDaSampling as ServiceData>::Settings,
     pub http: <ExecutorApiService as ServiceData>::Settings,
     pub cryptarchia: <crate::ExecutorCryptarchia as ServiceData>::Settings,
+    pub time: <NomosTimeService as ServiceData>::Settings,
     pub storage: <crate::StorageService<RocksBackend<Wire>> as ServiceData>::Settings,
     pub mempool: MempoolConfig,
 }

@@ -18,6 +18,7 @@ nomos-da-storage      = { workspace = true }
 nomos-da-verifier      = { workspace = true }
 nomos-mempool         = { workspace = true }
 nomos-storage         = { workspace = true }
+nomos-time            = { workspace = true }
 nomos-tracing         = { workspace = true }
 overwatch-derive      = { workspace = true }
 overwatch-rs          = { workspace = true }

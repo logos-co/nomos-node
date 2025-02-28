@@ -1,4 +1,4 @@
-use std::{fs, net::Ipv4Addr, path::PathBuf, process, sync::Arc, time::Duration};
+use std::{fs, net::Ipv4Addr, num::NonZero, path::PathBuf, process, sync::Arc, time::Duration};
 
 use axum::{extract::State, http::StatusCode, response::IntoResponse, routing::post, Json, Router};
 use cfgsync::{
@@ -27,7 +27,7 @@ struct CfgSyncConfig {
     timeout: u64,
 
     // ConsensusConfig related parameters
-    security_param: u32,
+    security_param: NonZero<u32>,
     active_slot_coeff: f64,
 
     // DaConfig related parameters

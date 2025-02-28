@@ -30,7 +30,8 @@ use nomos_mempool::backend::mockpool::MockPool;
 use nomos_node::{
     BlobInfo, Cryptarchia, DaIndexer, DaMempool, DaNetworkService, DaSampling, DaVerifier,
     DispersedBlobInfo, HeaderId, MempoolNetworkAdapter, NetworkBackend, NetworkService,
-    NomosDaMembership, RocksBackend, StorageService, SystemSig, Tx, TxMempool, Wire, MB16,
+    NomosDaMembership, NomosTimeService, RocksBackend, StorageService, SystemSig, Tx, TxMempool,
+    Wire, MB16,
 };
 use overwatch_derive::Services;
 use overwatch_rs::OpaqueServiceHandle;
@@ -57,6 +58,7 @@ pub type ExecutorApiService = ApiService<
         nomos_da_sampling::network::adapters::executor::Libp2pAdapter<NomosDaMembership>,
         ChaCha20Rng,
         SamplingStorageAdapter<DaBlob, Wire>,
+        nomos_time::backends::system_time::SystemTimeBackend,
         MB16,
     >,
 >;
@@ -106,6 +108,7 @@ pub struct NomosExecutor {
     cl_mempool: OpaqueServiceHandle<TxMempool>,
     da_mempool: OpaqueServiceHandle<DaMempool>,
     cryptarchia: OpaqueServiceHandle<ExecutorCryptarchia>,
+    time: OpaqueServiceHandle<NomosTimeService>,
     http: OpaqueServiceHandle<ExecutorApiService>,
     storage: OpaqueServiceHandle<StorageService<RocksBackend<Wire>>>,
     system_sig: OpaqueServiceHandle<SystemSig>,

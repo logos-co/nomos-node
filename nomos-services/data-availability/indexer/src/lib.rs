@@ -57,6 +57,7 @@ pub type ConsensusRelay<
     DaVerifierBackend,
     DaVerifierNetwork,
     DaVerifierStorage,
+    TimeBackend,
 > = Relay<
     CryptarchiaConsensus<
         NetAdapter,
@@ -75,6 +76,7 @@ pub type ConsensusRelay<
         DaVerifierBackend,
         DaVerifierNetwork,
         DaVerifierStorage,
+        TimeBackend,
     >,
 >;
 
@@ -98,6 +100,7 @@ pub struct DataIndexerService<
     DaVerifierBackend,
     DaVerifierNetwork,
     DaVerifierStorage,
+    TimeBackend,
 > where
     Blob: 'static,
     NetAdapter: NetworkAdapter,
@@ -135,6 +138,8 @@ pub struct DataIndexerService<
     DaVerifierNetwork: nomos_da_verifier::network::NetworkAdapter,
     DaVerifierStorage: nomos_da_verifier::storage::DaStorageAdapter,
     DaVerifierNetwork::Settings: Clone,
+    TimeBackend: nomos_time::backends::TimeBackend,
+    TimeBackend::Settings: Clone + Send + Sync,
 {
     service_state: OpaqueServiceStateHandle<Self>,
     storage_relay: Relay<StorageService<DaStorage::Backend>>,
@@ -156,6 +161,7 @@ pub struct DataIndexerService<
         DaVerifierBackend,
         DaVerifierNetwork,
         DaVerifierStorage,
+        TimeBackend,
     >,
 }
 
@@ -205,6 +211,7 @@ impl<
         DaVerifierBackend,
         DaVerifierNetwork,
         DaVerifierStorage,
+        TimeBackend,
     > ServiceData
     for DataIndexerService<
         Blob,
@@ -226,6 +233,7 @@ impl<
         DaVerifierBackend,
         DaVerifierNetwork,
         DaVerifierStorage,
+        TimeBackend,
     >
 where
     Blob: 'static,
@@ -264,6 +272,8 @@ where
     DaVerifierNetwork: nomos_da_verifier::network::NetworkAdapter,
     DaVerifierStorage: nomos_da_verifier::storage::DaStorageAdapter,
     DaVerifierNetwork::Settings: Clone,
+    TimeBackend: nomos_time::backends::TimeBackend,
+    TimeBackend::Settings: Clone + Send + Sync,
 {
     const SERVICE_ID: ServiceId = DA_INDEXER_TAG;
     type Settings = IndexerSettings<DaStorage::Settings>;
@@ -292,6 +302,7 @@ impl<
         DaVerifierBackend,
         DaVerifierNetwork,
         DaVerifierStorage,
+        TimeBackend,
     >
     DataIndexerService<
         Blob,
@@ -313,6 +324,7 @@ impl<
         DaVerifierBackend,
         DaVerifierNetwork,
         DaVerifierStorage,
+        TimeBackend,
     >
 where
     Blob: Send + Sync + 'static,
@@ -353,6 +365,8 @@ where
     DaVerifierBackend::Settings: Clone,
     DaVerifierNetwork: nomos_da_verifier::network::NetworkAdapter,
     DaVerifierNetwork::Settings: Clone,
+    TimeBackend: nomos_time::backends::TimeBackend,
+    TimeBackend::Settings: Clone + Send + Sync,
 {
     #[instrument(skip_all)]
     async fn handle_new_block(
@@ -413,6 +427,7 @@ impl<
         DaVerifierBackend,
         DaVerifierNetwork,
         DaVerifierStorage,
+        TimeBackend,
     > ServiceCore
     for DataIndexerService<
         Blob,
@@ -434,6 +449,7 @@ impl<
         DaVerifierBackend,
         DaVerifierNetwork,
         DaVerifierStorage,
+        TimeBackend,
     >
 where
     Blob: Debug + Send + Sync,
@@ -496,6 +512,8 @@ where
     DaVerifierBackend::Settings: Clone,
     DaVerifierNetwork: nomos_da_verifier::network::NetworkAdapter,
     DaVerifierNetwork::Settings: Clone,
+    TimeBackend: nomos_time::backends::TimeBackend,
+    TimeBackend::Settings: Clone + Send + Sync,
 {
     fn init(
         service_state: OpaqueServiceStateHandle<Self>,
