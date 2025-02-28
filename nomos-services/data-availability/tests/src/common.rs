@@ -63,7 +63,8 @@ use nomos_mempool::{
     network::adapters::libp2p::{
         Libp2pAdapter as MempoolNetworkAdapter, Settings as AdapterSettings,
     },
-    DaMempoolSettings, TxMempoolService, TxMempoolSettings,
+    tx::settings::TxMempoolSettings,
+    DaMempoolSettings, TxMempoolService,
 };
 use nomos_network::{
     backends::libp2p::{Libp2p as NetworkBackend, Libp2pConfig},

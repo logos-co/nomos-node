@@ -39,6 +39,7 @@ use nomos_executor::{api::backend::AxumBackendSettings, config::Config};
 use nomos_network::{backends::libp2p::Libp2pConfig, NetworkConfig};
 use nomos_node::{
     api::paths::{CL_METRICS, DA_GET_RANGE},
+    config::mempool::MempoolConfig,
     RocksBackendSettings,
 };
 use nomos_tracing::logging::local::FileConfig;

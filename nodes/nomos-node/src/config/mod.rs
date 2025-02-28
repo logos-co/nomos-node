@@ -25,7 +25,7 @@ use serde::{Deserialize, Serialize};
 use subnetworks_assignations::versions::v1::FillFromNodeList;
 use tracing::Level;
 
-use crate::{NomosApiService, NomosDaMembership, Wire};
+use crate::{config::mempool::MempoolConfig, NomosApiService, NomosDaMembership, Wire};
 
 pub mod mempool;
 

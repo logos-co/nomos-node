@@ -8,13 +8,15 @@ use nomos_core::{
 };
 use nomos_da_sampling::{backend::DaSamplingServiceBackend, DaSamplingService};
 use nomos_mempool::{
-    backend::MemPool, network::NetworkAdapter as MempoolAdapter, DaMempoolService, TxMempoolService,
+    backend::{MemPool, RecoverableMempool},
+    network::NetworkAdapter as MempoolAdapter,
+    DaMempoolService, TxMempoolService,
 };
 use nomos_network::{NetworkMsg, NetworkService};
 use nomos_storage::{backends::StorageBackend, StorageMsg, StorageService};
 use overwatch_rs::services::relay::{OutboundRelay, Relay};
 use rand::{RngCore, SeedableRng};
-use serde::de::DeserializeOwned;
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use crate::{
     blend, network,

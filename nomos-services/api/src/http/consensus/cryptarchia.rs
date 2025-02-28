@@ -22,7 +22,7 @@ use nomos_mempool::{
 use nomos_storage::backends::{rocksdb::RocksBackend, StorageSerde};
 use overwatch_rs::overwatch::handle::OverwatchHandle;
 use rand::{RngCore, SeedableRng};
-use serde::{de::DeserializeOwned, Serialize};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use tokio::sync::oneshot;
 
 use crate::http::DynError;

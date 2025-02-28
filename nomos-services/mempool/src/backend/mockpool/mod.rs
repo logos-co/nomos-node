@@ -1,18 +1,26 @@
 use std::{
     collections::BTreeMap,
+    convert::Infallible,
+    fmt::Debug,
     hash::Hash,
     time::{SystemTime, UNIX_EPOCH},
 };
 
+use ::serde::{Deserialize, Serialize};
 use linked_hash_map::LinkedHashMap;
+use overwatch_rs::services::state::ServiceState;
 
 use super::Status;
-use crate::backend::{MemPool, MempoolError};
+use crate::{
+    backend::{MemPool, MempoolError, RecoverableMempool},
+    tx::settings::TxMempoolSettings,
+};
 
 mod serde;
 
 /// A mock mempool implementation that stores all transactions in memory in the
 /// order received.
+#[derive(Serialize, Deserialize)]
 pub struct MockPool<BlockId, Item, Key> {
     #[serde(
         serialize_with = "serde::serialize_pending_items",
