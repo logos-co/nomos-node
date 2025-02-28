@@ -1,9 +1,8 @@
-// std
 use std::net::Ipv4Addr;
-// crates
+
 use reqwest::Client;
 use serde::de::DeserializeOwned;
-// internal
+
 use crate::server::ClientIp;
 
 pub async fn get_config<Config: DeserializeOwned>(

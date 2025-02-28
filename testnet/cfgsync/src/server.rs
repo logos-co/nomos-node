@@ -1,33 +1,28 @@
-// std
-use std::fs;
-use std::net::Ipv4Addr;
-use std::path::PathBuf;
-use std::sync::Arc;
-use std::time::Duration;
-// crates
-use axum::extract::State;
-use axum::Json;
-use axum::{http::StatusCode, response::IntoResponse, routing::post, Router};
+use std::{fs, net::Ipv4Addr, num::NonZero, path::PathBuf, sync::Arc, time::Duration};
+
+use axum::{extract::State, http::StatusCode, response::IntoResponse, routing::post, Json, Router};
 use nomos_da_network_core::swarm::{DAConnectionMonitorSettings, DAConnectionPolicySettings};
 use nomos_tracing_service::TracingSettings;
 use serde::{Deserialize, Serialize};
-use tests::nodes::executor::create_executor_config;
-use tests::nodes::validator::create_validator_config;
-use tests::topology::configs::consensus::ConsensusParams;
-use tests::topology::configs::da::DaParams;
+use tests::{
+    nodes::{executor::create_executor_config, validator::create_validator_config},
+    topology::configs::{consensus::ConsensusParams, da::DaParams},
+};
 use tokio::sync::oneshot::channel;
-// internal
-use crate::config::Host;
-use crate::repo::{ConfigRepo, RepoResponse};
 
-#[derive(Default, Debug, Deserialize)]
+use crate::{
+    config::Host,
+    repo::{ConfigRepo, RepoResponse},
+};
+
+#[derive(Debug, Deserialize)]
 pub struct CfgSyncConfig {
     pub port: u16,
     pub n_hosts: usize,
     pub timeout: u64,
 
     // ConsensusConfig related parameters
-    pub security_param: u32,
+    pub security_param: NonZero<u32>,
     pub active_slot_coeff: f64,
 
     // DaConfig related parameters

@@ -7,6 +7,7 @@ pub mod server;
 mod tests {
     use std::{
         net::{Ipv4Addr, SocketAddr},
+        num::NonZero,
         str::FromStr,
         time::Duration,
     };
@@ -14,6 +15,7 @@ mod tests {
     use futures::future::join_all;
     use nomos_libp2p::{ed25519, libp2p, Multiaddr, PeerId, Protocol};
     use nomos_node::Config as ValidatorConfig;
+    use nomos_tracing_service::TracingSettings;
     use tokio::time::timeout;
 
     use crate::{
@@ -27,7 +29,18 @@ mod tests {
         let config = CfgSyncConfig {
             n_hosts,
             timeout: 10,
-            ..Default::default()
+            port: 16,
+            security_param: NonZero::new(1).unwrap(),
+            active_slot_coeff: 0.0,
+            subnetwork_size: 0,
+            dispersal_factor: 0,
+            num_samples: 0,
+            num_subnets: 0,
+            old_blobs_check_interval_secs: 0,
+            blobs_validity_duration_secs: 0,
+            global_params_path: "".into(),
+            balancer_interval_secs: 0,
+            tracing_settings: TracingSettings::default(),
         };
 
         let app_addr: SocketAddr = "127.0.0.1:4321".parse().unwrap();

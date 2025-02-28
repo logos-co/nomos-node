@@ -8,8 +8,10 @@ use nomos_tracing_service::TracingSettings;
 use tests::topology::configs::{consensus::ConsensusParams, da::DaParams, GeneralConfig};
 use tokio::{sync::oneshot::Sender, time::timeout};
 
-use crate::config::{create_node_configs, Host};
-use crate::server::CfgSyncConfig;
+use crate::{
+    config::{create_node_configs, Host},
+    server::CfgSyncConfig,
+};
 
 pub enum RepoResponse {
     Config(Box<GeneralConfig>),
