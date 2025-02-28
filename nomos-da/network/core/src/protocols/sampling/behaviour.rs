@@ -465,7 +465,7 @@ impl<Membership: MembershipHandler<Id = PeerId, NetworkId = SubnetworkId> + 'sta
 {
     /// Schedule a new task for sample the blob, if stream is not available
     /// queue messages for later processing.
-    #[allow(clippy::too_many_arguments)]
+    #[expect(clippy::too_many_arguments)]
     fn sample(
         peer_id: PeerId,
         outgoing_tasks: &FuturesUnordered<OutgoingStreamHandlerFuture>,

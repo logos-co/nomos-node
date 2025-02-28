@@ -88,7 +88,6 @@ where
     make_request_and_return_response!(cl::cl_mempool_status::<T>(&handle, items))
 }
 #[derive(Deserialize)]
-#[allow(dead_code)]
 pub struct CryptarchiaInfoQuery {
     from: Option<HeaderId>,
     to: Option<HeaderId>,

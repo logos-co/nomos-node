@@ -48,7 +48,7 @@ impl SampleRequest {
     }
 }
 
-#[allow(clippy::large_enum_variant)]
+#[expect(clippy::large_enum_variant)]
 #[repr(C)]
 #[derive(Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub enum SampleResponse {

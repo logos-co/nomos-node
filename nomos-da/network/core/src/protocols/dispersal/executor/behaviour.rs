@@ -167,7 +167,8 @@ type StreamHandlerFutureSuccess = (
 );
 type StreamHandlerFuture = BoxFuture<'static, Result<StreamHandlerFutureSuccess, DispersalError>>;
 
-/// Executor dispersal protocol
+/// Executor dispersal protocol.
+///
 /// Do not handle incoming connections, just accepts outgoing ones.
 /// It takes care of sending blobs to different subnetworks.
 /// Bubbles up events with the success or error when dispersing

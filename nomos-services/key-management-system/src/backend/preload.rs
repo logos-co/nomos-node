@@ -77,7 +77,6 @@ impl KMSBackend for PreloadKMSBackend {
 
 // This enum won't be used outside of this module
 // because [`PreloadKMSBackend`] doesn't support generating new keys.
-#[allow(dead_code)]
 #[derive(Debug, PartialEq, Eq)]
 pub enum SupportedKeyTypes {
     Ed25519,

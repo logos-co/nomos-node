@@ -54,7 +54,6 @@ impl Clone for ReplicationError {
 }
 
 /// Nomos DA BroadcastEvents to be bubble up to logic layers
-#[allow(dead_code)] // todo: remove when used in tests
 #[derive(Debug)]
 pub enum ReplicationEvent {
     IncomingMessage {
@@ -81,7 +80,8 @@ impl ReplicationEvent {
     }
 }
 
-/// Nomos DA broadcas network behaviour
+/// Nomos DA broadcas network behaviour.
+///
 /// This item handles the logic of the nomos da subnetworks broadcasting
 /// DA subnetworks are a logical distribution of subsets.
 /// A node just connects and accepts connections to other nodes that are in the

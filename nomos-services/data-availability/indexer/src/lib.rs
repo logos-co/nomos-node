@@ -118,7 +118,7 @@ pub struct DataIndexerService<
 {
     service_state: OpaqueServiceStateHandle<Self>,
     storage_relay: Relay<StorageService<DaStorage::Backend>>,
-    #[allow(clippy::type_complexity)]
+    #[expect(clippy::type_complexity)]
     consensus_relay: ConsensusRelay<
         NetAdapter,
         BlendAdapter,

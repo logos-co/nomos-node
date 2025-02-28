@@ -14,7 +14,6 @@ pub struct GeneralTracingConfig {
 }
 
 impl GeneralTracingConfig {
-    #[allow(dead_code)]
     fn local_debug_tracing(id: usize) -> Self {
         let host_identifier = format!("node-{id}");
         Self {
@@ -56,7 +55,6 @@ pub fn create_tracing_configs(ids: &[[u8; 32]]) -> Vec<GeneralTracingConfig> {
     }
 }
 
-#[allow(dead_code)]
 fn create_debug_configs(ids: &[[u8; 32]]) -> Vec<GeneralTracingConfig> {
     ids.iter()
         .enumerate()
@@ -64,7 +62,6 @@ fn create_debug_configs(ids: &[[u8; 32]]) -> Vec<GeneralTracingConfig> {
         .collect()
 }
 
-#[allow(dead_code)]
 fn create_default_configs(ids: &[[u8; 32]]) -> Vec<GeneralTracingConfig> {
     ids.iter()
         .map(|_| GeneralTracingConfig::default())

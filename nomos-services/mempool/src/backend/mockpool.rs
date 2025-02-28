@@ -76,7 +76,7 @@ where
     fn view(&self, _ancestor_hint: BlockId) -> Box<dyn Iterator<Item = Self::Item> + Send> {
         // we need to have an owned version of the iterator to bypass adding a lifetime
         // bound to the return iterator type
-        #[allow(clippy::needless_collect)]
+        #[expect(clippy::needless_collect)]
         let pending_items: Vec<Item> = self.pending_items.values().cloned().collect();
         Box::new(pending_items.into_iter())
     }

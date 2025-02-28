@@ -702,7 +702,6 @@ where
         }
     }
 
-    #[allow(clippy::type_complexity, clippy::too_many_arguments)]
     #[instrument(level = "debug", skip(cryptarchia, leader, relays))]
     async fn process_block(
         mut cryptarchia: Cryptarchia,
@@ -789,7 +788,6 @@ where
         cryptarchia
     }
 
-    #[allow(clippy::too_many_arguments)]
     #[instrument(level = "debug", skip(tx_selector, blob_selector, relays))]
     async fn propose_block(
         parent: HeaderId,

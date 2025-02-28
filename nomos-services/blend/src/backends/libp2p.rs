@@ -26,7 +26,7 @@ use super::BlendBackend;
 
 /// A blend backend that uses the libp2p network stack.
 pub struct Libp2pBlendBackend {
-    #[allow(dead_code)]
+    #[expect(dead_code)]
     task: JoinHandle<()>,
     swarm_message_sender: mpsc::Sender<BlendSwarmMessage>,
     incoming_message_sender: broadcast::Sender<Vec<u8>>,

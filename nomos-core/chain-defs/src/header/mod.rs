@@ -15,7 +15,6 @@ pub struct HeaderId([u8; 32]);
 #[derive(Clone, Debug, Eq, PartialEq, Copy, Hash)]
 pub struct ContentId([u8; 32]);
 
-#[allow(dead_code)]
 #[derive(Clone, Debug, Eq, PartialEq, Copy)]
 pub struct Nonce([u8; 32]);
 

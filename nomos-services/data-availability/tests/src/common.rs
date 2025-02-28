@@ -210,7 +210,7 @@ pub struct TestBlendSettings {
     >,
 }
 
-#[allow(clippy::too_many_arguments)]
+#[expect(clippy::too_many_arguments)]
 pub fn new_node(
     leader_config: &LeaderConfig,
     ledger_config: &nomos_ledger::Config,

@@ -154,7 +154,7 @@ impl DaEncoder {
             .collect()
     }
 
-    #[allow(clippy::type_complexity)]
+    #[expect(clippy::type_complexity)]
     fn compute_kzg_row_commitments(
         global_parameters: &GlobalParameters,
         matrix: &ChunksMatrix,
@@ -229,7 +229,7 @@ impl DaEncoder {
         .collect())
     }
 
-    #[allow(clippy::type_complexity)]
+    #[expect(clippy::type_complexity)]
     fn compute_kzg_column_commitments(
         global_parameters: &GlobalParameters,
         matrix: &ChunksMatrix,

@@ -135,18 +135,16 @@ where
     type FromBehaviour = FromBehaviour;
     type ToBehaviour = ToBehaviour;
     type InboundProtocol = ReadyUpgrade<StreamProtocol>;
-    #[allow(deprecated)]
     type InboundOpenInfo = ();
     type OutboundProtocol = ReadyUpgrade<StreamProtocol>;
-    #[allow(deprecated)]
     type OutboundOpenInfo = ();
 
-    #[allow(deprecated)] // Self::InboundOpenInfo is deprecated
+    #[expect(deprecated)] // Self::InboundOpenInfo is deprecated
     fn listen_protocol(&self) -> SubstreamProtocol<Self::InboundProtocol, Self::InboundOpenInfo> {
         SubstreamProtocol::new(ReadyUpgrade::new(PROTOCOL_NAME), ())
     }
 
-    #[allow(deprecated)] // Self::OutboundOpenInfo is deprecated
+    #[expect(deprecated)] // Self::OutboundOpenInfo is deprecated
     #[expect(clippy::cognitive_complexity)]
     fn poll(
         &mut self,
@@ -310,7 +308,7 @@ where
         }
     }
 
-    #[allow(deprecated)] // Self::InboundOpenInfo and Self::OutboundOpenInfo are deprecated
+    #[expect(deprecated)] // Self::InboundOpenInfo and Self::OutboundOpenInfo are deprecated
     #[expect(clippy::cognitive_complexity)]
     fn on_connection_event(
         &mut self,

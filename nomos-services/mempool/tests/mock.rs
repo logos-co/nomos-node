@@ -15,7 +15,7 @@ use nomos_tracing_service::{Tracing, TracingSettings};
 use overwatch_derive::*;
 use overwatch_rs::{overwatch::OverwatchRunner, OpaqueServiceHandle};
 
-#[allow(clippy::type_complexity)]
+#[expect(clippy::type_complexity)]
 #[derive(Services)]
 struct MockPoolNode {
     logging: OpaqueServiceHandle<Tracing>,

@@ -111,7 +111,7 @@ pub struct MockConfig {
 
 pub enum MockBackendMessage {
     BootProducer {
-        #[allow(clippy::type_complexity)]
+        #[expect(clippy::type_complexity)]
         spawner: Box<
             dyn Fn(
                     BoxFuture<'static, Result<(), overwatch_rs::DynError>>,

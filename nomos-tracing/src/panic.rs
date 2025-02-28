@@ -6,7 +6,6 @@ use std::{
 pub fn panic_hook(panic_info: &PanicHookInfo) {
     let payload = panic_info.payload();
 
-    #[allow(clippy::manual_map)]
     let payload = payload.downcast_ref::<&str>().map_or_else(
         || payload.downcast_ref::<String>().map(|s| s.as_str()),
         |s| Some(&**s),
