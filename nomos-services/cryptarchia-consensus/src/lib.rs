@@ -1073,57 +1073,31 @@ where
         match initial_state.recovery_strategy() {
             CryptarchiaInitialisationStrategy::Genesis => {
                 info!("Building Cryptarchia from genesis...");
-                let leader = Leader::from_genesis(genesis_id, leader_config, ledger_config);
-                let cryptarchia = Cryptarchia::new(genesis_id, genesis_state, ledger_config);
-
-                (cryptarchia, leader)
+                Self::build_from_genesis(genesis_id, genesis_state, leader_config, ledger_config)
             }
-            CryptarchiaInitialisationStrategy::RecoveryFromGenesis(GenesisRecoveryStrategy {
-                tip,
-            }) => {
+            CryptarchiaInitialisationStrategy::RecoveryFromGenesis(strategy) => {
                 info!("Recovering Cryptarchia with Genesis strategy.");
-                let mut leader = Leader::from_genesis(genesis_id, leader_config, ledger_config);
-                let cryptarchia = Self::recover_cryptarchia(
+                Self::recover_from_genesis(
+                    strategy,
                     genesis_id,
                     genesis_state,
-                    tip,
-                    &mut leader,
+                    leader_config,
                     ledger_config,
                     relays,
                     block_subscription_sender,
                 )
-                .await;
-
-                (cryptarchia, leader)
+                .await
             }
             CryptarchiaInitialisationStrategy::RecoveryFromSecurity(strategy) => {
-                let SecurityRecoveryStrategy {
-                    tip,
-                    security_block_id,
-                    security_ledger_state,
-                    security_leader_notes,
-                } = *strategy;
-
                 info!("Recovering Cryptarchia with Security strategy.");
-                let mut leader = Leader::new(
-                    security_block_id,
-                    security_leader_notes,
-                    leader_config.nf_sk,
-                    ledger_config,
-                );
-
-                let cryptarchia = Self::recover_cryptarchia(
-                    security_block_id,
-                    security_ledger_state,
-                    tip,
-                    &mut leader,
+                Self::recover_from_security(
+                    *strategy,
+                    leader_config,
                     ledger_config,
                     relays,
                     block_subscription_sender,
                 )
-                .await;
-
-                (cryptarchia, leader)
+                .await
             }
         }
     }
@@ -1185,6 +1159,99 @@ where
         }
 
         cryptarchia
+    }
+
+    fn build_from_genesis(
+        genesis_id: HeaderId,
+        genesis_state: LedgerState,
+        leader_config: LeaderConfig,
+        ledger_config: nomos_ledger::Config,
+    ) -> (Cryptarchia, Leader) {
+        let leader = Leader::from_genesis(genesis_id, leader_config, ledger_config);
+        let cryptarchia = Cryptarchia::new(genesis_id, genesis_state, ledger_config);
+
+        (cryptarchia, leader)
+    }
+
+    async fn recover_from_genesis(
+        GenesisRecoveryStrategy { tip }: GenesisRecoveryStrategy,
+        genesis_id: HeaderId,
+        genesis_state: LedgerState,
+        leader_config: LeaderConfig,
+        ledger_config: nomos_ledger::Config,
+        relays: &CryptarchiaConsensusRelays<
+            BlendAdapter,
+            BS,
+            ClPool,
+            ClPoolAdapter,
+            DaPool,
+            DaPoolAdapter,
+            NetAdapter,
+            SamplingBackend,
+            SamplingRng,
+            Storage,
+            TxS,
+        >,
+        block_subscription_sender: &mut broadcast::Sender<Block<ClPool::Item, DaPool::Item>>,
+    ) -> (Cryptarchia, Leader) {
+        let mut leader = Leader::from_genesis(genesis_id, leader_config, ledger_config);
+        let cryptarchia = Self::recover_cryptarchia(
+            genesis_id,
+            genesis_state,
+            tip,
+            &mut leader,
+            ledger_config,
+            relays,
+            block_subscription_sender,
+        )
+        .await;
+
+        (cryptarchia, leader)
+    }
+
+    async fn recover_from_security(
+        SecurityRecoveryStrategy {
+            tip,
+            security_block_id,
+            security_ledger_state,
+            security_leader_notes,
+        }: SecurityRecoveryStrategy,
+        leader_config: LeaderConfig,
+        ledger_config: nomos_ledger::Config,
+        relays: &CryptarchiaConsensusRelays<
+            BlendAdapter,
+            BS,
+            ClPool,
+            ClPoolAdapter,
+            DaPool,
+            DaPoolAdapter,
+            NetAdapter,
+            SamplingBackend,
+            SamplingRng,
+            Storage,
+            TxS,
+        >,
+        block_subscription_sender: &mut broadcast::Sender<Block<ClPool::Item, DaPool::Item>>,
+    ) -> (Cryptarchia, Leader) {
+        let mut leader = Leader::new(
+            security_block_id,
+            security_leader_notes,
+            leader_config.nf_sk,
+            ledger_config,
+        );
+
+        let cryptarchia = Self::recover_cryptarchia(
+            security_block_id,
+            security_ledger_state,
+            tip,
+            &mut leader,
+            ledger_config,
+            relays,
+            block_subscription_sender,
+        )
+        .await;
+
+        (cryptarchia, leader)
     }
 }
 
