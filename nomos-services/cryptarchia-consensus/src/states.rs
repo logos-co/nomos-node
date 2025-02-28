@@ -8,10 +8,23 @@ use serde::{Deserialize, Serialize};
 
 use crate::{leadership::Leader, Cryptarchia, CryptarchiaSettings, Error};
 
+/// Indicates that there's stored data so [`Cryptarchia`] should be recovered.
+/// However, the number of stored epochs is fewer than
+/// [`Config::security_param`](cryptarchia_engine::config::Config).
+///
+/// As a result, a [`Cryptarchia`](cryptarchia_engine::Cryptarchia) instance
+/// must first be built from genesis and then recovered up to the `tip` epoch.
 pub struct GenesisRecoveryStrategy {
     pub tip: HeaderId,
 }
 
+/// Indicates that there's stored data so [`Cryptarchia`] should be recovered,
+/// and the number of stored epochs is larger than
+/// [`Config::security_param`](cryptarchia_engine::config::Config).
+///
+/// As a result, a [`Cryptarchia`](cryptarchia_engine::Cryptarchia) instance
+/// must first be built from the security state and then recovered up to the
+/// `tip` epoch.
 pub struct SecurityRecoveryStrategy {
     pub tip: HeaderId,
     pub security_block_id: HeaderId,
@@ -20,6 +33,8 @@ pub struct SecurityRecoveryStrategy {
 }
 
 pub enum CryptarchiaInitialisationStrategy {
+    /// Indicates that there's no stored data so [`Cryptarchia`] should be built
+    /// from genesis.
     Genesis,
     RecoveryFromGenesis(GenesisRecoveryStrategy),
     RecoveryFromSecurity(Box<SecurityRecoveryStrategy>),
@@ -51,10 +66,10 @@ impl<TxS, BxS, NetworkAdapterSettings, BlendAdapterSettings>
             security_block,
             security_ledger_state,
             security_leader_notes,
-            _txs: Default::default(),
-            _bxs: Default::default(),
-            _network_adapter_settings: Default::default(),
-            _blend_adapter_settings: Default::default(),
+            _txs: PhantomData,
+            _bxs: PhantomData,
+            _network_adapter_settings: PhantomData,
+            _blend_adapter_settings: PhantomData,
         }
     }
 
@@ -75,7 +90,7 @@ impl<TxS, BxS, NetworkAdapterSettings, BlendAdapterSettings>
         )
     }
 
-    fn can_recover(&self) -> bool {
+    const fn can_recover(&self) -> bool {
         // This only checks whether tip is defined, as that's a state variable that
         // should always exist. Other attributes might not be present.
         self.tip.is_some()

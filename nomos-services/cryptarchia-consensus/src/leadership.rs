@@ -32,7 +32,7 @@ impl Leader {
         nf_sk: NullifierSecret,
         config: Config,
     ) -> Self {
-        Leader {
+        Self {
             notes: HashMap::from([(header_id, header_notes)]),
             nf_sk,
             config,
@@ -44,7 +44,7 @@ impl Leader {
         LeaderConfig { notes, nf_sk }: LeaderConfig,
         config: Config,
     ) -> Self {
-        Leader::new(genesis, notes, nf_sk, config)
+        Self::new(genesis, notes, nf_sk, config)
     }
 
     // Signal that the chain extended with a new header, possibly evolving a leader
