@@ -1,6 +1,5 @@
 use serde::{Deserialize, Serialize};
-use std::marker::PhantomData;
-use thiserror::Error;
+use std::{convert::Infallible, marker::PhantomData};
 
 use overwatch_rs::services::state::ServiceState;
 
@@ -34,13 +33,10 @@ impl<PoolState, PoolSettings, NetworkSettings> From<PoolState>
     }
 }
 
-#[derive(Error, Debug)]
-pub enum Error {}
-
 impl<PoolState, PoolSettings, NetworkSettings> ServiceState
     for TxMempoolState<PoolState, PoolSettings, NetworkSettings>
 {
-    type Error = Error;
+    type Error = Infallible;
     type Settings = TxMempoolSettings<PoolSettings, NetworkSettings>;
 
     fn from_settings(_settings: &Self::Settings) -> Result<Self, Self::Error> {

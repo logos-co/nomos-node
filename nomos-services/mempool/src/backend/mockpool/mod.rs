@@ -2,11 +2,11 @@ use overwatch_rs::services::state::ServiceState;
 // std
 use ::serde::{Deserialize, Serialize};
 use linked_hash_map::LinkedHashMap;
+use std::convert::Infallible;
 use std::fmt::Debug;
 use std::hash::Hash;
 use std::time::SystemTime;
 use std::{collections::BTreeMap, time::UNIX_EPOCH};
-use thiserror::Error;
 // crates
 // internal
 use crate::backend::{MemPool, MempoolError, RecoverableMempool};
@@ -216,16 +216,13 @@ where
     }
 }
 
-#[derive(Error, Debug)]
-pub enum Error {}
-
 impl<BlockId, Item, Key> ServiceState for MockPool<BlockId, Item, Key>
 where
     Key: Hash + Eq + Ord + Clone + Send,
     Item: Clone + Send + 'static,
     BlockId: Ord + Copy,
 {
-    type Error = Error;
+    type Error = Infallible;
     type Settings = TxMempoolSettings<(), ()>;
 
     fn from_settings(_settings: &Self::Settings) -> Result<Self, Self::Error> {
