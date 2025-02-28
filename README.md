@@ -45,18 +45,24 @@ struct MockPoolNode {
 
 ## Docker
 
-To build and run a docker container with Nomos node run:
+To build and run a docker container with the Nomos node you need to mount both `config.yml` and `global_params_path` specified in the configuration. 
 
 ```bash
 docker build -t nomos .
-docker run nomos /etc/nomos/config.yml
+
+docker run -v "/path/to/config.yml" -v "/path/to/global_params:global/params/path" nomos /etc/nomos/config.yml
+
 ```
 
-To run a node with a different configuration run:
+To use an example configuration located at `nodes/nomos-node/config.yaml`, first run the test that generates the random kzgrs file and then run the docker container with the appropriate config and global params:
 
 ```bash
-docker run -v /path/to/config.yml:/etc/nomos/config.yml nomos /etc/nomos/config.yml
+cargo test --package kzgrs-backend write_random_kzgrs_params_to_file -- --ignored
+
+docker run -v "$(pwd)/nodes/nomos-node/config.yaml:/etc/nomos/config.yml" -v "$(pwd)/nomos-da/kzgrs-backend/kzgrs_test_params:/app/tests/kzgrs/kzgrs_test_params" nomos /etc/nomos/config.yml
+
 ```
+
 
 ## License
 
