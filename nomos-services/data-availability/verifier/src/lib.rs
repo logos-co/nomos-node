@@ -34,6 +34,10 @@ pub enum DaVerifierMsg<B, A> {
         blob: B,
         reply_channel: Sender<Option<A>>,
     },
+    VerifyBlob {
+        blob: B,
+        reply_channel: Sender<Result<B, DynError>>,
+    },
 }
 
 impl<B: 'static, A: 'static> Debug for DaVerifierMsg<B, A> {
@@ -41,6 +45,9 @@ impl<B: 'static, A: 'static> Debug for DaVerifierMsg<B, A> {
         match self {
             DaVerifierMsg::AddBlob { .. } => {
                 write!(f, "DaVerifierMsg::AddBlob")
+            }
+            DaVerifierMsg::VerifyBlob { .. } => {
+                write!(f, "DaVerifierMsg::VerifyBlob")
             }
         }
     }
@@ -177,21 +184,41 @@ where
                     }
                 }
                 Some(msg) = service_state.inbound_relay.recv() => {
-                    let DaVerifierMsg::AddBlob { blob, reply_channel } = msg;
-                    let blob_id = blob.id();
-                    match Self::handle_new_blob(&verifier, &storage_adapter, blob).await {
-                        Ok(attestation) => {
-                            if let Err(err) = reply_channel.send(Some(attestation)) {
-                                error!("Error replying attestation {err:?}");
+                    match msg {
+                        DaVerifierMsg::AddBlob { blob, reply_channel } => {
+                            let blob_id = blob.id();
+                            match Self::handle_new_blob(&verifier, &storage_adapter, blob).await {
+                                Ok(attestation) => {
+                                    if let Err(err) = reply_channel.send(Some(attestation)) {
+                                        error!("Error replying attestation {err:?}");
+                                    }
+                                },
+                                Err(err) => {
+                                    error!("Error handling blob {blob_id:?} due to {err:?}");
+                                    if let Err(err) = reply_channel.send(None) {
+                                        error!("Error replying attestation {err:?}");
+                                    }
+                                },
+                            };
+                        },
+                        DaVerifierMsg::VerifyBlob { blob, reply_channel } => {
+                            let blob_id = blob.id();
+                            match verifier.verify(&blob) {
+                                Ok(_) => {
+                                    if let Err(err) = reply_channel.send(Ok(blob)) {
+                                        error!("Error replying verification {err:?}");
+                                    }
+                                },
+                                Err(err) => {
+                                    error!("Error verifying blob {blob_id:?} due to {err:?}");
+                                    if let Err(err) = reply_channel.send(Err(err.into())) {
+                                        error!("Error replying verification {err:?}");
+                                    }
+                                },
                             }
                         },
-                        Err(err) => {
-                            error!("Error handling blob {blob_id:?} due to {err:?}");
-                            if let Err(err) = reply_channel.send(None) {
-                                error!("Error replying attestation {err:?}");
-                            }
-                        },
-                    };
+
+                    }
                 }
                 Some(msg) = lifecycle_stream.next() => {
                     if lifecycle::should_stop_service::<Self>(&msg).await {

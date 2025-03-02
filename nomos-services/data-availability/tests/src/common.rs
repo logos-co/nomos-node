@@ -165,7 +165,7 @@ pub(crate) type DaIndexer = DataIndexerService<
     KzgrsDaVerifier,
     Libp2pAdapter<NomosDaMembership>,
     VerifierStorageAdapter<DaBlob, Wire>,
-    SystemTimeBackend
+    SystemTimeBackend,
 >;
 
 pub(crate) type TxMempool = TxMempoolService<

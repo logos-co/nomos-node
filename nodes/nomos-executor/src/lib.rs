@@ -36,7 +36,6 @@ use nomos_node::{
 use overwatch_derive::Services;
 use overwatch_rs::OpaqueServiceHandle;
 use rand_chacha::ChaCha20Rng;
-use subnetworks_assignations::versions::v1::FillFromNodeList;
 
 pub type ExecutorApiService = ApiService<
     AxumBackend<
@@ -46,7 +45,7 @@ pub type ExecutorApiService = ApiService<
         NomosDaMembership,
         BlobInfo,
         KzgrsDaVerifier,
-        VerifierNetworkAdapter<FillFromNodeList>,
+        VerifierNetworkAdapter<NomosDaMembership>,
         VerifierStorageAdapter<DaBlob, Wire>,
         Tx,
         Wire,
@@ -71,7 +70,7 @@ pub type DispersalMempoolAdapter = KzgrsMempoolAdapter<
     ChaCha20Rng,
     SamplingStorageAdapter<DaBlob, Wire>,
     KzgrsDaVerifier,
-    VerifierNetworkAdapter<FillFromNodeList>,
+    VerifierNetworkAdapter<NomosDaMembership>,
     VerifierStorageAdapter<DaBlob, Wire>,
 >;
 

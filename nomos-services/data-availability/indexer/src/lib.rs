@@ -514,11 +514,6 @@ where
     DaVerifierNetwork::Settings: Clone,
     TimeBackend: nomos_time::backends::TimeBackend,
     TimeBackend::Settings: Clone + Send + Sync,
-    DaVerifierStorage: nomos_da_verifier::storage::DaStorageAdapter,
-    DaVerifierBackend: nomos_da_verifier::backend::VerifierBackend + Send,
-    DaVerifierBackend::Settings: Clone,
-    DaVerifierNetwork: nomos_da_verifier::network::NetworkAdapter,
-    DaVerifierNetwork::Settings: Clone,
 {
     fn init(
         service_state: OpaqueServiceStateHandle<Self>,

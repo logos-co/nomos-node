@@ -60,7 +60,6 @@ pub type Cryptarchia<
 >;
 
 pub async fn cryptarchia_info<
-    'a,
     Tx,
     SS,
     SamplingBackend,
@@ -73,7 +72,7 @@ pub async fn cryptarchia_info<
     TimeBackend,
     const SIZE: usize,
 >(
-    handle: &'a OverwatchHandle,
+    handle: &OverwatchHandle,
 ) -> Result<CryptarchiaInfo, DynError>
 where
     Tx: Transaction
@@ -131,7 +130,6 @@ where
 
 #[allow(clippy::type_complexity)]
 pub async fn cryptarchia_headers<
-    'a,
     Tx,
     SS,
     SamplingBackend,
@@ -144,7 +142,7 @@ pub async fn cryptarchia_headers<
     TimeBackend,
     const SIZE: usize,
 >(
-    handle: &'a OverwatchHandle,
+    handle: &OverwatchHandle,
     from: Option<HeaderId>,
     to: Option<HeaderId>,
 ) -> Result<Vec<HeaderId>, DynError>

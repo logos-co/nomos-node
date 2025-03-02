@@ -253,7 +253,7 @@ where
     DaStorage: DaStorageAdapter,
     R: SeedableRng + RngCore,
     DaVerifierStorage: nomos_da_verifier::storage::DaStorageAdapter + Send + Sync,
-    DaVerifierBackend: nomos_da_verifier::backend::VerifierBackend + Send + 'static,
+    DaVerifierBackend: VerifierBackend + Send + 'static,
     DaVerifierBackend::Settings: Clone,
     DaVerifierNetwork: nomos_da_verifier::network::NetworkAdapter,
     DaVerifierNetwork::Settings: Clone,

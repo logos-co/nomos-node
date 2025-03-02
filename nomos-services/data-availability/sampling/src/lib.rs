@@ -7,14 +7,14 @@ use std::{collections::BTreeSet, fmt::Debug};
 use backend::{DaSamplingServiceBackend, SamplingState};
 use kzgrs_backend::common::blob::DaBlob;
 use network::NetworkAdapter;
-use nomos_core::da::BlobId;
+use nomos_core::da::{BlobId, DaVerifier};
 use nomos_da_network_service::{backends::libp2p::common::SamplingEvent, NetworkService};
-use nomos_da_verifier::DaVerifierService;
+use nomos_da_verifier::{DaVerifierMsg, DaVerifierService};
 use nomos_storage::StorageService;
 use nomos_tracing::{error_with_id, info_with_id};
 use overwatch_rs::{
     services::{
-        relay::{Relay, RelayMessage},
+        relay::{OutboundRelay, Relay, RelayMessage},
         state::{NoOperator, NoState},
         ServiceCore, ServiceData, ServiceId,
     },
@@ -109,8 +109,8 @@ where
     DaNetwork: NetworkAdapter + Send + 'static,
     DaNetwork::Settings: Clone,
     DaStorage: DaStorageAdapter<Blob = DaBlob>,
-    DaVerifierStorage: nomos_da_verifier::storage::DaStorageAdapter + std::marker::Send,
-    DaVerifierBackend: nomos_da_verifier::backend::VerifierBackend + Send + 'static,
+    DaVerifierStorage: nomos_da_verifier::storage::DaStorageAdapter + Send,
+    DaVerifierBackend: nomos_da_verifier::backend::VerifierBackend<DaBlob = DaBlob> + Send,
     DaVerifierBackend::Settings: Clone,
     DaVerifierNetwork: nomos_da_verifier::network::NetworkAdapter,
     <DaVerifierNetwork as nomos_da_verifier::network::NetworkAdapter>::Settings: Clone,
@@ -153,11 +153,19 @@ where
         event: SamplingEvent,
         sampler: &mut Backend,
         storage_adapter: &DaStorage,
+        verifier_relay: &OutboundRelay<DaVerifierMsg<DaVerifierBackend::DaBlob, ()>>,
     ) {
         match event {
             SamplingEvent::SamplingSuccess { blob_id, blob } => {
                 info_with_id!(blob_id, "SamplingSuccess");
-                sampler.handle_sampling_success(blob_id, *blob).await;
+                if let Ok(blob) = Self::verify_blob(verifier_relay, *blob).await {
+                    sampler.handle_sampling_success(blob_id, blob).await;
+                    return;
+                } else {
+                    error_with_id!(blob_id, "SamplingError");
+                    sampler.handle_sampling_error(blob_id).await;
+                    return;
+                }
             }
             SamplingEvent::SamplingError { error } => {
                 if let Some(blob_id) = error.blob_id() {
@@ -188,6 +196,24 @@ where
                 }
             }
         }
+    }
+
+    async fn verify_blob(
+        verifier_relay: &OutboundRelay<DaVerifierMsg<DaBlob, ()>>,
+        blob: DaBlob,
+    ) -> Result<DaBlob, DynError> {
+        let (reply_sender, reply_receiver) = oneshot::channel();
+        verifier_relay
+            .send(DaVerifierMsg::VerifyBlob {
+                blob,
+                reply_channel: reply_sender,
+            })
+            .await
+            .expect("Failed to send verify blob message to verifier relay");
+
+        reply_receiver
+            .await
+            .expect("Failed to receive reply blob message from verifier relay")
     }
 }
 
@@ -260,8 +286,9 @@ where
     Backend::Settings: Clone + Send + Sync + 'static,
     DaNetwork: NetworkAdapter + Send + Sync + 'static,
     DaNetwork::Settings: Clone + Send + Sync + 'static,
-    DaStorage: DaStorageAdapter<Blob = DaBlob> + Sync + Send,
+    DaStorage: DaStorageAdapter<Blob = Backend::Blob> + Sync + Send,
     DaVerifierBackend: nomos_da_verifier::backend::VerifierBackend + Send + Sync + 'static,
+    DaVerifierBackend: DaVerifier<DaBlob = Backend::Blob> + Send,
     DaVerifierBackend::Settings: Clone,
     DaVerifierNetwork: nomos_da_verifier::network::NetworkAdapter,
     DaVerifierNetwork::Settings: Clone,
@@ -298,7 +325,7 @@ where
         let Self {
             network_relay,
             storage_relay,
-            verifier_relay: _verifier_relay,
+            verifier_relay,
             mut service_state,
             mut sampler,
         } = self;
@@ -312,6 +339,8 @@ where
         let storage_relay = storage_relay.connect().await?;
         let storage_adapter = DaStorage::new(storage_relay).await;
 
+        let verifier_relay = verifier_relay.connect().await?;
+
         let mut lifecycle_stream = service_state.lifecycle_handle.message_stream();
         loop {
             tokio::select! {
@@ -319,7 +348,7 @@ where
                     Self::handle_service_message(service_message, &mut network_adapter, &mut sampler).await;
                 }
                 Some(sampling_message) = sampling_message_stream.next() => {
-                    Self::handle_sampling_message(sampling_message, &mut sampler, &storage_adapter).await;
+                    Self::handle_sampling_message(sampling_message, &mut sampler, &storage_adapter, &verifier_relay).await;
                 }
                 Some(msg) = lifecycle_stream.next() => {
                     if lifecycle::should_stop_service::<Self>(&msg).await {
