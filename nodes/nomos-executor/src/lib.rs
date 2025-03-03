@@ -23,7 +23,7 @@ use nomos_da_sampling::{
 };
 use nomos_da_verifier::{
     backend::kzgrs::KzgrsDaVerifier,
-    network::adapters::validator::Libp2pAdapter as VerifierNetworkAdapter,
+    network::adapters::executor::Libp2pAdapter as VerifierNetworkAdapter,
     storage::adapters::rocksdb::RocksAdapter as VerifierStorageAdapter,
 };
 use nomos_mempool::backend::mockpool::MockPool;
