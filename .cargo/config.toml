@@ -12,7 +12,9 @@ rustflags = [
   "-Aclippy::large_stack_frames",
 
   "-Wclippy::pedantic",
+  "-Aclippy::similar_names",
+  # TODO: Remove at some point
   "-Aclippy::missing_errors_doc",
+  # TODO: Remove at some point
   "-Aclippy::missing_panics_doc",
-  "-Aclippy::similar_names"
 ]
