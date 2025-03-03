@@ -50,9 +50,9 @@ fn main() {
     let o = args.next();
     if o.is_none() {
         println!("open in read-write mode");
-        rocksdb_rw()
+        rocksdb_rw();
     } else {
         println!("open in read-only mode");
-        rocksdb_ro()
+        rocksdb_ro();
     }
 }

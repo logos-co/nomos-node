@@ -85,6 +85,7 @@ impl AsRef<[u8]> for MockTxId {
 }
 
 impl MockTxId {
+    #[must_use]
     pub const fn new(tx_id: [u8; 32]) -> Self {
         Self(tx_id)
     }

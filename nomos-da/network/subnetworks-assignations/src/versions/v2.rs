@@ -15,6 +15,7 @@ pub struct FillWithOriginalReplication {
 }
 
 impl FillWithOriginalReplication {
+    #[must_use]
     pub fn new(
         peers: &[PeerId],
         subnetwork_size: usize,
@@ -78,7 +79,7 @@ impl MembershipHandler for FillWithOriginalReplication {
             .filter_map(|(netowrk_id, subnetwork)| {
                 subnetwork
                     .contains(id)
-                    .then_some(netowrk_id as Self::NetworkId)
+                    .then_some(netowrk_id.try_into().unwrap())
             })
             .collect()
     }
@@ -101,7 +102,7 @@ impl MembershipHandler for FillWithOriginalReplication {
     }
 
     fn last_subnetwork_id(&self) -> Self::NetworkId {
-        self.subnetwork_size as u16
+        self.subnetwork_size.try_into().unwrap()
     }
 }
 

@@ -15,6 +15,7 @@ pub struct ConsensusParams {
 }
 
 impl ConsensusParams {
+    #[must_use]
     pub const fn default_for_participants(n_participants: usize) -> Self {
         Self {
             n_participants,
@@ -38,9 +39,10 @@ pub struct GeneralConsensusConfig {
     pub genesis_state: LedgerState,
 }
 
+#[must_use]
 pub fn create_consensus_configs(
     ids: &[[u8; 32]],
-    consensus_params: ConsensusParams,
+    consensus_params: &ConsensusParams,
 ) -> Vec<GeneralConsensusConfig> {
     let notes = (0..ids.len())
         .map(|_| NoteWitness::basic(1, NMO_UNIT, &mut thread_rng()))
@@ -58,7 +60,7 @@ pub fn create_consensus_configs(
     // no commitments for now, proofs are not checked anyway
     let genesis_state = LedgerState::from_commitments(
         notes.iter().zip(&sks).map(|(n, sk)| n.commit(sk.commit())),
-        (ids.len() as u32).into(),
+        ids.len().try_into().unwrap(),
     );
     let ledger_config = nomos_ledger::Config {
         epoch_config: EpochConfig {

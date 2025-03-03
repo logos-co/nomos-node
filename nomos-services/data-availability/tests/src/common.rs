@@ -19,6 +19,7 @@ use nomos_blend::{
     message_blend::{
         CryptographicProcessorSettings, MessageBlendSettings, TemporalSchedulerSettings,
     },
+    persistent_transmission::PersistentTransmissionSettings,
 };
 use nomos_blend_message::{sphinx::SphinxMessage, BlendMessage};
 use nomos_blend_service::{
@@ -36,6 +37,7 @@ use nomos_da_indexer::{
     },
     DataIndexerService, IndexerSettings,
 };
+use nomos_da_network_core::swarm::{DAConnectionMonitorSettings, DAConnectionPolicySettings};
 use nomos_da_network_service::{
     backends::libp2p::{common::DaNetworkBackendSettings, validator::DaNetworkValidatorBackend},
     NetworkConfig as DaNetworkConfig, NetworkService as DaNetworkService,
@@ -220,6 +222,7 @@ pub struct TestBlendSettings {
 }
 
 #[expect(clippy::too_many_arguments)]
+#[expect(clippy::too_many_lines)]
 pub fn new_node(
     leader_config: &LeaderConfig,
     ledger_config: &nomos_ledger::Config,
@@ -244,7 +247,7 @@ pub fn new_node(
             },
             blend: BlendConfig {
                 backend: blend_config.backend.clone(),
-                persistent_transmission: Default::default(),
+                persistent_transmission: PersistentTransmissionSettings::default(),
                 message_blend: MessageBlendSettings {
                     cryptographic_processor: CryptographicProcessorSettings {
                         private_key: blend_config.private_key.to_bytes(),
@@ -255,7 +258,7 @@ pub fn new_node(
                     },
                 },
                 cover_traffic: nomos_blend_service::CoverTrafficExtSettings {
-                    epoch_duration: Duration::from_secs(432000),
+                    epoch_duration: Duration::from_secs(432_000),
                     slot_duration: Duration::from_secs(20),
                 },
                 membership: blend_config.membership.clone(),
@@ -274,8 +277,8 @@ pub fn new_node(
                     ),
                     addresses: da_network_settings.peer_addresses.into_iter().collect(),
                     listening_address: da_network_settings.listening_address,
-                    policy_settings: Default::default(),
-                    monitor_settings: Default::default(),
+                    policy_settings: DAConnectionPolicySettings::default(),
+                    monitor_settings: DAConnectionMonitorSettings::default(),
                     balancer_interval: Duration::ZERO,
                     redial_cooldown: Duration::ZERO,
                 },
@@ -355,11 +358,11 @@ pub fn new_node(
         },
         None,
     )
-    .map_err(|e| eprintln!("Error encountered: {}", e))
+    .map_err(|e| eprintln!("Error encountered: {e}"))
     .unwrap()
 }
 
-pub fn new_blend_configs(listening_addresses: Vec<Multiaddr>) -> Vec<TestBlendSettings> {
+pub fn new_blend_configs(listening_addresses: &[Multiaddr]) -> Vec<TestBlendSettings> {
     let settings = listening_addresses
         .iter()
         .map(|listening_address| {
@@ -421,7 +424,7 @@ pub fn new_client(db_path: PathBuf) -> Overwatch {
         },
         None,
     )
-    .map_err(|e| eprintln!("Error encountered: {}", e))
+    .map_err(|e| eprintln!("Error encountered: {e}"))
     .unwrap()
 }
 

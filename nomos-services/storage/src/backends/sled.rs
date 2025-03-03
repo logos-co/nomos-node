@@ -59,7 +59,7 @@ impl<SerdeOp: StorageSerde + Send + Sync + 'static> StorageBackend for SledBacke
     fn new(config: Self::Settings) -> Result<Self, Self::Error> {
         Ok(Self {
             sled: sled::open(config.db_path)?,
-            _serde_op: Default::default(),
+            _serde_op: PhantomData,
         })
     }
 

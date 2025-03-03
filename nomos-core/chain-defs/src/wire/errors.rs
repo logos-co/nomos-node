@@ -19,8 +19,8 @@ impl From<Error> for io::Error {
 impl Clone for Error {
     fn clone(&self) -> Self {
         match self {
-            Self::Serialize(error) => Self::Serialize(clone_bincode_error(error)),
-            Self::Deserialize(error) => Self::Deserialize(clone_bincode_error(error)),
+            Self::Serialize(error) => Self::Serialize(Box::new(clone_bincode_error(error))),
+            Self::Deserialize(error) => Self::Deserialize(Box::new(clone_bincode_error(error))),
         }
     }
 }

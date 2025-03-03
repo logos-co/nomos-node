@@ -128,7 +128,7 @@ impl<R: Rng + Sync + Send> DaSamplingServiceBackend<R> for KzgrsSamplingBackend<
     }
 
     fn prune(&mut self) {
-        self.prune_by_time()
+        self.prune_by_time();
     }
 }
 
@@ -140,6 +140,7 @@ mod test {
         time::{Duration, Instant},
     };
 
+    use kzgrs::{Commitment, Proof};
     use kzgrs_backend::common::{blob::DaBlob, Column};
     use nomos_core::da::BlobId;
     use rand::{prelude::*, rngs::StdRng};
@@ -151,8 +152,8 @@ mod test {
 
     fn create_sampler(num_samples: usize, num_subnets: usize) -> KzgrsSamplingBackend<StdRng> {
         let settings = KzgrsSamplingBackendSettings {
-            num_samples: num_samples as u16,
-            num_subnets: num_subnets as u16,
+            num_samples: num_samples.try_into().unwrap(),
+            num_subnets: num_subnets.try_into().unwrap(),
             old_blobs_check_interval: Duration::from_millis(20),
             blobs_validity_duration: Duration::from_millis(10),
         };
@@ -170,7 +171,7 @@ mod test {
         let state = backend.init_sampling(blob_id).await;
 
         if let SamplingState::Init(subnets) = state {
-            let unique_subnet_ids: HashSet<_> = subnets.iter().cloned().collect();
+            let unique_subnet_ids: HashSet<_> = subnets.iter().copied().collect();
 
             assert_eq!(
                 unique_subnet_ids.len(),
@@ -194,6 +195,7 @@ mod test {
     }
 
     #[tokio::test]
+    #[expect(clippy::too_many_lines)]
     async fn test_sampler() {
         // fictitious number of subnets
         let subnet_num: usize = 42;
@@ -207,9 +209,9 @@ mod test {
         let blob = DaBlob {
             column_idx: 42,
             column: Column(vec![]),
-            column_commitment: Default::default(),
-            aggregated_column_commitment: Default::default(),
-            aggregated_column_proof: Default::default(),
+            column_commitment: Commitment::default(),
+            aggregated_column_commitment: Commitment::default(),
+            aggregated_column_proof: Proof::default(),
             rows_commitments: vec![],
             rows_proofs: vec![],
         };
@@ -306,7 +308,7 @@ mod test {
         // we already added subnet 42
         for i in 1..(subnet_num - 1) {
             let mut b = blob2.clone();
-            b.column_idx = i as u16;
+            b.column_idx = i.try_into().unwrap();
             sampler.handle_sampling_success(b1, b).await;
         }
         assert!(sampler.validated_blobs.is_empty());
@@ -325,7 +327,7 @@ mod test {
         // we should have all subnets set,
         // and the validated blobs should now have that blob
         // pending blobs should now be empty
-        blob3.column_idx = (subnet_num - 1) as u16;
+        blob3.column_idx = u16::try_from(subnet_num - 1).unwrap();
         sampler.handle_sampling_success(b1, blob3).await;
         assert!(sampler.pending_sampling_blobs.is_empty());
         assert!(sampler.validated_blobs.len() == 1);
@@ -357,7 +359,7 @@ mod test {
         // second set: will fail for expired
         let ctx11 = SamplingContext {
             subnets: HashSet::new(),
-            started: Instant::now() - Duration::from_secs(1),
+            started: Instant::now().checked_sub(Duration::from_secs(1)).unwrap(),
         };
         let ctx12 = ctx11.clone();
         let ctx13 = ctx11.clone();

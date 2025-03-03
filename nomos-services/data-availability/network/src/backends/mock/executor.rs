@@ -71,12 +71,12 @@ impl NetworkBackend for MockExecutorBackend {
     type EventKind = EventKind;
     type NetworkEvent = Event;
 
-    fn new(_config: Self::Settings, _: OverwatchHandle) -> Self {
-        let (_commands_tx, _) = tokio::sync::mpsc::channel(BUFFER_SIZE);
+    fn new(config: Self::Settings, _: OverwatchHandle) -> Self {
+        let (commands_tx, _) = tokio::sync::mpsc::channel(BUFFER_SIZE);
         let (events_tx, _) = tokio::sync::broadcast::channel(BUFFER_SIZE);
         Self {
-            _config,
-            _commands_tx,
+            _config: config,
+            _commands_tx: commands_tx,
             events_tx,
         }
     }

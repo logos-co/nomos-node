@@ -34,7 +34,7 @@ pub struct DaNetworkBackendSettings<Membership> {
     // Identification Secp256k1 private key in Hex format (`0x123...abc`). Default random.
     #[serde(with = "secret_key_serde", default = "ed25519::SecretKey::generate")]
     pub node_key: ed25519::SecretKey,
-    /// Membership of DA network PoV set
+    /// Membership of DA network `PoV` set
     pub membership: Membership,
     pub addresses: HashMap<PeerId, Multiaddr>,
     pub listening_address: Multiaddr,
@@ -122,7 +122,7 @@ pub(crate) async fn handle_validator_events_stream(
                                 .send(SamplingEvent::SamplingRequest { blob_id, column_idx, response_sender: sampling_response_sender })
                             {
                                 error!("Error in internal broadcast of sampling request: {e:?}");
-                                sampling_response_receiver.close()
+                                sampling_response_receiver.close();
                             }
 
                             if let Some(maybe_blob) = sampling_response_receiver.recv().await {

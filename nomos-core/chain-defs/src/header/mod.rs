@@ -32,6 +32,7 @@ pub struct Header {
 }
 
 impl Header {
+    #[must_use]
     pub const fn parent(&self) -> HeaderId {
         self.parent
     }
@@ -47,32 +48,38 @@ impl Header {
         h.update(self.leader_proof.evolved_commitment().as_bytes());
 
         for proof in &self.orphaned_leader_proofs {
-            proof.update_hasher(h)
+            proof.update_hasher(h);
         }
     }
 
+    #[must_use]
     pub fn id(&self) -> HeaderId {
         let mut h = Blake2b::new();
         self.update_hasher(&mut h);
         HeaderId(h.finalize().into())
     }
 
+    #[must_use]
     pub fn leader_proof(&self) -> &impl LeaderProof {
         &self.leader_proof
     }
 
+    #[must_use]
     pub const fn slot(&self) -> Slot {
         self.slot
     }
 
+    #[must_use]
     pub fn orphaned_proofs(&self) -> &[Self] {
         &self.orphaned_leader_proofs
     }
 
+    #[must_use]
     pub const fn content_size(&self) -> u32 {
         self.content_size
     }
 
+    #[must_use]
     pub const fn new(
         parent: HeaderId,
         content_size: u32,
@@ -90,6 +97,7 @@ impl Header {
         }
     }
 
+    #[must_use]
     pub fn with_orphaned_proofs(mut self, orphaned_leader_proofs: Vec<Self>) -> Self {
         self.orphaned_leader_proofs = orphaned_leader_proofs;
         self
@@ -104,6 +112,7 @@ pub struct Builder {
 }
 
 impl Builder {
+    #[must_use]
     pub const fn new(parent: HeaderId, slot: Slot, leader_proof: Risc0LeaderProof) -> Self {
         Self {
             parent,
@@ -113,11 +122,13 @@ impl Builder {
         }
     }
 
+    #[must_use]
     pub fn with_orphaned_proofs(mut self, orphaned_leader_proofs: Vec<Header>) -> Self {
         self.orphaned_leader_proofs = orphaned_leader_proofs;
         self
     }
 
+    #[must_use]
     pub fn build(self, content_id: ContentId, content_size: u32) -> Header {
         Header {
             parent: self.parent,

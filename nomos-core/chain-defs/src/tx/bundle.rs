@@ -20,15 +20,17 @@ pub struct Bundle {
 }
 
 impl Bundle {
+    #[must_use]
     pub const fn bundle(&self) -> &cl::Bundle {
         &self.bundle
     }
 
+    #[must_use]
     pub fn cm_roots(&self) -> &[[u8; 32]] {
         &self.cm_roots
     }
 
-    /// Requires a x86 machine with docker installed or RISC0_DEV_MODE=1
+    /// Requires a x86 machine with docker installed or `RISC0_DEV_MODE=1`
     pub fn prove(
         bundle_witness: &cl::BundleWitness,
         cm_root: [u8; 32],
@@ -62,6 +64,7 @@ impl Bundle {
         })
     }
 
+    #[must_use]
     pub fn as_bytes(&self) -> Bytes {
         let mut buff = BytesMut::new();
         wire::serializer_into_buffer(&mut buff)

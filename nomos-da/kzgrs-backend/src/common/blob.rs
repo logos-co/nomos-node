@@ -41,16 +41,19 @@ pub struct DaBlob {
 }
 
 impl DaBlob {
+    #[must_use]
     pub fn id(&self) -> Vec<u8> {
         build_blob_id(&self.aggregated_column_commitment, &self.rows_commitments).into()
     }
 
+    #[must_use]
     pub fn column_id(&self) -> Vec<u8> {
         let mut hasher = Sha3_256::new();
         hasher.update(self.column.as_bytes());
         hasher.finalize().as_slice().to_vec()
     }
 
+    #[must_use]
     pub fn column_len(&self) -> usize {
         self.column.as_bytes().len()
     }

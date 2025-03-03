@@ -62,7 +62,7 @@ where
         let responses_stream = adapter.dispersal_events_stream().await?;
         for (subnetwork_id, blob) in encoded_data.into_iter().enumerate() {
             adapter
-                .disperse((subnetwork_id as u16).into(), blob)
+                .disperse(u16::try_from(subnetwork_id).unwrap().into(), blob)
                 .await?;
         }
 

@@ -55,7 +55,7 @@ pub struct NetworkService<B: NetworkBackend + 'static> {
 }
 
 pub struct NetworkState<B: NetworkBackend> {
-    _backend: B::State,
+    backend: B::State,
 }
 
 impl<B: NetworkBackend + 'static> ServiceData for NetworkService<B> {
@@ -103,7 +103,7 @@ where
                     Self::handle_network_service_message(msg, &mut backend).await;
                 }
                 Some(msg) = lifecycle_stream.next() => {
-                    if lifecycle::should_stop_service::<Self>(&msg).await {
+                    if lifecycle::should_stop_service::<Self>(&msg) {
                         // TODO: Maybe add a call to backend to handle this. Maybe trying to save unprocessed messages?
                         break;
                     }
@@ -124,15 +124,15 @@ where
             NetworkMsg::Process(msg) => {
                 // split sending in two steps to help the compiler understand we do not
                 // need to hold an instance of &I (which is not send) across an await point
-                let _send = backend.process(msg);
-                _send.await
+                let send = backend.process(msg);
+                send.await;
             }
             NetworkMsg::Subscribe { kind, sender } => sender
                 .send(backend.subscribe(kind).await)
                 .unwrap_or_else(|_| {
                     tracing::warn!(
                         "client hung up before a subscription handle could be established"
-                    )
+                    );
                 }),
         }
     }
@@ -149,7 +149,7 @@ impl<B: NetworkBackend> Clone for NetworkConfig<B> {
 impl<B: NetworkBackend> Clone for NetworkState<B> {
     fn clone(&self) -> Self {
         Self {
-            _backend: self._backend.clone(),
+            backend: self.backend.clone(),
         }
     }
 }
@@ -159,6 +159,6 @@ impl<B: NetworkBackend> ServiceState for NetworkState<B> {
     type Error = <B::State as ServiceState>::Error;
 
     fn from_settings(settings: &Self::Settings) -> Result<Self, Self::Error> {
-        B::State::from_settings(&settings.backend).map(|_backend| Self { _backend })
+        B::State::from_settings(&settings.backend).map(|backend| Self { backend })
     }
 }

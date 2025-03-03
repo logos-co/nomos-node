@@ -42,7 +42,7 @@ fn get_packed_message_size(packed_message: &[u8]) -> Result<usize> {
 fn prepare_message_for_writer(packed_message: &[u8]) -> Result<Vec<u8>> {
     let data_length = get_packed_message_size(packed_message)?;
     let mut buffer = Vec::with_capacity(MAX_MSG_LEN_BYTES + data_length);
-    buffer.extend_from_slice(&(data_length as LenType).to_be_bytes());
+    buffer.extend_from_slice(&(LenType::try_from(data_length).unwrap()).to_be_bytes());
     buffer.extend_from_slice(packed_message);
     Ok(buffer)
 }
@@ -128,6 +128,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[expect(clippy::large_stack_arrays)]
     async fn pack_to_writer_too_large_message() {
         let blob_id = BlobId::from([0; 32]);
         let error_description = ["."; MAX_MSG_LEN].concat();

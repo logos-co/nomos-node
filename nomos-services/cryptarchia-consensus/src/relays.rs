@@ -143,8 +143,8 @@ where
             blend_relay,
             cl_mempool_relay,
             da_mempool_relay,
-            sampling_relay,
             storage_adapter,
+            sampling_relay,
         }
     }
 

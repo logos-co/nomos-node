@@ -74,8 +74,8 @@ where
 
         Self {
             network_relay,
-            _phantom_tx: Default::default(),
-            _blob_cert: Default::default(),
+            _phantom_tx: PhantomData,
+            _blob_cert: PhantomData,
         }
     }
 

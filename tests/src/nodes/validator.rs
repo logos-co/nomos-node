@@ -9,8 +9,11 @@ use std::{
 use cryptarchia_consensus::{CryptarchiaInfo, CryptarchiaSettings};
 use cryptarchia_engine::time::SlotConfig;
 use kzgrs_backend::common::blob::DaBlob;
-use nomos_blend::message_blend::{
-    CryptographicProcessorSettings, MessageBlendSettings, TemporalSchedulerSettings,
+use nomos_blend::{
+    message_blend::{
+        CryptographicProcessorSettings, MessageBlendSettings, TemporalSchedulerSettings,
+    },
+    persistent_transmission::PersistentTransmissionSettings,
 };
 use nomos_core::block::Block;
 use nomos_da_indexer::{
@@ -94,15 +97,20 @@ impl Validator {
         }
 
         config.storage.db_path = dir.path().join("db");
-        config
-            .da_sampling
-            .storage_adapter_settings
-            .blob_storage_directory = dir.path().to_owned();
-        config
-            .da_verifier
-            .storage_adapter_settings
-            .blob_storage_directory = dir.path().to_owned();
-        config.da_indexer.storage.blob_storage_directory = dir.path().to_owned();
+        dir.path().clone_into(
+            &mut config
+                .da_sampling
+                .storage_adapter_settings
+                .blob_storage_directory,
+        );
+        dir.path().clone_into(
+            &mut config
+                .da_verifier
+                .storage_adapter_settings
+                .blob_storage_directory,
+        );
+        dir.path()
+            .clone_into(&mut config.da_indexer.storage.blob_storage_directory);
 
         serde_yaml::to_writer(&mut file, &config).unwrap();
         let child = Command::new(std::env::current_dir().unwrap().join(BIN_PATH))
@@ -118,7 +126,7 @@ impl Validator {
             config,
         };
         tokio::time::timeout(adjust_timeout(Duration::from_secs(10)), async {
-            node.wait_online().await
+            node.wait_online().await;
         })
         .await
         .unwrap();
@@ -133,6 +141,7 @@ impl Validator {
             .await
     }
 
+    #[must_use]
     pub fn url(&self) -> Url {
         format!("http://{}", self.addr).parse().unwrap()
     }
@@ -165,7 +174,7 @@ impl Validator {
             Pool::Cl => "cl",
             Pool::Da => "da",
         };
-        let addr = format!("/{}/metrics", discr);
+        let addr = format!("/{discr}/metrics");
         let res = self
             .get(&addr)
             .await
@@ -174,7 +183,7 @@ impl Validator {
             .await
             .unwrap();
         MempoolMetrics {
-            pending_items: res["pending_items"].as_u64().unwrap() as usize,
+            pending_items: usize::try_from(res["pending_items"].as_u64().unwrap()).unwrap(),
             last_item_timestamp: res["last_item_timestamp"].as_u64().unwrap(),
         }
     }
@@ -197,6 +206,7 @@ impl Validator {
     }
 
     // not async so that we can use this in `Drop`
+    #[must_use]
     pub fn get_logs_from_file(&self) -> String {
         println!(
             "fetching logs from dir {}...",
@@ -218,6 +228,7 @@ impl Validator {
             .collect::<String>()
     }
 
+    #[must_use]
     pub const fn config(&self) -> &Config {
         &self.config
     }
@@ -242,11 +253,13 @@ impl Validator {
 
     pub async fn consensus_info(&self) -> CryptarchiaInfo {
         let res = self.get(CRYPTARCHIA_INFO).await;
-        println!("{:?}", res);
+        println!("{res:?}");
         res.unwrap().json().await.unwrap()
     }
 }
 
+#[must_use]
+#[expect(clippy::too_many_lines)]
 pub fn create_validator_config(config: GeneralConfig) -> Config {
     Config {
         network: NetworkConfig {
@@ -257,7 +270,7 @@ pub fn create_validator_config(config: GeneralConfig) -> Config {
         },
         blend: nomos_blend_service::BlendConfig {
             backend: config.blend_config.backend,
-            persistent_transmission: Default::default(),
+            persistent_transmission: PersistentTransmissionSettings::default(),
             message_blend: MessageBlendSettings {
                 cryptographic_processor: CryptographicProcessorSettings {
                     private_key: config.blend_config.private_key.to_bytes(),
@@ -268,7 +281,7 @@ pub fn create_validator_config(config: GeneralConfig) -> Config {
                 },
             },
             cover_traffic: nomos_blend_service::CoverTrafficExtSettings {
-                epoch_duration: Duration::from_secs(432000),
+                epoch_duration: Duration::from_secs(432_000),
                 slot_duration: Duration::from_secs(20),
             },
             membership: config.blend_config.membership,

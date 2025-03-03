@@ -35,16 +35,16 @@ where
     M: BlendMessage,
     M::PublicKey: PartialEq,
 {
-    pub fn new(nodes: Vec<Node<NodeId, M::PublicKey>>, local_public_key: M::PublicKey) -> Self {
+    pub fn new(nodes: Vec<Node<NodeId, M::PublicKey>>, local_public_key: &M::PublicKey) -> Self {
         let mut remote_nodes = Vec::with_capacity(nodes.len() - 1);
         let mut local_node = None;
-        nodes.into_iter().for_each(|node| {
-            if node.public_key == local_public_key {
+        for node in nodes {
+            if node.public_key == *local_public_key {
                 local_node = Some(node);
             } else {
                 remote_nodes.push(node);
             }
-        });
+        }
 
         Self {
             remote_nodes,

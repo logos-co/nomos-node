@@ -24,6 +24,7 @@ use tracing_subscriber::{fmt::TestWriter, EnvFilter};
 use crate::common::*;
 
 #[test]
+#[expect(clippy::too_many_lines)]
 fn test_verifier() {
     let _ = tracing_subscriber::fmt()
         .with_env_filter(EnvFilter::from_default_env())
@@ -53,7 +54,7 @@ fn test_verifier() {
         .collect::<Vec<_>>();
 
     let commitments = notes.iter().zip(&sks).map(|(n, sk)| n.commit(sk.commit()));
-    let genesis_state = LedgerState::from_commitments(commitments, (ids.len() as u32).into());
+    let genesis_state = LedgerState::from_commitments(commitments, ids.len().try_into().unwrap());
     let ledger_config = nomos_ledger::Config {
         epoch_config: EpochConfig {
             epoch_stake_distribution_stabilization: NonZero::new(3).unwrap(),
@@ -84,7 +85,7 @@ fn test_verifier() {
         ..Default::default()
     };
 
-    let blend_configs = new_blend_configs(vec![
+    let blend_configs = new_blend_configs(&[
         Multiaddr::from_str("/ip4/127.0.0.1/udp/7783/quic-v1").unwrap(),
         Multiaddr::from_str("/ip4/127.0.0.1/udp/7784/quic-v1").unwrap(),
         Multiaddr::from_str("/ip4/127.0.0.1/udp/7785/quic-v1").unwrap(),
@@ -238,7 +239,7 @@ fn test_verifier() {
                 rows_proofs: encoded_data
                     .rows_proofs
                     .iter()
-                    .map(|proofs| proofs.get(index).cloned().unwrap())
+                    .map(|proofs| proofs.get(index).copied().unwrap())
                     .collect(),
             };
 

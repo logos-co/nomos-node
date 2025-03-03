@@ -20,9 +20,10 @@ pub struct GeneralNetworkConfig {
     pub initial_peers: Vec<Multiaddr>,
 }
 
+#[must_use]
 pub fn create_network_configs(
     ids: &[[u8; 32]],
-    network_params: NetworkParams,
+    network_params: &NetworkParams,
 ) -> Vec<GeneralNetworkConfig> {
     let swarm_configs: Vec<SwarmConfig> = ids
         .iter()
@@ -53,7 +54,7 @@ pub fn create_network_configs(
 
 fn initial_peers_by_network_layout(
     mut swarm_configs: Vec<SwarmConfig>,
-    network_params: NetworkParams,
+    network_params: &NetworkParams,
 ) -> Vec<Vec<Multiaddr>> {
     let mut all_initial_peers = vec![];
     let first_swarm = swarm_configs.remove(0);

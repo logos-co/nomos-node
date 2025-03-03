@@ -10,6 +10,7 @@ fn cargo_metadata() -> serde_json::Value {
     serde_json::from_slice(&output.stdout).expect("Failed to parse `cargo metadata` output")
 }
 
+#[must_use]
 pub fn get_target_directory() -> PathBuf {
     let metadata = cargo_metadata();
     let target_directory = metadata["target_directory"]
@@ -19,6 +20,7 @@ pub fn get_target_directory() -> PathBuf {
 }
 
 #[cfg(debug_assertions)]
+#[must_use]
 pub const fn get_profile() -> &'static str {
     "debug"
 }
@@ -28,10 +30,12 @@ pub fn get_profile() -> &'static str {
     "release"
 }
 
+#[must_use]
 pub fn get_project_identifier(crate_name: &str) -> String {
     format!("com.nomos.{crate_name}")
 }
 
+#[must_use]
 pub fn get_workspace_root() -> PathBuf {
     let metadata = cargo_metadata();
     let workspace_root = metadata["workspace_root"]
@@ -62,6 +66,7 @@ pub fn get_target_directory_for_current_profile(target_triple: &str) -> Result<P
     Err("Could not find target directory for profile.".to_string())
 }
 
+#[must_use]
 pub fn get_cargo_package_version(package_name: &str) -> String {
     let metadata = cargo_metadata();
     let packages = metadata["packages"]
@@ -74,8 +79,9 @@ pub fn get_cargo_package_version(package_name: &str) -> String {
     package["version"].to_string()
 }
 
+#[must_use]
 pub fn get_formatted_cargo_package_version(package_name: &str) -> String {
     let version = get_cargo_package_version(package_name);
     let version = version.trim_matches('"');
-    format!("v{}", version)
+    format!("v{version}")
 }

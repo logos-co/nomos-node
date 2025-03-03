@@ -34,7 +34,7 @@ pub struct SubnetworkDeviation {
 pub trait SubnetworkConnectionPolicy {
     fn connection_number_deviation(
         &self,
-        subnetwork_id: &SubnetworkId,
+        subnetwork_id: SubnetworkId,
         stats: &SubnetworkStats,
     ) -> SubnetworkDeviation;
 }
@@ -83,16 +83,22 @@ where
                 outbound: 0,
             });
 
-        stats.inbound = (stats.inbound as isize + inbound).max(0) as usize;
-        stats.outbound = (stats.outbound as isize + outbound).max(0) as usize;
+        stats.inbound = (isize::try_from(stats.inbound).unwrap() + inbound)
+            .max(0)
+            .try_into()
+            .unwrap();
+        stats.outbound = (isize::try_from(stats.outbound).unwrap() + outbound)
+            .max(0)
+            .try_into()
+            .unwrap();
     }
 
     fn select_missing_peers(
         &self,
-        subnetwork_id: &SubnetworkId,
+        subnetwork_id: SubnetworkId,
         missing_count: usize,
     ) -> Vec<PeerId> {
-        let candidates = self.membership.members_of(subnetwork_id);
+        let candidates = self.membership.members_of(&subnetwork_id);
         candidates
             .into_iter()
             .filter(|peer| !self.connected_peers.contains(peer) && *peer != self.local_peer_id)
@@ -148,14 +154,14 @@ where
                     });
                 let deviation = self
                     .policy
-                    .connection_number_deviation(&subnetwork_id, stats);
+                    .connection_number_deviation(subnetwork_id, stats);
 
                 // In DA balancer implementation we are only concerned about missing peer
                 // connections. Sampling protocol requires to allow any number of peers to
                 // request for a sample, which requires to allow any number of
                 // peers to connect at any given time.
                 let ConnectionDeviation::Missing(missing_count) = deviation.outbound;
-                peers_to_connect.extend(self.select_missing_peers(&subnetwork_id, missing_count));
+                peers_to_connect.extend(self.select_missing_peers(subnetwork_id, missing_count));
             }
 
             if peers_to_connect.is_empty() {
@@ -189,7 +195,7 @@ mod tests {
     impl SubnetworkConnectionPolicy for MockPolicy {
         fn connection_number_deviation(
             &self,
-            _id: &SubnetworkId,
+            _id: SubnetworkId,
             _stats: &SubnetworkStats,
         ) -> SubnetworkDeviation {
             SubnetworkDeviation {
@@ -233,7 +239,7 @@ mod tests {
         }
 
         fn last_subnetwork_id(&self) -> Self::NetworkId {
-            self.subnets as u16
+            self.subnets.try_into().unwrap()
         }
     }
 
@@ -258,9 +264,8 @@ mod tests {
         let poll_result = balancer.poll(&mut cx);
 
         assert!(matches!(poll_result, Poll::Ready(ref peers) if peers.len() == 1));
-        let peers = match poll_result {
-            Poll::Ready(peers) => peers,
-            _ => panic!("Expected Poll::Ready with peers"),
+        let Poll::Ready(peers) = poll_result else {
+            panic!("Expected Poll::Ready with peers")
         };
 
         assert_eq!(peers.len(), 1);
@@ -290,9 +295,8 @@ mod tests {
         let poll_result = balancer.poll(&mut cx);
 
         assert!(matches!(poll_result, Poll::Ready(ref peers) if peers.len() == 2));
-        let peers = match poll_result {
-            Poll::Ready(peers) => peers,
-            _ => panic!("Expected Poll::Ready with peers"),
+        let Poll::Ready(peers) = poll_result else {
+            panic!("Expected Poll::Ready with peers")
         };
 
         assert_eq!(peers.len(), 2);

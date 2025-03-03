@@ -59,8 +59,8 @@ where
     ) -> Self {
         Self {
             storage_relay,
-            _tx: Default::default(),
-            _blob_certificate: Default::default(),
+            _tx: PhantomData,
+            _blob_certificate: PhantomData,
         }
     }
 

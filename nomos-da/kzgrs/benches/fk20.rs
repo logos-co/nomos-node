@@ -15,7 +15,7 @@ use rand::SeedableRng;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 
 fn main() {
-    divan::main()
+    divan::main();
 }
 
 static GLOBAL_PARAMETERS: Lazy<GlobalParameters> = Lazy::new(|| {
@@ -28,7 +28,7 @@ fn compute_fk20_proofs_for_size(bencher: Bencher, size: usize) {
     bencher
         .with_inputs(|| {
             let buff: Vec<_> = (0..BYTES_PER_FIELD_ELEMENT * size)
-                .map(|i| (i % 255) as u8)
+                .map(|i| u8::try_from(i % 255).unwrap())
                 .rev()
                 .collect();
             let domain = GeneralEvaluationDomain::new(size).unwrap();
@@ -52,7 +52,7 @@ fn compute_parallel_fk20_proofs_for_size(bencher: Bencher, size: usize) {
     bencher
         .with_inputs(|| {
             let buff: Vec<_> = (0..BYTES_PER_FIELD_ELEMENT * size)
-                .map(|i| (i % 255) as u8)
+                .map(|i| u8::try_from(i % 255).unwrap())
                 .rev()
                 .collect();
             let domain = GeneralEvaluationDomain::new(size).unwrap();
@@ -62,9 +62,9 @@ fn compute_parallel_fk20_proofs_for_size(bencher: Bencher, size: usize) {
         .input_counter(move |_| ItemsCount::new(size * thread_count))
         .bench_refs(|poly| {
             (0..thread_count).into_par_iter().for_each(|_| {
-                fk20_batch_generate_elements_proofs(poly, &GLOBAL_PARAMETERS, None);
+                let _ = fk20_batch_generate_elements_proofs(poly, &GLOBAL_PARAMETERS, None);
             });
-            black_box(())
+            black_box(());
         });
 }
 
@@ -73,7 +73,7 @@ fn compute_fk20_proofs_for_size_with_cache(bencher: Bencher, size: usize) {
     bencher
         .with_inputs(|| {
             let buff: Vec<_> = (0..BYTES_PER_FIELD_ELEMENT * size)
-                .map(|i| (i % 255) as u8)
+                .map(|i| u8::try_from(i % 255).unwrap())
                 .rev()
                 .collect();
             let domain = GeneralEvaluationDomain::new(size).unwrap();
@@ -98,7 +98,7 @@ fn compute_parallel_fk20_proofs_for_size_with_cache(bencher: Bencher, size: usiz
     bencher
         .with_inputs(|| {
             let buff: Vec<_> = (0..BYTES_PER_FIELD_ELEMENT * size)
-                .map(|i| (i % 255) as u8)
+                .map(|i| u8::try_from(i % 255).unwrap())
                 .rev()
                 .collect();
             let domain = GeneralEvaluationDomain::new(size).unwrap();
@@ -109,8 +109,8 @@ fn compute_parallel_fk20_proofs_for_size_with_cache(bencher: Bencher, size: usiz
         .input_counter(move |_| ItemsCount::new(size * thread_count))
         .bench_refs(|(poly, cache)| {
             (0..thread_count).into_par_iter().for_each(|_| {
-                fk20_batch_generate_elements_proofs(poly, &GLOBAL_PARAMETERS, Some(cache));
+                let _ = fk20_batch_generate_elements_proofs(poly, &GLOBAL_PARAMETERS, Some(cache));
             });
-            black_box(())
+            black_box(());
         });
 }

@@ -5,6 +5,7 @@ mod test {
     use std::time::Duration;
 
     use futures::StreamExt;
+    use kzgrs::{Commitment, Proof};
     use kzgrs_backend::common::{blob::DaBlob, Column};
     use libp2p::{
         identity::Keypair, quic, swarm::SwarmEvent, Multiaddr, PeerId, Swarm, SwarmBuilder,
@@ -45,7 +46,62 @@ mod test {
             .build()
     }
     #[tokio::test]
+    #[expect(clippy::too_many_lines)]
     async fn test_sampling_two_peers() {
+        const MSG_COUNT: u8 = 10;
+        async fn test_sampling_swarm(
+            mut swarm: Swarm<
+                SamplingBehaviour<
+                    impl MembershipHandler<Id = PeerId, NetworkId = SubnetworkId> + 'static,
+                >,
+            >,
+        ) -> Vec<[u8; 32]> {
+            let mut res = vec![];
+            loop {
+                match swarm.next().await {
+                    None => {}
+                    Some(SwarmEvent::Behaviour(SamplingEvent::IncomingSample {
+                        request_receiver,
+                        response_sender,
+                    })) => {
+                        debug!("Received request");
+                        // spawn here because otherwise we block polling
+                        tokio::spawn(request_receiver);
+                        response_sender
+                            .send(BehaviourSampleRes::SamplingSuccess {
+                                blob_id: Default::default(),
+                                subnetwork_id: Default::default(),
+                                blob: Box::new(DaBlob {
+                                    column: Column(vec![]),
+                                    column_idx: 0,
+                                    column_commitment: Commitment::default(),
+                                    aggregated_column_commitment: Commitment::default(),
+                                    aggregated_column_proof: Proof::default(),
+                                    rows_commitments: vec![],
+                                    rows_proofs: vec![],
+                                }),
+                            })
+                            .unwrap();
+                    }
+                    Some(SwarmEvent::Behaviour(SamplingEvent::SamplingSuccess {
+                        blob_id, ..
+                    })) => {
+                        debug!("Received response");
+                        res.push(blob_id);
+                    }
+                    Some(SwarmEvent::Behaviour(SamplingEvent::SamplingError { error })) => {
+                        debug!("Error during sampling: {error}");
+                    }
+                    Some(event) => {
+                        debug!("{event:?}");
+                    }
+                }
+                if res.len() == MSG_COUNT as usize {
+                    break res;
+                }
+            }
+        }
+
         let _ = tracing_subscriber::fmt()
             .with_env_filter(EnvFilter::from_default_env())
             .compact()
@@ -83,59 +139,6 @@ mod test {
 
         let request_sender_1 = p1.behaviour().sample_request_channel();
         let request_sender_2 = p2.behaviour().sample_request_channel();
-        const MSG_COUNT: usize = 10;
-        async fn test_sampling_swarm(
-            mut swarm: Swarm<
-                SamplingBehaviour<
-                    impl MembershipHandler<Id = PeerId, NetworkId = SubnetworkId> + 'static,
-                >,
-            >,
-        ) -> Vec<[u8; 32]> {
-            let mut res = vec![];
-            loop {
-                match swarm.next().await {
-                    None => {}
-                    Some(SwarmEvent::Behaviour(SamplingEvent::IncomingSample {
-                        request_receiver,
-                        response_sender,
-                    })) => {
-                        debug!("Received request");
-                        // spawn here because otherwise we block polling
-                        tokio::spawn(request_receiver);
-                        response_sender
-                            .send(BehaviourSampleRes::SamplingSuccess {
-                                blob_id: Default::default(),
-                                subnetwork_id: Default::default(),
-                                blob: Box::new(DaBlob {
-                                    column: Column(vec![]),
-                                    column_idx: 0,
-                                    column_commitment: Default::default(),
-                                    aggregated_column_commitment: Default::default(),
-                                    aggregated_column_proof: Default::default(),
-                                    rows_commitments: vec![],
-                                    rows_proofs: vec![],
-                                }),
-                            })
-                            .unwrap()
-                    }
-                    Some(SwarmEvent::Behaviour(SamplingEvent::SamplingSuccess {
-                        blob_id, ..
-                    })) => {
-                        debug!("Received response");
-                        res.push(blob_id);
-                    }
-                    Some(SwarmEvent::Behaviour(SamplingEvent::SamplingError { error })) => {
-                        debug!("Error during sampling: {error}");
-                    }
-                    Some(event) => {
-                        debug!("{event:?}");
-                    }
-                }
-                if res.len() == MSG_COUNT {
-                    break res;
-                }
-            }
-        }
         let _p1_address = p1_address.clone();
         let _p2_address = p2_address.clone();
 
@@ -151,8 +154,8 @@ mod test {
         });
         tokio::time::sleep(Duration::from_secs(2)).await;
         for i in 0..MSG_COUNT {
-            request_sender_1.send((0, [i as u8; 32])).unwrap();
-            request_sender_2.send((0, [i as u8; 32])).unwrap();
+            request_sender_1.send((0, [i; 32])).unwrap();
+            request_sender_2.send((0, [i; 32])).unwrap();
         }
 
         let res1 = t1.await.unwrap();

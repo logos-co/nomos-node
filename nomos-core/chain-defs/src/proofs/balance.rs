@@ -1,3 +1,4 @@
+use cl::PartialTxWitness;
 use nomos_proof_statements::bundle::{BundlePrivate, BundlePublic};
 use risc0_zkvm::Prover;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
@@ -22,7 +23,7 @@ impl BalanceProof {
             balances: bundle_witness
                 .partial_witnesses()
                 .iter()
-                .map(|ptx| ptx.balance())
+                .map(PartialTxWitness::balance)
                 .collect(),
         };
 

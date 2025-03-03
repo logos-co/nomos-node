@@ -72,7 +72,7 @@ impl SwarmHandler {
                     self.handle_event(event);
                 }
                 Some(command) = self.commands_rx.recv() => {
-                    self.handle_command(command).await;
+                    self.handle_command(command);
                 }
             }
         }
@@ -125,13 +125,14 @@ impl SwarmHandler {
         }
     }
 
-    async fn handle_command(&mut self, command: Command) {
+    #[expect(clippy::cognitive_complexity)]
+    fn handle_command(&mut self, command: Command) {
         match command {
             Command::Connect(dial) => {
                 self.connect(dial);
             }
             Command::Broadcast { topic, message } => {
-                self.broadcast_and_retry(topic, message, 0).await;
+                self.broadcast_and_retry(topic, message, 0);
             }
             Command::Subscribe(topic) => {
                 tracing::debug!("subscribing to topic: {topic}");
@@ -158,7 +159,7 @@ impl SwarmHandler {
                 message,
                 retry_count,
             } => {
-                self.broadcast_and_retry(topic, message, retry_count).await;
+                self.broadcast_and_retry(topic, message, retry_count);
             }
         }
     }
@@ -173,7 +174,7 @@ impl SwarmHandler {
     fn connect(&mut self, dial: Dial) {
         tracing::debug!("Connecting to {}", dial.addr);
 
-        match self.swarm.connect(dial.addr.clone()) {
+        match self.swarm.connect(&dial.addr) {
             Ok(connection_id) => {
                 // Dialing has been scheduled. The result will be notified as a SwarmEvent.
                 self.pending_dials.insert(connection_id, dial);
@@ -203,7 +204,7 @@ impl SwarmHandler {
                 return;
             }
 
-            let wait = Self::exp_backoff(dial.retry_count);
+            let wait = Self::exp_backoff(dial.retry_count.try_into().unwrap());
             tracing::debug!("Retry dialing in {wait:?}: {dial:?}");
 
             let commands_tx = self.commands_tx.clone();
@@ -214,7 +215,8 @@ impl SwarmHandler {
         }
     }
 
-    async fn broadcast_and_retry(&mut self, topic: Topic, message: Box<[u8]>, retry_count: usize) {
+    #[expect(clippy::cognitive_complexity)]
+    fn broadcast_and_retry(&mut self, topic: Topic, message: Box<[u8]>, retry_count: usize) {
         tracing::debug!("broadcasting message to topic: {topic}");
 
         match self.swarm.broadcast(&topic, message.to_vec()) {
@@ -231,7 +233,7 @@ impl SwarmHandler {
                 }
             }
             Err(gossipsub::PublishError::InsufficientPeers) if retry_count < MAX_RETRY => {
-                let wait = Self::exp_backoff(retry_count);
+                let wait = Self::exp_backoff(retry_count.try_into().unwrap());
                 tracing::error!("failed to broadcast message to topic due to insufficient peers, trying again in {wait:?}");
 
                 let commands_tx = self.commands_tx.clone();
@@ -253,7 +255,7 @@ impl SwarmHandler {
         }
     }
 
-    const fn exp_backoff(retry: usize) -> Duration {
-        std::time::Duration::from_secs(BACKOFF.pow(retry as u32))
+    const fn exp_backoff(retry: u32) -> Duration {
+        std::time::Duration::from_secs(BACKOFF.pow(retry))
     }
 }

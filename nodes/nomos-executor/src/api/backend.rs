@@ -240,6 +240,7 @@ where
         })
     }
 
+    #[expect(clippy::too_many_lines)]
     async fn serve(self, handle: OverwatchHandle) -> Result<(), Self::Error> {
         let mut builder = CorsLayer::new();
         if self.settings.cors_origins.is_empty() {

@@ -22,7 +22,7 @@ async fn disseminate_with_metadata(
         .expect("Client from default settings should be able to build");
 
     let backend_address = executor_config.http.backend_settings.address;
-    let exec_url = Url::parse(&format!("http://{}", backend_address)).unwrap();
+    let exec_url = Url::parse(&format!("http://{backend_address}")).unwrap();
     let client = ExecutorHttpClient::new(client, exec_url, None);
 
     client.publish_blob(data.to_vec(), metadata).await.unwrap();
@@ -110,12 +110,12 @@ async fn local_testnet() {
     let executor = &topology.executors()[0];
     let app_id = hex::decode(APP_ID).expect("Invalid APP_ID");
 
-    let mut index = 0u64;
+    let mut index = 0u8;
     loop {
         disseminate_with_metadata(
             executor,
             &generate_data(index),
-            create_metadata(&app_id, index),
+            create_metadata(&app_id, index.into()),
         )
         .await;
 
@@ -124,8 +124,8 @@ async fn local_testnet() {
     }
 }
 
-fn generate_data(index: u64) -> Vec<u8> {
-    (index as u8..index as u8 + 31).collect()
+fn generate_data(index: u8) -> Vec<u8> {
+    (index..index + 31).collect()
 }
 
 fn create_metadata(app_id: &[u8], index: u64) -> kzgrs_backend::dispersal::Metadata {

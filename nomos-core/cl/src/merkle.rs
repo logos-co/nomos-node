@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
+#[must_use]
 pub fn padded_leaves<const N: usize>(elements: &[Vec<u8>]) -> [[u8; 32]; N] {
     let mut leaves = [[0u8; 32]; N];
 
@@ -12,6 +13,7 @@ pub fn padded_leaves<const N: usize>(elements: &[Vec<u8>]) -> [[u8; 32]; N] {
     leaves
 }
 
+#[must_use]
 pub fn leaf(data: &[u8]) -> [u8; 32] {
     let mut hasher = Sha256::new();
     hasher.update(b"NOMOS_MERKLE_LEAF");
@@ -19,6 +21,7 @@ pub fn leaf(data: &[u8]) -> [u8; 32] {
     hasher.finalize().into()
 }
 
+#[must_use]
 pub fn node(a: [u8; 32], b: [u8; 32]) -> [u8; 32] {
     let mut hasher = Sha256::new();
     hasher.update(b"NOMOS_MERKLE_NODE");
@@ -27,6 +30,7 @@ pub fn node(a: [u8; 32], b: [u8; 32]) -> [u8; 32] {
     hasher.finalize().into()
 }
 
+#[must_use]
 pub fn root<const N: usize>(elements: [[u8; 32]; N]) -> [u8; 32] {
     let n = elements.len();
 
@@ -49,6 +53,7 @@ pub enum PathNode {
     Right([u8; 32]),
 }
 
+#[must_use]
 pub fn path_root(leaf: [u8; 32], path: &[PathNode]) -> [u8; 32] {
     let mut computed_hash = leaf;
 
@@ -66,6 +71,7 @@ pub fn path_root(leaf: [u8; 32], path: &[PathNode]) -> [u8; 32] {
     computed_hash
 }
 
+#[must_use]
 pub fn path<const N: usize>(leaves: [[u8; 32]; N], idx: usize) -> Vec<PathNode> {
     assert!(N.is_power_of_two());
     assert!(idx < N);

@@ -47,6 +47,7 @@ const INDEXER_TEST_MAX_SECONDS: u64 = 60;
 // performed in integration tests crate using the real node.
 
 #[test]
+#[expect(clippy::too_many_lines)]
 fn test_indexer() {
     let performed_tx = Arc::new(AtomicBool::new(false));
     let performed_rx = performed_tx.clone();
@@ -73,7 +74,7 @@ fn test_indexer() {
 
     let commitments = notes.iter().zip(&sks).map(|(n, sk)| n.commit(sk.commit()));
 
-    let genesis_state = LedgerState::from_commitments(commitments, (ids.len() as u32).into());
+    let genesis_state = LedgerState::from_commitments(commitments, ids.len().try_into().unwrap());
     let ledger_config = nomos_ledger::Config {
         epoch_config: EpochConfig {
             epoch_stake_distribution_stabilization: NonZero::new(3).unwrap(),
@@ -98,7 +99,7 @@ fn test_indexer() {
         port: 7772,
         ..Default::default()
     };
-    let blend_configs = new_blend_configs(vec![
+    let blend_configs = new_blend_configs(&[
         Multiaddr::from_str("/ip4/127.0.0.1/udp/7781/quic-v1").unwrap(),
         Multiaddr::from_str("/ip4/127.0.0.1/udp/7782/quic-v1").unwrap(),
     ]);
@@ -198,7 +199,7 @@ fn test_indexer() {
             rows_proofs: encoded_data
                 .rows_proofs
                 .iter()
-                .map(|proofs| proofs.get(i).cloned().unwrap())
+                .map(|proofs| proofs.get(i).copied().unwrap())
                 .collect(),
         };
 
@@ -257,7 +258,7 @@ fn test_indexer() {
             .unwrap();
         let broadcast_receiver = receiver.await.unwrap();
         let mut broadcast_receiver =
-            BroadcastStream::new(broadcast_receiver).filter_map(|result| result.ok());
+            BroadcastStream::new(broadcast_receiver).filter_map(std::result::Result::ok);
 
         // Mock both attested blobs by writting directly into the da storage.
         store_blobs_in_db(blobs, storage_outbound).await;
@@ -297,7 +298,7 @@ fn test_indexer() {
                         break;
                     }
                 }
-                _ = &mut timeout => {
+                () = &mut timeout => {
                     break;
                 }
             }

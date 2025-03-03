@@ -6,7 +6,9 @@ use bundler::utils::{
 };
 use clap::{arg, Parser};
 use log::{error, info};
-use tauri_bundler::RpmSettings;
+use tauri_bundler::{
+    AppImageSettings, DebianSettings, DmgSettings, MacOsSettings, RpmSettings, WindowsSettings,
+};
 use tauri_utils::platform::target_triple;
 
 const CRATE_NAME: &str = "nomos-node";
@@ -85,13 +87,13 @@ fn build_package(version: String) {
             bin: None,
             external_bin: None,
             deep_link_protocols: None,
-            deb: Default::default(),
-            appimage: Default::default(),
+            deb: DebianSettings::default(),
+            appimage: AppImageSettings::default(),
             rpm: rpm_settings,
-            dmg: Default::default(),
-            macos: Default::default(),
+            dmg: DmgSettings::default(),
+            macos: MacOsSettings::default(),
             updater: None,
-            windows: Default::default(),
+            windows: WindowsSettings::default(),
         })
         .binaries(vec![tauri_bundler::BundleBinary::new(
             String::from(CRATE_NAME),
@@ -104,7 +106,7 @@ fn build_package(version: String) {
 
     let arch = settings
         .target()
-        .split("-")
+        .split('-')
         .next()
         .expect("Could not determine target architecture.");
     info!("Bundling for '{}'", arch);
@@ -136,14 +138,11 @@ struct BundleArguments {
 fn parse_version(arguments: BundleArguments, cargo_package_version: String) -> String {
     if let Some(version) = arguments.version {
         // Check for version mismatch
-        if version != cargo_package_version {
-            // Maybe this should be a warning instead of a panic?
-            panic!(
-                "Error: Expected Cargo package version: '{}', but received argument: '{}'. \
-            Please ensure the version matches the Cargo package version.",
-                cargo_package_version, version
+        // Maybe this should be a warning instead of a panic?
+        assert!(version == cargo_package_version,
+                "Error: Expected Cargo package version: '{cargo_package_version}', but received argument: '{version}'. \
+            Please ensure the version matches the Cargo package version."
             );
-        }
 
         version
     } else {

@@ -11,10 +11,9 @@ pub struct FillSize<const SIZE: usize, Tx> {
 }
 
 impl<const SIZE: usize, Tx> FillSize<SIZE, Tx> {
-    pub fn new() -> Self {
-        Self {
-            _tx: Default::default(),
-        }
+    #[must_use]
+    pub const fn new() -> Self {
+        Self { _tx: PhantomData }
     }
 }
 
@@ -22,7 +21,7 @@ impl<const SIZE: usize, Tx: Transaction> TxSelect for FillSize<SIZE, Tx> {
     type Tx = Tx;
     type Settings = ();
 
-    fn new(_: Self::Settings) -> Self {
+    fn new((): Self::Settings) -> Self {
         Self::new()
     }
 

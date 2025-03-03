@@ -24,6 +24,7 @@ pub struct GeneralBlendConfig {
     >,
 }
 
+#[must_use]
 pub fn create_blend_configs(ids: &[[u8; 32]]) -> Vec<GeneralBlendConfig> {
     let mut configs: Vec<GeneralBlendConfig> = ids
         .iter()
@@ -51,9 +52,9 @@ pub fn create_blend_configs(ids: &[[u8; 32]]) -> Vec<GeneralBlendConfig> {
         .collect();
 
     let nodes = blend_nodes(&configs);
-    configs.iter_mut().for_each(|config| {
-        config.membership = nodes.clone();
-    });
+    for config in &mut configs {
+        config.membership.clone_from(&nodes);
+    }
 
     configs
 }

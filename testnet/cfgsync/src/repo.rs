@@ -44,6 +44,7 @@ impl From<CfgSyncConfig> for Arc<ConfigRepo> {
 }
 
 impl ConfigRepo {
+    #[must_use]
     pub fn new(
         n_hosts: usize,
         consensus_params: ConsensusParams,
@@ -76,36 +77,33 @@ impl ConfigRepo {
     async fn run(&self) {
         let timeout_duration = self.timeout_duration;
 
-        match timeout(timeout_duration, self.wait_for_hosts()).await {
-            Ok(_) => {
-                println!("All hosts have announced their IPs");
+        if timeout(timeout_duration, self.wait_for_hosts()).await == Ok(()) {
+            println!("All hosts have announced their IPs");
 
-                let mut waiting_hosts = self.waiting_hosts.lock().unwrap();
-                let hosts = waiting_hosts
-                    .iter()
-                    .map(|(host, _)| host)
-                    .cloned()
-                    .collect();
+            let mut waiting_hosts = self.waiting_hosts.lock().unwrap();
+            let hosts = waiting_hosts
+                .iter()
+                .map(|(host, _)| host)
+                .cloned()
+                .collect();
 
-                let configs = create_node_configs(
-                    self.consensus_params.clone(),
-                    self.da_params.clone(),
-                    self.tracing_settings.clone(),
-                    hosts,
-                );
+            let configs = create_node_configs(
+                &self.consensus_params,
+                &self.da_params,
+                &self.tracing_settings,
+                hosts,
+            );
 
-                for (host, sender) in waiting_hosts.drain() {
-                    let config = configs.get(&host).expect("host should have a config");
-                    let _ = sender.send(RepoResponse::Config(Box::new(config.to_owned())));
-                }
+            for (host, sender) in waiting_hosts.drain() {
+                let config = configs.get(&host).expect("host should have a config");
+                let _ = sender.send(RepoResponse::Config(Box::new(config.to_owned())));
             }
-            Err(_) => {
-                println!("Timeout: Not all hosts announced within the time limit");
+        } else {
+            println!("Timeout: Not all hosts announced within the time limit");
 
-                let mut waiting_hosts = self.waiting_hosts.lock().unwrap();
-                for (_, sender) in waiting_hosts.drain() {
-                    let _ = sender.send(RepoResponse::Timeout);
-                }
+            let mut waiting_hosts = self.waiting_hosts.lock().unwrap();
+            for (_, sender) in waiting_hosts.drain() {
+                let _ = sender.send(RepoResponse::Timeout);
             }
         }
     }

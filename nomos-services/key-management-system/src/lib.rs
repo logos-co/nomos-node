@@ -136,8 +136,8 @@ where
             service_state.settings_reader.get_updated_settings();
         let backend = Backend::new(backend_settings);
         Ok(Self {
-            service_state,
             backend,
+            service_state,
         })
     }
 
@@ -154,7 +154,7 @@ where
                     Self::handle_kms_message(msg, &mut backend).await;
                 }
                 Some(msg) = lifecycle_stream.next() => {
-                    if lifecycle::should_stop_service::<Self>(&msg).await {
+                    if lifecycle::should_stop_service::<Self>(&msg) {
                         return Ok(());
                     }
                 }

@@ -32,7 +32,7 @@ pub mod serde {
         let s: Cow<str> = Cow::deserialize(deserializer)?;
         let mut output = [0u8; N];
         const_hex::decode_to_slice(s.as_ref(), &mut output)
-            .map(|_| output)
+            .map(|()| output)
             .map_err(<D::Error as serde::de::Error>::custom)
     }
 
@@ -45,15 +45,15 @@ pub mod serde {
     ) -> Result<[u8; N], D::Error> {
         use serde::Deserialize;
         <&[u8]>::deserialize(deserializer).and_then(|bytes| {
-            if bytes.len() != N {
+            if bytes.len() == N {
+                let mut output = [0u8; N];
+                output.copy_from_slice(bytes);
+                Ok(output)
+            } else {
                 Err(<D::Error as serde::de::Error>::invalid_length(
                     bytes.len(),
                     &format!("{N}").as_str(),
                 ))
-            } else {
-                let mut output = [0u8; N];
-                output.copy_from_slice(bytes);
-                Ok(output)
             }
         })
     }

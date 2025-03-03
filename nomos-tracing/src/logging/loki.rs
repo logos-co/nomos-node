@@ -1,4 +1,4 @@
-use std::error::Error;
+use std::{collections::HashMap, error::Error};
 
 use serde::{Deserialize, Serialize};
 use tokio::runtime::Handle;
@@ -19,7 +19,7 @@ pub fn create_loki_layer(
         vec![("host".into(), config.host_identifier)]
             .into_iter()
             .collect(),
-        Default::default(),
+        HashMap::default(),
     )?;
 
     handle.spawn(task);

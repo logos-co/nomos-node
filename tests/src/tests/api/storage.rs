@@ -72,7 +72,7 @@ fn test_get_shared_commitments() {
             .unwrap();
 
         let client = reqwest::Client::new();
-        let url = Url::parse(&format!("http://{}/da/get-shared-commitments", http_addr)).unwrap();
+        let url = Url::parse(&format!("http://{http_addr}/da/get-shared-commitments")).unwrap();
         let request = client.get(url).json(&commitments_id).build().unwrap();
         let response = client.execute(request).await.unwrap();
 

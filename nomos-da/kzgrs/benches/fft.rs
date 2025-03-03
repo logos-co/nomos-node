@@ -4,7 +4,7 @@ use ark_ff::BigInt;
 use ark_poly::{EvaluationDomain, GeneralEvaluationDomain};
 use divan::{black_box, counter::ItemsCount, Bencher};
 fn main() {
-    divan::main()
+    divan::main();
 }
 
 #[divan::bench(args = [16, 32, 64, 128, 256, 512, 1024, 2048, 4096])]

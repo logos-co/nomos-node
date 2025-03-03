@@ -44,8 +44,9 @@ tracing                  = "0.1"
 tracing-subscriber       = "0.2.25"
 
 [dev-dependencies]
-blake2       = { version = "0.10" }
-x25519-dalek = { version = "2", features = ["getrandom", "static_secrets"] }
+blake2                = { version = "0.10" }
+nomos-da-network-core = { workspace = true }
+x25519-dalek          = { version = "2", features = ["getrandom", "static_secrets"] }
 
 [features]
 default         = ["libp2p"]
