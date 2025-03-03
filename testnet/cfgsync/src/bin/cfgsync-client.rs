@@ -1,15 +1,9 @@
 use std::{env, fs, net::Ipv4Addr, process};
 
+use cfgsync::client::get_config;
 use nomos_executor::config::Config as ExecutorConfig;
 use nomos_node::Config as ValidatorConfig;
-use reqwest::Client;
 use serde::{de::DeserializeOwned, Serialize};
-
-#[derive(Serialize)]
-struct ClientIp {
-    ip: Ipv4Addr,
-    identifier: String,
-}
 
 fn parse_ip(ip_str: String) -> Ipv4Addr {
     ip_str.parse().unwrap_or_else(|_| {
@@ -18,30 +12,13 @@ fn parse_ip(ip_str: String) -> Ipv4Addr {
     })
 }
 
-async fn get_config<Config: Serialize + DeserializeOwned>(
+async fn pull_to_file<Config: Serialize + DeserializeOwned>(
     ip: Ipv4Addr,
     identifier: String,
     url: &str,
     config_file: &str,
 ) -> Result<(), String> {
-    let client = Client::new();
-
-    let response = client
-        .post(url)
-        .json(&ClientIp { ip, identifier })
-        .send()
-        .await
-        .map_err(|err| format!("Failed to send IP announcement: {}", err))?;
-
-    if !response.status().is_success() {
-        return Err(format!("Server error: {:?}", response.status()));
-    }
-
-    let config = response
-        .json::<Config>()
-        .await
-        .map_err(|err| format!("Failed to parse response: {}", err))?;
-
+    let config = get_config::<Config>(ip, identifier, url).await?;
     let yaml = serde_yaml::to_string(&config)
         .map_err(|err| format!("Failed to serialize config to YAML: {}", err))?;
 
@@ -70,12 +47,17 @@ async fn main() {
 
     let config_result = match host_kind.as_str() {
         "executor" => {
-            get_config::<ExecutorConfig>(ip, identifier, &node_config_endpoint, &config_file_path)
+            pull_to_file::<ExecutorConfig>(ip, identifier, &node_config_endpoint, &config_file_path)
                 .await
         }
         _ => {
-            get_config::<ValidatorConfig>(ip, identifier, &node_config_endpoint, &config_file_path)
-                .await
+            pull_to_file::<ValidatorConfig>(
+                ip,
+                identifier,
+                &node_config_endpoint,
+                &config_file_path,
+            )
+            .await
         }
     };
 
