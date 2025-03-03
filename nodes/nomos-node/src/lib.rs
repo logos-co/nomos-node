@@ -161,7 +161,7 @@ pub type DaIndexer<SamplingAdapter> = DataIndexerService<
     KzgrsDaVerifier,
     VerifierNetworkAdapter<FillFromNodeList>,
     VerifierStorageAdapter<DaBlob, Wire>,
-    nomos_time::backends::system_time::SystemTimeBackend,
+    nomos_time::backends::system_time::SystemTimeBackend
 >;
 
 pub type NodeDaIndexer =
