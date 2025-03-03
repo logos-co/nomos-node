@@ -1,7 +1,7 @@
 use std::time::Duration;
 
 use executor_http_client::ExecutorHttpClient;
-use kzgrs_backend::{common::blob::DaBlob, reconstruction::reconstruct_without_missing_data};
+use kzgrs_backend::reconstruction::reconstruct_without_missing_data;
 use reqwest::{ClientBuilder, Url};
 use tests::{
     adjust_timeout,
@@ -95,8 +95,7 @@ async fn disseminate_retrieve_reconstruct() {
                 .into_iter()
                 .filter(|(i, _)| i == &from)
                 .flat_map(|(_, blobs)| blobs)
-                .collect::<Vec<DaBlob>>()
-                .len();
+                .count();
         }
     };
 

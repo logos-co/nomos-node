@@ -395,7 +395,7 @@ where
         to_sample: &mut HashMap<PeerId, VecDeque<(SubnetworkId, BlobId)>>,
         to_close: &mut VecDeque<SampleStream>,
         stream: SampleStream,
-        cx: &mut Context<'_>,
+        cx: &Context<'_>,
     ) {
         let peer = stream.peer_id;
 
@@ -495,7 +495,7 @@ where
     fn schedule_incoming_stream_task(
         incoming_tasks: &FuturesUnordered<IncomingStreamHandlerFuture>,
         sample_stream: SampleStream,
-        cx: &mut Context<'_>,
+        cx: &Context<'_>,
     ) -> (Receiver<BehaviourSampleReq>, Sender<BehaviourSampleRes>) {
         let (request_sender, request_receiver) = oneshot::channel();
         let (response_sender, response_receiver) = oneshot::channel();
@@ -515,11 +515,10 @@ impl<Membership: MembershipHandler<Id = PeerId, NetworkId = SubnetworkId> + 'sta
 {
     /// Schedule a new task for sample the blob, if stream is not available
     /// queue messages for later processing.
-    #[expect(clippy::too_many_arguments)]
     fn sample(
         peer_id: PeerId,
-        outgoing_tasks: &mut FuturesUnordered<OutgoingStreamHandlerFuture>,
-        membership: &mut Membership,
+        outgoing_tasks: &FuturesUnordered<OutgoingStreamHandlerFuture>,
+        membership: &Membership,
         subnetwork_id: SubnetworkId,
         blob_id: BlobId,
         control: &Control,

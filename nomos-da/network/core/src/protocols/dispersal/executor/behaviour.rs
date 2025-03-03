@@ -315,7 +315,7 @@ where
         to_disperse: &mut HashMap<PeerId, VecDeque<(SubnetworkId, DaBlob)>>,
         idle_streams: &mut HashMap<PeerId, DispersalStream>,
         stream: DispersalStream,
-        cx: &mut Context<'_>,
+        cx: &Context<'_>,
     ) {
         if let Some((subnetwork_id, next_request)) =
             Self::next_request(&stream.peer_id, to_disperse)

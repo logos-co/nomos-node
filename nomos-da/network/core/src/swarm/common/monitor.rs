@@ -48,14 +48,14 @@ impl MonitorEvent {
 impl From<&DispersalExecutorEvent> for MonitorEvent {
     fn from(event: &DispersalExecutorEvent) -> Self {
         match event {
-            DispersalExecutorEvent::DispersalSuccess { .. } => MonitorEvent::Noop,
+            DispersalExecutorEvent::DispersalSuccess { .. } => Self::Noop,
             DispersalExecutorEvent::DispersalError { error } => match error {
                 // Only map Io or OpenStreamError to MonitorEvent
                 &ExecutorDispersalError::Io { .. }
                 | &ExecutorDispersalError::OpenStreamError { .. } => {
-                    MonitorEvent::ExecutorDispersal(error.clone())
+                    Self::ExecutorDispersal(error.clone())
                 }
-                _ => MonitorEvent::Noop, // All other cases return Noop
+                _ => Self::Noop, // All other cases return Noop
             },
         }
     }
@@ -84,14 +84,14 @@ impl From<&ReplicationEvent> for MonitorEvent {
 impl From<&SamplingEvent> for MonitorEvent {
     fn from(event: &SamplingEvent) -> Self {
         match event {
-            SamplingEvent::SamplingSuccess { .. } => MonitorEvent::Noop,
-            SamplingEvent::IncomingSample { .. } => MonitorEvent::Noop,
+            SamplingEvent::SamplingSuccess { .. } => Self::Noop,
+            SamplingEvent::IncomingSample { .. } => Self::Noop,
             SamplingEvent::SamplingError { error } => match error {
-                // Only map Io or OpenStreamError to MonitorEvent
+                // Only map Io or OpenStreamError to Self
                 &SamplingError::Io { .. } | &SamplingError::OpenStream { .. } => {
-                    MonitorEvent::Sampling(error.clone())
+                    Self::Sampling(error.clone())
                 }
-                _ => MonitorEvent::Noop, // All other cases return Noop
+                _ => Self::Noop, // All other cases return Noop
             },
         }
     }

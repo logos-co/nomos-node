@@ -124,7 +124,7 @@ where
             config.validator_settings.balancer_interval,
             config.validator_settings.redial_cooldown,
         );
-        let address = config.validator_settings.listening_address.clone();
+        let address = config.validator_settings.listening_address;
         // put swarm to listen at the specified configuration address
         executor_swarm
             .protocol_swarm_mut()

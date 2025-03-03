@@ -67,9 +67,9 @@ impl TopologyConfig {
         }
     }
 
-    pub fn validators_and_executor(num_validators: usize, num_subnets: usize) -> TopologyConfig {
+    pub fn validators_and_executor(num_validators: usize, num_subnets: usize) -> Self {
         let dispersal_factor = num_validators.add(1).saturating_div(num_subnets);
-        TopologyConfig {
+        Self {
             n_validators: num_validators,
             n_executors: 1,
             consensus_params: ConsensusParams::default_for_participants(num_validators + 1),
