@@ -24,6 +24,7 @@ use nomos_da_sampling::{
 use nomos_da_verifier::{
     backend::kzgrs::KzgrsDaVerifier,
     network::adapters::executor::Libp2pAdapter as VerifierNetworkAdapter,
+    storage::adapters::rocksdb::RocksAdapter as VerifierStorageAdapter,
 };
 use nomos_mempool::backend::mockpool::MockPool;
 use nomos_node::{
@@ -44,6 +45,8 @@ pub type ExecutorApiService = ApiService<
         NomosDaMembership,
         BlobInfo,
         KzgrsDaVerifier,
+        VerifierNetworkAdapter<NomosDaMembership>,
+        VerifierStorageAdapter<DaBlob, Wire>,
         Tx,
         Wire,
         DispersalKZGRSBackend<DispersalNetworkAdapter<NomosDaMembership>, DispersalMempoolAdapter>,
@@ -66,6 +69,9 @@ pub type DispersalMempoolAdapter = KzgrsMempoolAdapter<
     nomos_da_sampling::network::adapters::executor::Libp2pAdapter<NomosDaMembership>,
     ChaCha20Rng,
     SamplingStorageAdapter<DaBlob, Wire>,
+    KzgrsDaVerifier,
+    VerifierNetworkAdapter<NomosDaMembership>,
+    VerifierStorageAdapter<DaBlob, Wire>,
 >;
 
 pub type DaDispersal = DispersalService<
