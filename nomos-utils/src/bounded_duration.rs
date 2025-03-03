@@ -9,8 +9,10 @@ use time::Duration;
 // This means that we could add different bound from a const configuration
 // checked on compile time.
 /// This is a proxy type to be use to bound `Duration` deserialization checks.
+///
 /// It embedded the check at type level. It implements the pertinent types from
 /// the `serde_with` crate so it can be use within `serde_as` macros.
+///
 /// # Examples
 /// ```rust
 ///     use serde_with::serde_as;
@@ -86,8 +88,7 @@ impl<'de, const MIN_DURATION: usize, TAG: TimeTag> DeserializeAs<'de, Duration>
     where
         D: Deserializer<'de>,
     {
-        let duration: MinimalBoundedDuration<MIN_DURATION, TAG> =
-            MinimalBoundedDuration::deserialize(deserializer)?;
+        let duration: Self = Self::deserialize(deserializer)?;
         Ok(duration.duration)
     }
 }
