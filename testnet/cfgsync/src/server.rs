@@ -33,6 +33,9 @@ pub struct CfgSyncConfig {
     pub old_blobs_check_interval_secs: u64,
     pub blobs_validity_duration_secs: u64,
     pub global_params_path: String,
+    pub min_dispersal_peers: usize,
+    pub min_replication_peers: usize,
+    pub monitor_failure_time_window_secs: u64,
     pub balancer_interval_secs: u64,
 
     // Tracing params
@@ -65,14 +68,17 @@ impl CfgSyncConfig {
             blobs_validity_duration: Duration::from_secs(self.blobs_validity_duration_secs),
             global_params_path: self.global_params_path.clone(),
             policy_settings: DAConnectionPolicySettings {
-                min_dispersal_peers: self.num_subnets as usize,
-                min_replication_peers: self.dispersal_factor,
-                max_dispersal_failures: 0,
-                max_sampling_failures: 0,
-                max_replication_failures: 0,
-                malicious_threshold: 0,
+                min_dispersal_peers: self.min_dispersal_peers,
+                min_replication_peers: self.min_replication_peers,
+                max_dispersal_failures: 3,
+                max_sampling_failures: 3,
+                max_replication_failures: 3,
+                malicious_threshold: 10,
             },
-            monitor_settings: DAConnectionMonitorSettings::default(),
+            monitor_settings: DAConnectionMonitorSettings {
+                failure_time_window: Duration::from_secs(self.monitor_failure_time_window_secs),
+                ..Default::default()
+            },
             balancer_interval: Duration::from_secs(self.balancer_interval_secs),
             redial_cooldown: Duration::ZERO,
         }
