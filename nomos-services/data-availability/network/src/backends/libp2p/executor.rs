@@ -1,4 +1,4 @@
-use std::{collections::HashSet, fmt::Debug, marker::PhantomData, pin::Pin, time::Duration};
+use std::{fmt::Debug, marker::PhantomData, pin::Pin};
 
 use futures::{
     future::Aborted,
@@ -27,8 +27,8 @@ use tracing::instrument;
 
 use crate::backends::{
     libp2p::common::{
-        dial_validator_subnetwork_peers, handle_sample_request, handle_validator_events_stream,
-        DaNetworkBackendSettings, SamplingEvent, BROADCAST_CHANNEL_SIZE,
+        handle_sample_request, handle_validator_events_stream, DaNetworkBackendSettings,
+        SamplingEvent, BROADCAST_CHANNEL_SIZE,
     },
     NetworkBackend,
 };

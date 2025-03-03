@@ -1,6 +1,6 @@
 use std::{
     collections::{HashMap, HashSet, VecDeque},
-    task::{Context, Poll},
+    task::{Context, Poll, Waker},
 };
 
 use either::Either;
@@ -13,10 +13,8 @@ use kzgrs_backend::common::blob::DaBlob;
 use libp2p::{
     core::{transport::PortUse, Endpoint},
     swarm::{
-        behaviour::{ConnectionClosed, ConnectionEstablished},
-        dial_opts::DialOpts,
-        ConnectionDenied, ConnectionId, FromSwarm, NetworkBehaviour, THandler, THandlerInEvent,
-        THandlerOutEvent, ToSwarm,
+        behaviour::ConnectionClosed, dial_opts::DialOpts, ConnectionDenied, ConnectionId,
+        FromSwarm, NetworkBehaviour, THandler, THandlerInEvent, THandlerOutEvent, ToSwarm,
     },
     Multiaddr, PeerId, Stream,
 };
@@ -27,7 +25,6 @@ use nomos_da_messages::{
     dispersal,
     packing::{pack_to_writer, unpack_from_reader},
 };
-use rand::{prelude::IteratorRandom, SeedableRng};
 use subnetworks_assignations::MembershipHandler;
 use thiserror::Error;
 use tokio::sync::{mpsc, mpsc::UnboundedSender};

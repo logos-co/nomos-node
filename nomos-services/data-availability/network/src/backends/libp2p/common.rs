@@ -1,12 +1,7 @@
-use std::{
-    collections::{HashMap, HashSet},
-    fmt::Debug,
-    time::Duration,
-};
+use std::{collections::HashMap, fmt::Debug, time::Duration};
 
 use futures::StreamExt;
 use kzgrs_backend::common::{blob::DaBlob, ColumnIndex};
-use libp2p::{swarm::NetworkBehaviour, Swarm};
 use log::error;
 use nomos_core::da::BlobId;
 use nomos_da_network_core::{
@@ -21,7 +16,6 @@ use nomos_da_network_core::{
 };
 use nomos_libp2p::{ed25519, secret_key_serde, Multiaddr, PeerId};
 use serde::{Deserialize, Serialize};
-use subnetworks_assignations::MembershipHandler;
 use tokio::sync::{
     broadcast, mpsc,
     mpsc::{error::SendError, UnboundedSender},
@@ -57,39 +51,6 @@ pub enum SamplingEvent {
     },
     /// A failed sampling error
     SamplingError { error: SamplingError },
-}
-
-pub(crate) fn dial_validator_subnetwork_peers<Membership, Behaviour>(
-    membership: &Membership,
-    addresses: &HashMap<PeerId, Multiaddr>,
-    swarm: &mut Swarm<Behaviour>,
-    local_peer_id: PeerId,
-) -> HashSet<PeerId>
-where
-    Membership: MembershipHandler<NetworkId = SubnetworkId, Id = PeerId>
-        + Clone
-        + Debug
-        + Send
-        + Sync
-        + 'static,
-    Behaviour: NetworkBehaviour,
-{
-    let mut connected_peers = HashSet::new();
-    membership
-        .membership(&local_peer_id)
-        .iter()
-        .flat_map(|subnet| membership.members_of(subnet))
-        .filter(|peer| peer != &local_peer_id)
-        .filter_map(|peer| addresses.get(&peer).map(|addr| (peer, addr.clone())))
-        .for_each(|(peer, addr)| {
-            // Only dial if we haven't already connected to this peer.
-            if connected_peers.insert(peer) {
-                swarm
-                    .dial(addr)
-                    .expect("Node should be able to dial peer in a subnet");
-            }
-        });
-    connected_peers
 }
 
 /// Task that handles forwarding of events to the subscriptions channels/stream

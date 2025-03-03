@@ -17,6 +17,7 @@ use nomos_da_indexer::{
     storage::adapters::rocksdb::RocksAdapterSettings as IndexerStorageAdapterSettings,
     IndexerSettings,
 };
+use nomos_da_network_core::swarm::DAConnectionPolicySettings;
 use nomos_da_network_service::{
     backends::libp2p::common::DaNetworkBackendSettings, NetworkConfig as DaNetworkConfig,
 };

@@ -55,10 +55,10 @@ impl TopologyConfig {
                 policy_settings: DAConnectionPolicySettings {
                     min_dispersal_peers: 1,
                     min_replication_peers: 1,
-                    max_dispersal_failures: 1,
-                    max_sampling_failures: 1,
-                    max_replication_failures: 1,
-                    malicious_threshold: 1,
+                    max_dispersal_failures: 2,
+                    max_sampling_failures: 2,
+                    max_replication_failures: 2,
+                    malicious_threshold: 10,
                 },
                 balancer_interval: Duration::from_secs(5),
                 ..Default::default()
@@ -78,12 +78,12 @@ impl TopologyConfig {
                 subnetwork_size: num_subnets,
                 num_subnets: num_subnets as u16,
                 policy_settings: DAConnectionPolicySettings {
-                    min_dispersal_peers: num_subnets,
-                    min_replication_peers: dispersal_factor,
-                    max_dispersal_failures: 0,
-                    max_sampling_failures: 0,
-                    max_replication_failures: 0,
-                    malicious_threshold: 0,
+                    min_dispersal_peers: 1,
+                    min_replication_peers: dispersal_factor - 1,
+                    max_dispersal_failures: 2,
+                    max_sampling_failures: 2,
+                    max_replication_failures: 2,
+                    malicious_threshold: 10,
                 },
                 balancer_interval: Duration::from_secs(5),
                 ..Default::default()

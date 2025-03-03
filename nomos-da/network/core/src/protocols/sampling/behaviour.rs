@@ -1,5 +1,5 @@
 use std::{
-    collections::{HashMap, HashSet, VecDeque},
+    collections::{HashMap, VecDeque},
     task::{Context, Poll},
 };
 
@@ -11,7 +11,7 @@ use futures::{
     },
     future::BoxFuture,
     stream::{BoxStream, FuturesUnordered},
-    AsyncWriteExt, FutureExt, StreamExt, TryFutureExt,
+    AsyncWriteExt, FutureExt, StreamExt,
 };
 use kzgrs_backend::common::{blob::DaBlob, ColumnIndex};
 use libp2p::{

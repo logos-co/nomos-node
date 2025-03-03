@@ -5,9 +5,12 @@ pub mod validator;
 pub mod test {
     use futures::StreamExt;
     use kzgrs_backend::common::{blob::DaBlob, Column};
-    use libp2p::{identity::Keypair, quic, swarm::SwarmEvent, Multiaddr, PeerId};
+    use libp2p::{
+        swarm::{dial_opts::DialOpts, SwarmEvent},
+        PeerId, Swarm,
+    };
+    use libp2p_swarm_test::SwarmExt;
     use log::info;
-    use subnetworks_assignations::MembershipHandler;
     use tracing_subscriber::{fmt::TestWriter, EnvFilter};
 
     use crate::{
@@ -17,7 +20,6 @@ pub mod test {
             validator::behaviour::{DispersalEvent, DispersalValidatorBehaviour},
         },
         test_utils::AllNeighbours,
-        SubnetworkId,
     };
 
     #[tokio::test]

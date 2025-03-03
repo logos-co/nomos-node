@@ -20,6 +20,7 @@ use nomos_da_indexer::{
     storage::adapters::rocksdb::RocksAdapterSettings as IndexerStorageAdapterSettings,
     IndexerSettings,
 };
+use nomos_da_network_core::swarm::DAConnectionPolicySettings;
 use nomos_da_network_service::{
     backends::libp2p::{
         common::DaNetworkBackendSettings, executor::DaNetworkExecutorBackendSettings,
@@ -216,7 +217,7 @@ pub fn create_executor_config(config: GeneralConfig) -> Config {
                     addresses: config.da_config.addresses,
                     listening_address: config.da_config.listening_address,
                     policy_settings: DAConnectionPolicySettings {
-                        min_dispersal_peers: config.da_config.num_subnets as usize,
+                        min_dispersal_peers: da_policy_settings.min_dispersal_peers,
                         min_replication_peers: da_policy_settings.min_replication_peers,
                         max_dispersal_failures: da_policy_settings.max_dispersal_failures,
                         max_sampling_failures: da_policy_settings.max_sampling_failures,

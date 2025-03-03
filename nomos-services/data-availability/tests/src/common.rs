@@ -36,6 +36,7 @@ use nomos_da_indexer::{
     },
     DataIndexerService, IndexerSettings,
 };
+use nomos_da_network_core::swarm::{DAConnectionMonitorSettings, DAConnectionPolicySettings};
 use nomos_da_network_service::{
     backends::libp2p::{common::DaNetworkBackendSettings, validator::DaNetworkValidatorBackend},
     NetworkConfig as DaNetworkConfig, NetworkService as DaNetworkService,

@@ -39,6 +39,9 @@ mod tests {
             old_blobs_check_interval_secs: 0,
             blobs_validity_duration_secs: 0,
             global_params_path: "".into(),
+            min_dispersal_peers: 0,
+            min_replication_peers: 0,
+            monitor_failure_time_window_secs: 0,
             balancer_interval_secs: 0,
             tracing_settings: TracingSettings::default(),
         };

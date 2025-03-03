@@ -1,8 +1,7 @@
 use std::time::Duration;
 
 use executor_http_client::ExecutorHttpClient;
-use kzgrs_backend::common::blob::DaBlob;
-use kzgrs_backend::reconstruction::reconstruct_without_missing_data;
+use kzgrs_backend::{common::blob::DaBlob, reconstruction::reconstruct_without_missing_data};
 use reqwest::{ClientBuilder, Url};
 use tests::{
     adjust_timeout,
