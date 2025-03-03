@@ -1,8 +1,8 @@
 use std::{env, fs, net::Ipv4Addr, process};
 
+use cfgsync::client::get_config;
 use nomos_executor::config::Config as ExecutorConfig;
 use nomos_node::Config as ValidatorConfig;
-use reqwest::Client;
 use serde::{de::DeserializeOwned, Serialize};
 
 #[derive(Serialize)]
@@ -18,7 +18,7 @@ fn parse_ip(ip_str: &str) -> Ipv4Addr {
     })
 }
 
-async fn get_config<Config: Serialize + DeserializeOwned>(
+async fn pull_to_file<Config: Serialize + DeserializeOwned>(
     ip: Ipv4Addr,
     identifier: String,
     url: &str,
@@ -69,12 +69,17 @@ async fn main() {
 
     let config_result = match host_kind.as_str() {
         "executor" => {
-            get_config::<ExecutorConfig>(ip, identifier, &node_config_endpoint, &config_file_path)
+            pull_to_file::<ExecutorConfig>(ip, identifier, &node_config_endpoint, &config_file_path)
                 .await
         }
         _ => {
-            get_config::<ValidatorConfig>(ip, identifier, &node_config_endpoint, &config_file_path)
-                .await
+            pull_to_file::<ValidatorConfig>(
+                ip,
+                identifier,
+                &node_config_endpoint,
+                &config_file_path,
+            )
+            .await
         }
     };
 

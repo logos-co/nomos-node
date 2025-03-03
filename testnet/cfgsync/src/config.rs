@@ -160,19 +160,19 @@ fn update_network_init_peers(hosts: &[Host]) -> Vec<Multiaddr> {
 
 fn update_da_peer_addresses(
     hosts: Vec<Host>,
-    peer_addresses: HashMap<PeerId, Multiaddr>,
-) -> HashMap<PeerId, (Multiaddr, Ipv4Addr)> {
-    peer_addresses
+    da_configs: Vec<GeneralDaConfig>,
+) -> HashMap<PeerId, Multiaddr> {
+    da_configs
         .into_iter()
         .zip(hosts)
-        .map(|((peer_id, _), host)| {
+        .map(|(config, host)| {
             let new_multiaddr = Multiaddr::from_str(&format!(
                 "/ip4/{}/udp/{}/quic-v1",
                 host.ip, host.da_network_port,
             ))
             .unwrap();
 
-            (peer_id, (new_multiaddr, host.ip))
+            (config.peer_id, new_multiaddr)
         })
         .collect()
 }
@@ -245,10 +245,11 @@ mod cfgsync_tests {
     use nomos_tracing_service::{
         FilterLayer, LoggerLayer, MetricsLayer, TracingLayer, TracingSettings,
     };
-    use tests::topology::configs::{consensus::ConsensusParams, da::DaParams};
+    use tests::topology::configs::{consensus::ConsensusParams, da::DaParams, GeneralConfig};
     use tracing::Level;
 
     use super::{create_node_configs, Host, HostKind};
+    use crate::tests::extract_ip;
 
     #[test]
     fn basic_ip_list() {
@@ -300,7 +301,22 @@ mod cfgsync_tests {
             assert_eq!(network_port, host.network_port);
             assert_eq!(da_network_port, host.da_network_port);
             assert_eq!(blend_port, host.blend_port);
+
+            check_da_membership(host.ip, config);
         }
+    }
+
+    pub fn check_da_membership(my_ip: Ipv4Addr, config: &GeneralConfig) {
+        let key = libp2p::identity::Keypair::from(ed25519::Keypair::from(
+            config.da_config.node_key.clone(),
+        ));
+        let my_peer_id = PeerId::from_public_key(&key.public());
+        let my_multiaddr = config.da_config.addresses.get(&my_peer_id).unwrap();
+        let my_multiaddr_ip = extract_ip(my_multiaddr).unwrap();
+        assert_eq!(
+            my_ip, my_multiaddr_ip,
+            "DA membership ip doesn't match host ip"
+        );
     }
 
     fn extract_port(multiaddr: &Multiaddr) -> u16 {

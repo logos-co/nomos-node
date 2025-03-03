@@ -1,46 +1,53 @@
-use std::{path::PathBuf, process};
+use std::{fs, net::Ipv4Addr, num::NonZero, path::PathBuf, sync::Arc, time::Duration};
 
-use cfgsync::server::{cfgsync_app, CfgSyncConfig};
-use clap::Parser;
+use axum::{extract::State, http::StatusCode, response::IntoResponse, routing::post, Json, Router};
+use nomos_da_network_core::swarm::{DAConnectionMonitorSettings, DAConnectionPolicySettings};
+use nomos_tracing_service::TracingSettings;
+use serde::{Deserialize, Serialize};
+use tests::{
+    nodes::{executor::create_executor_config, validator::create_validator_config},
+    topology::configs::{consensus::ConsensusParams, da::DaParams},
+};
+use tokio::sync::oneshot::channel;
 
-#[derive(Parser, Debug)]
-#[command(about = "CfgSync")]
-struct Args {
-    config: PathBuf,
-}
+use crate::{
+    config::Host,
+    repo::{ConfigRepo, RepoResponse},
+};
 
 #[derive(Debug, Deserialize)]
-struct CfgSyncConfig {
-    port: u16,
-    n_hosts: usize,
-    timeout: u64,
+pub struct CfgSyncConfig {
+    pub port: u16,
+    pub n_hosts: usize,
+    pub timeout: u64,
 
     // ConsensusConfig related parameters
-    security_param: NonZero<u32>,
-    active_slot_coeff: f64,
+    pub security_param: NonZero<u32>,
+    pub active_slot_coeff: f64,
 
     // DaConfig related parameters
-    subnetwork_size: usize,
-    dispersal_factor: usize,
-    num_samples: u16,
-    num_subnets: u16,
-    old_blobs_check_interval_secs: u64,
-    blobs_validity_duration_secs: u64,
-    global_params_path: String,
+    pub subnetwork_size: usize,
+    pub dispersal_factor: usize,
+    pub num_samples: u16,
+    pub num_subnets: u16,
+    pub old_blobs_check_interval_secs: u64,
+    pub blobs_validity_duration_secs: u64,
+    pub global_params_path: String,
+    pub balancer_interval_secs: u64,
 
     // Tracing params
-    tracing_settings: TracingSettings,
+    pub tracing_settings: TracingSettings,
 }
 
 impl CfgSyncConfig {
-    fn load_from_file(file_path: &PathBuf) -> Result<Self, String> {
+    pub fn load_from_file(file_path: &PathBuf) -> Result<Self, String> {
         let config_content = fs::read_to_string(file_path)
-            .map_err(|err| format!("Failed to read config file: {err}"))?;
+            .map_err(|err| format!("Failed to read config file: {}", err))?;
         serde_yaml::from_str(&config_content)
-            .map_err(|err| format!("Failed to parse config file: {err}"))
+            .map_err(|err| format!("Failed to parse config file: {}", err))
     }
 
-    const fn to_consensus_params(&self) -> ConsensusParams {
+    pub const fn to_consensus_params(&self) -> ConsensusParams {
         ConsensusParams {
             n_participants: self.n_hosts,
             security_param: self.security_param,
@@ -48,8 +55,7 @@ impl CfgSyncConfig {
         }
     }
 
-    fn to_da_params(&self) -> DaParams {
-        let default = DaParams::default();
+    pub fn to_da_params(&self) -> DaParams {
         DaParams {
             subnetwork_size: self.subnetwork_size,
             dispersal_factor: self.dispersal_factor,
@@ -58,22 +64,29 @@ impl CfgSyncConfig {
             old_blobs_check_interval: Duration::from_secs(self.old_blobs_check_interval_secs),
             blobs_validity_duration: Duration::from_secs(self.blobs_validity_duration_secs),
             global_params_path: self.global_params_path.clone(),
-            policy_settings: default.policy_settings,
-            monitor_settings: default.monitor_settings,
-            balancer_interval: default.balancer_interval,
-            redial_cooldown: default.redial_cooldown,
+            policy_settings: DAConnectionPolicySettings {
+                min_dispersal_peers: self.num_subnets as usize,
+                min_replication_peers: self.dispersal_factor,
+                max_dispersal_failures: 0,
+                max_sampling_failures: 0,
+                max_replication_failures: 0,
+                malicious_threshold: 0,
+            },
+            monitor_settings: DAConnectionMonitorSettings::default(),
+            balancer_interval: Duration::from_secs(self.balancer_interval_secs),
+            redial_cooldown: Duration::ZERO,
         }
     }
 
-    fn to_tracing_settings(&self) -> TracingSettings {
+    pub fn to_tracing_settings(&self) -> TracingSettings {
         self.tracing_settings.clone()
     }
 }
 
 #[derive(Serialize, Deserialize)]
-struct ClientIp {
-    ip: Ipv4Addr,
-    identifier: String,
+pub struct ClientIp {
+    pub ip: Ipv4Addr,
+    pub identifier: String,
 }
 
 async fn validator_config(
@@ -118,21 +131,9 @@ async fn executor_config(
     )
 }
 
-#[tokio::main]
-async fn main() {
-    let cli = Args::parse();
-
-    let config = CfgSyncConfig::load_from_file(&cli.config).unwrap_or_else(|err| {
-        eprintln!("{err}");
-        process::exit(1);
-    });
-
-    let port = config.port;
-    let app = cfgsync_app(config.into());
-
-    println!("Server running on http://0.0.0.0:{}", port);
-    axum::Server::bind(&format!("0.0.0.0:{}", port).parse().unwrap())
-        .serve(app.into_make_service())
-        .await
-        .unwrap();
+pub fn cfgsync_app(config_repo: Arc<ConfigRepo>) -> Router {
+    Router::new()
+        .route("/validator", post(validator_config))
+        .route("/executor", post(executor_config))
+        .with_state(config_repo)
 }
