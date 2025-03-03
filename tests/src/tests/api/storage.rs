@@ -105,8 +105,8 @@ fn test_get_blob_data() {
 
         let url = format!("http://{}/da/get-blob", http_addr);
         let req: GetLightBlobReq<DaBlob> = GetLightBlobReq {
-            blob_id: blob_id.clone(),
-            column_idx: column_idx.clone(),
+            blob_id: *blob_id,
+            column_idx: *column_idx,
         };
         let received_blob: DaLightBlob = fetch_from_api(&url, &req).await;
         finished_tx
