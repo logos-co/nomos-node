@@ -11,7 +11,7 @@ use serde::{de::DeserializeOwned, Serialize};
 pub async fn block_req<S, Tx>(
     handle: &overwatch_rs::overwatch::handle::OverwatchHandle,
     id: HeaderId,
-) -> Result<Option<Block<Tx, full_replication::BlobInfo>>, super::DynError>
+) -> Result<Option<Block<Tx, kzgrs_backend::dispersal::BlobInfo>>, super::DynError>
 where
     Tx: serde::Serialize + DeserializeOwned + Clone + Eq + core::hash::Hash,
     S: StorageSerde + Send + Sync + 'static,
