@@ -63,7 +63,6 @@ where
         Self {
             sampling: SamplingBehaviour::new(peer_id, membership.clone(), addresses.clone()),
             executor_dispersal: DispersalExecutorBehaviour::new(
-                peer_id,
                 membership.clone(),
                 addresses.clone(),
             ),

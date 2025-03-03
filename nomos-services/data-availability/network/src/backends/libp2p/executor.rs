@@ -1,4 +1,4 @@
-use std::{collections::HashSet, fmt::Debug, marker::PhantomData, pin::Pin, time::Duration};
+use std::{fmt::Debug, marker::PhantomData, pin::Pin};
 
 use futures::{
     future::Aborted,
@@ -27,8 +27,8 @@ use tracing::instrument;
 
 use crate::backends::{
     libp2p::common::{
-        dial_validator_subnetwork_peers, handle_sample_request, handle_validator_events_stream,
-        DaNetworkBackendSettings, SamplingEvent, BROADCAST_CHANNEL_SIZE,
+        handle_sample_request, handle_validator_events_stream, DaNetworkBackendSettings,
+        SamplingEvent, BROADCAST_CHANNEL_SIZE,
     },
     NetworkBackend,
 };
@@ -124,7 +124,7 @@ where
             config.validator_settings.balancer_interval,
             config.validator_settings.redial_cooldown,
         );
-        let address = config.validator_settings.listening_address.clone();
+        let address = config.validator_settings.listening_address;
         // put swarm to listen at the specified configuration address
         executor_swarm
             .protocol_swarm_mut()
@@ -132,26 +132,9 @@ where
             .unwrap_or_else(|e| {
                 panic!("Error listening on DA network with address {address}: {e}")
             });
-        // Dial peers in the same subnetworks (Node might participate in multiple).
-        let local_peer_id = *executor_swarm.local_peer_id();
-
-        let validator_subnetworks_connected_peers = dial_validator_subnetwork_peers(
-            &config.validator_settings.membership,
-            &config.validator_settings.addresses,
-            executor_swarm.protocol_swarm_mut(),
-            local_peer_id,
-        );
-
-        let dispersal_peers = dial_dispersal_peers(
-            &mut executor_swarm,
-            &config,
-            &validator_subnetworks_connected_peers,
-        );
 
         let sampling_request_channel = executor_swarm.sample_request_channel();
-
         let dispersal_blobs_sender = executor_swarm.dispersal_blobs_channel();
-        let executor_open_stream_sender = executor_swarm.dispersal_open_stream_sender();
 
         let (task_abort_handle, abort_registration) = AbortHandle::new_pair();
         let task = (
@@ -160,12 +143,6 @@ where
                 .runtime()
                 .spawn(Abortable::new(executor_swarm.run(), abort_registration)),
         );
-
-        std::thread::sleep(Duration::from_secs(1));
-        // open streams to dispersal peers
-        for peer_id in dispersal_peers.iter() {
-            executor_open_stream_sender.send(*peer_id).unwrap();
-        }
 
         let (sampling_broadcast_sender, sampling_broadcast_receiver) =
             broadcast::channel(BROADCAST_CHANNEL_SIZE);
@@ -280,96 +257,4 @@ async fn handle_executor_dispersal_events_stream(
             error!("Error forwarding internal dispersal executor event: {e}");
         }
     }
-}
-
-fn dial_dispersal_peers<Membership>(
-    executor_swarm: &mut ExecutorSwarm<Membership>,
-    config: &DaNetworkExecutorBackendSettings<Membership>,
-    validator_connected_peers: &HashSet<PeerId>,
-) -> HashSet<PeerId>
-where
-    Membership: MembershipHandler<NetworkId = SubnetworkId, Id = PeerId>
-        + Clone
-        + Debug
-        + Send
-        + Sync
-        + 'static,
-{
-    let mut connected_peers = HashSet::new();
-
-    let local_peer_id = *executor_swarm.local_peer_id();
-    let membership = &config.validator_settings.membership;
-
-    // filter out which subnetworks we already have connections with
-    let connected_subnetworks: HashSet<SubnetworkId> = (0..config.num_subnets)
-        .filter(|subnetwork_id| {
-            !membership
-                .members_of(subnetwork_id)
-                .is_disjoint(validator_connected_peers)
-        })
-        .collect();
-
-    let already_connected_peers: HashSet<PeerId> = membership
-        .members()
-        .intersection(validator_connected_peers)
-        .copied()
-        .collect();
-
-    // select dispersal peers from the subnetworks we are not connected yet
-    let selected_dispersal_peers = select_dispersal_peers(
-        &local_peer_id,
-        config,
-        &connected_subnetworks,
-        //
-        &HashSet::new(),
-    );
-
-    for peer_id in selected_dispersal_peers {
-        let addr = config
-            .validator_settings
-            .addresses
-            .get(&peer_id)
-            .expect("Peer address should be in the list")
-            .clone();
-
-        executor_swarm
-            .dial(addr)
-            .expect("Should schedule the dials");
-
-        connected_peers.insert(peer_id);
-    }
-
-    // add peers from the subnetwork we are connected with
-    connected_peers
-        .union(&already_connected_peers)
-        .copied()
-        .collect()
-}
-
-/// Use selection as per the base [specification](https://www.notion.so/NomosDA-Network-Specification-c6664294d630470ba20aefb21a218f8c?pvs=4#10e8f96fb65c803f9ed9d5a91df3ac83)
-fn select_dispersal_peers<Membership>(
-    local_peer_id: &PeerId,
-    config: &DaNetworkExecutorBackendSettings<Membership>,
-    filtered_subnetworks: &HashSet<SubnetworkId>,
-    filtered_peers: &HashSet<PeerId>,
-) -> HashSet<PeerId>
-where
-    Membership: MembershipHandler<NetworkId = SubnetworkId, Id = PeerId>
-        + Clone
-        + Debug
-        + Send
-        + Sync
-        + 'static,
-{
-    let membership = &config.validator_settings.membership;
-    (0..config.num_subnets)
-        .filter(|subnetwork_id| !filtered_subnetworks.contains(subnetwork_id))
-        .filter_map(|subnetwork_id| {
-            membership
-                .members_of(&subnetwork_id)
-                .difference(filtered_peers)
-                .find(|&id| id != local_peer_id)
-                .copied()
-        })
-        .collect()
 }

@@ -1,11 +1,14 @@
 pub mod configs;
 
+use std::{ops::Add, time::Duration};
+
 use configs::{
     da::{create_da_configs, DaParams},
     network::{create_network_configs, NetworkParams},
     tracing::create_tracing_configs,
     GeneralConfig,
 };
+use nomos_da_network_core::swarm::DAConnectionPolicySettings;
 use rand::{thread_rng, Rng};
 
 use crate::{
@@ -49,6 +52,40 @@ impl TopologyConfig {
                 dispersal_factor: 2,
                 subnetwork_size: 2,
                 num_subnets: 2,
+                policy_settings: DAConnectionPolicySettings {
+                    min_dispersal_peers: 1,
+                    min_replication_peers: 1,
+                    max_dispersal_failures: 2,
+                    max_sampling_failures: 2,
+                    max_replication_failures: 2,
+                    malicious_threshold: 10,
+                },
+                balancer_interval: Duration::from_secs(5),
+                ..Default::default()
+            },
+            network_params: Default::default(),
+        }
+    }
+
+    pub fn validators_and_executor(num_validators: usize, num_subnets: usize) -> Self {
+        let dispersal_factor = num_validators.add(1).saturating_div(num_subnets);
+        Self {
+            n_validators: num_validators,
+            n_executors: 1,
+            consensus_params: ConsensusParams::default_for_participants(num_validators + 1),
+            da_params: DaParams {
+                dispersal_factor,
+                subnetwork_size: num_subnets,
+                num_subnets: num_subnets as u16,
+                policy_settings: DAConnectionPolicySettings {
+                    min_dispersal_peers: 1,
+                    min_replication_peers: dispersal_factor - 1,
+                    max_dispersal_failures: 2,
+                    max_sampling_failures: 2,
+                    max_replication_failures: 2,
+                    malicious_threshold: 10,
+                },
+                balancer_interval: Duration::from_secs(5),
                 ..Default::default()
             },
             network_params: Default::default(),
