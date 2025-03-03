@@ -137,6 +137,7 @@ impl<const MIN_DURATION: usize, TAG: TimeTag> From<MinimalBoundedDuration<MIN_DU
 
 #[cfg(test)]
 mod test {
+    use serde_json::json;
     use serde_with::serde_as;
     use time::Duration;
 
@@ -144,7 +145,8 @@ mod test {
 
     #[test]
     fn success_deserialize() {
-        let value = serde_json::to_value(Duration::days(1)).unwrap();
+        let json_value = json!("1.0");
+        let value = serde_json::to_value(json_value).unwrap();
         let _duration: MinimalBoundedDuration<1, SECOND> = serde_json::from_value(value).unwrap();
     }
 
