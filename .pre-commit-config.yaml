@@ -10,7 +10,10 @@ repos:
     hooks:
       - id: cargo-deny
         args:
+          - check
           - --hide-inclusion-graph
-          - -c .cargo-deny.toml
+          - -c
+          - .cargo-deny.toml
           - --show-stats
-          - -D warnings
+          - -D
+          - warnings
