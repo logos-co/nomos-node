@@ -161,7 +161,7 @@ where
                     self.service_state_handle.state_updater.update(self.pool.save().into());
                 }
                 Some(lifecycle_msg) = lifecycle_stream.next() =>  {
-                    if lifecycle::should_stop_service::<Self>(&lifecycle_msg).await {
+                    if lifecycle::should_stop_service::<Self>(&lifecycle_msg) {
                         break;
                     }
                 }

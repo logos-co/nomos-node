@@ -241,7 +241,7 @@ where
                     Self::handle_sampling_message(sampling_message, &mut sampler, &storage_adapter).await;
                 }
                 Some(msg) = lifecycle_stream.next() => {
-                    if lifecycle::should_stop_service::<Self>(&msg).await {
+                    if lifecycle::should_stop_service::<Self>(&msg) {
                         break;
                     }
                 }
