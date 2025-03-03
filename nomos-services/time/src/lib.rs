@@ -41,7 +41,7 @@ pub enum TimeServiceMessage {
 impl Debug for TimeServiceMessage {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            TimeServiceMessage::Subscribe { .. } => f.write_str("New time service subscription"),
+            Self::Subscribe { .. } => f.write_str("New time service subscription"),
         }
     }
 }
@@ -105,6 +105,7 @@ where
         const SLOTS_BUFFER: usize = 3;
         let (broadcast_sender, broadcast_receiver) = broadcast::channel(SLOTS_BUFFER);
 
+        #[expect(clippy::redundant_pub_crate)]
         loop {
             tokio::select! {
                 Some(service_message) = inbound_relay.recv() => {

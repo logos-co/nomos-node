@@ -44,7 +44,7 @@ impl<Rng> TemporalScheduler<Rng> {
     /// The lottery interval is half of the maximum delay,
     /// in order to guarantee that the interval between two subsequent message
     /// emissions is at most [`max_delay_seconds`].
-    fn lottery_interval_seconds(max_delay_seconds: u64) -> u64 {
+    const fn lottery_interval_seconds(max_delay_seconds: u64) -> u64 {
         max_delay_seconds / 2
     }
 }
@@ -102,7 +102,7 @@ pub struct TemporalSchedulerSettings {
 }
 
 impl<M, S> TemporalProcessor<M, S> {
-    pub(crate) fn new(scheduler: S) -> Self {
+    pub(crate) const fn new(scheduler: S) -> Self {
         Self {
             queue: VecDeque::new(),
             scheduler,

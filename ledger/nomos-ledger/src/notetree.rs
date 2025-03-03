@@ -42,7 +42,7 @@ impl NoteTree {
         Some(cl::merkle::path(leaves, index))
     }
 
-    pub fn commitments(&self) -> &rpds::VectorSync<NoteCommitment> {
+    pub const fn commitments(&self) -> &rpds::VectorSync<NoteCommitment> {
         &self.commitments
     }
 }

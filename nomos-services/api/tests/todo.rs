@@ -140,11 +140,11 @@ mod todo {
     use utoipa::{IntoParams, ToSchema};
 
     /// In-memory todo store
-    pub(super) type Store = Mutex<Vec<Todo>>;
+    pub type Store = Mutex<Vec<Todo>>;
 
     /// Item to do.
     #[derive(Serialize, Deserialize, ToSchema, Clone)]
-    pub(super) struct Todo {
+    pub struct Todo {
         id: i32,
         #[schema(example = "Buy groceries")]
         value: String,
@@ -153,7 +153,7 @@ mod todo {
 
     /// Todo operation errors
     #[derive(Serialize, Deserialize, ToSchema)]
-    pub(super) enum TodoError {
+    pub enum TodoError {
         /// Todo already exists conflict.
         #[schema(example = "Todo already exists")]
         Conflict(String),
@@ -175,7 +175,7 @@ mod todo {
           (status = 200, description = "List all todos successfully", body = [Todo])
       )
   )]
-    pub(super) async fn list_todos(State(store): State<Arc<Store>>) -> Json<Vec<Todo>> {
+    pub async fn list_todos(State(store): State<Arc<Store>>) -> Json<Vec<Todo>> {
         let todos = store.lock().unwrap().clone();
 
         Json(todos)
@@ -183,7 +183,7 @@ mod todo {
 
     /// Todo search query
     #[derive(Deserialize, IntoParams)]
-    pub(super) struct TodoSearchQuery {
+    pub struct TodoSearchQuery {
         /// Search by value. Search is incase sensitive.
         value: String,
         /// Search by `done` status.
@@ -203,7 +203,7 @@ mod todo {
           (status = 200, description = "List matching todos by query", body = [Todo])
       )
   )]
-    pub(super) async fn search_todos(
+    pub async fn search_todos(
         State(store): State<Arc<Store>>,
         query: Query<TodoSearchQuery>,
     ) -> Json<Vec<Todo>> {
@@ -234,7 +234,7 @@ mod todo {
           (status = 409, description = "Todo already exists", body = TodoError)
       )
   )]
-    pub(super) async fn create_todo(
+    pub async fn create_todo(
         State(store): State<Arc<Store>>,
         Json(todo): Json<Todo>,
     ) -> impl IntoResponse {
@@ -279,7 +279,7 @@ mod todo {
           ("api_key" = [])
       )
   )]
-    pub(super) async fn mark_done(
+    pub async fn mark_done(
         Path(id): Path<i32>,
         State(store): State<Arc<Store>>,
         headers: HeaderMap,
@@ -320,7 +320,7 @@ mod todo {
           ("api_key" = [])
       )
   )]
-    pub(super) async fn delete_todo(
+    pub async fn delete_todo(
         Path(id): Path<i32>,
         State(store): State<Arc<Store>>,
         headers: HeaderMap,

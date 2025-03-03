@@ -19,7 +19,7 @@ pub struct Block<Tx: Clone + Eq + Hash, BlobCertificate: Clone + Eq + Hash> {
 }
 
 impl<Tx: Clone + Eq + Hash, BlobCertificate: Clone + Eq + Hash> Block<Tx, BlobCertificate> {
-    pub fn header(&self) -> &Header {
+    pub const fn header(&self) -> &Header {
         &self.header
     }
 

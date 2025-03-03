@@ -17,7 +17,7 @@ pub enum KzgrsDaVerifierError {
 impl fmt::Display for KzgrsDaVerifierError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
-            KzgrsDaVerifierError::VerificationError => write!(f, "Verification failed"),
+            Self::VerificationError => write!(f, "Verification failed"),
         }
     }
 }

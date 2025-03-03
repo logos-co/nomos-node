@@ -43,7 +43,7 @@ pub struct Config {
 impl Config {
     pub fn update_from_args(
         mut self,
-        #[allow(unused_variables)] log_args: LogArgs,
+        log_args: LogArgs,
         network_args: NetworkArgs,
         blend_args: BlendArgs,
         http_args: HttpArgs,

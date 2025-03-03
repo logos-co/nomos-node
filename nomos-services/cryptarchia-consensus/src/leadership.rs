@@ -31,7 +31,7 @@ impl Leader {
         LeaderConfig { notes, nf_sk }: LeaderConfig,
         config: Config,
     ) -> Self {
-        Leader {
+        Self {
             notes: HashMap::from([(genesis, notes)]),
             nf_sk,
             config,

@@ -23,7 +23,7 @@ impl<const SIZE: usize, Tx: Transaction> TxSelect for FillSize<SIZE, Tx> {
     type Settings = ();
 
     fn new(_: Self::Settings) -> Self {
-        FillSize::new()
+        Self::new()
     }
 
     fn select_tx_from<'i, I: Iterator<Item = Self::Tx> + 'i>(

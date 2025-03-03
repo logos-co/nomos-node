@@ -30,7 +30,7 @@ where
     M: BlendMessage,
     M::PublicKey: Clone + PartialEq,
 {
-    pub fn new(
+    pub const fn new(
         settings: CryptographicProcessorSettings<M::PrivateKey>,
         membership: Membership<NodeId, M>,
         rng: R,

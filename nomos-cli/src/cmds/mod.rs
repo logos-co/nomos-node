@@ -14,9 +14,9 @@ pub enum Command {
 impl Command {
     pub fn run(self) -> Result<(), Box<dyn std::error::Error>> {
         match self {
-            Command::Disseminate(cmd) => cmd.run(),
-            Command::Retrieve(cmd) => cmd.run(),
-            Command::Reconstruct(cmd) => cmd.run(),
+            Self::Disseminate(cmd) => cmd.run(),
+            Self::Retrieve(cmd) => cmd.run(),
+            Self::Reconstruct(cmd) => cmd.run(),
         }?;
         Ok(())
     }

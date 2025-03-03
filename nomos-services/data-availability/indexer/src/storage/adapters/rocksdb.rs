@@ -171,17 +171,15 @@ where
                     return (idx, Vec::new());
                 };
 
-                let deserialized_blobs: Vec<_> = blobs
+                let deserialized_blobs = blobs
                     .into_iter()
-                    .filter_map(|bytes| S::deserialize::<DaLightBlob>(bytes).ok())
-                    .collect();
+                    .filter_map(|bytes| S::deserialize::<DaLightBlob>(bytes).ok());
 
                 let deserialized_shared_commitments =
                     S::deserialize::<DaBlobSharedCommitments>(shared_commitments)
                         .expect("Failed to deserialize shared commitments");
 
                 let da_blobs: Vec<_> = deserialized_blobs
-                    .into_iter()
                     .map(|blob| {
                         DaBlob::from_blob_and_shared_commitments(
                             blob,

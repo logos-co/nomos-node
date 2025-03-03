@@ -81,12 +81,12 @@ where
             output_stream,
             temporal_sender,
             cryptographic_processor,
-            _rng: Default::default(),
-            _scheduler: Default::default(),
+            _rng: PhantomData,
+            _scheduler: PhantomData,
         }
     }
 
-    fn process_incoming_message(self: &mut Pin<&mut Self>, message: Vec<u8>) {
+    fn process_incoming_message(self: &Pin<&mut Self>, message: Vec<u8>) {
         match self.cryptographic_processor.unwrap_message(&message) {
             Ok((unwrapped_message, fully_unwrapped)) => {
                 let message = if fully_unwrapped {

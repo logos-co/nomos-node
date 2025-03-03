@@ -44,7 +44,7 @@ impl KMSBackend for PreloadKMSBackend {
         let key = self
             .keys
             .get(&key_id)
-            .ok_or(Error::KeyNotRegistered(key_id.clone()))?;
+            .ok_or_else(|| Error::KeyNotRegistered(key_id.clone()))?;
         if key.key_type() != key_type {
             return Err(Error::KeyTypeMismatch(key.key_type(), key_type).into());
         }
@@ -77,7 +77,6 @@ impl KMSBackend for PreloadKMSBackend {
 
 // This enum won't be used outside of this module
 // because [`PreloadKMSBackend`] doesn't support generating new keys.
-#[allow(dead_code)]
 #[derive(Debug, PartialEq, Eq)]
 pub enum SupportedKeyTypes {
     Ed25519,
@@ -103,7 +102,7 @@ impl SecuredKey for Key {
 }
 
 impl Key {
-    fn key_type(&self) -> SupportedKeyTypes {
+    const fn key_type(&self) -> SupportedKeyTypes {
         match self {
             Self::Ed25519(_) => SupportedKeyTypes::Ed25519,
         }

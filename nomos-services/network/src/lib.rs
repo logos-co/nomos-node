@@ -96,6 +96,7 @@ where
             mut backend,
         } = self;
         let mut lifecycle_stream = lifecycle_handle.message_stream();
+        #[expect(clippy::redundant_pub_crate)]
         loop {
             tokio::select! {
                 Some(msg) = inbound_relay.recv() => {
@@ -139,7 +140,7 @@ where
 
 impl<B: NetworkBackend> Clone for NetworkConfig<B> {
     fn clone(&self) -> Self {
-        NetworkConfig {
+        Self {
             backend: self.backend.clone(),
         }
     }
@@ -147,7 +148,7 @@ impl<B: NetworkBackend> Clone for NetworkConfig<B> {
 
 impl<B: NetworkBackend> Clone for NetworkState<B> {
     fn clone(&self) -> Self {
-        NetworkState {
+        Self {
             _backend: self._backend.clone(),
         }
     }

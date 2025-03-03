@@ -47,13 +47,13 @@ impl NullifierSecret {
         NullifierCommitment(commit_bytes)
     }
 
-    pub fn from_bytes(bytes: [u8; 16]) -> Self {
+    pub const fn from_bytes(bytes: [u8; 16]) -> Self {
         Self(bytes)
     }
 }
 
 impl NullifierCommitment {
-    pub fn as_bytes(&self) -> &[u8; 32] {
+    pub const fn as_bytes(&self) -> &[u8; 32] {
         &self.0
     }
 
@@ -77,7 +77,7 @@ impl Nullifier {
         Self(nf_bytes)
     }
 
-    pub fn as_bytes(&self) -> &[u8; 32] {
+    pub const fn as_bytes(&self) -> &[u8; 32] {
         &self.0
     }
 }

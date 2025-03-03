@@ -26,7 +26,7 @@ use super::BlendBackend;
 
 /// A blend backend that uses the libp2p network stack.
 pub struct Libp2pBlendBackend {
-    #[allow(dead_code)]
+    #[expect(dead_code)]
     task: JoinHandle<()>,
     swarm_message_sender: mpsc::Sender<BlendSwarmMessage>,
     incoming_message_sender: broadcast::Sender<Vec<u8>>,
@@ -118,7 +118,7 @@ struct BlendBehaviour {
 
 impl BlendBehaviour {
     fn new(config: &Libp2pBlendBackendSettings) -> Self {
-        BlendBehaviour {
+        Self {
             blend:
                 nomos_blend_network::Behaviour::<SphinxMessage, TokioIntervalStreamProvider>::new(
                     nomos_blend_network::Config {
@@ -223,6 +223,7 @@ where
         }
     }
 
+    #[expect(clippy::cognitive_complexity)]
     fn handle_event(&mut self, event: SwarmEvent<BlendBehaviourEvent>) {
         match event {
             SwarmEvent::Behaviour(BlendBehaviourEvent::Blend(

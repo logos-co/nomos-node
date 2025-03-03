@@ -12,15 +12,15 @@ pub enum Error {
 
 impl From<Error> for io::Error {
     fn from(value: Error) -> Self {
-        io::Error::new(io::ErrorKind::InvalidData, value)
+        Self::new(io::ErrorKind::InvalidData, value)
     }
 }
 
 impl Clone for Error {
     fn clone(&self) -> Self {
         match self {
-            Error::Serialize(error) => Error::Serialize(clone_bincode_error(error)),
-            Error::Deserialize(error) => Error::Deserialize(clone_bincode_error(error)),
+            Self::Serialize(error) => Self::Serialize(clone_bincode_error(error)),
+            Self::Deserialize(error) => Self::Deserialize(clone_bincode_error(error)),
         }
     }
 }

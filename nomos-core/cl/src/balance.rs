@@ -11,7 +11,7 @@ pub type Unit = [u8; 32];
 pub struct Balance([u8; 32]);
 
 impl Balance {
-    pub fn to_bytes(&self) -> [u8; 32] {
+    pub const fn to_bytes(&self) -> [u8; 32] {
         self.0
     }
 }
@@ -24,7 +24,7 @@ pub struct UnitBalance {
 }
 
 impl UnitBalance {
-    pub fn is_zero(&self) -> bool {
+    pub const fn is_zero(&self) -> bool {
         self.pos == self.neg
     }
 }
@@ -111,7 +111,7 @@ impl BalanceWitness {
     }
 
     pub fn combine(balances: impl IntoIterator<Item = Self>, blinding: [u8; 16]) -> Self {
-        let mut combined = BalanceWitness::zero(blinding);
+        let mut combined = Self::zero(blinding);
 
         for balance in balances {
             for unit_bal in balance.balances.iter() {

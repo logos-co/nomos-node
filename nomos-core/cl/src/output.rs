@@ -18,7 +18,7 @@ pub struct OutputWitness {
 }
 
 impl OutputWitness {
-    pub fn new(note: NoteWitness, nf_pk: NullifierCommitment) -> Self {
+    pub const fn new(note: NoteWitness, nf_pk: NullifierCommitment) -> Self {
         Self { note, nf_pk }
     }
 
@@ -39,7 +39,7 @@ impl OutputWitness {
 }
 
 impl Output {
-    pub fn to_bytes(&self) -> [u8; 32] {
+    pub const fn to_bytes(&self) -> [u8; 32] {
         self.note_comm.0
     }
 }

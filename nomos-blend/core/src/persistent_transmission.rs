@@ -48,7 +48,7 @@ where
         scheduler: Scheduler,
         drop_message: S::Item,
         rng: Rng,
-    ) -> PersistentTransmissionStream<S, Rng, Scheduler> {
+    ) -> Self {
         let coin = Coin::<Rng>::new(rng, settings.drop_message_probability).unwrap();
         Self {
             coin,

@@ -40,7 +40,7 @@ pub struct DispersalRequest {
 }
 
 impl DispersalRequest {
-    pub fn new(blob: Blob, subnetwork_id: SubnetworkId) -> Self {
+    pub const fn new(blob: Blob, subnetwork_id: SubnetworkId) -> Self {
         Self {
             blob,
             subnetwork_id,

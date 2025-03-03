@@ -13,8 +13,10 @@ use crate::{
     wire,
 };
 /// Wrapper over a block building `new` method than holds intermediary state and
-/// can be passed around. It also compounds the transaction selection and blob
-/// selection heuristics to be used for transaction and blob selection.
+/// can be passed around.
+///
+/// It also compounds the transaction selection and blob selection heuristics to
+/// be used for transaction and blob selection.
 ///
 /// Example:
 /// ``` ignore
@@ -70,7 +72,6 @@ where
         self
     }
 
-    #[allow(clippy::result_large_err)]
     pub fn build(self) -> Result<Block<Tx, B>, String> {
         if let Self {
             tx_selector,

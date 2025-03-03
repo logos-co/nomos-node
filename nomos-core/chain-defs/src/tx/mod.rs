@@ -43,7 +43,7 @@ impl Transaction for Tx {
 
     fn as_bytes(&self) -> Bytes {
         match self {
-            Tx::Bundle(bundle) => bundle.as_bytes(),
+            Self::Bundle(bundle) => bundle.as_bytes(),
         }
     }
 }
