@@ -1,5 +1,8 @@
 pub mod fisheryates;
 
+#[cfg(feature = "time")]
+pub mod bounded_duration;
+
 #[cfg(feature = "serde")]
 pub mod serde {
     fn serialize_human_readable_bytes_array<const N: usize, S: serde::Serializer>(
