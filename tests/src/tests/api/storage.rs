@@ -14,7 +14,10 @@ use nomos_da_storage::rocksdb::{
 };
 use nomos_libp2p::libp2p::bytes::Bytes;
 use nomos_node::{
-    api::{backend::AxumBackendSettings, handlers::GetLightBlobReq},
+    api::{
+        backend::AxumBackendSettings,
+        handlers::{DABlobCommitmentsRequest, GetLightBlobReq},
+    },
     NomosApiService, Wire,
 };
 use nomos_storage::{
@@ -100,8 +103,8 @@ fn test_get_blob_data() {
         .await;
 
         let url = format!("http://{}/da/get-shared-commitments", http_addr);
-        let received_shared_commitments: DaBlobSharedCommitments =
-            fetch_from_api(&url, &blob_id[..]).await;
+        let req: DABlobCommitmentsRequest<DaBlob> = DABlobCommitmentsRequest { blob_id: *blob_id };
+        let received_shared_commitments: DaBlobSharedCommitments = fetch_from_api(&url, &req).await;
 
         let url = format!("http://{}/da/get-blob", http_addr);
         let req: GetLightBlobReq<DaBlob> = GetLightBlobReq {

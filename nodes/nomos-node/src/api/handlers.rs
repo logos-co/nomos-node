@@ -370,17 +370,22 @@ where
     make_request_and_return_response!(storage::block_req::<S, Tx>(&handle, id))
 }
 
+#[derive(Serialize, Deserialize)]
+pub struct DABlobCommitmentsRequest<B: Blob> {
+    pub blob_id: B::BlobId,
+}
+
 #[utoipa::path(
     get,
     path = paths::DA_GET_SHARED_COMMITMENTS,
     responses(
-        (status = 200, description = "Get blob shared commitments", body = <DaBlob as Blob>::BlobId),
+        (status = 200, description = "Request the commitments for an specific `BlobId`", body = DABlobCommitmentsRequest<DaBlob>),
         (status = 500, description = "Internal server error", body = String),
     )
 )]
 pub async fn da_get_commitments<StorageOp, DaBlob>(
     State(handle): State<OverwatchHandle>,
-    Json(blob_id): Json<<DaBlob as Blob>::BlobId>,
+    Json(req): Json<DABlobCommitmentsRequest<DaBlob>>,
 ) -> Response
 where
     DaBlob: Blob,
@@ -391,7 +396,8 @@ where
     StorageOp: StorageSerde + Send + Sync + 'static,
 {
     make_request_and_return_response!(storage::get_shared_commitments::<StorageOp, DaBlob>(
-        &handle, blob_id
+        &handle,
+        req.blob_id
     ))
 }
 
