@@ -1,11 +1,14 @@
 pub mod configs;
 
+use std::time::Duration;
+
 use configs::{
     da::{create_da_configs, DaParams},
     network::{create_network_configs, NetworkParams},
     tracing::create_tracing_configs,
     GeneralConfig,
 };
+use nomos_da_network_core::swarm::DAConnectionPolicySettings;
 use rand::{thread_rng, Rng};
 
 use crate::{
@@ -49,6 +52,15 @@ impl TopologyConfig {
                 dispersal_factor: 2,
                 subnetwork_size: 2,
                 num_subnets: 2,
+                policy_settings: DAConnectionPolicySettings {
+                    min_dispersal_peers: 1,
+                    min_replication_peers: 1,
+                    max_dispersal_failures: 0,
+                    max_sampling_failures: 0,
+                    max_replication_failures: 0,
+                    malicious_threshold: 0,
+                },
+                balancer_interval: Duration::from_secs(5),
                 ..Default::default()
             },
             network_params: Default::default(),

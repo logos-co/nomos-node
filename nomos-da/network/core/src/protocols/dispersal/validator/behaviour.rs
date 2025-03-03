@@ -161,7 +161,7 @@ impl<M: MembershipHandler<Id = PeerId, NetworkId = SubnetworkId> + 'static> Netw
     }
 
     fn on_swarm_event(&mut self, event: FromSwarm) {
-        self.stream_behaviour.on_swarm_event(event)
+        self.stream_behaviour.on_swarm_event(event);
     }
 
     fn on_connection_handler_event(
@@ -198,9 +198,9 @@ impl<M: MembershipHandler<Id = PeerId, NetworkId = SubnetworkId> + 'static> Netw
         }
         if let Poll::Ready(Some((peer_id, stream))) = incoming_streams.poll_next_unpin(cx) {
             tasks.push(Self::handle_new_stream(peer_id, stream).boxed());
+            cx.waker().wake_by_ref();
         }
-        // TODO: probably must be smarter when to wake this
-        cx.waker().wake_by_ref();
+
         Poll::Pending
     }
 }

@@ -20,46 +20,6 @@ pub mod test {
         SubnetworkId,
     };
 
-    pub fn executor_swarm(
-        addressbook: AddressBook,
-        key: Keypair,
-        membership: impl MembershipHandler<NetworkId = SubnetworkId, Id = PeerId> + 'static,
-    ) -> libp2p::Swarm<
-        DispersalExecutorBehaviour<impl MembershipHandler<NetworkId = SubnetworkId, Id = PeerId>>,
-    > {
-        let peer_id = PeerId::from_public_key(&key.public());
-        libp2p::SwarmBuilder::with_existing_identity(key)
-            .with_tokio()
-            .with_other_transport(|keypair| quic::tokio::Transport::new(quic::Config::new(keypair)))
-            .unwrap()
-            .with_behaviour(|_key| {
-                DispersalExecutorBehaviour::new(peer_id, membership, addressbook)
-            })
-            .unwrap()
-            .with_swarm_config(|cfg| {
-                cfg.with_idle_connection_timeout(std::time::Duration::from_secs(u64::MAX))
-            })
-            .build()
-    }
-
-    pub fn validator_swarm(
-        key: Keypair,
-        membership: impl MembershipHandler<NetworkId = SubnetworkId, Id = PeerId> + 'static,
-    ) -> libp2p::Swarm<
-        DispersalValidatorBehaviour<impl MembershipHandler<NetworkId = SubnetworkId, Id = PeerId>>,
-    > {
-        libp2p::SwarmBuilder::with_existing_identity(key)
-            .with_tokio()
-            .with_other_transport(|keypair| quic::tokio::Transport::new(quic::Config::new(keypair)))
-            .unwrap()
-            .with_behaviour(|_key| DispersalValidatorBehaviour::new(membership))
-            .unwrap()
-            .with_swarm_config(|cfg| {
-                cfg.with_idle_connection_timeout(std::time::Duration::from_secs(u64::MAX))
-            })
-            .build()
-    }
-
     #[tokio::test]
     async fn test_dispersal_single_node() {
         let _ = tracing_subscriber::fmt()
@@ -69,7 +29,6 @@ pub mod test {
             .try_init();
         let k1 = libp2p::identity::Keypair::generate_ed25519();
         let k2 = libp2p::identity::Keypair::generate_ed25519();
-        let validator_peer = PeerId::from_public_key(&k2.public());
         let neighbours = AllNeighbours {
             neighbours: [
                 PeerId::from_public_key(&k1.public()),
@@ -78,17 +37,28 @@ pub mod test {
             .into_iter()
             .collect(),
         };
-        let addr: Multiaddr = "/ip4/127.0.0.1/udp/5063/quic-v1".parse().unwrap();
-        let addr2 = addr.clone().with_p2p(validator_peer).unwrap();
-        let addressbook =
-            AddressBook::from_iter([(PeerId::from_public_key(&k2.public()), addr2.clone())]);
-        let mut executor = executor_swarm(addressbook, k1, neighbours.clone());
-        let mut validator = validator_swarm(k2, neighbours);
+
+        let mut executor = Swarm::new_ephemeral(|_| {
+            DispersalExecutorBehaviour::new(
+                PeerId::from_public_key(&k1.public()),
+                neighbours.clone(),
+                AddressBook::empty(),
+            )
+        });
+        let mut validator = Swarm::new_ephemeral(|_| DispersalValidatorBehaviour::new(neighbours));
+
+        validator.listen().with_memory_addr_external().await;
+        executor
+            .dial(
+                DialOpts::peer_id(*validator.local_peer_id())
+                    .addresses(validator.external_addresses().cloned().collect())
+                    .build(),
+            )
+            .unwrap();
 
         let msg_count = 10usize;
 
         let validator_task = async move {
-            validator.listen_on(addr).unwrap();
             let mut res = vec![];
             loop {
                 match validator.select_next_some().await {

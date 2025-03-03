@@ -152,7 +152,7 @@ pub(crate) async fn handle_validator_events_stream(
                         }
                     }}
             }
-            Some(da_blob) = StreamExt::next(&mut validation_events_receiver)=> {
+            Some(da_blob) = StreamExt::next(&mut validation_events_receiver) => {
                 if let Err(error) = validation_broadcast_sender.send(da_blob) {
                     error!("Error in internal broadcast of validation for blob: {:?}", error.0);
                 }

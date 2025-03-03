@@ -133,25 +133,25 @@ where
                 panic!("Error listening on DA network with address {address}: {e}")
             });
         // Dial peers in the same subnetworks (Node might participate in multiple).
-        let local_peer_id = *executor_swarm.local_peer_id();
+        // let local_peer_id = *executor_swarm.local_peer_id();
 
-        let validator_subnetworks_connected_peers = dial_validator_subnetwork_peers(
-            &config.validator_settings.membership,
-            &config.validator_settings.addresses,
-            executor_swarm.protocol_swarm_mut(),
-            local_peer_id,
-        );
+        //let validator_subnetworks_connected_peers = dial_validator_subnetwork_peers(
+        //    &config.validator_settings.membership,
+        //    &config.validator_settings.addresses,
+        //    executor_swarm.protocol_swarm_mut(),
+        //    local_peer_id,
+        //);
 
-        let dispersal_peers = dial_dispersal_peers(
-            &mut executor_swarm,
-            &config,
-            &validator_subnetworks_connected_peers,
-        );
+        //let dispersal_peers = dial_dispersal_peers(
+        //    &mut executor_swarm,
+        //    &config,
+        //    &validator_subnetworks_connected_peers,
+        //);
 
         let sampling_request_channel = executor_swarm.sample_request_channel();
 
         let dispersal_blobs_sender = executor_swarm.dispersal_blobs_channel();
-        let executor_open_stream_sender = executor_swarm.dispersal_open_stream_sender();
+        //let executor_open_stream_sender = executor_swarm.dispersal_open_stream_sender();
 
         let (task_abort_handle, abort_registration) = AbortHandle::new_pair();
         let task = (
@@ -163,9 +163,9 @@ where
 
         std::thread::sleep(Duration::from_secs(1));
         // open streams to dispersal peers
-        for peer_id in dispersal_peers.iter() {
-            executor_open_stream_sender.send(*peer_id).unwrap();
-        }
+        //for peer_id in dispersal_peers.iter() {
+        //    executor_open_stream_sender.send(*peer_id).unwrap();
+        //}
 
         let (sampling_broadcast_sender, sampling_broadcast_receiver) =
             broadcast::channel(BROADCAST_CHANNEL_SIZE);
