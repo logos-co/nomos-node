@@ -265,6 +265,8 @@ pub struct SamplingBehaviour<Membership: MembershipHandler> {
     membership: Membership,
     /// Pending blobs that need to be dispersed by PeerId
     to_sample: HashMap<PeerId, VecDeque<(Membership::NetworkId, BlobId)>>,
+    /// Sample streams that has no tasks and should be closed.
+    to_close: VecDeque<SampleStream>,
     /// Hook of pending samples channel
     samples_request_sender: UnboundedSender<(Membership::NetworkId, BlobId)>,
     /// Pending samples stream
@@ -288,6 +290,7 @@ where
         let incoming_tasks = FuturesUnordered::new();
 
         let to_sample = HashMap::new();
+        let to_close = VecDeque::new();
 
         let (samples_request_sender, receiver) = mpsc::unbounded_channel();
         let samples_request_stream = UnboundedReceiverStream::new(receiver).boxed();
@@ -301,6 +304,7 @@ where
             incoming_tasks,
             membership,
             to_sample,
+            to_close,
             samples_request_sender,
             samples_request_stream,
         }
@@ -367,7 +371,9 @@ where
     fn handle_outgoing_stream(
         outgoing_tasks: &FuturesUnordered<OutgoingStreamHandlerFuture>,
         to_sample: &mut HashMap<PeerId, VecDeque<(SubnetworkId, BlobId)>>,
-        mut stream: SampleStream,
+        to_close: &mut VecDeque<SampleStream>,
+        stream: SampleStream,
+        cx: &mut Context<'_>,
     ) {
         let peer = stream.peer_id;
 
@@ -376,13 +382,10 @@ where
             let sample_request = sampling::SampleRequest::new(blob_id, subnetwork_id);
             outgoing_tasks
                 .push(Self::stream_sample(stream, sample_request, subnetwork_id, blob_id).boxed());
-        // if not pop stream from connected ones
+            cx.waker().wake_by_ref();
         } else {
-            tokio::task::spawn(async move {
-                if let Err(error) = stream.stream.close().await {
-                    error!("Error closing sampling stream: {error}");
-                };
-            });
+            // if not pop stream from connected ones
+            to_close.push_back(stream);
         }
     }
 
@@ -589,6 +592,7 @@ impl<M: MembershipHandler<Id = PeerId, NetworkId = SubnetworkId> + 'static> Netw
             outgoing_tasks,
             incoming_tasks,
             to_sample,
+            to_close,
             samples_request_stream,
             incoming_streams,
             membership,
@@ -614,8 +618,7 @@ impl<M: MembershipHandler<Id = PeerId, NetworkId = SubnetworkId> + 'static> Netw
                 Ok((blob_id, subnetwork_id, sample_response, stream)) => {
                     let peer_id = stream.peer_id;
                     // handle the free stream then return the success
-                    Self::handle_outgoing_stream(outgoing_tasks, to_sample, stream);
-                    cx.waker().wake_by_ref();
+                    Self::handle_outgoing_stream(outgoing_tasks, to_sample, to_close, stream, cx);
                     // return an error if there was an error on the other side of the wire
                     if let Some(event) = Self::handle_sample_response(
                         blob_id,
@@ -623,18 +626,9 @@ impl<M: MembershipHandler<Id = PeerId, NetworkId = SubnetworkId> + 'static> Netw
                         sample_response,
                         peer_id,
                     ) {
-                        tracing::info!(">>>>> sampling return event: {event:?}");
                         return event;
                     }
                 }
-                // Ignore `UnexpectedEof` errors and continue polling, stream is closeed by the
-                // sender after the message is sent.
-                Err(SamplingError::Io { error, .. })
-                    if error.kind() == std::io::ErrorKind::UnexpectedEof =>
-                {
-                    return Poll::Pending;
-                }
-                // Something went up on our side of the wire, bubble it up
                 Err(error) => {
                     return Poll::Ready(ToSwarm::GenerateEvent(SamplingEvent::SamplingError {
                         error,
@@ -647,6 +641,7 @@ impl<M: MembershipHandler<Id = PeerId, NetworkId = SubnetworkId> + 'static> Netw
             let sample_stream = SampleStream { stream, peer_id };
             let (request_receiver, response_sender) =
                 Self::schedule_incoming_stream_task(incoming_tasks, sample_stream);
+            // Sheduled a task, lets poll again.
             cx.waker().wake_by_ref();
             return Poll::Ready(ToSwarm::GenerateEvent(SamplingEvent::IncomingSample {
                 request_receiver,
@@ -659,14 +654,15 @@ impl<M: MembershipHandler<Id = PeerId, NetworkId = SubnetworkId> + 'static> Netw
                 Ok(sample_stream) => {
                     let (request_receiver, response_sender) =
                         Self::schedule_incoming_stream_task(incoming_tasks, sample_stream);
+                    // Sheduled a task, lets poll again.
                     cx.waker().wake_by_ref();
                     return Poll::Ready(ToSwarm::GenerateEvent(SamplingEvent::IncomingSample {
                         request_receiver,
                         response_sender,
                     }));
                 }
-                // Ignore `UnexpectedEof` errors and continue polling, stream is closeed by the
-                // sender after the message is sent.
+                //  Ignore `UnexpectedEof` errors and continue polling, stream is closeed by the
+                //  sender after the message is sent.
                 Err(SamplingError::Io { error, .. })
                     if error.kind() == std::io::ErrorKind::UnexpectedEof =>
                 {
@@ -690,6 +686,12 @@ impl<M: MembershipHandler<Id = PeerId, NetworkId = SubnetworkId> + 'static> Netw
                     .addresses(vec![address.clone()])
                     .build();
                 return Poll::Ready(ToSwarm::Dial { opts });
+            }
+        }
+        // discard stream, if still pending pushback to close later
+        if let Some(mut stream) = to_close.pop_front() {
+            if stream.stream.close().poll_unpin(cx).is_pending() {
+                to_close.push_back(stream);
             }
         }
 
