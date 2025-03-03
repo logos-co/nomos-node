@@ -81,6 +81,12 @@ impl EncodedData {
     }
 }
 
+impl<'A> EncodedData {
+    fn iter(&self) -> EncodedDataIterator<'a> {
+        <&Self as IntoIterator>::into_iter(self)
+    }
+}
+
 impl<'a> IntoIterator for &'a EncodedData {
     type Item = DaBlob;
     type IntoIter = EncodedDataIterator<'a>;
@@ -218,8 +224,8 @@ impl DaEncoder {
         global_parameters: &GlobalParameters,
         polynomials: &[Polynomial],
         toeplitz1cache: Option<&Toeplitz1Cache>,
-    ) -> Result<Vec<Vec<Proof>>, KzgRsError> {
-        Ok({
+    ) -> Vec<Vec<Proof>> {
+        {
             #[cfg(not(feature = "parallel"))]
             {
                 polynomials.iter()
@@ -230,7 +236,7 @@ impl DaEncoder {
             }
         }
         .map(|poly| fk20_batch_generate_elements_proofs(poly, global_parameters, toeplitz1cache))
-        .collect())
+        .collect()
     }
 
     #[expect(clippy::type_complexity)]

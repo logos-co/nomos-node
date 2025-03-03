@@ -125,13 +125,13 @@ impl SwarmHandler {
         }
     }
 
-    async fn handle_command(&mut self, command: Command) {
+    fn handle_command(&mut self, command: Command) {
         match command {
             Command::Connect(dial) => {
                 self.connect(dial);
             }
             Command::Broadcast { topic, message } => {
-                self.broadcast_and_retry(topic, message, 0).await;
+                self.broadcast_and_retry(topic, message, 0);
             }
             Command::Subscribe(topic) => {
                 tracing::debug!("subscribing to topic: {topic}");
@@ -158,7 +158,7 @@ impl SwarmHandler {
                 message,
                 retry_count,
             } => {
-                self.broadcast_and_retry(topic, message, retry_count).await;
+                self.broadcast_and_retry(topic, message, retry_count);
             }
         }
     }

@@ -314,6 +314,9 @@ mod tests {
 
     use super::*;
 
+    static FOO_BROADCAST_MESSAGES: &[&str] = &["foo1", "foo2"];
+    static BAR_BROADCAST_MESSAGES: &[&str] = &["bar1"];
+
     #[tokio::test]
     #[expect(clippy::too_many_lines)]
     async fn test_mock_network() {
@@ -355,9 +358,6 @@ mod tests {
         tokio::spawn(async move {
             task.run_producer_handler().await.unwrap();
         });
-
-        static FOO_BROADCAST_MESSAGES: &[&str] = &["foo1", "foo2"];
-        static BAR_BROADCAST_MESSAGES: &[&str] = &["bar1"];
 
         // broadcast
         for val in FOO_BROADCAST_MESSAGES {
