@@ -53,7 +53,7 @@ pub fn create_blend_configs(ids: &[[u8; 32]]) -> Vec<GeneralBlendConfig> {
 
     let nodes = blend_nodes(&configs);
     for config in &mut configs {
-        config.membership = nodes.clone();
+        config.membership.clone_from(&nodes);
     }
 
     configs

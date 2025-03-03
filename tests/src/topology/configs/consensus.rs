@@ -42,7 +42,7 @@ pub struct GeneralConsensusConfig {
 #[must_use]
 pub fn create_consensus_configs(
     ids: &[[u8; 32]],
-    consensus_params: ConsensusParams,
+    consensus_params: &ConsensusParams,
 ) -> Vec<GeneralConsensusConfig> {
     let notes = (0..ids.len())
         .map(|_| NoteWitness::basic(1, NMO_UNIT, &mut thread_rng()))

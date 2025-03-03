@@ -68,7 +68,7 @@ impl Host {
 pub fn create_node_configs(
     consensus_params: ConsensusParams,
     da_params: DaParams,
-    tracing_settings: TracingSettings,
+    tracing_settings: &TracingSettings,
     hosts: Vec<Host>,
 ) -> HashMap<Host, GeneralConfig> {
     let mut ids = vec![[0; 32]; consensus_params.n_participants];
@@ -78,7 +78,7 @@ pub fn create_node_configs(
 
     let consensus_configs = create_consensus_configs(&ids, consensus_params);
     let da_configs = create_da_configs(&ids, da_params);
-    let network_configs = create_network_configs(&ids, Default::default());
+    let network_configs = create_network_configs(&ids, NetworkParams::default());
     let blend_configs = create_blend_configs(&ids);
     let api_configs = ids
         .iter()
@@ -106,7 +106,7 @@ pub fn create_node_configs(
 
         // DA Libp2p network config.
         let mut da_config = da_configs[i].clone();
-        da_config.addresses = new_peer_addresses.clone();
+        da_config.addresses.clone_from(&new_peer_addresses);
         da_config.listening_address = Multiaddr::from_str(&format!(
             "/ip4/0.0.0.0/udp/{}/quic-v1",
             host.da_network_port,
@@ -117,13 +117,15 @@ pub fn create_node_configs(
         let mut network_config = network_configs[i].clone();
         network_config.swarm_config.host = Ipv4Addr::from_str("0.0.0.0").unwrap();
         network_config.swarm_config.port = host.network_port;
-        network_config.initial_peers = host_network_init_peers.clone();
+        network_config
+            .initial_peers
+            .clone_from(&host_network_init_peers);
 
         // Blend config.
         let mut blend_config = blend_configs[i].clone();
         blend_config.backend.listening_address =
             Multiaddr::from_str(&format!("/ip4/0.0.0.0/udp/{}/quic-v1", host.blend_port)).unwrap();
-        blend_config.membership = host_blend_membership.clone();
+        blend_config.membership.clone_from(&host_blend_membership);
 
         // Tracing config.
         let tracing_config =
@@ -149,7 +151,7 @@ pub fn create_node_configs(
     configured_hosts
 }
 
-fn update_network_init_peers(hosts: Vec<Host>) -> Vec<Multiaddr> {
+fn update_network_init_peers(hosts: &[Host]) -> Vec<Multiaddr> {
     hosts
         .iter()
         .map(|h| nomos_libp2p::Swarm::multiaddr(h.ip, h.network_port))
@@ -209,14 +211,14 @@ fn update_tracing_identifier(
         tracing_settings: TracingSettings {
             logger: match settings.logger {
                 LoggerLayer::Loki(mut config) => {
-                    config.host_identifier = identifier.clone();
+                    config.host_identifier.clone_from(&identifier);
                     LoggerLayer::Loki(config)
                 }
                 other => other,
             },
             tracing: match settings.tracing {
                 TracingLayer::Otlp(mut config) => {
-                    config.service_name = identifier.clone();
+                    config.service_name.clone_from(&identifier);
                     TracingLayer::Otlp(config)
                 }
                 other => other,
@@ -238,6 +240,7 @@ fn update_tracing_identifier(
 mod cfgsync_tests {
     use std::{net::Ipv4Addr, num::NonZero, str::FromStr, time::Duration};
 
+    use nomos_da_network_core::swarm::{DAConnectionMonitorSettings, DAConnectionPolicySettings};
     use nomos_libp2p::{Multiaddr, Protocol};
     use nomos_tracing_service::{
         FilterLayer, LoggerLayer, MetricsLayer, TracingLayer, TracingSettings,
@@ -274,8 +277,8 @@ mod cfgsync_tests {
                 old_blobs_check_interval: Duration::from_secs(5),
                 blobs_validity_duration: Duration::from_secs(u64::MAX),
                 global_params_path: String::new(),
-                policy_settings: Default::default(),
-                monitor_settings: Default::default(),
+                policy_settings: DAConnectionPolicySettings::default(),
+                monitor_settings: DAConnectionMonitorSettings::default(),
                 balancer_interval: Duration::ZERO,
                 redial_cooldown: Duration::ZERO,
             },

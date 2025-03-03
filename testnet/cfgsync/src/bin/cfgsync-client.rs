@@ -11,7 +11,7 @@ struct ClientIp {
     identifier: String,
 }
 
-fn parse_ip(ip_str: String) -> Ipv4Addr {
+fn parse_ip(ip_str: &str) -> Ipv4Addr {
     ip_str.parse().unwrap_or_else(|_| {
         eprintln!("Invalid IP format, defaulting to 127.0.0.1");
         Ipv4Addr::new(127, 0, 0, 1)

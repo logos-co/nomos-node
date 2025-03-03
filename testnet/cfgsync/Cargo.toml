@@ -10,6 +10,7 @@ clap                  = { version = "4", features = ["derive"] }
 nomos-blend           = { workspace = true }
 nomos-blend-message   = { workspace = true }
 nomos-blend-service   = { workspace = true }
+nomos-da-network-core = { workspace = true }
 nomos-executor        = { workspace = true }
 nomos-libp2p          = { workspace = true }
 nomos-node            = { workspace = true }

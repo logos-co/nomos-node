@@ -84,7 +84,7 @@ pub struct GeneralDaConfig {
 }
 
 #[must_use]
-pub fn create_da_configs(ids: &[[u8; 32]], da_params: DaParams) -> Vec<GeneralDaConfig> {
+pub fn create_da_configs(ids: &[[u8; 32]], da_params: &DaParams) -> Vec<GeneralDaConfig> {
     let mut node_keys = vec![];
     let mut peer_ids = vec![];
     let mut listening_addresses = vec![];

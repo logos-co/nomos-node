@@ -36,8 +36,8 @@ impl TopologyConfig {
             n_validators: 2,
             n_executors: 0,
             consensus_params: ConsensusParams::default_for_participants(2),
-            da_params: Default::default(),
-            network_params: Default::default(),
+            da_params: DaParams::default(),
+            network_params: NetworkParams::default(),
         }
     }
 
@@ -53,7 +53,7 @@ impl TopologyConfig {
                 num_subnets: 2,
                 ..Default::default()
             },
-            network_params: Default::default(),
+            network_params: NetworkParams::default(),
         }
     }
 }

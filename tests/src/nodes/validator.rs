@@ -94,15 +94,20 @@ impl Validator {
         }
 
         config.storage.db_path = dir.path().join("db");
-        config
-            .da_sampling
-            .storage_adapter_settings
-            .blob_storage_directory = dir.path().to_owned();
-        config
-            .da_verifier
-            .storage_adapter_settings
-            .blob_storage_directory = dir.path().to_owned();
-        config.da_indexer.storage.blob_storage_directory = dir.path().to_owned();
+        dir.path().clone_into(
+            &mut config
+                .da_sampling
+                .storage_adapter_settings
+                .blob_storage_directory,
+        );
+        dir.path().clone_into(
+            &mut config
+                .da_verifier
+                .storage_adapter_settings
+                .blob_storage_directory,
+        );
+        dir.path()
+            .clone_into(&mut config.da_indexer.storage.blob_storage_directory);
 
         serde_yaml::to_writer(&mut file, &config).unwrap();
         let child = Command::new(std::env::current_dir().unwrap().join(BIN_PATH))
@@ -261,7 +266,7 @@ pub fn create_validator_config(config: GeneralConfig) -> Config {
         },
         blend: nomos_blend_service::BlendConfig {
             backend: config.blend_config.backend,
-            persistent_transmission: Default::default(),
+            persistent_transmission: PersistentTransmissionSettings::default(),
             message_blend: MessageBlendSettings {
                 cryptographic_processor: CryptographicProcessorSettings {
                     private_key: config.blend_config.private_key.to_bytes(),
