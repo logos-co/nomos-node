@@ -125,6 +125,7 @@ impl SwarmHandler {
         }
     }
 
+    #[expect(clippy::cognitive_complexity)]
     fn handle_command(&mut self, command: Command) {
         match command {
             Command::Connect(dial) => {
@@ -203,7 +204,7 @@ impl SwarmHandler {
                 return;
             }
 
-            let wait = Self::exp_backoff(dial.retry_count);
+            let wait = Self::exp_backoff(dial.retry_count.try_into().unwrap());
             tracing::debug!("Retry dialing in {wait:?}: {dial:?}");
 
             let commands_tx = self.commands_tx.clone();
@@ -232,7 +233,7 @@ impl SwarmHandler {
                 }
             }
             Err(gossipsub::PublishError::InsufficientPeers) if retry_count < MAX_RETRY => {
-                let wait = Self::exp_backoff(retry_count);
+                let wait = Self::exp_backoff(retry_count.try_into().unwrap());
                 tracing::error!("failed to broadcast message to topic due to insufficient peers, trying again in {wait:?}");
 
                 let commands_tx = self.commands_tx.clone();
@@ -254,7 +255,7 @@ impl SwarmHandler {
         }
     }
 
-    const fn exp_backoff(retry: usize) -> Duration {
-        std::time::Duration::from_secs(BACKOFF.pow(retry as u32))
+    const fn exp_backoff(retry: u32) -> Duration {
+        std::time::Duration::from_secs(BACKOFF.pow(retry))
     }
 }

@@ -47,7 +47,7 @@ pub fn serializer_into_buffer(buffer: &mut [u8]) -> Serializer<&'_ mut [u8]> {
 /// Serialize an object directly into a vec
 pub fn serialize<T: Serialize>(item: &T) -> Result<Vec<u8>> {
     let size = OPTIONS.serialized_size(item).map_err(Error::Serialize)?;
-    let mut buf = Vec::with_capacity(size as usize);
+    let mut buf = Vec::with_capacity(size.try_into().unwrap());
     serializer(&mut buf).serialize_into(item)?;
     Ok(buf)
 }

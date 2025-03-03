@@ -183,7 +183,7 @@ impl Validator {
             .await
             .unwrap();
         MempoolMetrics {
-            pending_items: res["pending_items"].as_u64().unwrap() as usize,
+            pending_items: usize::try_from(res["pending_items"].as_u64().unwrap()).unwrap(),
             last_item_timestamp: res["last_item_timestamp"].as_u64().unwrap(),
         }
     }

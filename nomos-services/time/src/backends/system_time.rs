@@ -72,7 +72,7 @@ mod test {
         let backend = SystemTimeBackend::init(settings);
         let stream = backend.tick_stream();
         let result: Vec<_> = stream
-            .take(SAMPLE_SIZE as usize)
+            .take(SAMPLE_SIZE.try_into().unwrap())
             .map(|slot_tick| slot_tick.slot)
             .collect()
             .await;

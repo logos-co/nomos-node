@@ -27,13 +27,14 @@ impl LeaderPublic {
         let total_stake_sq_big = total_stake_big.checked_mul(&total_stake_big).unwrap();
         let double_total_stake_sq_big = total_stake_sq_big.checked_mul(&U256::from_u64(2)).unwrap();
 
-        let precision_u64 = u64::MAX;
+        let precision_f64 = f64::MAX;
         let precision_big = U256::from_u64(u64::MAX);
-        let precision_f64 = precision_u64 as f64;
         let order: U256 = U256::MAX;
 
         let order_div_precision = order.checked_div(&precision_big).unwrap();
         let order_div_precision_sq = order_div_precision.checked_div(&precision_big).unwrap();
+        #[expect(clippy::cast_possible_truncation)]
+        #[expect(clippy::cast_sign_loss)]
         let neg_f_ln: U256 =
             U256::from_u64(((-f64::ln(1f64 - active_slot_coefficient)) * precision_f64) as u64);
         let neg_f_ln_sq = neg_f_ln.checked_mul(&neg_f_ln).unwrap();

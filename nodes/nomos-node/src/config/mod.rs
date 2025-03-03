@@ -67,7 +67,7 @@ pub struct NetworkArgs {
     host: Option<IpAddr>,
 
     #[clap(long = "net-port", env = "NET_PORT")]
-    port: Option<usize>,
+    port: Option<u16>,
 
     // TODO: Use either the raw bytes or the key type directly to delegate error handling to clap
     #[clap(long = "net-node-key", env = "NET_NODE_KEY")]
@@ -232,7 +232,7 @@ pub fn update_network(
     }
 
     if let Some(port) = port {
-        network.backend.inner.port = port as u16;
+        network.backend.inner.port = port;
     }
 
     if let Some(node_key) = node_key {

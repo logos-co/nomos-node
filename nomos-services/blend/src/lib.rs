@@ -272,10 +272,13 @@ impl CoverTrafficExtSettings {
         }
     }
 
-    const fn slots_per_epoch(&self) -> usize {
-        (self.epoch_duration.as_secs() as usize)
-            .checked_div(self.slot_duration.as_secs() as usize)
+    fn slots_per_epoch(&self) -> usize {
+        self.epoch_duration
+            .as_secs()
+            .checked_div(self.slot_duration.as_secs())
             .expect("Invalid epoch & slot duration")
+            .try_into()
+            .unwrap()
     }
 
     fn epoch_stream(

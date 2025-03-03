@@ -60,7 +60,7 @@ pub fn create_consensus_configs(
     // no commitments for now, proofs are not checked anyway
     let genesis_state = LedgerState::from_commitments(
         notes.iter().zip(&sks).map(|(n, sk)| n.commit(sk.commit())),
-        (ids.len() as u32).into(),
+        ids.len().try_into().unwrap(),
     );
     let ledger_config = nomos_ledger::Config {
         epoch_config: EpochConfig {

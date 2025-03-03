@@ -36,7 +36,7 @@ async fn happy_test(topology: &Topology) {
         tokio::select! {
             () = timeout => panic!("timed out waiting for nodes to produce {} blocks", n_blocks),
             () = async { while stream::iter(nodes)
-                .any(|n| async move { (n.consensus_info().await.height as u32) < n_blocks })
+                .any(|n| async move { u32::try_from(n.consensus_info().await.height).unwrap() < n_blocks })
                 .await
             {
                 println!(
