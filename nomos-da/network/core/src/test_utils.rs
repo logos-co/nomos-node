@@ -31,6 +31,6 @@ impl MembershipHandler for AllNeighbours {
     }
 
     fn last_subnetwork_id(&self) -> Self::NetworkId {
-        unimplemented!()
+        0
     }
 }

@@ -547,11 +547,11 @@ impl<M: MembershipHandler<Id = PeerId, NetworkId = SubnetworkId> + 'static> Netw
                     subnetwork_id,
                     blob,
                 );
-                cx.waker().wake_by_ref();
             } else {
                 let entry = disconnected_pending_blobs.entry(subnetwork_id).or_default();
                 entry.push_back(blob);
             }
+            cx.waker().wake_by_ref();
         }
         // poll pending streams
         if let Poll::Ready(Some(res)) = pending_out_streams.poll_next_unpin(cx) {
