@@ -29,7 +29,6 @@ members = [
   "nomos-services/data-availability/indexer",
   "nomos-services/data-availability/network",
   "nomos-services/data-availability/sampling",
-  "nomos-services/data-availability/tests",
   "nomos-services/data-availability/verifier",
   "nomos-services/key-management-system",
   "nomos-services/mempool",
@@ -72,7 +71,6 @@ nomos-da-network-core    = { path = "./nomos-da/network/core" }
 nomos-da-network-service = { path = "./nomos-services/data-availability/network" }
 nomos-da-sampling        = { path = "./nomos-services/data-availability/sampling" }
 nomos-da-storage         = { path = "./nomos-da/storage" }
-nomos-da-tests           = { path = "./nomos-services/data-availability/tests" }
 nomos-da-verifier        = { path = "./nomos-services/data-availability/verifier" }
 nomos-executor           = { path = "./nodes/nomos-executor", default-features = false }
 nomos-ledger             = { path = "./ledger/nomos-ledger" }
