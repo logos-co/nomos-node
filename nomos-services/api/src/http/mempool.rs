@@ -4,6 +4,7 @@ use nomos_core::{da::blob::info::DispersedBlobInfo, header::HeaderId};
 use nomos_da_sampling::{
     backend::DaSamplingServiceBackend, network::NetworkAdapter as DaSamplingNetworkAdapter,
 };
+use nomos_da_verifier::backend::VerifierBackend;
 use nomos_mempool::{
     backend::mockpool::MockPool, network::NetworkAdapter, DaMempoolService, MempoolMsg,
     TxMempoolService,
@@ -56,6 +57,9 @@ pub async fn add_blob_info<
     SamplingAdapter,
     SamplingRng,
     SamplingStorage,
+    DaVerifierBackend,
+    DaVerifierNetwork,
+    DaVerifierStorage,
 >(
     handle: &overwatch_rs::overwatch::handle::OverwatchHandle,
     item: A::Payload,
@@ -75,6 +79,11 @@ where
     SamplingAdapter: DaSamplingNetworkAdapter + Send,
     SamplingRng: SeedableRng + RngCore + Send,
     SamplingStorage: nomos_da_sampling::storage::DaStorageAdapter,
+    DaVerifierNetwork: nomos_da_verifier::network::NetworkAdapter,
+    DaVerifierBackend: VerifierBackend + Send + 'static,
+    DaVerifierBackend::Settings: Clone,
+    DaVerifierStorage: nomos_da_verifier::storage::DaStorageAdapter,
+    DaVerifierNetwork::Settings: Clone,
 {
     let relay = handle
         .relay::<DaMempoolService<
@@ -84,6 +93,9 @@ where
             SamplingAdapter,
             SamplingRng,
             SamplingStorage,
+            DaVerifierBackend,
+            DaVerifierNetwork,
+            DaVerifierStorage,
         >>()
         .connect()
         .await?;

@@ -109,6 +109,9 @@ pub async fn cryptarchia_info<
     SamplingNetworkAdapter,
     SamplingRng,
     SamplingStorage,
+    DaVerifierBackend,
+    DaVerifierNetwork,
+    DaVerifierStorage,
     TimeBackend,
     const SIZE: usize,
 >(
@@ -135,6 +138,11 @@ where
     SamplingBackend::BlobId: Debug + 'static,
     SamplingNetworkAdapter: nomos_da_sampling::network::NetworkAdapter,
     SamplingStorage: nomos_da_sampling::storage::DaStorageAdapter,
+    DaVerifierStorage: nomos_da_verifier::storage::DaStorageAdapter,
+    DaVerifierBackend: nomos_da_verifier::backend::VerifierBackend + Send + 'static,
+    DaVerifierBackend::Settings: Clone,
+    DaVerifierNetwork: nomos_da_verifier::network::NetworkAdapter,
+    DaVerifierNetwork::Settings: Clone,
     TimeBackend: nomos_time::backends::TimeBackend,
     TimeBackend::Settings: Clone + Send + Sync,
 {
@@ -145,6 +153,9 @@ where
         SamplingNetworkAdapter,
         SamplingRng,
         SamplingStorage,
+        DaVerifierBackend,
+        DaVerifierNetwork,
+        DaVerifierStorage,
         TimeBackend,
         SIZE,
     >(&handle))
@@ -165,6 +176,9 @@ pub async fn cryptarchia_headers<
     SamplingNetworkAdapter,
     SamplingRng,
     SamplingStorage,
+    DaVerifierBackend,
+    DaVerifierNetwork,
+    DaVerifierStorage,
     TimeBackend,
     const SIZE: usize,
 >(
@@ -192,6 +206,11 @@ where
     SamplingBackend::BlobId: Debug + 'static,
     SamplingNetworkAdapter: nomos_da_sampling::network::NetworkAdapter,
     SamplingStorage: nomos_da_sampling::storage::DaStorageAdapter,
+    DaVerifierStorage: nomos_da_verifier::storage::DaStorageAdapter,
+    DaVerifierBackend: nomos_da_verifier::backend::VerifierBackend + Send + 'static,
+    DaVerifierBackend::Settings: Clone,
+    DaVerifierNetwork: nomos_da_verifier::network::NetworkAdapter,
+    DaVerifierNetwork::Settings: Clone,
     TimeBackend: nomos_time::backends::TimeBackend,
     TimeBackend::Settings: Clone + Send + Sync,
 {
@@ -203,6 +222,9 @@ where
         SamplingNetworkAdapter,
         SamplingRng,
         SamplingStorage,
+        DaVerifierBackend,
+        DaVerifierNetwork,
+        DaVerifierStorage,
         TimeBackend,
         SIZE,
     >(&store, from, to))
@@ -268,6 +290,9 @@ pub async fn get_range<
     SamplingNetworkAdapter,
     SamplingRng,
     SamplingStorage,
+    DaVerifierBackend,
+    DaVerifierNetwork,
+    DaVerifierStorage,
     TimeBackend,
     const SIZE: usize,
 >(
@@ -321,6 +346,11 @@ where
     SamplingBackend::BlobId: Debug + 'static,
     SamplingNetworkAdapter: nomos_da_sampling::network::NetworkAdapter,
     SamplingStorage: nomos_da_sampling::storage::DaStorageAdapter,
+    DaVerifierStorage: nomos_da_verifier::storage::DaStorageAdapter,
+    DaVerifierBackend: nomos_da_verifier::backend::VerifierBackend + Send + 'static,
+    DaVerifierBackend::Settings: Clone,
+    DaVerifierNetwork: nomos_da_verifier::network::NetworkAdapter,
+    DaVerifierNetwork::Settings: Clone,
     TimeBackend: nomos_time::backends::TimeBackend,
     TimeBackend::Settings: Clone + Send + Sync,
 {
@@ -333,6 +363,9 @@ where
         SamplingNetworkAdapter,
         SamplingRng,
         SamplingStorage,
+        DaVerifierBackend,
+        DaVerifierNetwork,
+        DaVerifierStorage,
         TimeBackend,
         SIZE,
     >(&handle, app_id, range))
@@ -462,7 +495,16 @@ where
         (status = 500, description = "Internal server error", body = String),
     )
 )]
-pub async fn add_blob_info<B, SamplingBackend, SamplingAdapter, SamplingRng, SamplingStorage>(
+pub async fn add_blob_info<
+    B,
+    SamplingBackend,
+    SamplingAdapter,
+    SamplingRng,
+    SamplingStorage,
+    DaVerifierBackend,
+    DaVerifierNetwork,
+    DaVerifierStorage,
+>(
     State(handle): State<OverwatchHandle>,
     Json(blob_info): Json<B>,
 ) -> Response
@@ -486,6 +528,11 @@ where
     SamplingAdapter: nomos_da_sampling::network::NetworkAdapter + Send + 'static,
     SamplingRng: SeedableRng + RngCore + Send + 'static,
     SamplingStorage: nomos_da_sampling::storage::DaStorageAdapter,
+    DaVerifierStorage: nomos_da_verifier::storage::DaStorageAdapter,
+    DaVerifierBackend: nomos_da_verifier::backend::VerifierBackend + Send + 'static,
+    DaVerifierBackend::Settings: Clone,
+    DaVerifierNetwork: nomos_da_verifier::network::NetworkAdapter,
+    DaVerifierNetwork::Settings: Clone,
 {
     make_request_and_return_response!(mempool::add_blob_info::<
         NetworkBackend,
@@ -496,5 +543,8 @@ where
         SamplingAdapter,
         SamplingRng,
         SamplingStorage,
+        DaVerifierBackend,
+        DaVerifierNetwork,
+        DaVerifierStorage,
     >(&handle, blob_info, DispersedBlobInfo::blob_id))
 }
