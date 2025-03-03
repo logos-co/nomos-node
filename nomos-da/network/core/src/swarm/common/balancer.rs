@@ -258,9 +258,8 @@ mod tests {
         let poll_result = balancer.poll(&mut cx);
 
         assert!(matches!(poll_result, Poll::Ready(ref peers) if peers.len() == 1));
-        let peers = match poll_result {
-            Poll::Ready(peers) => peers,
-            _ => panic!("Expected Poll::Ready with peers"),
+        let Poll::Ready(peers) = poll_result else {
+            panic!("Expected Poll::Ready with peers")
         };
 
         assert_eq!(peers.len(), 1);
@@ -290,9 +289,8 @@ mod tests {
         let poll_result = balancer.poll(&mut cx);
 
         assert!(matches!(poll_result, Poll::Ready(ref peers) if peers.len() == 2));
-        let peers = match poll_result {
-            Poll::Ready(peers) => peers,
-            _ => panic!("Expected Poll::Ready with peers"),
+        let Poll::Ready(peers) = poll_result else {
+            panic!("Expected Poll::Ready with peers")
         };
 
         assert_eq!(peers.len(), 2);

@@ -5,6 +5,7 @@ mod test {
     use std::time::Duration;
 
     use futures::StreamExt;
+    use kzgrs::{Commitment, Proof};
     use kzgrs_backend::common::{blob::DaBlob, Column};
     use libp2p::{
         identity::Keypair, quic, swarm::SwarmEvent, Multiaddr, PeerId, Swarm, SwarmBuilder,
@@ -45,7 +46,10 @@ mod test {
             .build()
     }
     #[tokio::test]
+    #[expect(clippy::too_many_lines)]
     async fn test_sampling_two_peers() {
+        const MSG_COUNT: usize = 10;
+
         let _ = tracing_subscriber::fmt()
             .with_env_filter(EnvFilter::from_default_env())
             .compact()
@@ -83,7 +87,6 @@ mod test {
 
         let request_sender_1 = p1.behaviour().sample_request_channel();
         let request_sender_2 = p2.behaviour().sample_request_channel();
-        const MSG_COUNT: usize = 10;
         async fn test_sampling_swarm(
             mut swarm: Swarm<
                 SamplingBehaviour<
@@ -109,9 +112,9 @@ mod test {
                                 blob: Box::new(DaBlob {
                                     column: Column(vec![]),
                                     column_idx: 0,
-                                    column_commitment: Default::default(),
-                                    aggregated_column_commitment: Default::default(),
-                                    aggregated_column_proof: Default::default(),
+                                    column_commitment: Commitment::default(),
+                                    aggregated_column_commitment: Commitment::default(),
+                                    aggregated_column_proof: Proof::default(),
                                     rows_commitments: vec![],
                                     rows_proofs: vec![],
                                 }),

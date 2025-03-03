@@ -13,5 +13,6 @@ rustflags = [
 
   "-Wclippy::pedantic",
   "-Aclippy::missing_errors_doc",
-  "-Aclippy::missing_panics_doc"
+  "-Aclippy::missing_panics_doc",
+  "-Aclippy::similar_names"
 ]

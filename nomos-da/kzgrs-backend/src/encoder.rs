@@ -81,8 +81,8 @@ impl EncodedData {
     }
 }
 
-impl<'A> EncodedData {
-    fn iter(&self) -> EncodedDataIterator<'a> {
+impl<'a> EncodedData {
+    fn iter(&'a self) -> EncodedDataIterator<'a> {
         <&Self as IntoIterator>::into_iter(self)
     }
 }
@@ -315,7 +315,7 @@ impl nomos_core::da::DaEncoder for DaEncoder {
             global_parameters,
             &row_polynomials,
             self.params.toeplitz1cache.as_ref(),
-        )?;
+        );
         let (_column_polynomials, column_commitments): (Vec<_>, Vec<_>) =
             Self::compute_kzg_column_commitments(global_parameters, &extended_data, column_domain)?
                 .into_iter()
@@ -467,8 +467,7 @@ pub mod test {
         let (_evals, polynomials): (Vec<_>, Vec<_>) = poly_data.into_iter().unzip();
         let extended_evaluations = DaEncoder::rs_encode_rows(&polynomials, domain);
         let extended_matrix = DaEncoder::evals_to_chunk_matrix(&extended_evaluations);
-        let proofs =
-            DaEncoder::compute_rows_proofs(&GLOBAL_PARAMETERS, &polynomials, None).unwrap();
+        let proofs = DaEncoder::compute_rows_proofs(&GLOBAL_PARAMETERS, &polynomials, None);
 
         let checks = izip!(matrix.iter(), &commitments, &proofs);
         for (row, commitment, proofs) in checks {

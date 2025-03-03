@@ -195,7 +195,7 @@ where
                     Self::wrap_and_send_to_persistent_transmission(msg, &mut cryptographic_processor, &persistent_sender);
                 }
                 Some(msg) = lifecycle_stream.next() => {
-                    if lifecycle::should_stop_service::<Self>(&msg).await {
+                    if lifecycle::should_stop_service::<Self>(&msg) {
                         // TODO: Maybe add a call to backend to handle this. Maybe trying to save unprocessed messages?
                         break;
                     }
@@ -311,7 +311,7 @@ where
             self.message_blend.cryptographic_processor.private_key,
         ))
         .to_bytes();
-        Membership::new(self.membership.clone(), public_key)
+        Membership::new(self.membership.clone(), &public_key)
     }
 }
 

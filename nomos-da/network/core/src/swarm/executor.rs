@@ -231,7 +231,7 @@ where
         handle_sampling_event(&self.sampling_events_sender, event).await;
     }
 
-    async fn handle_executor_dispersal_event(&mut self, event: DispersalExecutorEvent) {
+    fn handle_executor_dispersal_event(&mut self, event: DispersalExecutorEvent) {
         monitor_event(
             self.swarm.behaviour_mut().monitor_behaviour_mut(),
             MonitorEvent::from(&event),
@@ -283,7 +283,7 @@ where
                     counter.behaviour_events_received = 1,
                     event = EVENT_DISPERSAL_EXECUTOR_DISPERSAL
                 );
-                self.handle_executor_dispersal_event(event).await;
+                self.handle_executor_dispersal_event(event);
             }
             ExecutorBehaviourEvent::ValidatorDispersal(event) => {
                 tracing::info!(

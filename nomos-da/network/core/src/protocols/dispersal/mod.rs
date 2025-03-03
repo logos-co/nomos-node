@@ -4,6 +4,7 @@ pub mod validator;
 #[cfg(test)]
 pub mod test {
     use futures::StreamExt;
+    use kzgrs::{Commitment, Proof};
     use kzgrs_backend::common::{blob::DaBlob, Column};
     use libp2p::{identity::Keypair, quic, swarm::SwarmEvent, Multiaddr, PeerId};
     use log::info;
@@ -129,9 +130,9 @@ pub mod test {
                     DaBlob {
                         column_idx: 0,
                         column: Column(vec![]),
-                        column_commitment: Default::default(),
-                        aggregated_column_commitment: Default::default(),
-                        aggregated_column_proof: Default::default(),
+                        column_commitment: Commitment::default(),
+                        aggregated_column_commitment: Commitment::default(),
+                        aggregated_column_proof: Proof::default(),
                         rows_commitments: vec![],
                         rows_proofs: vec![],
                     },

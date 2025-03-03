@@ -72,7 +72,7 @@ impl SwarmHandler {
                     self.handle_event(event);
                 }
                 Some(command) = self.commands_rx.recv() => {
-                    self.handle_command(command).await;
+                    self.handle_command(command);
                 }
             }
         }
@@ -214,6 +214,7 @@ impl SwarmHandler {
         }
     }
 
+    #[expect(clippy::cognitive_complexity)]
     fn broadcast_and_retry(&mut self, topic: Topic, message: Box<[u8]>, retry_count: usize) {
         tracing::debug!("broadcasting message to topic: {topic}");
 
