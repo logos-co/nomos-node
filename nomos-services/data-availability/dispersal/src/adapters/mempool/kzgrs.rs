@@ -89,7 +89,7 @@ where
     fn new(mempool_relay: OutboundRelay<<Self::MempoolService as ServiceData>::Message>) -> Self {
         Self {
             mempool_relay,
-            _phantom: Default::default(),
+            _phantom: PhantomData,
         }
     }
 

@@ -20,7 +20,7 @@ use crate::protocol::REPLICATION_PROTOCOL;
 
 pub type DaMessage = nomos_da_messages::replication::ReplicationRequest;
 
-/// Events that bubbles up from the `BroadcastHandler` to the `NetworkBehaviour
+/// Events that bubbles up from the `BroadcastHandler` to the `NetworkBehaviour`
 #[expect(clippy::large_enum_variant)]
 #[derive(Debug)]
 pub enum HandlerEventToBehaviour {
@@ -73,7 +73,7 @@ impl ReplicationHandler {
         Self {
             inbound: None,
             outbound: None,
-            outgoing_messages: Default::default(),
+            outgoing_messages: Vec::default(),
         }
     }
 }
@@ -81,6 +81,14 @@ impl ReplicationHandler {
 impl Default for ReplicationHandler {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+fn read_message(mut stream: Stream) -> impl Future<Output = Result<(DaMessage, Stream), Error>> {
+    trace!("Reading messages");
+    async move {
+        let unpacked_message = unpack_from_reader(&mut stream).await?;
+        Ok((unpacked_message, stream))
     }
 }
 
@@ -108,17 +116,6 @@ impl ReplicationHandler {
         }
     }
 
-    fn read_message(
-        &self,
-        mut stream: Stream,
-    ) -> impl Future<Output = Result<(DaMessage, Stream), Error>> {
-        trace!("Reading messages");
-        async move {
-            let unpacked_message = unpack_from_reader(&mut stream).await?;
-            Ok((unpacked_message, stream))
-        }
-    }
-
     fn poll_pending_incoming_messages(
         &mut self,
         cx: &mut Context<'_>,
@@ -128,7 +125,7 @@ impl ReplicationHandler {
                 let mut read = std::pin::pin!(&mut future);
                 match read.poll_unpin(cx) {
                     Poll::Ready(Ok((message, stream))) => {
-                        self.inbound = Some(self.read_message(stream).boxed());
+                        self.inbound = Some(read_message(stream).boxed());
                         Some(Ok(message))
                     }
                     Poll::Ready(Err(e)) => Some(Err(e)),
@@ -145,10 +142,8 @@ impl ReplicationHandler {
     fn poll_pending_outgoing_messages(
         &mut self,
         cx: &mut Context<'_>,
-    ) -> Result<
-        Option<ConnectionHandlerEvent<ReadyUpgrade<StreamProtocol>, (), HandlerEventToBehaviour>>,
-        Error,
-    > {
+    ) -> Option<ConnectionHandlerEvent<ReadyUpgrade<StreamProtocol>, (), HandlerEventToBehaviour>>
+    {
         // Propagate incoming messages
         match self.outbound.take() {
             Some(OutboundState::OpenStream) => {
@@ -175,12 +170,12 @@ impl ReplicationHandler {
             },
             None => {
                 self.outbound = Some(OutboundState::OpenStream);
-                return Ok(Some(ConnectionHandlerEvent::OutboundSubstreamRequest {
+                return Some(ConnectionHandlerEvent::OutboundSubstreamRequest {
                     protocol: <Self as ConnectionHandler>::listen_protocol(self),
-                }));
+                });
             }
         }
-        Ok(None)
+        None
     }
 }
 impl ConnectionHandler for ReplicationHandler {
@@ -204,15 +199,9 @@ impl ConnectionHandler for ReplicationHandler {
         ConnectionHandlerEvent<Self::OutboundProtocol, Self::OutboundOpenInfo, Self::ToBehaviour>,
     > {
         match self.poll_pending_outgoing_messages(cx) {
-            Ok(Some(event)) => {
+            Some(event) => {
                 // bubble up event
                 return Poll::Ready(event);
-            }
-            Err(error) => {
-                error!("Outgoing message error: {error:?}");
-                return Poll::Ready(ConnectionHandlerEvent::NotifyBehaviour(
-                    HandlerEventToBehaviour::OutgoingMessageError { error },
-                ));
             }
             _ => {}
         };
@@ -252,7 +241,7 @@ impl ConnectionHandler for ReplicationHandler {
                 info: (),
             }) => {
                 trace!("Received inbound stream");
-                self.inbound = Some(self.read_message(stream).boxed());
+                self.inbound = Some(read_message(stream).boxed());
             }
             ConnectionEvent::FullyNegotiatedOutbound(FullyNegotiatedOutbound {
                 protocol: stream,

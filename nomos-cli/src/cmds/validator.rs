@@ -94,7 +94,7 @@ impl Retrieve {
 
 #[tokio::main]
 async fn retrieve_data(
-    res_sender: Sender<RetrievalRes<Index>>,
+    res_sender: &Sender<RetrievalRes<Index>>,
     url: Url,
     app_id: [u8; 32],
     range: Range<Index>,

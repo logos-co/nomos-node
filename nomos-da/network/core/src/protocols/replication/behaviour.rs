@@ -77,7 +77,7 @@ impl ReplicationEvent {
     pub fn blob_size(&self) -> Option<usize> {
         match self {
             Self::IncomingMessage { message, .. } => Some(message.blob.data.column_len()),
-            _ => None,
+            Self::ReplicationError { .. } => None,
         }
     }
 }
@@ -111,9 +111,9 @@ impl<Membership> ReplicationBehaviour<Membership> {
         Self {
             local_peer_id: peer_id,
             membership,
-            connected: Default::default(),
-            outgoing_events: Default::default(),
-            seen_message_cache: Default::default(),
+            connected: HashMap::default(),
+            outgoing_events: VecDeque::default(),
+            seen_message_cache: IndexSet::default(),
             waker: None,
         }
     }
@@ -137,8 +137,8 @@ where
             > 0
     }
 
-    fn no_loopback_member_peers_of(&self, subnetwork: &SubnetworkId) -> HashSet<PeerId> {
-        let mut peers = self.membership.members_of(subnetwork);
+    fn no_loopback_member_peers_of(&self, subnetwork: SubnetworkId) -> HashSet<PeerId> {
+        let mut peers = self.membership.members_of(&subnetwork);
         // no loopback
         peers.remove(&self.local_peer_id);
         peers
@@ -150,13 +150,13 @@ where
             return;
         }
         self.seen_message_cache.insert(message_id);
-        self.send_message(message);
+        self.send_message(&message);
     }
 
-    pub fn send_message(&mut self, message: DaMessage) {
+    pub fn send_message(&mut self, message: &DaMessage) {
         // push a message in the queue for every single peer connected that is a member
         // of the selected subnetwork_id
-        let peers = self.no_loopback_member_peers_of(&message.subnetwork_id);
+        let peers = self.no_loopback_member_peers_of(message.subnetwork_id);
 
         let connected_peers: Vec<_> = self
             .connected
@@ -373,7 +373,7 @@ mod tests {
                 peer_id_j,
                 &Multiaddr::empty(),
                 Endpoint::Dialer,
-                Default::default(),
+                PortUse::default(),
             )
             .unwrap();
 

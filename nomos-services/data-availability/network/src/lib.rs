@@ -60,7 +60,7 @@ pub struct NetworkService<B: NetworkBackend + Send + 'static> {
 }
 
 pub struct NetworkState<B: NetworkBackend> {
-    _backend: B::State,
+    backend: B::State,
 }
 
 impl<B: NetworkBackend + 'static + Send> ServiceData for NetworkService<B> {
@@ -132,8 +132,8 @@ where
             DaNetworkMsg::Process(msg) => {
                 // split sending in two steps to help the compiler understand we do not
                 // need to hold an instance of &I (which is not send) across an await point
-                let _send = backend.process(msg);
-                _send.await;
+                let send = backend.process(msg);
+                send.await;
             }
             DaNetworkMsg::Subscribe { kind, sender } => sender
                 .send(backend.subscribe(kind).await)
@@ -157,7 +157,7 @@ impl<B: NetworkBackend> Clone for NetworkConfig<B> {
 impl<B: NetworkBackend> Clone for NetworkState<B> {
     fn clone(&self) -> Self {
         Self {
-            _backend: self._backend.clone(),
+            backend: self.backend.clone(),
         }
     }
 }
@@ -167,6 +167,6 @@ impl<B: NetworkBackend> ServiceState for NetworkState<B> {
     type Error = <B::State as ServiceState>::Error;
 
     fn from_settings(settings: &Self::Settings) -> Result<Self, Self::Error> {
-        B::State::from_settings(&settings.backend).map(|_backend| Self { _backend })
+        B::State::from_settings(&settings.backend).map(|backend| Self { backend })
     }
 }

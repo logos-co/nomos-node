@@ -79,14 +79,14 @@ impl SamplingError {
     #[must_use]
     pub const fn peer_id(&self) -> Option<&PeerId> {
         match self {
-            Self::Io { peer_id, .. } => Some(peer_id),
-            Self::Protocol { peer_id, .. } => Some(peer_id),
-            Self::OpenStream { peer_id, .. } => Some(peer_id),
-            Self::Deserialize { peer_id, .. } => Some(peer_id),
-            Self::RequestChannel { peer_id, .. } => Some(peer_id),
-            Self::ResponseChannel { peer_id, .. } => Some(peer_id),
-            Self::InvalidBlobId { peer_id, .. } => Some(peer_id),
-            Self::BlobNotFound { peer_id, .. } => Some(peer_id),
+            Self::Io { peer_id, .. }
+            | Self::Protocol { peer_id, .. }
+            | Self::OpenStream { peer_id, .. }
+            | Self::Deserialize { peer_id, .. }
+            | Self::RequestChannel { peer_id, .. }
+            | Self::ResponseChannel { peer_id, .. }
+            | Self::InvalidBlobId { peer_id, .. }
+            | Self::BlobNotFound { peer_id, .. } => Some(peer_id),
         }
     }
 
@@ -514,24 +514,24 @@ impl<Membership: MembershipHandler<Id = PeerId, NetworkId = SubnetworkId> + 'sta
         subnetwork_id: SubnetworkId,
         sample_response: sampling::SampleResponse,
         peer_id: PeerId,
-    ) -> Option<Poll<ToSwarm<<Self as NetworkBehaviour>::ToSwarm, THandlerInEvent<Self>>>> {
+    ) -> Poll<ToSwarm<<Self as NetworkBehaviour>::ToSwarm, THandlerInEvent<Self>>> {
         match sample_response {
-            sampling::SampleResponse::Error(error) => Some(Poll::Ready(ToSwarm::GenerateEvent(
-                SamplingEvent::SamplingError {
+            sampling::SampleResponse::Error(error) => {
+                Poll::Ready(ToSwarm::GenerateEvent(SamplingEvent::SamplingError {
                     error: SamplingError::Protocol {
                         subnetwork_id,
                         error,
                         peer_id,
                     },
-                },
-            ))),
-            sampling::SampleResponse::Blob(blob) => Some(Poll::Ready(ToSwarm::GenerateEvent(
-                SamplingEvent::SamplingSuccess {
+                }))
+            }
+            sampling::SampleResponse::Blob(blob) => {
+                Poll::Ready(ToSwarm::GenerateEvent(SamplingEvent::SamplingSuccess {
                     blob_id,
                     subnetwork_id,
                     blob: Box::new(blob.data),
-                },
-            ))),
+                }))
+            }
         }
     }
 }
@@ -643,15 +643,7 @@ impl<M: MembershipHandler<Id = PeerId, NetworkId = SubnetworkId> + 'static> Netw
                         connected_peers,
                         stream,
                     );
-                    // return an error if there was an error on the other side of the wire
-                    if let Some(event) = Self::handle_sample_response(
-                        blob_id,
-                        subnetwork_id,
-                        sample_response,
-                        peer_id,
-                    ) {
-                        return event;
-                    }
+                    Self::handle_sample_response(blob_id, subnetwork_id, sample_response, peer_id);
                 }
                 // Something went up on our side of the wire, bubble it up
                 Err(error) => {
@@ -711,7 +703,7 @@ impl<M: MembershipHandler<Id = PeerId, NetworkId = SubnetworkId> + 'static> Netw
                 cx.waker().wake_by_ref();
                 Poll::Pending
             }
-            _ => unreachable!(),
+            Poll::Ready(_) => unreachable!(),
         }
     }
 }

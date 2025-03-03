@@ -324,12 +324,12 @@ pub fn update_cryptarchia_consensus(
 
 pub fn update_time(
     time: &mut <TimeService<nomos_time::backends::system_time::SystemTimeBackend> as ServiceData>::Settings,
-    time_args: TimeArgs,
+    time_args: &TimeArgs,
 ) -> Result<()> {
     let TimeArgs {
         chain_start_time,
         slot_duration,
-    } = time_args;
+    } = *time_args;
     if let Some(start_time) = chain_start_time {
         time.backend_settings.slot_config.chain_start_time =
             time::OffsetDateTime::from_unix_timestamp(start_time)?;

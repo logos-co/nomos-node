@@ -313,20 +313,20 @@ where
                     SwarmEvent::Behaviour(behaviour_event) => {
                         self.handle_behaviour_event(behaviour_event).await;
                     }
-                    SwarmEvent::ConnectionEstablished { .. } => {}
-                    SwarmEvent::ConnectionClosed { .. } => {}
-                    SwarmEvent::IncomingConnection { .. } => {}
-                    SwarmEvent::IncomingConnectionError { .. } => {}
-                    SwarmEvent::OutgoingConnectionError { .. } => {}
-                    SwarmEvent::NewListenAddr { .. } => {}
-                    SwarmEvent::ExpiredListenAddr { .. } => {}
-                    SwarmEvent::ListenerClosed { .. } => {}
-                    SwarmEvent::ListenerError { .. } => {}
-                    SwarmEvent::Dialing { .. } => {}
-                    SwarmEvent::NewExternalAddrCandidate { .. } => {}
-                    SwarmEvent::ExternalAddrConfirmed { .. } => {}
-                    SwarmEvent::ExternalAddrExpired { .. } => {}
-                    SwarmEvent::NewExternalAddrOfPeer { .. } => {}
+                    SwarmEvent::ConnectionEstablished { .. }
+                    | SwarmEvent::ConnectionClosed { .. }
+                    | SwarmEvent::IncomingConnection { .. }
+                    | SwarmEvent::IncomingConnectionError { .. }
+                    | SwarmEvent::OutgoingConnectionError { .. }
+                    | SwarmEvent::NewListenAddr { .. }
+                    | SwarmEvent::ExpiredListenAddr { .. }
+                    | SwarmEvent::ListenerClosed { .. }
+                    | SwarmEvent::ListenerError { .. }
+                    | SwarmEvent::Dialing { .. }
+                    | SwarmEvent::NewExternalAddrCandidate { .. }
+                    | SwarmEvent::ExternalAddrConfirmed { .. }
+                    | SwarmEvent::ExternalAddrExpired { .. }
+                    | SwarmEvent::NewExternalAddrOfPeer { .. } => {}
                     event => {
                         debug!("Unsupported validator swarm event: {event:?}");
                     }

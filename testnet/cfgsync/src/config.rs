@@ -11,7 +11,7 @@ use tests::topology::configs::{
     blend::create_blend_configs,
     consensus::{create_consensus_configs, ConsensusParams},
     da::{create_da_configs, DaParams},
-    network::create_network_configs,
+    network::{create_network_configs, NetworkParams},
     time::default_time_config,
     tracing::GeneralTracingConfig,
     GeneralConfig,
@@ -76,9 +76,9 @@ pub fn create_node_configs(
         thread_rng().fill(id);
     }
 
-    let consensus_configs = create_consensus_configs(&ids, consensus_params);
-    let da_configs = create_da_configs(&ids, da_params);
-    let network_configs = create_network_configs(&ids, NetworkParams::default());
+    let consensus_configs = create_consensus_configs(&ids, &consensus_params);
+    let da_configs = create_da_configs(&ids, &da_params);
+    let network_configs = create_network_configs(&ids, &NetworkParams::default());
     let blend_configs = create_blend_configs(&ids);
     let api_configs = ids
         .iter()
@@ -90,7 +90,7 @@ pub fn create_node_configs(
 
     // Rebuild DA address lists.
     let peer_addresses = da_configs[0].addresses.clone();
-    let host_network_init_peers = update_network_init_peers(hosts.clone());
+    let host_network_init_peers = update_network_init_peers(&hosts);
     let host_da_peer_addresses = update_da_peer_addresses(hosts.clone(), peer_addresses);
     let host_blend_membership =
         update_blend_membership(hosts.clone(), blend_configs[0].membership.clone());
@@ -282,7 +282,7 @@ mod cfgsync_tests {
                 balancer_interval: Duration::ZERO,
                 redial_cooldown: Duration::ZERO,
             },
-            TracingSettings {
+            &TracingSettings {
                 logger: LoggerLayer::None,
                 tracing: TracingLayer::None,
                 filter: FilterLayer::None,

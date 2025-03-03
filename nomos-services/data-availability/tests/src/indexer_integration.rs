@@ -47,6 +47,7 @@ const INDEXER_TEST_MAX_SECONDS: u64 = 60;
 // performed in integration tests crate using the real node.
 
 #[test]
+#[expect(clippy::too_many_lines)]
 fn test_indexer() {
     let performed_tx = Arc::new(AtomicBool::new(false));
     let performed_rx = performed_tx.clone();

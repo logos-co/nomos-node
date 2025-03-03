@@ -419,6 +419,7 @@ where
         })
     }
 
+    #[expect(clippy::too_many_lines)]
     async fn run(mut self) -> Result<(), overwatch_rs::DynError> {
         let relays: CryptarchiaConsensusRelays<
             BlendAdapter,
@@ -587,15 +588,15 @@ impl<TxS, BxS, NetworkAdapterSettings, BlendAdapterSettings, TimeBackendSettings
     >
 {
     #[must_use]
-    pub fn new(tip: Option<HeaderId>, security_block: Option<HeaderId>) -> Self {
+    pub const fn new(tip: Option<HeaderId>, security_block: Option<HeaderId>) -> Self {
         Self {
             tip,
             security_block,
-            _txs: Default::default(),
-            _bxs: Default::default(),
-            _network_adapter_settings: Default::default(),
-            _blend_adapter_settings: Default::default(),
-            _time_backend_settings: Default::default(),
+            _txs: PhantomData,
+            _bxs: PhantomData,
+            _network_adapter_settings: PhantomData,
+            _blend_adapter_settings: PhantomData,
+            _time_backend_settings: PhantomData,
         }
     }
 }

@@ -71,7 +71,7 @@ impl ConfigRepo {
             let configs = create_node_configs(
                 self.consensus_params.clone(),
                 self.da_params.clone(),
-                self.tracing_settings.clone(),
+                &self.tracing_settings,
                 hosts,
             );
 

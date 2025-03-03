@@ -77,8 +77,8 @@ impl Topology {
             thread_rng().fill(id);
         }
 
-        let consensus_configs = create_consensus_configs(&ids, config.consensus_params);
-        let da_configs = create_da_configs(&ids, config.da_params);
+        let consensus_configs = create_consensus_configs(&ids, &config.consensus_params);
+        let da_configs = create_da_configs(&ids, &config.da_params);
         let network_configs = create_network_configs(&ids, config.network_params);
         let blend_configs = create_blend_configs(&ids);
         let api_configs = create_api_configs(&ids);

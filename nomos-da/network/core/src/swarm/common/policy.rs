@@ -72,7 +72,7 @@ where
 {
     fn connection_number_deviation(
         &self,
-        subnetwork_id: &SubnetworkId,
+        subnetwork_id: SubnetworkId,
         stats: &SubnetworkStats,
     ) -> SubnetworkDeviation {
         let is_member = self

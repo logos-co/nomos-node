@@ -5,7 +5,6 @@ use std::{
 };
 
 use axum::{routing, Router, Server};
-use hyper::Error;
 use nomos_api::{ApiService, ApiServiceSettings, Backend};
 use overwatch_derive::Services;
 use overwatch_rs::{
@@ -96,7 +95,7 @@ impl Backend for WebServer {
 }
 
 #[test]
-fn test_todo() -> Result<(), Error> {
+fn test_todo() {
     let addr = SocketAddr::new(Ipv4Addr::LOCALHOST.into(), 8080);
 
     // have to spawn the server in a separate thread because the overwatch
@@ -123,8 +122,6 @@ fn test_todo() -> Result<(), Error> {
         .unwrap();
 
     assert!(response.status().is_success());
-
-    Ok(())
 }
 
 mod todo {
@@ -284,7 +281,7 @@ mod todo {
         State(store): State<Arc<Store>>,
         headers: HeaderMap,
     ) -> StatusCode {
-        match check_api_key(false, headers) {
+        match check_api_key(false, &headers) {
             Ok(()) => (),
             Err(_) => return StatusCode::UNAUTHORIZED,
         }
@@ -324,7 +321,7 @@ mod todo {
         State(store): State<Arc<Store>>,
         headers: HeaderMap,
     ) -> impl IntoResponse {
-        match check_api_key(true, headers) {
+        match check_api_key(true, &headers) {
             Ok(()) => (),
             Err(error) => return error.into_response(),
         }
@@ -350,7 +347,7 @@ mod todo {
     // sake of example.
     fn check_api_key(
         require_api_key: bool,
-        headers: HeaderMap,
+        headers: &HeaderMap,
     ) -> Result<(), (StatusCode, Json<TodoError>)> {
         match headers.get("todo_apikey") {
             Some(header) if header != "utoipa-rocks" => Err((

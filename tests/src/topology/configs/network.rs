@@ -23,7 +23,7 @@ pub struct GeneralNetworkConfig {
 #[must_use]
 pub fn create_network_configs(
     ids: &[[u8; 32]],
-    network_params: NetworkParams,
+    network_params: &NetworkParams,
 ) -> Vec<GeneralNetworkConfig> {
     let swarm_configs: Vec<SwarmConfig> = ids
         .iter()
@@ -40,7 +40,7 @@ pub fn create_network_configs(
         })
         .collect();
 
-    let all_initial_peers = initial_peers_by_network_layout(swarm_configs.clone(), network_params);
+    let all_initial_peers = initial_peers_by_network_layout(swarm_configs.clone(), &network_params);
 
     swarm_configs
         .iter()

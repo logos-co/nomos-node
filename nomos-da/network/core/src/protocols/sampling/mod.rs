@@ -49,44 +49,6 @@ mod test {
     #[expect(clippy::too_many_lines)]
     async fn test_sampling_two_peers() {
         const MSG_COUNT: usize = 10;
-
-        let _ = tracing_subscriber::fmt()
-            .with_env_filter(EnvFilter::from_default_env())
-            .compact()
-            .with_writer(TestWriter::default())
-            .try_init();
-        let k1 = Keypair::generate_ed25519();
-        let k2 = Keypair::generate_ed25519();
-        let neighbours = AllNeighbours {
-            neighbours: [
-                PeerId::from_public_key(&k1.public()),
-                PeerId::from_public_key(&k2.public()),
-            ]
-            .into_iter()
-            .collect(),
-        };
-
-        let p1_address = "/ip4/127.0.0.1/udp/5080/quic-v1"
-            .parse::<Multiaddr>()
-            .unwrap()
-            .with_p2p(PeerId::from_public_key(&k1.public()))
-            .unwrap();
-        let p2_address = "/ip4/127.0.0.1/udp/5081/quic-v1"
-            .parse::<Multiaddr>()
-            .unwrap()
-            .with_p2p(PeerId::from_public_key(&k2.public()))
-            .unwrap();
-        let p1_addresses = vec![(PeerId::from_public_key(&k2.public()), p2_address.clone())];
-        let p2_addresses = vec![(PeerId::from_public_key(&k1.public()), p1_address.clone())];
-        let mut p1 = sampling_swarm(
-            k1.clone(),
-            neighbours.clone(),
-            p1_addresses.into_iter().collect(),
-        );
-        let mut p2 = sampling_swarm(k2.clone(), neighbours, p2_addresses.into_iter().collect());
-
-        let request_sender_1 = p1.behaviour().sample_request_channel();
-        let request_sender_2 = p2.behaviour().sample_request_channel();
         async fn test_sampling_swarm(
             mut swarm: Swarm<
                 SamplingBehaviour<
@@ -139,6 +101,44 @@ mod test {
                 }
             }
         }
+
+        let _ = tracing_subscriber::fmt()
+            .with_env_filter(EnvFilter::from_default_env())
+            .compact()
+            .with_writer(TestWriter::default())
+            .try_init();
+        let k1 = Keypair::generate_ed25519();
+        let k2 = Keypair::generate_ed25519();
+        let neighbours = AllNeighbours {
+            neighbours: [
+                PeerId::from_public_key(&k1.public()),
+                PeerId::from_public_key(&k2.public()),
+            ]
+            .into_iter()
+            .collect(),
+        };
+
+        let p1_address = "/ip4/127.0.0.1/udp/5080/quic-v1"
+            .parse::<Multiaddr>()
+            .unwrap()
+            .with_p2p(PeerId::from_public_key(&k1.public()))
+            .unwrap();
+        let p2_address = "/ip4/127.0.0.1/udp/5081/quic-v1"
+            .parse::<Multiaddr>()
+            .unwrap()
+            .with_p2p(PeerId::from_public_key(&k2.public()))
+            .unwrap();
+        let p1_addresses = vec![(PeerId::from_public_key(&k2.public()), p2_address.clone())];
+        let p2_addresses = vec![(PeerId::from_public_key(&k1.public()), p1_address.clone())];
+        let mut p1 = sampling_swarm(
+            k1.clone(),
+            neighbours.clone(),
+            p1_addresses.into_iter().collect(),
+        );
+        let mut p2 = sampling_swarm(k2.clone(), neighbours, p2_addresses.into_iter().collect());
+
+        let request_sender_1 = p1.behaviour().sample_request_channel();
+        let request_sender_2 = p2.behaviour().sample_request_channel();
         let _p1_address = p1_address.clone();
         let _p2_address = p2_address.clone();
 

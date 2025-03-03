@@ -8,7 +8,7 @@ use nomos_node::{
     config::BlendArgs, BlobInfo, CryptarchiaArgs, DaMempoolSettings, DispersedBlobInfo, HttpArgs,
     LogArgs, MempoolAdapterSettings, NetworkArgs, Transaction, Tx, CL_TOPIC, DA_TOPIC,
 };
-use overwatch_rs::overwatch::{OverwatchRunner, Services};
+use overwatch_rs::overwatch::OverwatchRunner;
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -17,28 +17,28 @@ struct Args {
     config: std::path::PathBuf,
     /// Overrides log config.
     #[clap(flatten)]
-    log_args: LogArgs,
+    log: LogArgs,
     /// Overrides network config.
     #[clap(flatten)]
-    network_args: NetworkArgs,
+    network: NetworkArgs,
     /// Overrides blend config.
     #[clap(flatten)]
-    blend_args: BlendArgs,
+    blend: BlendArgs,
     /// Overrides http config.
     #[clap(flatten)]
-    http_args: HttpArgs,
+    http: HttpArgs,
     #[clap(flatten)]
-    cryptarchia_args: CryptarchiaArgs,
+    cryptarchia: CryptarchiaArgs,
 }
 
 fn main() -> Result<()> {
     let Args {
         config,
-        log_args,
-        http_args,
-        network_args,
-        blend_args,
-        cryptarchia_args,
+        log: log_args,
+        http: http_args,
+        network: network_args,
+        blend: blend_args,
+        cryptarchia: cryptarchia_args,
     } = Args::parse();
     let config = serde_yaml::from_reader::<_, ExecutorConfig>(std::fs::File::open(config)?)?
         .update_from_args(

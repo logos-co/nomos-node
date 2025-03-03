@@ -220,6 +220,7 @@ pub struct TestBlendSettings {
 }
 
 #[expect(clippy::too_many_arguments)]
+#[expect(clippy::too_many_lines)]
 pub fn new_node(
     leader_config: &LeaderConfig,
     ledger_config: &nomos_ledger::Config,
@@ -244,7 +245,7 @@ pub fn new_node(
             },
             blend: BlendConfig {
                 backend: blend_config.backend.clone(),
-                persistent_transmission: Default::default(),
+                persistent_transmission: PersistentTransmissionSettings::default(),
                 message_blend: MessageBlendSettings {
                     cryptographic_processor: CryptographicProcessorSettings {
                         private_key: blend_config.private_key.to_bytes(),
@@ -255,7 +256,7 @@ pub fn new_node(
                     },
                 },
                 cover_traffic: nomos_blend_service::CoverTrafficExtSettings {
-                    epoch_duration: Duration::from_secs(432000),
+                    epoch_duration: Duration::from_secs(432_000),
                     slot_duration: Duration::from_secs(20),
                 },
                 membership: blend_config.membership.clone(),
@@ -274,8 +275,8 @@ pub fn new_node(
                     ),
                     addresses: da_network_settings.peer_addresses.into_iter().collect(),
                     listening_address: da_network_settings.listening_address,
-                    policy_settings: Default::default(),
-                    monitor_settings: Default::default(),
+                    policy_settings: DAConnectionPolicySettings::default(),
+                    monitor_settings: DAConnectionMonitorSettings::default(),
                     balancer_interval: Duration::ZERO,
                     redial_cooldown: Duration::ZERO,
                 },
@@ -359,7 +360,7 @@ pub fn new_node(
     .unwrap()
 }
 
-pub fn new_blend_configs(listening_addresses: Vec<Multiaddr>) -> Vec<TestBlendSettings> {
+pub fn new_blend_configs(listening_addresses: &[Multiaddr]) -> Vec<TestBlendSettings> {
     let settings = listening_addresses
         .iter()
         .map(|listening_address| {

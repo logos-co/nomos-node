@@ -9,8 +9,11 @@ use std::{
 use cryptarchia_consensus::CryptarchiaSettings;
 use cryptarchia_engine::time::SlotConfig;
 use kzgrs_backend::common::blob::DaBlob;
-use nomos_blend::message_blend::{
-    CryptographicProcessorSettings, MessageBlendSettings, TemporalSchedulerSettings,
+use nomos_blend::{
+    message_blend::{
+        CryptographicProcessorSettings, MessageBlendSettings, TemporalSchedulerSettings,
+    },
+    persistent_transmission::PersistentTransmissionSettings,
 };
 use nomos_da_dispersal::{
     backend::kzgrs::{DispersalKZGRSBackendSettings, EncoderSettings},
@@ -91,14 +94,18 @@ impl Executor {
         }
 
         config.storage.db_path = dir.path().join("db");
-        config
-            .da_sampling
-            .storage_adapter_settings
-            .blob_storage_directory = dir.path().to_owned();
-        config
-            .da_verifier
-            .storage_adapter_settings
-            .blob_storage_directory = dir.path().to_owned();
+        dir.path().clone_into(
+            &mut config
+                .da_sampling
+                .storage_adapter_settings
+                .blob_storage_directory,
+        );
+        dir.path().clone_into(
+            &mut config
+                .da_verifier
+                .storage_adapter_settings
+                .blob_storage_directory,
+        );
         dir.path()
             .clone_into(&mut config.da_indexer.storage.blob_storage_directory);
 
@@ -187,7 +194,7 @@ pub fn create_executor_config(config: GeneralConfig) -> Config {
                 },
             },
             cover_traffic: nomos_blend_service::CoverTrafficExtSettings {
-                epoch_duration: Duration::from_secs(432000),
+                epoch_duration: Duration::from_secs(432_000),
                 slot_duration: Duration::from_secs(20),
             },
             membership: config.blend_config.membership,

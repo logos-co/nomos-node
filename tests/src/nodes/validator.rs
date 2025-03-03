@@ -9,8 +9,11 @@ use std::{
 use cryptarchia_consensus::{CryptarchiaInfo, CryptarchiaSettings};
 use cryptarchia_engine::time::SlotConfig;
 use kzgrs_backend::common::blob::DaBlob;
-use nomos_blend::message_blend::{
-    CryptographicProcessorSettings, MessageBlendSettings, TemporalSchedulerSettings,
+use nomos_blend::{
+    message_blend::{
+        CryptographicProcessorSettings, MessageBlendSettings, TemporalSchedulerSettings,
+    },
+    persistent_transmission::PersistentTransmissionSettings,
 };
 use nomos_core::block::Block;
 use nomos_da_indexer::{
@@ -277,7 +280,7 @@ pub fn create_validator_config(config: GeneralConfig) -> Config {
                 },
             },
             cover_traffic: nomos_blend_service::CoverTrafficExtSettings {
-                epoch_duration: Duration::from_secs(432000),
+                epoch_duration: Duration::from_secs(432_000),
                 slot_duration: Duration::from_secs(20),
             },
             membership: config.blend_config.membership,

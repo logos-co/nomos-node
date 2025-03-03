@@ -83,8 +83,8 @@ impl Disseminate {
 
 #[tokio::main]
 async fn disperse_data(
-    res_sender: Sender<Result<(), String>>,
-    client: ExecutorHttpClient,
+    res_sender: &Sender<Result<(), String>>,
+    client: &ExecutorHttpClient,
     bytes: Vec<u8>,
     metadata: Metadata,
 ) {

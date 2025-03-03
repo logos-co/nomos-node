@@ -106,7 +106,7 @@ mod test {
                             BlobId::from(blob_id_bytes),
                             get_da_blob(None)
                         );
-                        swarm_2.behaviour_mut().send_message(DaMessage::new(blob, 0));
+                        swarm_2.behaviour_mut().send_message(&DaMessage::new(blob, 0));
                         i += 1;
                     }
                     // print out events

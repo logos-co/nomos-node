@@ -28,7 +28,7 @@ pub async fn handle_validator_dispersal_event<Membership>(
         if let Err(e) = validation_events_sender.send(blob_message.data.clone()) {
             error!("Error sending blob to validation: {e:?}");
         }
-        replication_behaviour.send_message(replication::ReplicationRequest::new(
+        replication_behaviour.send_message(&replication::ReplicationRequest::new(
             blob_message,
             message.subnetwork_id,
         ));

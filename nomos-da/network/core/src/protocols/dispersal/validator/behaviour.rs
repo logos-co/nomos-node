@@ -65,7 +65,7 @@ impl DispersalEvent {
     pub fn blob_size(&self) -> Option<usize> {
         match self {
             Self::IncomingMessage { message } => Some(message.blob.data.column_len()),
-            _ => None,
+            Self::DispersalError { .. } => None,
         }
     }
 }

@@ -24,6 +24,7 @@ use tracing_subscriber::{fmt::TestWriter, EnvFilter};
 use crate::common::*;
 
 #[test]
+#[expect(clippy::too_many_lines)]
 fn test_verifier() {
     let _ = tracing_subscriber::fmt()
         .with_env_filter(EnvFilter::from_default_env())

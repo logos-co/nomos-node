@@ -87,8 +87,7 @@ where
             .map(|stream| {
                 Box::pin(stream.filter_map(|event| async {
                     match event {
-                        DaNetworkEvent::Sampling(_) => None,
-                        DaNetworkEvent::Verifying(_) => None,
+                        DaNetworkEvent::Sampling(_) | DaNetworkEvent::Verifying(_) => None,
                         DaNetworkEvent::Dispersal(DispersalExecutorEvent::DispersalError {
                             error,
                         }) => Some(Err(Box::new(error) as DynError)),
