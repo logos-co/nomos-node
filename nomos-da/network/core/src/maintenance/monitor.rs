@@ -117,7 +117,7 @@ where
                 PeerStatus::Unhealthy => {
                     self.temporarily_block_peer(output.peer_id);
                 }
-                _ => {}
+                PeerStatus::Healthy => {}
             }
         }
     }

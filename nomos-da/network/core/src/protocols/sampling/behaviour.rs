@@ -643,7 +643,12 @@ impl<M: MembershipHandler<Id = PeerId, NetworkId = SubnetworkId> + 'static> Netw
                         connected_peers,
                         stream,
                     );
-                    Self::handle_sample_response(blob_id, subnetwork_id, sample_response, peer_id);
+                    return Self::handle_sample_response(
+                        blob_id,
+                        subnetwork_id,
+                        sample_response,
+                        peer_id,
+                    );
                 }
                 // Something went up on our side of the wire, bubble it up
                 Err(error) => {

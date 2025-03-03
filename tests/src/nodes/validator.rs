@@ -259,6 +259,7 @@ impl Validator {
 }
 
 #[must_use]
+#[expect(clippy::too_many_lines)]
 pub fn create_validator_config(config: GeneralConfig) -> Config {
     Config {
         network: NetworkConfig {

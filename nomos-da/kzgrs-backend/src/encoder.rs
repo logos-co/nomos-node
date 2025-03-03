@@ -81,12 +81,6 @@ impl EncodedData {
     }
 }
 
-impl<'a> EncodedData {
-    fn iter(&'a self) -> EncodedDataIterator<'a> {
-        <&Self as IntoIterator>::into_iter(self)
-    }
-}
-
 impl<'a> IntoIterator for &'a EncodedData {
     type Item = DaBlob;
     type IntoIter = EncodedDataIterator<'a>;

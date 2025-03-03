@@ -60,7 +60,7 @@ impl Disseminate {
         let metadata = Metadata::new(app_id, self.index.into());
 
         let (res_sender, res_receiver) = std::sync::mpsc::channel();
-        std::thread::spawn(move || disperse_data(res_sender, client, bytes, metadata));
+        std::thread::spawn(move || disperse_data(&res_sender, &client, bytes, metadata));
 
         match res_receiver.recv() {
             Ok(update) => match update {

@@ -128,6 +128,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[expect(clippy::large_stack_arrays)]
     async fn pack_to_writer_too_large_message() {
         let blob_id = BlobId::from([0; 32]);
         let error_description = ["."; MAX_MSG_LEN].concat();

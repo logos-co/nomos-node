@@ -199,7 +199,7 @@ where
         loop {
             tokio::select! {
                 Some(msg) = self.swarm_messages_receiver.recv() => {
-                    self.handle_swarm_message(msg).await;
+                    self.handle_swarm_message(msg);
                 }
                 Some(event) = self.swarm.next() => {
                     self.handle_event(event);
@@ -208,7 +208,8 @@ where
         }
     }
 
-    async fn handle_swarm_message(&mut self, msg: BlendSwarmMessage) {
+    #[expect(clippy::cognitive_complexity)]
+    fn handle_swarm_message(&mut self, msg: BlendSwarmMessage) {
         match msg {
             BlendSwarmMessage::Publish(msg) => {
                 let msg_size = msg.len();

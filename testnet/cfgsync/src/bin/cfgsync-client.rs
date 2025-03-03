@@ -56,7 +56,7 @@ async fn main() {
     let config_file_path = env::var("CFG_FILE_PATH").unwrap_or_else(|_| "config.yaml".to_string());
     let server_addr =
         env::var("CFG_SERVER_ADDR").unwrap_or_else(|_| "http://127.0.0.1:4400".to_string());
-    let ip = parse_ip(env::var("CFG_HOST_IP").unwrap_or_else(|_| "127.0.0.1".to_string()));
+    let ip = parse_ip(&env::var("CFG_HOST_IP").unwrap_or_else(|_| "127.0.0.1".to_string()));
     let identifier =
         env::var("CFG_HOST_IDENTIFIER").unwrap_or_else(|_| "unidentified-node".to_string());
 

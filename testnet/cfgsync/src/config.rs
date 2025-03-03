@@ -66,8 +66,8 @@ impl Host {
 
 #[must_use]
 pub fn create_node_configs(
-    consensus_params: ConsensusParams,
-    da_params: DaParams,
+    consensus_params: &ConsensusParams,
+    da_params: &DaParams,
     tracing_settings: &TracingSettings,
     hosts: Vec<Host>,
 ) -> HashMap<Host, GeneralConfig> {
@@ -76,8 +76,8 @@ pub fn create_node_configs(
         thread_rng().fill(id);
     }
 
-    let consensus_configs = create_consensus_configs(&ids, &consensus_params);
-    let da_configs = create_da_configs(&ids, &da_params);
+    let consensus_configs = create_consensus_configs(&ids, consensus_params);
+    let da_configs = create_da_configs(&ids, da_params);
     let network_configs = create_network_configs(&ids, &NetworkParams::default());
     let blend_configs = create_blend_configs(&ids);
     let api_configs = ids
@@ -221,7 +221,7 @@ fn update_tracing_identifier(
                     config.service_name.clone_from(&identifier);
                     TracingLayer::Otlp(config)
                 }
-                other => other,
+                other @ TracingLayer::None => other,
             },
             filter: settings.filter,
             metrics: match settings.metrics {
@@ -229,7 +229,7 @@ fn update_tracing_identifier(
                     config.host_identifier = identifier;
                     MetricsLayer::Otlp(config)
                 }
-                other => other,
+                other @ MetricsLayer::None => other,
             },
             level: settings.level,
         },
@@ -264,12 +264,12 @@ mod cfgsync_tests {
             .collect();
 
         let configs = create_node_configs(
-            ConsensusParams {
+            &ConsensusParams {
                 n_participants: 10,
                 security_param: NonZero::new(10).unwrap(),
                 active_slot_coeff: 0.9,
             },
-            DaParams {
+            &DaParams {
                 subnetwork_size: 2,
                 dispersal_factor: 1,
                 num_samples: 1,

@@ -209,7 +209,7 @@ where
             verifying_broadcast_receiver,
             dispersal_broadcast_receiver,
             dispersal_blobs_sender,
-            _membership: Default::default(),
+            _membership: PhantomData,
         }
     }
 

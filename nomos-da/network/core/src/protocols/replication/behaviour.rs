@@ -144,13 +144,13 @@ where
         peers
     }
 
-    fn replicate_message(&mut self, message: DaMessage) {
+    fn replicate_message(&mut self, message: &DaMessage) {
         let message_id = (message.blob.blob_id.to_vec(), message.subnetwork_id);
         if self.seen_message_cache.contains(&message_id) {
             return;
         }
         self.seen_message_cache.insert(message_id);
-        self.send_message(&message);
+        self.send_message(message);
     }
 
     pub fn send_message(&mut self, message: &DaMessage) {
@@ -237,7 +237,7 @@ where
         };
         match event {
             HandlerEventToBehaviour::IncomingMessage { message } => {
-                self.replicate_message(message.clone());
+                self.replicate_message(&message);
                 self.outgoing_events.push_back(ToSwarm::GenerateEvent(
                     ReplicationEvent::IncomingMessage {
                         peer_id,
@@ -434,7 +434,7 @@ mod tests {
 
         // Simulate sending a message from the first behavior.
         let message = DaMessage::new(Blob::new(BlobId::from([0; 32]), get_da_blob(None)), 0);
-        all_behaviours[0].replicate_message(message.clone());
+        all_behaviours[0].replicate_message(&message);
 
         let waker = Arc::new(TestWaker);
         let waker_ref = waker_ref(&waker);

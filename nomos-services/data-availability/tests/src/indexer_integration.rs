@@ -99,7 +99,7 @@ fn test_indexer() {
         port: 7772,
         ..Default::default()
     };
-    let blend_configs = new_blend_configs(vec![
+    let blend_configs = new_blend_configs(&[
         Multiaddr::from_str("/ip4/127.0.0.1/udp/7781/quic-v1").unwrap(),
         Multiaddr::from_str("/ip4/127.0.0.1/udp/7782/quic-v1").unwrap(),
     ]);

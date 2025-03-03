@@ -198,12 +198,9 @@ impl ConnectionHandler for ReplicationHandler {
     ) -> Poll<
         ConnectionHandlerEvent<Self::OutboundProtocol, Self::OutboundOpenInfo, Self::ToBehaviour>,
     > {
-        match self.poll_pending_outgoing_messages(cx) {
-            Some(event) => {
-                // bubble up event
-                return Poll::Ready(event);
-            }
-            _ => {}
+        if let Some(event) = self.poll_pending_outgoing_messages(cx) {
+            // bubble up event
+            return Poll::Ready(event);
         };
         match self.poll_pending_incoming_messages(cx) {
             Some(Ok(message)) => {

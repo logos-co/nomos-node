@@ -69,8 +69,8 @@ impl ConfigRepo {
                 .collect();
 
             let configs = create_node_configs(
-                self.consensus_params.clone(),
-                self.da_params.clone(),
+                &self.consensus_params,
+                &self.da_params,
                 &self.tracing_settings,
                 hosts,
             );

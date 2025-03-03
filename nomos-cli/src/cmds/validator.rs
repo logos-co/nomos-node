@@ -63,7 +63,7 @@ impl Retrieve {
         let to: Index = self.to.into();
 
         let (res_sender, res_receiver) = std::sync::mpsc::channel();
-        std::thread::spawn(move || retrieve_data(res_sender, addr, app_id, from..to));
+        std::thread::spawn(move || retrieve_data(&res_sender, addr, app_id, from..to));
 
         match res_receiver.recv() {
             Ok(update) => match update {
