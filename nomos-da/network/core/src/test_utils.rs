@@ -15,7 +15,7 @@ impl MembershipHandler for AllNeighbours {
     type Id = PeerId;
 
     fn membership(&self, _self_id: &Self::Id) -> HashSet<Self::NetworkId> {
-        [0].into_iter().collect()
+        std::iter::once(0).collect()
     }
 
     fn is_allowed(&self, _id: &Self::Id) -> bool {

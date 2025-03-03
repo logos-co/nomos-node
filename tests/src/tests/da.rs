@@ -54,21 +54,19 @@ async fn disseminate_and_retrieve() {
         .get_indexer_range(app_id.try_into().unwrap(), from..to)
         .await;
 
-    let executor_idx_0_blobs: Vec<_> = executor_blobs
+    let executor_idx_0_blobs = executor_blobs
         .iter()
         .filter(|(i, _)| i == &from)
-        .flat_map(|(_, blobs)| blobs)
-        .collect();
-    let validator_idx_0_blobs: Vec<_> = validator_blobs
+        .flat_map(|(_, blobs)| blobs);
+    let validator_idx_0_blobs = validator_blobs
         .iter()
         .filter(|(i, _)| i == &from)
-        .flat_map(|(_, blobs)| blobs)
-        .collect();
+        .flat_map(|(_, blobs)| blobs);
 
     // Index zero shouldn't be empty, validator replicated both blobs to executor
     // because they both are in the same subnetwork.
-    assert!(executor_idx_0_blobs.len() == 2);
-    assert!(validator_idx_0_blobs.len() == 2);
+    assert!(executor_idx_0_blobs.count() == 2);
+    assert!(validator_idx_0_blobs.count() == 2);
 }
 
 #[ignore = "todo: make work in parallel to other tests"]

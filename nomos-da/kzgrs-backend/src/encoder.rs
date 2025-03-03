@@ -109,7 +109,7 @@ pub struct EncodedDataIterator<'a> {
 }
 
 impl<'a> EncodedDataIterator<'a> {
-    pub fn new(encoded_data: &'a EncodedData) -> Self {
+    pub const fn new(encoded_data: &'a EncodedData) -> Self {
         Self {
             encoded_data,
             next_index: 0,
@@ -154,7 +154,7 @@ impl DaEncoder {
             .collect()
     }
 
-    #[allow(clippy::type_complexity)]
+    #[expect(clippy::type_complexity)]
     fn compute_kzg_row_commitments(
         global_parameters: &GlobalParameters,
         matrix: &ChunksMatrix,
@@ -229,7 +229,7 @@ impl DaEncoder {
         .collect())
     }
 
-    #[allow(clippy::type_complexity)]
+    #[expect(clippy::type_complexity)]
     fn compute_kzg_column_commitments(
         global_parameters: &GlobalParameters,
         matrix: &ChunksMatrix,
@@ -582,10 +582,10 @@ pub mod test {
         ];
         let encoded_data = encoder.encode(&data).unwrap();
 
-        let blobs: Vec<_> = (&encoded_data).into_iter().collect();
-        assert_eq!(blobs.len(), 16);
+        let blobs = (&encoded_data).into_iter();
+        assert_eq!(blobs.count(), 16);
 
-        let blobs: Vec<_> = encoded_data.into_iter().collect();
-        assert_eq!(blobs.len(), 16);
+        let blobs = encoded_data.into_iter();
+        assert_eq!(blobs.count(), 16);
     }
 }

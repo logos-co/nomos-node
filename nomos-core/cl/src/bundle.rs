@@ -10,7 +10,7 @@ pub struct Bundle {
 }
 
 impl Bundle {
-    pub fn new(partials: Vec<PartialTx>) -> Self {
+    pub const fn new(partials: Vec<PartialTx>) -> Self {
         Self { partials }
     }
 
@@ -25,7 +25,7 @@ pub struct BundleWitness {
 }
 
 impl BundleWitness {
-    pub fn new(partials: Vec<PartialTxWitness>) -> Self {
+    pub const fn new(partials: Vec<PartialTxWitness>) -> Self {
         Self { partials }
     }
 

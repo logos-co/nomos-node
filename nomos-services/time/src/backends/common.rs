@@ -10,7 +10,7 @@ use tokio_stream::wrappers::IntervalStream;
 
 use crate::{EpochSlotTickStream, SlotTick};
 
-pub(crate) fn slot_timer(
+pub fn slot_timer(
     slot_config: SlotConfig,
     datetime: OffsetDateTime,
     current_slot: Slot,

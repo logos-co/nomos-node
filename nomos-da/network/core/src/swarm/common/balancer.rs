@@ -93,13 +93,9 @@ where
         missing_count: usize,
     ) -> Vec<PeerId> {
         let candidates = self.membership.members_of(subnetwork_id);
-        let available_peers: Vec<_> = candidates
+        candidates
             .into_iter()
             .filter(|peer| !self.connected_peers.contains(peer) && *peer != self.local_peer_id)
-            .collect();
-
-        available_peers
-            .into_iter()
             .choose_multiple(&mut rand::thread_rng(), missing_count)
     }
 }
@@ -295,7 +291,7 @@ mod tests {
 
         assert!(matches!(poll_result, Poll::Ready(ref peers) if peers.len() == 2));
         let peers = match poll_result {
-            Poll::Ready(peers) => peers.clone(),
+            Poll::Ready(peers) => peers,
             _ => panic!("Expected Poll::Ready with peers"),
         };
 

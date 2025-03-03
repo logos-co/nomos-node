@@ -1,4 +1,4 @@
-#[derive(thiserror::Error, Debug, PartialEq)]
+#[derive(thiserror::Error, Debug, PartialEq, Eq)]
 pub enum Error {
     #[error("Invalid blend message format")]
     InvalidBlendMessage,

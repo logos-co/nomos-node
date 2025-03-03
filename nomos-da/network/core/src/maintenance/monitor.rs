@@ -15,7 +15,7 @@ use libp2p::{
 };
 use thiserror::Error;
 
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum PeerStatus {
     Malicious,
     Unhealthy,

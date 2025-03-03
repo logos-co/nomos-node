@@ -70,15 +70,15 @@ impl EpochState {
         }
     }
 
-    pub fn epoch(&self) -> Epoch {
+    pub const fn epoch(&self) -> Epoch {
         self.epoch
     }
 
-    pub fn nonce(&self) -> &[u8; 32] {
+    pub const fn nonce(&self) -> &[u8; 32] {
         &self.nonce
     }
 
-    pub fn total_stake(&self) -> Value {
+    pub const fn total_stake(&self) -> Value {
         self.total_stake
     }
 }
@@ -95,7 +95,7 @@ where
 {
     pub fn from_genesis(id: Id, state: LedgerState, config: Config) -> Self {
         Self {
-            states: [(id, state)].into_iter().collect(),
+            states: std::iter::once((id, state)).collect(),
             config,
         }
     }
@@ -152,7 +152,7 @@ where
         self.states.get(id)
     }
 
-    pub fn config(&self) -> &Config {
+    pub const fn config(&self) -> &Config {
         &self.config
     }
 }
@@ -353,7 +353,7 @@ impl LedgerState {
     fn update_nonce(self, nullifier: Nullifier, slot: Slot) -> Self {
         Self {
             nonce: <[u8; 32]>::from(
-                Blake2b::new_with_prefix("epoch-nonce".as_bytes())
+                Blake2b::new_with_prefix(b"epoch-nonce")
                     .chain_update(self.nonce)
                     .chain_update(nullifier.as_bytes())
                     .chain_update(slot.to_be_bytes())
@@ -389,19 +389,19 @@ impl LedgerState {
         }
     }
 
-    pub fn slot(&self) -> Slot {
+    pub const fn slot(&self) -> Slot {
         self.slot
     }
 
-    pub fn epoch_state(&self) -> &EpochState {
+    pub const fn epoch_state(&self) -> &EpochState {
         &self.epoch_state
     }
 
-    pub fn next_epoch_state(&self) -> &EpochState {
+    pub const fn next_epoch_state(&self) -> &EpochState {
         &self.next_epoch_state
     }
 
-    pub fn lead_commitments(&self) -> &NoteTree {
+    pub const fn lead_commitments(&self) -> &NoteTree {
         &self.lead_commitments
     }
 }
@@ -564,7 +564,7 @@ pub mod tests {
         Ok(id)
     }
 
-    pub fn config() -> Config {
+    pub const fn config() -> Config {
         Config {
             epoch_config: EpochConfig {
                 epoch_stake_distribution_stabilization: NonZero::new(4).unwrap(),

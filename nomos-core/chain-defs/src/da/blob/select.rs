@@ -24,7 +24,7 @@ impl<const SIZE: usize, B: DispersedBlobInfo> BlobSelect for FillSize<SIZE, B> {
     type Settings = ();
 
     fn new(_settings: Self::Settings) -> Self {
-        FillSize::new()
+        Self::new()
     }
 
     fn select_blob_from<'i, I: Iterator<Item = Self::BlobId> + 'i>(

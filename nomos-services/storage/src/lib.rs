@@ -90,10 +90,7 @@ impl<Backend: StorageBackend> StorageReplyReceiver<Option<Bytes>, Backend> {
 impl<Backend: StorageBackend> StorageMsg<Backend> {
     pub fn new_load_message<K: Serialize>(
         key: K,
-    ) -> (
-        StorageMsg<Backend>,
-        StorageReplyReceiver<Option<Bytes>, Backend>,
-    ) {
+    ) -> (Self, StorageReplyReceiver<Option<Bytes>, Backend>) {
         let key = Backend::SerdeOperator::serialize(key);
         let (reply_channel, receiver) = tokio::sync::oneshot::channel();
         (
@@ -102,18 +99,15 @@ impl<Backend: StorageBackend> StorageMsg<Backend> {
         )
     }
 
-    pub fn new_store_message<K: Serialize, V: Serialize>(key: K, value: V) -> StorageMsg<Backend> {
+    pub fn new_store_message<K: Serialize, V: Serialize>(key: K, value: V) -> Self {
         let key = Backend::SerdeOperator::serialize(key);
         let value = Backend::SerdeOperator::serialize(value);
-        StorageMsg::Store { key, value }
+        Self::Store { key, value }
     }
 
     pub fn new_remove_message<K: Serialize>(
         key: K,
-    ) -> (
-        StorageMsg<Backend>,
-        StorageReplyReceiver<Option<Bytes>, Backend>,
-    ) {
+    ) -> (Self, StorageReplyReceiver<Option<Bytes>, Backend>) {
         let key = Backend::SerdeOperator::serialize(key);
         let (reply_channel, receiver) = tokio::sync::oneshot::channel();
         (
@@ -125,7 +119,7 @@ impl<Backend: StorageBackend> StorageMsg<Backend> {
     pub fn new_transaction_message(
         transaction: Backend::Transaction,
     ) -> (
-        StorageMsg<Backend>,
+        Self,
         StorageReplyReceiver<<Backend::Transaction as StorageTransaction>::Result, Backend>,
     ) {
         let (reply_channel, receiver) = tokio::sync::oneshot::channel();
@@ -143,19 +137,19 @@ impl<Backend: StorageBackend> StorageMsg<Backend> {
 impl<Backend: StorageBackend> Debug for StorageMsg<Backend> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            StorageMsg::Load { key, .. } => {
+            Self::Load { key, .. } => {
                 write!(f, "Load {{ {key:?} }}")
             }
-            StorageMsg::LoadPrefix { prefix, .. } => {
+            Self::LoadPrefix { prefix, .. } => {
                 write!(f, "LoadPrefix {{ {prefix:?} }}")
             }
-            StorageMsg::Store { key, value } => {
+            Self::Store { key, value } => {
                 write!(f, "Store {{ {key:?}, {value:?}}}")
             }
-            StorageMsg::Remove { key, .. } => {
+            Self::Remove { key, .. } => {
                 write!(f, "Remove {{ {key:?} }}")
             }
-            StorageMsg::Execute { .. } => write!(f, "Execute transaction"),
+            Self::Execute { .. } => write!(f, "Execute transaction"),
         }
     }
 }
@@ -312,6 +306,7 @@ impl<Backend: StorageBackend + Send + Sync + 'static> ServiceCore for StorageSer
         } = self;
         let mut lifecycle_stream = lifecycle_handle.message_stream();
         let backend = &mut backend;
+        #[expect(clippy::redundant_pub_crate)]
         loop {
             tokio::select! {
                 Some(msg) = inbound_relay.recv() => {

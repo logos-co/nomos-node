@@ -30,24 +30,27 @@ async fn happy_test(topology: &Topology) {
         .floor() as u64;
     let timeout = adjust_timeout(Duration::from_secs(timeout));
     let timeout = tokio::time::sleep(timeout);
-    tokio::select! {
-        _ = timeout => panic!("timed out waiting for nodes to produce {} blocks", n_blocks),
-        _ = async { while stream::iter(nodes)
-            .any(|n| async move { (n.consensus_info().await.height as u32) < n_blocks })
-            .await
-        {
-            println!(
-                "waiting... {}",
-                stream::iter(nodes)
-                    .then(|n| async move { format!("{}", n.consensus_info().await.height) })
-                    .collect::<Vec<_>>()
-                    .await
-                    .join(" | ")
-            );
-            tokio::time::sleep(std::time::Duration::from_millis(100)).await;
-        }
-        } => {}
-    };
+    #[expect(clippy::redundant_pub_crate)]
+    {
+        tokio::select! {
+            _ = timeout => panic!("timed out waiting for nodes to produce {} blocks", n_blocks),
+            _ = async { while stream::iter(nodes)
+                .any(|n| async move { (n.consensus_info().await.height as u32) < n_blocks })
+                .await
+            {
+                println!(
+                    "waiting... {}",
+                    stream::iter(nodes)
+                        .then(|n| async move { format!("{}", n.consensus_info().await.height) })
+                        .collect::<Vec<_>>()
+                        .await
+                        .join(" | ")
+                );
+                tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+            }
+            } => {}
+        };
+    }
 
     let last_committed_block_height = n_blocks - security_param.get();
     println!("{:?}", nodes[0].consensus_info().await);

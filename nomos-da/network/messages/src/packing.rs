@@ -14,7 +14,7 @@ struct MessageTooLargeError(usize);
 
 impl From<MessageTooLargeError> for io::Error {
     fn from(value: MessageTooLargeError) -> Self {
-        io::Error::new(
+        Self::new(
             io::ErrorKind::InvalidData,
             format!(
                 "Message too large. Maximum size is {}. Actual size is {}",
@@ -49,8 +49,8 @@ fn prepare_message_for_writer(packed_message: &[u8]) -> Result<Vec<u8>> {
 
 pub async fn pack_to_writer<Message, Writer>(message: &Message, writer: &mut Writer) -> Result<()>
 where
-    Message: Serialize,
-    Writer: AsyncWriteExt + Unpin,
+    Message: Serialize + Sync,
+    Writer: AsyncWriteExt + Send + Unpin,
 {
     let packed_message = pack(message)?;
     let prepared_packed_message = prepare_message_for_writer(&packed_message)?;

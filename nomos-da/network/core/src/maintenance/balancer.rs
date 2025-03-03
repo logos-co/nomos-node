@@ -38,7 +38,7 @@ pub struct ConnectionBalancerBehaviour<Balancer> {
 }
 
 impl<Balancer> ConnectionBalancerBehaviour<Balancer> {
-    pub fn new(addresses: AddressBook, balancer: Balancer) -> Self {
+    pub const fn new(addresses: AddressBook, balancer: Balancer) -> Self {
         Self {
             addresses,
             balancer,

@@ -64,28 +64,28 @@ pub enum DispersalError {
 }
 
 impl DispersalError {
-    pub fn blob_id(&self) -> Option<BlobId> {
+    pub const fn blob_id(&self) -> Option<BlobId> {
         match self {
-            DispersalError::Io { blob_id, .. } => Some(*blob_id),
-            DispersalError::Serialization { blob_id, .. } => Some(*blob_id),
-            DispersalError::Protocol {
+            Self::Io { blob_id, .. } => Some(*blob_id),
+            Self::Serialization { blob_id, .. } => Some(*blob_id),
+            Self::Protocol {
                 error: dispersal::DispersalError { blob_id, .. },
                 ..
             } => Some(*blob_id),
-            DispersalError::OpenStreamError { .. } => None,
+            Self::OpenStreamError { .. } => None,
         }
     }
 
-    pub fn subnetwork_id(&self) -> Option<SubnetworkId> {
+    pub const fn subnetwork_id(&self) -> Option<SubnetworkId> {
         match self {
-            DispersalError::Io { subnetwork_id, .. } => Some(*subnetwork_id),
-            DispersalError::Serialization { subnetwork_id, .. } => Some(*subnetwork_id),
-            DispersalError::Protocol { subnetwork_id, .. } => Some(*subnetwork_id),
-            DispersalError::OpenStreamError { .. } => None,
+            Self::Io { subnetwork_id, .. } => Some(*subnetwork_id),
+            Self::Serialization { subnetwork_id, .. } => Some(*subnetwork_id),
+            Self::Protocol { subnetwork_id, .. } => Some(*subnetwork_id),
+            Self::OpenStreamError { .. } => None,
         }
     }
 
-    pub fn peer_id(&self) -> Option<&PeerId> {
+    pub const fn peer_id(&self) -> Option<&PeerId> {
         match self {
             Self::Io { peer_id, .. } => Some(peer_id),
             Self::OpenStreamError { peer_id, .. } => Some(peer_id),
@@ -97,34 +97,34 @@ impl DispersalError {
 impl Clone for DispersalError {
     fn clone(&self) -> Self {
         match self {
-            DispersalError::Io {
+            Self::Io {
                 peer_id,
                 error,
                 blob_id,
                 subnetwork_id,
-            } => DispersalError::Io {
+            } => Self::Io {
                 peer_id: *peer_id,
                 error: std::io::Error::new(error.kind(), error.to_string()),
                 blob_id: *blob_id,
                 subnetwork_id: *subnetwork_id,
             },
-            DispersalError::Serialization {
+            Self::Serialization {
                 error,
                 blob_id,
                 subnetwork_id,
-            } => DispersalError::Serialization {
+            } => Self::Serialization {
                 error: error.clone(),
                 blob_id: *blob_id,
                 subnetwork_id: *subnetwork_id,
             },
-            DispersalError::Protocol {
+            Self::Protocol {
                 subnetwork_id,
                 error,
-            } => DispersalError::Protocol {
+            } => Self::Protocol {
                 subnetwork_id: *subnetwork_id,
                 error: error.clone(),
             },
-            DispersalError::OpenStreamError { peer_id, error } => DispersalError::OpenStreamError {
+            Self::OpenStreamError { peer_id, error } => Self::OpenStreamError {
                 peer_id: *peer_id,
                 error: match error {
                     OpenStreamError::UnsupportedProtocol(protocol) => {
@@ -167,7 +167,8 @@ type StreamHandlerFutureSuccess = (
 );
 type StreamHandlerFuture = BoxFuture<'static, Result<StreamHandlerFutureSuccess, DispersalError>>;
 
-/// Executor dispersal protocol
+/// Executor dispersal protocol.
+///
 /// Do not handle incoming connections, just accepts outgoing ones.
 /// It takes care of sending blobs to different subnetworks.
 /// Bubbles up events with the success or error when dispersing
@@ -313,7 +314,7 @@ where
     /// Run when a stream gets free, if there is a pending task for the stream
     /// it will get scheduled to run otherwise it is parked as idle.
     fn handle_stream(
-        tasks: &mut FuturesUnordered<StreamHandlerFuture>,
+        tasks: &FuturesUnordered<StreamHandlerFuture>,
         to_disperse: &mut HashMap<PeerId, VecDeque<(SubnetworkId, DaBlob)>>,
         idle_streams: &mut HashMap<PeerId, DispersalStream>,
         stream: DispersalStream,
@@ -346,7 +347,7 @@ impl<Membership: MembershipHandler<Id = PeerId, NetworkId = SubnetworkId> + 'sta
     /// Schedule a new task for sending the blob, if stream is not available
     /// queue messages for later processing.
     fn disperse_blob(
-        tasks: &mut FuturesUnordered<StreamHandlerFuture>,
+        tasks: &FuturesUnordered<StreamHandlerFuture>,
         idle_streams: &mut HashMap<Membership::Id, DispersalStream>,
         membership: &Membership,
         connected_peers: &HashMap<PeerId, ConnectionId>,
@@ -426,7 +427,7 @@ impl<Membership: MembershipHandler<Id = PeerId, NetworkId = SubnetworkId> + 'sta
         }
         peers
     }
-    fn open_streams_for_disconnected_subnetworks_selected_peer(&mut self, peer_id: PeerId) {
+    fn open_streams_for_disconnected_subnetworks_selected_peer(&self, peer_id: PeerId) {
         let subnetworks = self.membership.membership(&peer_id);
         // open stream will result in dialing if we are not yet connected to the peer
         for peer in self.find_subnetworks_candidates_excluding_peer(peer_id, &subnetworks) {
@@ -453,7 +454,7 @@ impl<Membership: MembershipHandler<Id = PeerId, NetworkId = SubnetworkId> + 'sta
 
     fn try_ensure_stream_from_missing_subnetwork(
         local_peer_id: &PeerId,
-        pending_out_streams_sender: &mut UnboundedSender<PeerId>,
+        pending_out_streams_sender: &UnboundedSender<PeerId>,
         membership: &Membership,
         subnetwork_id: &SubnetworkId,
     ) {

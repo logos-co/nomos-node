@@ -136,7 +136,7 @@ mod test {
                 Ok(result.map(|ivec| ivec.to_vec().into()))
             }))
             .await??;
-        assert_eq!(result, Some("bar".as_bytes().into()));
+        assert_eq!(result, Some(b"bar".as_ref().into()));
 
         Ok(())
     }

@@ -67,7 +67,7 @@ where
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            KMSMessage::Register {
+            Self::Register {
                 key_id, key_type, ..
             } => {
                 write!(
@@ -75,13 +75,13 @@ where
                     "KMS-Register {{ KeyId: {key_id:?}, KeyScheme: {key_type:?} }}"
                 )
             }
-            KMSMessage::PublicKey { key_id, .. } => {
+            Self::PublicKey { key_id, .. } => {
                 write!(f, "KMS-PublicKey {{ KeyId: {key_id:?} }}")
             }
-            KMSMessage::Sign { key_id, .. } => {
+            Self::Sign { key_id, .. } => {
                 write!(f, "KMS-Sign {{ KeyId: {key_id:?} }}")
             }
-            KMSMessage::Execute { .. } => {
+            Self::Execute { .. } => {
                 write!(f, "KMS-Execute")
             }
         }
@@ -147,6 +147,7 @@ where
             mut backend,
         } = self;
         let mut lifecycle_stream = service_state.lifecycle_handle.message_stream();
+        #[expect(clippy::redundant_pub_crate)]
         loop {
             tokio::select! {
                 Some(msg) = service_state.inbound_relay.recv() => {

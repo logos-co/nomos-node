@@ -72,7 +72,7 @@ where
             .choose_multiple(rng, amount)
     }
 
-    pub fn local_node(&self) -> &Node<NodeId, M::PublicKey> {
+    pub const fn local_node(&self) -> &Node<NodeId, M::PublicKey> {
         &self.local_node
     }
 

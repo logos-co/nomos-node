@@ -78,6 +78,7 @@ impl SwarmHandler {
         }
     }
 
+    #[expect(clippy::cognitive_complexity)]
     fn handle_event(&mut self, event: SwarmEvent<BehaviourEvent>) {
         match event {
             SwarmEvent::Behaviour(BehaviourEvent::Gossipsub(gossipsub::Event::Message {
@@ -252,7 +253,7 @@ impl SwarmHandler {
         }
     }
 
-    fn exp_backoff(retry: usize) -> Duration {
+    const fn exp_backoff(retry: usize) -> Duration {
         std::time::Duration::from_secs(BACKOFF.pow(retry as u32))
     }
 }

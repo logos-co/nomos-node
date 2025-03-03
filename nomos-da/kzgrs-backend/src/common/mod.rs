@@ -57,11 +57,9 @@ impl Row {
 }
 
 impl Column {
-    #[allow(unused)]
     pub fn iter(&self) -> impl Iterator<Item = &Chunk> {
         self.0.iter()
     }
-    #[allow(unused)]
     pub fn len(&self) -> usize {
         self.0.len()
     }

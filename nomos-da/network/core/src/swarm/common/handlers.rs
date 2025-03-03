@@ -16,7 +16,7 @@ use crate::{
 };
 
 pub async fn handle_validator_dispersal_event<Membership>(
-    validation_events_sender: &mut UnboundedSender<DaBlob>,
+    validation_events_sender: &UnboundedSender<DaBlob>,
     replication_behaviour: &mut ReplicationBehaviour<Membership>,
     event: DispersalEvent,
 ) where
@@ -36,7 +36,7 @@ pub async fn handle_validator_dispersal_event<Membership>(
 }
 
 pub async fn handle_sampling_event(
-    sampling_events_sender: &mut UnboundedSender<SamplingEvent>,
+    sampling_events_sender: &UnboundedSender<SamplingEvent>,
     event: SamplingEvent,
 ) {
     if let Err(e) = sampling_events_sender.send(event) {
@@ -45,7 +45,7 @@ pub async fn handle_sampling_event(
 }
 
 pub async fn handle_replication_event(
-    validation_events_sender: &mut UnboundedSender<DaBlob>,
+    validation_events_sender: &UnboundedSender<DaBlob>,
     event: ReplicationEvent,
 ) {
     if let ReplicationEvent::IncomingMessage { message, .. } = event {

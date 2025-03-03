@@ -23,11 +23,11 @@ pub struct RoutingInformation {
 }
 
 impl RoutingInformation {
-    pub fn new(flag: RoutingFlag) -> Self {
+    pub const fn new(flag: RoutingFlag) -> Self {
         Self { flag }
     }
 
-    pub fn from_bytes(data: &[u8]) -> Result<Self, Error> {
+    pub const fn from_bytes(data: &[u8]) -> Result<Self, Error> {
         if data.len() != Self::SIZE {
             return Err(Error::InvalidEncryptedRoutingInfoLength(data.len()));
         }
@@ -107,7 +107,7 @@ impl EncryptedRoutingInformation {
         ))
     }
 
-    fn layered_cipher_key(routing_key: &RoutingKeys) -> Key {
+    const fn layered_cipher_key(routing_key: &RoutingKeys) -> Key {
         Key {
             stream_cipher_key: routing_key.stream_cipher_key,
             integrity_mac_key: routing_key.header_integrity_hmac_key,

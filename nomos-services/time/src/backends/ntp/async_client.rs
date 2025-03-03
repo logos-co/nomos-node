@@ -41,7 +41,10 @@ impl AsyncNTPClient {
     }
 
     /// Request a timestamp from an NTP server
-    pub async fn request_timestamp<T: ToSocketAddrs>(&self, pool: T) -> Result<NtpResult, Error> {
+    pub async fn request_timestamp<T: ToSocketAddrs + Sync>(
+        &self,
+        pool: T,
+    ) -> Result<NtpResult, Error> {
         let socket = &UdpSocket::bind(self.settings.address)
             .await
             .map_err(Error::Io)?;

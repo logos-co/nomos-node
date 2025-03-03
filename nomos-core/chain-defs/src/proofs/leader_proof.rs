@@ -160,9 +160,7 @@ mod test {
 
         println!("slot={}", expected_public_inputs.slot);
 
-        let private_inputs = LeaderPrivate {
-            input: input.clone(),
-        };
+        let private_inputs = LeaderPrivate { input };
 
         let proof = Risc0LeaderProof::prove(
             expected_public_inputs,

@@ -51,7 +51,6 @@ macro_rules! adapter_for {
                 Ok(())
             }
 
-            #[allow(unreachable_patterns)]
             async fn listen_to_sampling_messages(
                 &self,
             ) -> Result<Pin<Box<dyn Stream<Item = SamplingEvent> + Send>>, DynError> {
@@ -70,11 +69,8 @@ macro_rules! adapter_for {
                             $DaNetworkEvent::Sampling(event) => {
                                 Some(event)
                             }
-                            $DaNetworkEvent::Verifying(_) => {
-                                unreachable!("Subscribirng to sampling events should return a sampling only event stream");
-                            }
                             _ => {
-                                unreachable!();
+                                unreachable!("Subscribing to sampling events should return a sampling only event stream");
                             }
                         }).boxed()
                     })

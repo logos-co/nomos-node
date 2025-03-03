@@ -31,11 +31,11 @@ pub struct Metadata {
 }
 
 impl Metadata {
-    pub fn new(app_id: [u8; 32], index: Index) -> Self {
+    pub const fn new(app_id: [u8; 32], index: Index) -> Self {
         Self { app_id, index }
     }
 
-    fn size(&self) -> usize {
+    const fn size(&self) -> usize {
         std::mem::size_of_val(&self.app_id) + std::mem::size_of_val(&self.index)
     }
 }
@@ -48,14 +48,14 @@ pub struct BlobInfo {
 }
 
 impl BlobInfo {
-    pub fn new(id: [u8; 32], metadata: Metadata) -> Self {
+    pub const fn new(id: [u8; 32], metadata: Metadata) -> Self {
         Self { id, metadata }
     }
 }
 
 impl Hash for BlobInfo {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        state.write(<BlobInfo as DispersedBlobInfo>::blob_id(self).as_ref());
+        state.write(<Self as DispersedBlobInfo>::blob_id(self).as_ref());
     }
 }
 

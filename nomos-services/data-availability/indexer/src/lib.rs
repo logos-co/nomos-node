@@ -129,7 +129,7 @@ pub struct DataIndexerService<
 {
     service_state: OpaqueServiceStateHandle<Self>,
     storage_relay: Relay<StorageService<DaStorage::Backend>>,
-    #[allow(clippy::type_complexity)]
+    #[expect(clippy::type_complexity)]
     consensus_relay: ConsensusRelay<
         NetAdapter,
         BlendAdapter,
@@ -162,10 +162,10 @@ pub enum DaMsg<Blob, Meta: Metadata> {
 impl<Blob: 'static, Meta: Metadata + 'static> Debug for DaMsg<Blob, Meta> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            DaMsg::AddIndex { .. } => {
+            Self::AddIndex { .. } => {
                 write!(f, "DaMsg::AddIndex")
             }
-            DaMsg::GetRange { .. } => {
+            Self::GetRange { .. } => {
                 write!(f, "DaMsg::GetRange")
             }
         }
@@ -307,7 +307,7 @@ where
     ClPool::Item: Clone + Eq + Hash + Debug + 'static,
     ClPool::Key: Debug + 'static,
     ClPool::Settings: Clone,
-    DaPool::Item: DispersedBlobInfo + Metadata + Clone + Eq + Hash + Debug + 'static,
+    DaPool::Item: DispersedBlobInfo + Metadata + Clone + Eq + Hash + Debug + Sync + 'static,
     <DaPool::Item as DispersedBlobInfo>::BlobId: AsRef<[u8]>,
     DaPool::Key: Debug + 'static,
     DaPool::Settings: Clone,
@@ -317,7 +317,7 @@ where
     TxS::Settings: Send,
     BS: BlobSelect<BlobId = DaPool::Item>,
     BS::Settings: Send,
-    DaStorage: DaStorageAdapter<Info = DaPool::Item, Blob = Blob>,
+    DaStorage: DaStorageAdapter<Info = DaPool::Item, Blob = Blob> + Sync,
     ConsensusStorage: StorageBackend + Send + Sync + 'static,
     SamplingRng: SeedableRng + RngCore,
     SamplingBackend: DaSamplingServiceBackend<SamplingRng, BlobId = DaPool::Key> + Send,
@@ -500,6 +500,7 @@ where
         let storage_adapter = DaStorage::new(storage_relay).await;
 
         let mut lifecycle_stream = service_state.lifecycle_handle.message_stream();
+        #[expect(clippy::redundant_pub_crate)]
         loop {
             tokio::select! {
                 Some(block) = consensus_blocks.next() => {

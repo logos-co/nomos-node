@@ -17,7 +17,7 @@ pub struct BasicAuthCredentials {
 }
 
 impl BasicAuthCredentials {
-    pub fn new(username: String, password: Option<String>) -> Self {
+    pub const fn new(username: String, password: Option<String>) -> Self {
         Self { username, password }
     }
 }
@@ -44,7 +44,7 @@ impl Default for ExecutorHttpClient {
 }
 
 impl ExecutorHttpClient {
-    pub fn new(
+    pub const fn new(
         client: Client,
         executor_address: Url,
         basic_auth: Option<BasicAuthCredentials>,

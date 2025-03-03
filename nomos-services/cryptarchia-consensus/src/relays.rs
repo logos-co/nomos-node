@@ -219,33 +219,33 @@ where
         .await
     }
 
-    pub fn network_relay(
+    pub const fn network_relay(
         &self,
     ) -> &NetworkRelay<<NetworkAdapter as network::NetworkAdapter>::Backend> {
         &self.network_relay
     }
 
-    pub fn blend_relay(
+    pub const fn blend_relay(
         &self,
     ) -> &BlendRelay<<BlendAdapter::Network as BlendNetworkAdapter>::BroadcastSettings> {
         &self.blend_relay
     }
 
-    pub fn cl_mempool_relay(&self) -> &ClMempoolRelay<ClPool, ClPoolAdapter> {
+    pub const fn cl_mempool_relay(&self) -> &ClMempoolRelay<ClPool, ClPoolAdapter> {
         &self.cl_mempool_relay
     }
 
-    pub fn da_mempool_relay(
+    pub const fn da_mempool_relay(
         &self,
     ) -> &DaMempoolRelay<DaPool, DaPoolAdapter, SamplingBackend::BlobId> {
         &self.da_mempool_relay
     }
 
-    pub fn sampling_relay(&self) -> &SamplingRelay<DaPool::Key> {
+    pub const fn sampling_relay(&self) -> &SamplingRelay<DaPool::Key> {
         &self.sampling_relay
     }
 
-    pub fn storage_adapter(&self) -> &StorageAdapter<Storage, TxS::Tx, BS::BlobId> {
+    pub const fn storage_adapter(&self) -> &StorageAdapter<Storage, TxS::Tx, BS::BlobId> {
         &self.storage_adapter
     }
 }

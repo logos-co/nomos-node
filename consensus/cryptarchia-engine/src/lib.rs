@@ -21,7 +21,7 @@ pub struct Branches<Id> {
     tips: HashSet<Id>,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Branch<Id> {
     id: Id,
     parent: Id,
@@ -31,16 +31,16 @@ pub struct Branch<Id> {
 }
 
 impl<Id: Copy> Branch<Id> {
-    pub fn id(&self) -> Id {
+    pub const fn id(&self) -> Id {
         self.id
     }
-    pub fn parent(&self) -> Id {
+    pub const fn parent(&self) -> Id {
         self.parent
     }
-    pub fn slot(&self) -> Slot {
+    pub const fn slot(&self) -> Slot {
         self.slot
     }
-    pub fn length(&self) -> u64 {
+    pub const fn length(&self) -> u64 {
         self.length
     }
 }
@@ -132,7 +132,7 @@ where
 }
 
 #[derive(Debug, Clone, Error)]
-#[cfg_attr(test, derive(PartialEq))]
+#[cfg_attr(test, derive(PartialEq, Eq))]
 pub enum Error<Id> {
     #[error("Parent block: {0:?} is not know to this node")]
     ParentMissing(Id),
@@ -173,7 +173,7 @@ where
         Self::maxvalid_bg(self.local_chain.clone(), &self.branches, k, s)
     }
 
-    pub fn tip(&self) -> Id {
+    pub const fn tip(&self) -> Id {
         self.local_chain.id
     }
 
@@ -183,11 +183,11 @@ where
         todo!()
     }
 
-    pub fn genesis(&self) -> Id {
+    pub const fn genesis(&self) -> Id {
         self.genesis
     }
 
-    pub fn branches(&self) -> &Branches<Id> {
+    pub const fn branches(&self) -> &Branches<Id> {
         &self.branches
     }
 
@@ -245,7 +245,7 @@ pub mod tests {
     use super::{Cryptarchia, Slot};
     use crate::Config;
 
-    pub fn config() -> Config {
+    pub const fn config() -> Config {
         Config {
             security_param: NonZero::new(1).unwrap(),
             active_slot_coeff: 1.0,

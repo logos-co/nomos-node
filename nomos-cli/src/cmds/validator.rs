@@ -30,7 +30,6 @@ pub struct Retrieve {
     pub addr: Url,
 }
 
-#[allow(clippy::type_complexity)]
 fn parse_app_blobs(val: &str) -> Result<Vec<(Index, Vec<DaBlob>)>, String> {
     let val: String = val.chars().filter(|&c| c != ' ' && c != '\n').collect();
     serde_json::from_str(&val).map_err(|e| e.to_string())
@@ -54,6 +53,7 @@ pub struct Reconstruct {
 }
 
 impl Retrieve {
+    #[expect(clippy::cognitive_complexity)]
     pub fn run(self) -> Result<(), Box<dyn std::error::Error>> {
         let app_id: [u8; 32] = hex::decode(&self.app_id)?
             .try_into()
@@ -117,8 +117,8 @@ async fn get_app_data_range_from_node<Metadata>(
 ) -> RetrievalRes<Metadata::Index>
 where
     Metadata: metadata::Metadata + Serialize,
-    <Metadata as metadata::Metadata>::Index: Serialize + DeserializeOwned,
-    <Metadata as metadata::Metadata>::AppId: Serialize + DeserializeOwned,
+    <Metadata as metadata::Metadata>::Index: Serialize + DeserializeOwned + Send + Sync,
+    <Metadata as metadata::Metadata>::AppId: Serialize + DeserializeOwned + Send + Sync,
 {
     let url = url
         .join(paths::DA_GET_RANGE)

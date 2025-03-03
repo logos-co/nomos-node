@@ -30,7 +30,7 @@ pub fn derive_unit(unit: &str) -> Unit {
 pub struct NoteCommitment(pub [u8; 32]);
 
 impl NoteCommitment {
-    pub fn as_bytes(&self) -> &[u8; 32] {
+    pub const fn as_bytes(&self) -> &[u8; 32] {
         &self.0
     }
 }
@@ -45,7 +45,13 @@ pub struct NoteWitness {
 }
 
 impl NoteWitness {
-    pub fn new(value: u64, unit: Unit, covenant: Covenant, state: [u8; 32], nonce: Nonce) -> Self {
+    pub const fn new(
+        value: u64,
+        unit: Unit,
+        covenant: Covenant,
+        state: [u8; 32],
+        nonce: Nonce,
+    ) -> Self {
         Self {
             value,
             unit,
@@ -113,11 +119,11 @@ impl Nonce {
         Self(nonce)
     }
 
-    pub fn as_bytes(&self) -> &[u8; 32] {
+    pub const fn as_bytes(&self) -> &[u8; 32] {
         &self.0
     }
 
-    pub fn from_bytes(bytes: [u8; 32]) -> Self {
+    pub const fn from_bytes(bytes: [u8; 32]) -> Self {
         Self(bytes)
     }
 }

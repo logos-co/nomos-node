@@ -19,7 +19,7 @@ pub fn get_target_directory() -> PathBuf {
 }
 
 #[cfg(debug_assertions)]
-pub fn get_profile() -> &'static str {
+pub const fn get_profile() -> &'static str {
     "debug"
 }
 
