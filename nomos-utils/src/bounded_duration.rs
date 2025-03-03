@@ -10,7 +10,7 @@ use time::Duration;
 // checked on compile time.
 /// This is a proxy type to be use to bound `Duration` deserialization checks.
 ///
-/// It embedded the check at type level. It implements the pertinent types from
+/// It embeds the checks at type level. It implements the pertinent types from
 /// the `serde_with` crate so it can be use within `serde_as` macros.
 ///
 /// # Examples
