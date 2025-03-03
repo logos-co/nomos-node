@@ -82,19 +82,19 @@ where
         self.replication.update_membership(membership);
     }
 
-    pub fn sampling_behaviour(&self) -> &SamplingBehaviour<Membership> {
+    pub const fn sampling_behaviour(&self) -> &SamplingBehaviour<Membership> {
         &self.sampling
     }
 
-    pub fn dispersal_executor_behaviour(&self) -> &DispersalExecutorBehaviour<Membership> {
+    pub const fn dispersal_executor_behaviour(&self) -> &DispersalExecutorBehaviour<Membership> {
         &self.executor_dispersal
     }
 
-    pub fn dispersal_validator_behaviour(&self) -> &DispersalValidatorBehaviour<Membership> {
+    pub const fn dispersal_validator_behaviour(&self) -> &DispersalValidatorBehaviour<Membership> {
         &self.validator_dispersal
     }
 
-    pub fn replication_behaviour(&self) -> &ReplicationBehaviour<Membership> {
+    pub const fn replication_behaviour(&self) -> &ReplicationBehaviour<Membership> {
         &self.replication
     }
 

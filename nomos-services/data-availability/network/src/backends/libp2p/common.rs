@@ -102,7 +102,6 @@ pub(crate) async fn handle_validator_events_stream(
         mut sampling_events_receiver,
         mut validation_events_receiver,
     } = events_streams;
-    #[allow(clippy::never_loop)]
     loop {
         // WARNING: `StreamExt::next` is cancellation safe.
         // If adding more branches check if such methods are within the cancellation

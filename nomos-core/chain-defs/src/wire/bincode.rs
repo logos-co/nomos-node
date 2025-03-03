@@ -9,7 +9,7 @@ use bincode::{
 use once_cell::sync::Lazy;
 
 // Type composition is cool but also makes naming types a bit awkward
-pub(crate) type BincodeOptions = WithOtherTrailing<
+pub type BincodeOptions = WithOtherTrailing<
     WithOtherIntEncoding<
         WithOtherLimit<WithOtherEndian<bincode::DefaultOptions, LittleEndian>, Bounded>,
         FixintEncoding,
@@ -20,8 +20,8 @@ pub(crate) type BincodeOptions = WithOtherTrailing<
 // TODO: Remove this once we transition to smaller proofs
 // Risc0 proofs are HUGE (220 Kb) and it's the only reason we need to have this
 // limit so large
-pub(crate) const DATA_LIMIT: u64 = 1 << 18; // Do not serialize/deserialize more than 256 KiB
-pub(crate) static OPTIONS: Lazy<BincodeOptions> = Lazy::new(|| {
+pub const DATA_LIMIT: u64 = 1 << 18; // Do not serialize/deserialize more than 256 KiB
+pub static OPTIONS: Lazy<BincodeOptions> = Lazy::new(|| {
     bincode::DefaultOptions::new()
         .with_little_endian()
         .with_limit(DATA_LIMIT)
@@ -29,10 +29,10 @@ pub(crate) static OPTIONS: Lazy<BincodeOptions> = Lazy::new(|| {
         .reject_trailing_bytes()
 });
 
-pub(crate) type BincodeDeserializer<'de> = bincode::Deserializer<SliceReader<'de>, BincodeOptions>;
-pub(crate) type BincodeSerializer<T> = bincode::Serializer<T, BincodeOptions>;
+pub type BincodeDeserializer<'de> = bincode::Deserializer<SliceReader<'de>, BincodeOptions>;
+pub type BincodeSerializer<T> = bincode::Serializer<T, BincodeOptions>;
 
-pub(crate) fn clone_bincode_error(error: &bincode::Error) -> bincode::Error {
+pub fn clone_bincode_error(error: &bincode::Error) -> bincode::Error {
     use bincode::ErrorKind;
     Box::new(match error.as_ref() {
         ErrorKind::Io(error) => ErrorKind::Io(std::io::Error::new(error.kind(), error.to_string())),

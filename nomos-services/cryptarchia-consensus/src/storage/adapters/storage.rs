@@ -19,6 +19,8 @@ where
 impl<Storage, Tx, BlobCertificate> StorageAdapter<Storage, Tx, BlobCertificate>
 where
     Storage: StorageBackend + Send + Sync,
+    Tx: Sync,
+    BlobCertificate: Sync,
 {
     /// Sends a store message to the storage service to retrieve a value by its
     /// key

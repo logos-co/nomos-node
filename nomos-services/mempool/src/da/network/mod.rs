@@ -6,7 +6,7 @@ use nomos_da_network_core::SubnetworkId;
 pub mod adapters;
 
 // TODO: remove after using it in the service
-#[allow(dead_code)]
+#[expect(dead_code)]
 #[async_trait::async_trait]
 pub trait DaNetworkAdapter {
     // TODO: bound to proper da-backend trait

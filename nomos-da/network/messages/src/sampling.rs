@@ -40,7 +40,7 @@ pub struct SampleRequest {
 }
 
 impl SampleRequest {
-    pub fn new(blob_id: BlobId, column_idx: ColumnIndex) -> Self {
+    pub const fn new(blob_id: BlobId, column_idx: ColumnIndex) -> Self {
         Self {
             blob_id,
             column_idx,
@@ -48,7 +48,7 @@ impl SampleRequest {
     }
 }
 
-#[allow(clippy::large_enum_variant)]
+#[expect(clippy::large_enum_variant)]
 #[repr(C)]
 #[derive(Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub enum SampleResponse {

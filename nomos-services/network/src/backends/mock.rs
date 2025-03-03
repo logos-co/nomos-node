@@ -111,7 +111,7 @@ pub struct MockConfig {
 
 pub enum MockBackendMessage {
     BootProducer {
-        #[allow(clippy::type_complexity)]
+        #[expect(clippy::type_complexity)]
         spawner: Box<
             dyn Fn(
                     BoxFuture<'static, Result<(), overwatch_rs::DynError>>,
@@ -281,8 +281,13 @@ impl NetworkBackend for Mock {
             }
             MockBackendMessage::Query { topic, tx } => {
                 tracing::info!("processed query");
-                let normal_msgs = self.messages.lock().unwrap();
-                let msgs = normal_msgs.get(&topic).cloned().unwrap_or_default();
+                let msgs = self
+                    .messages
+                    .lock()
+                    .unwrap()
+                    .get(&topic)
+                    .cloned()
+                    .unwrap_or_default();
                 let _ = tx.send(msgs);
             }
         };

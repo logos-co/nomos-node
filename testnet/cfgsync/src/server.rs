@@ -47,7 +47,7 @@ impl CfgSyncConfig {
             .map_err(|err| format!("Failed to parse config file: {}", err))
     }
 
-    pub fn to_consensus_params(&self) -> ConsensusParams {
+    pub const fn to_consensus_params(&self) -> ConsensusParams {
         ConsensusParams {
             n_participants: self.n_hosts,
             security_param: self.security_param,
@@ -98,16 +98,16 @@ async fn validator_config(
     let (reply_tx, reply_rx) = channel();
     config_repo.register(Host::default_validator_from_ip(ip, identifier), reply_tx);
 
-    match reply_rx.await {
-        Ok(config_response) => match config_response {
+    (reply_rx.await).map_or_else(
+        |_| (StatusCode::INTERNAL_SERVER_ERROR, "Error receiving config").into_response(),
+        |config_response| match config_response {
             RepoResponse::Config(config) => {
                 let config = create_validator_config(*config);
                 (StatusCode::OK, Json(config)).into_response()
             }
             RepoResponse::Timeout => (StatusCode::REQUEST_TIMEOUT).into_response(),
         },
-        Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, "Error receiving config").into_response(),
-    }
+    )
 }
 
 async fn executor_config(
@@ -119,21 +119,21 @@ async fn executor_config(
     let (reply_tx, reply_rx) = channel();
     config_repo.register(Host::default_executor_from_ip(ip, identifier), reply_tx);
 
-    match reply_rx.await {
-        Ok(config_response) => match config_response {
+    (reply_rx.await).map_or_else(
+        |_| (StatusCode::INTERNAL_SERVER_ERROR, "Error receiving config").into_response(),
+        |config_response| match config_response {
             RepoResponse::Config(config) => {
                 let config = create_executor_config(*config);
                 (StatusCode::OK, Json(config)).into_response()
             }
             RepoResponse::Timeout => (StatusCode::REQUEST_TIMEOUT).into_response(),
         },
-        Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, "Error receiving config").into_response(),
-    }
+    )
 }
 
 pub fn cfgsync_app(config_repo: Arc<ConfigRepo>) -> Router {
     Router::new()
         .route("/validator", post(validator_config))
         .route("/executor", post(executor_config))
-        .with_state(config_repo.clone())
+        .with_state(config_repo)
 }

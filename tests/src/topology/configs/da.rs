@@ -125,7 +125,7 @@ pub fn create_da_configs(ids: &[[u8; 32]], da_params: DaParams) -> Vec<GeneralDa
             let subnetwork_ids = membership.membership(&peer_id);
 
             GeneralDaConfig {
-                node_key: node_key.clone(),
+                node_key,
                 peer_id,
                 membership: membership.clone(),
                 addresses: addresses.clone(),

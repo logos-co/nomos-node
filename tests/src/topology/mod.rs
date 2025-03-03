@@ -30,8 +30,8 @@ pub struct TopologyConfig {
 }
 
 impl TopologyConfig {
-    pub fn two_validators() -> TopologyConfig {
-        TopologyConfig {
+    pub fn two_validators() -> Self {
+        Self {
             n_validators: 2,
             n_executors: 0,
             consensus_params: ConsensusParams::default_for_participants(2),
@@ -40,8 +40,8 @@ impl TopologyConfig {
         }
     }
 
-    pub fn validator_and_executor() -> TopologyConfig {
-        TopologyConfig {
+    pub fn validator_and_executor() -> Self {
+        Self {
             n_validators: 1,
             n_executors: 1,
             consensus_params: ConsensusParams::default_for_participants(2),

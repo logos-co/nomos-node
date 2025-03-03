@@ -1,3 +1,5 @@
+use std::convert::Infallible;
+
 use blake2::{
     digest::{Update, VariableOutput},
     Blake2bVar,
@@ -19,15 +21,15 @@ pub struct MockTransaction<M> {
 
 impl<M: Serialize> MockTransaction<M> {
     pub fn new(content: M) -> Self {
-        let id = MockTxId::from(serialize(&content).unwrap().as_slice());
+        let id = MockTxId::try_from(serialize(&content).unwrap().as_slice()).unwrap();
         Self { id, content }
     }
 
-    pub fn message(&self) -> &M {
+    pub const fn message(&self) -> &M {
         &self.content
     }
 
-    pub fn id(&self) -> MockTxId {
+    pub const fn id(&self) -> MockTxId {
         self.id
     }
 
@@ -41,17 +43,18 @@ impl<M: Serialize> MockTransaction<M> {
 }
 
 impl<M: Serialize> Transaction for MockTransaction<M> {
-    const HASHER: TransactionHasher<Self> = MockTransaction::id;
+    const HASHER: TransactionHasher<Self> = Self::id;
     type Hash = MockTxId;
 
     fn as_bytes(&self) -> Bytes {
-        MockTransaction::as_bytes(self)
+        Self::as_bytes(self)
     }
 }
 
+#[expect(clippy::fallible_impl_from)]
 impl<M: Serialize> From<M> for MockTransaction<M> {
     fn from(msg: M) -> Self {
-        let id = MockTxId::from(serialize(&msg).unwrap().as_slice());
+        let id = MockTxId::try_from(serialize(&msg).unwrap().as_slice()).unwrap();
         Self { id, content: msg }
     }
 }
@@ -82,18 +85,20 @@ impl AsRef<[u8]> for MockTxId {
 }
 
 impl MockTxId {
-    pub fn new(tx_id: [u8; 32]) -> MockTxId {
-        MockTxId(tx_id)
+    pub const fn new(tx_id: [u8; 32]) -> Self {
+        Self(tx_id)
     }
 }
 
-impl From<&[u8]> for MockTxId {
-    fn from(msg: &[u8]) -> Self {
+impl TryFrom<&[u8]> for MockTxId {
+    type Error = Infallible;
+
+    fn try_from(msg: &[u8]) -> Result<Self, Self::Error> {
         let mut hasher = Blake2bVar::new(32).unwrap();
         hasher.update(msg);
         let mut id = [0u8; 32];
         hasher.finalize_variable(&mut id).unwrap();
-        Self(id)
+        Ok(Self(id))
     }
 }
 

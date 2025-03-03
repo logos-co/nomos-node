@@ -73,7 +73,7 @@ struct Cryptarchia {
 }
 
 impl Cryptarchia {
-    fn tip(&self) -> HeaderId {
+    const fn tip(&self) -> HeaderId {
         self.consensus.tip()
     }
 
@@ -83,7 +83,7 @@ impl Cryptarchia {
             .expect("tip state not available")
     }
 
-    fn genesis(&self) -> HeaderId {
+    const fn genesis(&self) -> HeaderId {
         self.consensus.genesis()
     }
 
@@ -491,6 +491,7 @@ where
         let mut lifecycle_stream = self.service_state.lifecycle_handle.message_stream();
 
         async {
+            #[expect(clippy::redundant_pub_crate)]
             loop {
                 tokio::select! {
                     Some(block) = incoming_blocks.next() => {
@@ -730,9 +731,9 @@ where
             }
             ConsensusMsg::GetHeaders { from, to, tx } => {
                 // default to tip block if not present
-                let from = from.unwrap_or(cryptarchia.tip());
+                let from = from.unwrap_or_else(|| cryptarchia.tip());
                 // default to genesis block if not present
-                let to = to.unwrap_or(cryptarchia.genesis());
+                let to = to.unwrap_or_else(|| cryptarchia.genesis());
 
                 let mut res = Vec::new();
                 let mut cur = from;
@@ -753,7 +754,6 @@ where
         }
     }
 
-    #[allow(clippy::type_complexity, clippy::too_many_arguments)]
     #[instrument(level = "debug", skip(cryptarchia, leader, relays))]
     async fn process_block(
         mut cryptarchia: Cryptarchia,
@@ -840,7 +840,6 @@ where
         cryptarchia
     }
 
-    #[allow(clippy::too_many_arguments)]
     #[instrument(level = "debug", skip(tx_selector, blob_selector, relays))]
     async fn propose_block(
         parent: HeaderId,
@@ -944,7 +943,7 @@ pub enum ConsensusMsg<Block> {
 impl<Block: 'static> RelayMessage for ConsensusMsg<Block> {}
 
 #[serde_as]
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct CryptarchiaInfo {
     pub tip: HeaderId,

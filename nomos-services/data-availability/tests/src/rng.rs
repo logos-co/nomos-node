@@ -26,10 +26,10 @@ impl SeedableRng for TestRng {
 
     fn from_seed(seed: Self::Seed) -> Self {
         let seed_as_u64 = u64::from_le_bytes(seed);
-        TestRng(StepRng::new(seed_as_u64, 1))
+        Self(StepRng::new(seed_as_u64, 1))
     }
 
     fn seed_from_u64(seed: u64) -> Self {
-        TestRng(StepRng::new(seed, 1))
+        Self(StepRng::new(seed, 1))
     }
 }

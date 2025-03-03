@@ -10,6 +10,7 @@ use num_traits::Zero;
 
 /// Extend a polynomial over some factor `polynomial.len()*factor and return the
 /// original points plus the extra ones.
+///
 /// `factor` need to be `>1`
 pub fn encode(
     polynomial: &DensePolynomial<Fr>,
@@ -18,7 +19,9 @@ pub fn encode(
     Evaluations::from_vec_and_domain(domain.fft(&polynomial.coeffs), domain)
 }
 
-/// Interpolate points into a polynomial, then evaluate the polynomial in the
+/// Interpolate points into a polynomial.
+///
+/// Then evaluate the polynomial in the
 /// original evaluations to recover the original data.
 /// `domain` need to be the same domain of the original `evaluations` and
 /// `polynomial` used for encoding.
@@ -44,6 +47,7 @@ pub fn decode(
 }
 
 /// Interpolate a set of points using lagrange interpolation and roots of unity
+///
 /// Warning!! Be aware that the mapping between points and roots of unity is the
 /// intended: A polynomial `f(x)` is derived for `w_x` (root) mapping to p_x.
 /// `[(w_1, p_1)..(w_n, p_n)]` even if points are missing it is important to

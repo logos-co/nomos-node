@@ -92,13 +92,12 @@ impl MockBlendMessage {
     pub fn payload(message: &[u8]) -> Result<Vec<u8>, Error> {
         let padded_payload = &message[NODE_ID_SIZE * MAX_LAYERS..];
         // remove the payload padding
-        match padded_payload
+        padded_payload
             .iter()
             .rposition(|&x| x == PAYLOAD_PADDING_SEPARATOR)
-        {
-            Some(pos) => Ok(padded_payload[0..pos].to_vec()),
-            _ => Err(Error::InvalidBlendMessage),
-        }
+            .map_or(Err(Error::InvalidBlendMessage), |pos| {
+                Ok(padded_payload[0..pos].to_vec())
+            })
     }
 }
 

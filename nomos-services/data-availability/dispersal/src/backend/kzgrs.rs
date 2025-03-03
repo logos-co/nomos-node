@@ -41,7 +41,7 @@ pub struct DispersalFromAdapter<Adapter> {
 
 // remove if solved, this occurs in the timeout method below (out of our
 // handling)
-#[allow(dependency_on_unit_never_type_fallback)]
+#[expect(dependency_on_unit_never_type_fallback)]
 #[async_trait::async_trait]
 impl<Adapter> DaDispersal for DispersalFromAdapter<Adapter>
 where

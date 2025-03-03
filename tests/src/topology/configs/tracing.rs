@@ -14,7 +14,6 @@ pub struct GeneralTracingConfig {
 }
 
 impl GeneralTracingConfig {
-    #[allow(dead_code)]
     fn local_debug_tracing(id: usize) -> Self {
         let host_identifier = format!("node-{id}");
         Self {
@@ -32,8 +31,7 @@ impl GeneralTracingConfig {
                     // Allow events only from modules that matches the regex, if it matches - use
                     // provided tracing level. Libp2p and risc0 related crates are very log
                     // intensive in debug mode.
-                    filters: [("nomos", "debug")]
-                        .iter()
+                    filters: std::iter::once(&("nomos", "debug"))
                         .map(|(k, v)| (k.to_string(), v.to_string()))
                         .collect(),
                 }),
@@ -57,7 +55,6 @@ pub fn create_tracing_configs(ids: &[[u8; 32]]) -> Vec<GeneralTracingConfig> {
     }
 }
 
-#[allow(dead_code)]
 fn create_debug_configs(ids: &[[u8; 32]]) -> Vec<GeneralTracingConfig> {
     ids.iter()
         .enumerate()
@@ -65,7 +62,6 @@ fn create_debug_configs(ids: &[[u8; 32]]) -> Vec<GeneralTracingConfig> {
         .collect()
 }
 
-#[allow(dead_code)]
 fn create_default_configs(ids: &[[u8; 32]]) -> Vec<GeneralTracingConfig> {
     ids.iter()
         .map(|_| GeneralTracingConfig::default())

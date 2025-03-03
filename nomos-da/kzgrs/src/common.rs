@@ -32,7 +32,7 @@ impl fmt::Display for BlstError {
 
 impl From<BLST_ERROR> for KzgRsError {
     fn from(err: BLST_ERROR) -> Self {
-        KzgRsError::BlstError(BlstError(err))
+        Self::BlstError(BlstError(err))
     }
 }
 
@@ -80,11 +80,13 @@ pub fn bytes_to_evaluations<const CHUNK_SIZE: usize>(
 }
 
 /// Transform chunks of bytes (of size `CHUNK_SIZE`) into `Fr` which are
-/// considered evaluations of a polynomial. Then use FFT to transform that
-/// polynomial into coefficient form. `CHUNK_SIZE` needs to be 31 (bytes) or
-/// less, otherwise it cannot be encoded. The input data need to be padded, so
-/// it fits in a len modulus of `CHUNK_SIZE`. Returns the polynomial in
-/// evaluation form and in coefficient form
+/// considered evaluations of a polynomial.
+///
+/// Then use FFT to transform that polynomial into coefficient form.
+/// `CHUNK_SIZE` needs to be 31 (bytes) or less, otherwise it cannot be encoded.
+/// The input data need to be padded, so it fits in a len modulus of
+/// `CHUNK_SIZE`. Returns the polynomial in evaluation form and in coefficient
+/// form
 pub fn bytes_to_polynomial<const CHUNK_SIZE: usize>(
     data: &[u8],
     domain: GeneralEvaluationDomain<Fr>,
@@ -102,10 +104,11 @@ pub fn bytes_to_polynomial<const CHUNK_SIZE: usize>(
 }
 
 /// Transform chunks of bytes (of size `CHUNK_SIZE`) into `Fr` which are
-/// considered evaluations of a polynomial. Then use FFT to transform that
-/// polynomial into coefficient form. No extra checks are done for the caller.
-/// Caller need to ensure that `CHUNK_SIZE` is not bigger than the underlying
-/// `Fr` element can be decoded from.
+/// considered evaluations of a polynomial.
+///
+/// Then use FFT to transform that polynomial into coefficient form. No extra
+/// checks are done for the caller. Caller need to ensure that `CHUNK_SIZE` is
+/// not bigger than the underlying `Fr` element can be decoded from.
 pub fn bytes_to_polynomial_unchecked<const CHUNK_SIZE: usize>(
     data: &[u8],
     domain: GeneralEvaluationDomain<Fr>,
@@ -115,7 +118,8 @@ pub fn bytes_to_polynomial_unchecked<const CHUNK_SIZE: usize>(
     (evals, coefficients)
 }
 
-/// Transform arbitrary bytes into a field element
+/// Transform arbitrary bytes into a field element.
+///
 /// This transformation is bounds unchecked, it's up to the caller to know if
 /// data fits within the bls modulus.
 /// Data len cannot be higher than `BYTES_PER_FIELD_ELEMENT`

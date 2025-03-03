@@ -15,7 +15,6 @@ pub struct HeaderId([u8; 32]);
 #[derive(Clone, Debug, Eq, PartialEq, Copy, Hash)]
 pub struct ContentId([u8; 32]);
 
-#[allow(dead_code)]
 #[derive(Clone, Debug, Eq, PartialEq, Copy)]
 pub struct Nonce([u8; 32]);
 
@@ -33,7 +32,7 @@ pub struct Header {
 }
 
 impl Header {
-    pub fn parent(&self) -> HeaderId {
+    pub const fn parent(&self) -> HeaderId {
         self.parent
     }
 
@@ -62,19 +61,19 @@ impl Header {
         &self.leader_proof
     }
 
-    pub fn slot(&self) -> Slot {
+    pub const fn slot(&self) -> Slot {
         self.slot
     }
 
-    pub fn orphaned_proofs(&self) -> &[Header] {
+    pub fn orphaned_proofs(&self) -> &[Self] {
         &self.orphaned_leader_proofs
     }
 
-    pub fn content_size(&self) -> u32 {
+    pub const fn content_size(&self) -> u32 {
         self.content_size
     }
 
-    pub fn new(
+    pub const fn new(
         parent: HeaderId,
         content_size: u32,
         content_id: ContentId,
@@ -91,7 +90,7 @@ impl Header {
         }
     }
 
-    pub fn with_orphaned_proofs(mut self, orphaned_leader_proofs: Vec<Header>) -> Self {
+    pub fn with_orphaned_proofs(mut self, orphaned_leader_proofs: Vec<Self>) -> Self {
         self.orphaned_leader_proofs = orphaned_leader_proofs;
         self
     }
@@ -105,7 +104,7 @@ pub struct Builder {
 }
 
 impl Builder {
-    pub fn new(parent: HeaderId, slot: Slot, leader_proof: Risc0LeaderProof) -> Self {
+    pub const fn new(parent: HeaderId, slot: Slot, leader_proof: Risc0LeaderProof) -> Self {
         Self {
             parent,
             slot,
