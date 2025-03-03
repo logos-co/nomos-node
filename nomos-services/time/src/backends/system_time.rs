@@ -1,6 +1,6 @@
 use std::num::NonZero;
 
-use cryptarchia_engine::{EpochConfig, Slot, SlotConfig};
+use cryptarchia_engine::{time::SlotConfig, EpochConfig, Slot};
 use time::OffsetDateTime;
 
 use crate::{
@@ -44,7 +44,7 @@ impl TimeBackend for SystemTimeBackend {
 mod test {
     use std::{num::NonZero, time::Duration};
 
-    use cryptarchia_engine::{EpochConfig, Slot, SlotConfig};
+    use cryptarchia_engine::{time::SlotConfig, EpochConfig, Slot};
     use futures::StreamExt;
     use time::OffsetDateTime;
 

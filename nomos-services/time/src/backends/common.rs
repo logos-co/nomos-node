@@ -1,13 +1,16 @@
 use std::{num::NonZero, pin::Pin};
 
-use cryptarchia_engine::{time::SlotTimer, EpochConfig, Slot, SlotConfig};
+use cryptarchia_engine::{
+    time::{SlotConfig, SlotTimer},
+    EpochConfig, Slot,
+};
 use futures::StreamExt;
 use time::OffsetDateTime;
 use tokio_stream::wrappers::IntervalStream;
 
 use crate::{EpochSlotTickStream, SlotTick};
 
-pub(crate) fn slot_timer(
+pub fn slot_timer(
     slot_config: SlotConfig,
     datetime: OffsetDateTime,
     current_slot: Slot,

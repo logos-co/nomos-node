@@ -7,7 +7,7 @@ use std::{
     time::Duration,
 };
 
-use cryptarchia_engine::{EpochConfig, Slot, SlotConfig};
+use cryptarchia_engine::{time::SlotConfig, EpochConfig, Slot};
 use futures::{Stream, StreamExt};
 use sntpc::{fraction_to_nanoseconds, NtpResult};
 use time::OffsetDateTime;

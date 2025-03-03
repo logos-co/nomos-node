@@ -1,4 +1,3 @@
-// std
 use std::{
     num::NonZero,
     str::FromStr,
@@ -11,7 +10,7 @@ use std::{
 
 use cl::{NoteWitness, NullifierSecret};
 use cryptarchia_consensus::LeaderConfig;
-use cryptarchia_engine::{EpochConfig, SlotConfig};
+use cryptarchia_engine::{time::SlotConfig, EpochConfig};
 use kzgrs_backend::common::blob::DaBlob;
 use nomos_core::{da::DaEncoder as _, staking::NMO_UNIT};
 use nomos_da_verifier::backend::kzgrs::KzgrsDaVerifierSettings;
@@ -22,7 +21,6 @@ use tempfile::{NamedTempFile, TempDir};
 use time::OffsetDateTime;
 use tracing_subscriber::{fmt::TestWriter, EnvFilter};
 
-// internal
 use crate::common::*;
 
 #[test]

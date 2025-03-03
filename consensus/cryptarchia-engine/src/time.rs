@@ -13,11 +13,11 @@ pub struct Slot(u64);
 pub struct Epoch(u32);
 
 impl Slot {
-    pub fn to_be_bytes(&self) -> [u8; 8] {
+    pub const fn to_be_bytes(&self) -> [u8; 8] {
         self.0.to_be_bytes()
     }
 
-    pub fn genesis() -> Self {
+    pub const fn genesis() -> Self {
         Self(0)
     }
 
@@ -29,11 +29,11 @@ impl Slot {
         let since_start = offset_date_time - slot_config.chain_start_time;
         if since_start.is_negative() {
             // current slot is behind the start time, so return default 0
-            Slot::genesis()
+            Self::genesis()
         } else {
             // safety: since_start is already checked never negative in this case
             // division panics if `slot_duration` is less than a second.
-            Slot::from(
+            Self::from(
                 (since_start.whole_seconds() as u64)
                     .checked_div(slot_config.slot_duration.as_secs())
                     .expect("slots tick should be at least a second"),
@@ -75,23 +75,23 @@ impl From<Slot> for u64 {
 }
 
 impl Add<u64> for Slot {
-    type Output = Slot;
+    type Output = Self;
 
     fn add(self, rhs: u64) -> Self::Output {
-        Slot(self.0 + rhs)
+        Self(self.0 + rhs)
     }
 }
 
 impl Add<u32> for Epoch {
-    type Output = Epoch;
+    type Output = Self;
 
     fn add(self, rhs: u32) -> Self::Output {
-        Epoch(self.0 + rhs)
+        Self(self.0 + rhs)
     }
 }
 
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct EpochConfig {
     // The stake distribution is always taken at the beginning of the previous epoch.
     // This parameters controls how many slots to wait for it to be stabilized
@@ -107,10 +107,15 @@ pub struct EpochConfig {
 
 impl EpochConfig {
     pub fn epoch_length(&self, base_period_length: NonZero<u64>) -> u64 {
-        ((self.epoch_stake_distribution_stabilization.get()
-            + self.epoch_period_nonce_buffer.get()
-            + self.epoch_period_nonce_stabilization.get()) as u64)
-            .saturating_mul(base_period_length.get())
+        [
+            u64::from(self.epoch_stake_distribution_stabilization.get()),
+            u64::from(self.epoch_period_nonce_buffer.get()),
+            u64::from(self.epoch_period_nonce_stabilization.get()),
+        ]
+        .into_iter()
+        .reduce(u64::saturating_add)
+        .unwrap_or(0)
+        .saturating_mul(base_period_length.get())
     }
 
     pub fn epoch(&self, slot: Slot, base_period_length: NonZero<u64>) -> Epoch {
@@ -136,8 +141,8 @@ pub struct SlotTimer {
 
 #[cfg(feature = "tokio")]
 impl SlotTimer {
-    pub fn new(config: SlotConfig) -> Self {
-        SlotTimer { config }
+    pub const fn new(config: SlotConfig) -> Self {
+        Self { config }
     }
 
     pub fn current_slot(&self, now: OffsetDateTime) -> Slot {
