@@ -30,6 +30,7 @@ use time::Duration;
 // `MinimalBoundedDuration` and its implemented only by the supported types.
 #[expect(private_bounds)]
 #[derive(Serialize)]
+#[serde(transparent)]
 pub struct MinimalBoundedDuration<const MIN_DURATION: usize, TAG: TimeTag> {
     duration: Duration,
     #[serde(skip_serializing)]
