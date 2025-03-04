@@ -12,6 +12,7 @@ cl                       = { workspace = true }
 criterion                = { version = "0.5", features = ["async_tokio"] }
 cryptarchia-consensus    = { workspace = true }
 cryptarchia-engine       = { workspace = true, features = ["serde"] }
+common-http-client       = { workspace = true }
 executor-http-client     = { workspace = true }
 fixed                    = "1"
 fraction                 = "0.13"
@@ -64,9 +65,9 @@ path = "src/tests/cryptarchia/happy.rs"
 
 [[test]]
 name = "test_da"
-path = "src/tests/da.rs"
+path = "src/tests/da/disperse.rs"
 
 [[test]]
-name = "test_api_storage"
-path = "src/tests/api/storage.rs"
+name = "test_api"
+path = "src/tests/da/api.rs"
 

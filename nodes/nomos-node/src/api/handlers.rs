@@ -402,28 +402,68 @@ where
     make_request_and_return_response!(storage::block_req::<S, Tx>(&handle, id))
 }
 
+#[derive(Serialize, Deserialize)]
+pub struct DABlobCommitmentsRequest<B: Blob> {
+    pub blob_id: B::BlobId,
+}
+
 #[utoipa::path(
     get,
     path = paths::DA_GET_SHARED_COMMITMENTS,
     responses(
-        (status = 200, description = "Get blob shared commitments", body = <DaBlob as Blob>::BlobId),
+        (status = 200, description = "Request the commitments for an specific `BlobId`", body = DABlobCommitmentsRequest<DaBlob>),
         (status = 500, description = "Internal server error", body = String),
     )
 )]
 pub async fn da_get_commitments<StorageOp, DaBlob>(
     State(handle): State<OverwatchHandle>,
-    Json(blob_id): Json<<DaBlob as Blob>::BlobId>,
+    Json(req): Json<DABlobCommitmentsRequest<DaBlob>>,
 ) -> Response
 where
-    DaBlob: Blob + Serialize + DeserializeOwned + Clone + Send + Sync + 'static,
+    DaBlob: Blob,
     <DaBlob as Blob>::BlobId:
         AsRef<[u8]> + Serialize + DeserializeOwned + Clone + Send + Sync + 'static,
     <DaBlob as Blob>::SharedCommitments:
         serde::Serialize + DeserializeOwned + Send + Sync + 'static,
     StorageOp: StorageSerde + Send + Sync + 'static,
+    <StorageOp as StorageSerde>::Error: Send + Sync,
 {
     make_request_and_return_response!(storage::get_shared_commitments::<StorageOp, DaBlob>(
-        &handle, blob_id
+        &handle,
+        req.blob_id
+    ))
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct DAGetLightBlobReq<B: Blob> {
+    pub blob_id: B::BlobId,
+    pub column_idx: B::ColumnIndex,
+}
+
+#[utoipa::path(
+    get,
+    path = paths::DA_GET_LIGHT_BLOB,
+    responses(
+        (status = 200, description = "Get blob by blob id", body = GetLightBlobReq<DaBlob>),
+        (status = 500, description = "Internal server error", body = String),
+    )
+)]
+pub async fn da_get_light_blob<StorageOp, DaBlob>(
+    State(handle): State<OverwatchHandle>,
+    Json(request): Json<DAGetLightBlobReq<DaBlob>>,
+) -> Response
+where
+    DaBlob: Blob,
+    <DaBlob as Blob>::BlobId: AsRef<[u8]> + DeserializeOwned + Clone + Send + Sync + 'static,
+    <DaBlob as Blob>::ColumnIndex: AsRef<[u8]> + DeserializeOwned + Send + Sync + 'static,
+    <DaBlob as Blob>::LightBlob: Serialize + DeserializeOwned + Send + Sync + 'static,
+    StorageOp: StorageSerde + Send + Sync + 'static,
+    <StorageOp as StorageSerde>::Error: Send + Sync,
+{
+    make_request_and_return_response!(storage::get_light_blob::<StorageOp, DaBlob>(
+        &handle,
+        request.blob_id,
+        request.column_idx
     ))
 }
 
