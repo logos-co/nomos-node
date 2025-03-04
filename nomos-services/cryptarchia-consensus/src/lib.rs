@@ -454,9 +454,9 @@ where
             blend_relay,
             cl_mempool_relay,
             da_mempool_relay,
+            sampling_relay,
             block_subscription_sender,
             storage_relay,
-            sampling_relay,
             time_relay,
         })
     }
