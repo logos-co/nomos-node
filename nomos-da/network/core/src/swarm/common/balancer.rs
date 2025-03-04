@@ -138,7 +138,7 @@ where
         if self.interval.as_mut().poll_next(cx).is_ready() {
             let mut peers_to_connect = VecDeque::new();
 
-            for subnetwork_id in 0..self.membership.last_subnetwork_id() {
+            for subnetwork_id in 0..=self.membership.last_subnetwork_id() {
                 let stats = self
                     .subnetwork_stats
                     .get(&subnetwork_id)
@@ -201,7 +201,7 @@ mod tests {
     struct MockMembership {
         subnetwork: SubnetworkId,
         members: HashSet<PeerId>,
-        subnets: usize,
+        last_subnet_id: usize,
     }
 
     impl MembershipHandler for MockMembership {
@@ -233,7 +233,7 @@ mod tests {
         }
 
         fn last_subnetwork_id(&self) -> Self::NetworkId {
-            self.subnets.try_into().unwrap()
+            self.last_subnet_id as u16
         }
     }
 
@@ -246,7 +246,7 @@ mod tests {
         let membership = MockMembership {
             subnetwork: subnetwork_id,
             members: HashSet::from([peer1, peer2]),
-            subnets: 1,
+            last_subnet_id: 0,
         };
 
         let policy = MockPolicy { missing: 1 };
@@ -277,7 +277,7 @@ mod tests {
         let membership = MockMembership {
             subnetwork: subnetwork_id,
             members: HashSet::from([peer1, peer2, peer3, peer4]),
-            subnets: 1,
+            last_subnet_id: 0,
         };
 
         let policy = MockPolicy { missing: 2 };
@@ -306,7 +306,7 @@ mod tests {
         let membership = MockMembership {
             subnetwork: subnetwork_id,
             members: HashSet::from([peer1, peer2]),
-            subnets: 1,
+            last_subnet_id: 0,
         };
 
         let policy = MockPolicy { missing: 0 };

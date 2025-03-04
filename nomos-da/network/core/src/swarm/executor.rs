@@ -105,6 +105,8 @@ where
             balancer_interval_stream,
         );
 
+        tracing::info!("DA executor peer_id: {local_peer_id}");
+
         (
             Self {
                 swarm: Self::build_swarm(

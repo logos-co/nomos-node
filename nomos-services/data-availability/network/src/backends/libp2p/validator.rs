@@ -21,8 +21,8 @@ use tracing::instrument;
 
 use crate::backends::{
     libp2p::common::{
-        dial_validator_subnetwork_peers, handle_sample_request, handle_validator_events_stream,
-        DaNetworkBackendSettings, SamplingEvent, BROADCAST_CHANNEL_SIZE,
+        handle_sample_request, handle_validator_events_stream, DaNetworkBackendSettings,
+        SamplingEvent, BROADCAST_CHANNEL_SIZE,
     },
     NetworkBackend,
 };
@@ -102,15 +102,6 @@ where
             .unwrap_or_else(|e| {
                 panic!("Error listening on DA network with address {address}: {e}")
             });
-        // Dial peers in the same subnetworks (Node might participate in multiple).
-        let local_peer_id = *validator_swarm.local_peer_id();
-
-        dial_validator_subnetwork_peers(
-            &config.membership,
-            &config.addresses,
-            validator_swarm.protocol_swarm_mut(),
-            local_peer_id,
-        );
 
         let sampling_request_channel = validator_swarm.sample_request_channel();
 

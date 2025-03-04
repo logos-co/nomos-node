@@ -6,7 +6,6 @@ use std::{
     time::Duration,
 };
 
-use fixed::types::U57F7;
 use nomos_da_network_core::swarm::{DAConnectionMonitorSettings, DAConnectionPolicySettings};
 use nomos_libp2p::{ed25519, Multiaddr, PeerId};
 use nomos_node::NomosDaMembership;
@@ -49,15 +48,22 @@ impl Default for DaParams {
             num_samples: 1,
             num_subnets: 2,
             old_blobs_check_interval: Duration::from_secs(5),
-            blobs_validity_duration: Duration::from_secs(u64::MAX),
+            blobs_validity_duration: Duration::from_secs(60),
             global_params_path: GLOBAL_PARAMS_PATH.to_string(),
-            policy_settings: DAConnectionPolicySettings::default(),
+            policy_settings: DAConnectionPolicySettings {
+                min_dispersal_peers: 1,
+                min_replication_peers: 1,
+                max_dispersal_failures: 2,
+                max_sampling_failures: 2,
+                max_replication_failures: 2,
+                malicious_threshold: 10,
+            },
             monitor_settings: DAConnectionMonitorSettings {
-                failure_time_window: Duration::from_secs(1),
-                time_decay_factor: U57F7::ZERO,
+                failure_time_window: Duration::from_secs(5),
+                ..Default::default()
             },
             balancer_interval: Duration::from_secs(5),
-            redial_cooldown: Duration::from_secs(5),
+            redial_cooldown: Duration::ZERO,
         }
     }
 }

@@ -15,6 +15,7 @@ nomos-core               = { workspace = true }
 nomos-da-network-core    = { workspace = true }
 nomos-da-network-service = { workspace = true }
 nomos-da-storage         = { workspace = true }
+nomos-da-verifier        = { workspace = true }
 nomos-storage            = { workspace = true }
 nomos-tracing            = { workspace = true }
 overwatch-derive         = { workspace = true }

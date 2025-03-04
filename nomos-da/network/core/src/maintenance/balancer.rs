@@ -1,7 +1,7 @@
 use std::{
     collections::VecDeque,
     convert::Infallible,
-    task::{Context, Poll},
+    task::{Context, Poll, Waker},
 };
 
 use libp2p::{
@@ -35,19 +35,32 @@ pub struct ConnectionBalancerBehaviour<Balancer> {
     addresses: AddressBook,
     balancer: Balancer,
     peers_to_dial: VecDeque<PeerId>,
+    waker: Option<Waker>,
 }
 
-impl<Balancer> ConnectionBalancerBehaviour<Balancer> {
-    pub const fn new(addresses: AddressBook, balancer: Balancer) -> Self {
+impl<Balancer> ConnectionBalancerBehaviour<Balancer>
+where
+    Balancer: ConnectionBalancer,
+{
+    pub fn new(addresses: AddressBook, balancer: Balancer) -> Self {
+        tracing::info!("Balancer address book: {addresses:?}");
         Self {
             addresses,
             balancer,
             peers_to_dial: VecDeque::new(),
+            waker: None,
         }
     }
 
     pub fn update_addresses(&mut self, addresses: AddressBook) {
         self.addresses = addresses;
+    }
+
+    fn record_event(&mut self, event: ConnectionEvent) {
+        self.balancer.record_event(event);
+        if let Some(waker) = self.waker.take() {
+            waker.wake();
+        }
     }
 }
 
@@ -65,8 +78,7 @@ where
         _: &Multiaddr,
         _: &Multiaddr,
     ) -> Result<Self::ConnectionHandler, ConnectionDenied> {
-        self.balancer
-            .record_event(ConnectionEvent::OpenInbound(peer));
+        self.record_event(ConnectionEvent::OpenInbound(peer));
         Ok(dummy::ConnectionHandler)
     }
 
@@ -78,8 +90,7 @@ where
         _: Endpoint,
         _: PortUse,
     ) -> Result<Self::ConnectionHandler, ConnectionDenied> {
-        self.balancer
-            .record_event(ConnectionEvent::OpenOutbound(peer));
+        self.record_event(ConnectionEvent::OpenOutbound(peer));
         Ok(dummy::ConnectionHandler)
     }
 
@@ -90,12 +101,10 @@ where
         {
             match endpoint {
                 Dialer { .. } => {
-                    self.balancer
-                        .record_event(ConnectionEvent::CloseInbound(peer_id));
+                    self.record_event(ConnectionEvent::CloseInbound(peer_id));
                 }
                 Listener { .. } => {
-                    self.balancer
-                        .record_event(ConnectionEvent::CloseOutbound(peer_id));
+                    self.record_event(ConnectionEvent::CloseOutbound(peer_id));
                 }
             }
         }
@@ -122,14 +131,15 @@ where
 
         if let Some(peer) = self.peers_to_dial.pop_front() {
             if let Some(addr) = self.addresses.get_address(&peer) {
-                return Poll::Ready(ToSwarm::Dial {
-                    opts: DialOpts::peer_id(peer)
-                        .addresses(vec![addr.clone()])
-                        .build(),
-                });
+                let opts = DialOpts::peer_id(peer)
+                    .addresses(vec![addr.clone()])
+                    .extend_addresses_through_behaviour()
+                    .build();
+                return Poll::Ready(ToSwarm::Dial { opts });
             }
         }
 
+        self.waker = Some(cx.waker().clone());
         Poll::Pending
     }
 }

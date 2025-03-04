@@ -1,4 +1,4 @@
-use std::{fmt::Debug, hash::Hash};
+use std::{fmt::Debug, hash::Hash, marker::PhantomData};
 
 use nomos_blend_service::{network::NetworkAdapter as BlendNetworkAdapter, ServiceMessage};
 use nomos_core::{
@@ -51,6 +51,7 @@ pub struct CryptarchiaConsensusRelays<
     SamplingRng,
     Storage,
     TxS,
+    DaVerifierBackend,
 > where
     BlendAdapter: blend::BlendAdapter<Network: BlendNetworkAdapter>,
     BS: BlobSelect,
@@ -63,6 +64,8 @@ pub struct CryptarchiaConsensusRelays<
     SamplingRng: SeedableRng + RngCore,
     SamplingBackend: DaSamplingServiceBackend<SamplingRng>,
     TxS: TxSelect,
+    DaVerifierBackend: nomos_da_verifier::backend::VerifierBackend + Send + Sync + 'static,
+    DaVerifierBackend::Settings: Clone,
 {
     network_relay: NetworkRelay<<NetworkAdapter as network::NetworkAdapter>::Backend>,
     blend_relay: BlendRelay<
@@ -72,6 +75,7 @@ pub struct CryptarchiaConsensusRelays<
     da_mempool_relay: DaMempoolRelay<DaPool, DaPoolAdapter, SamplingBackend::BlobId>,
     storage_adapter: StorageAdapter<Storage, TxS::Tx, BS::BlobId>,
     sampling_relay: SamplingRelay<DaPool::Key>,
+    _phantom_data: PhantomData<DaVerifierBackend>,
 }
 
 impl<
@@ -86,6 +90,7 @@ impl<
         SamplingRng,
         Storage,
         TxS,
+        DaVerifierBackend,
     >
     CryptarchiaConsensusRelays<
         BlendAdapter,
@@ -99,6 +104,7 @@ impl<
         SamplingRng,
         Storage,
         TxS,
+        DaVerifierBackend,
     >
 where
     BlendAdapter: blend::BlendAdapter<Network: BlendNetworkAdapter>,
@@ -125,6 +131,8 @@ where
     SamplingBackend::Blob: Debug,
     SamplingBackend::BlobId: Debug,
     TxS: TxSelect<Tx = ClPool::Item> + Clone + Send + Sync,
+    DaVerifierBackend: nomos_da_verifier::backend::VerifierBackend + Send + Sync + 'static,
+    DaVerifierBackend::Settings: Clone,
 {
     pub async fn new(
         network_relay: NetworkRelay<<NetworkAdapter as network::NetworkAdapter>::Backend>,
@@ -145,15 +153,23 @@ where
             da_mempool_relay,
             storage_adapter,
             sampling_relay,
+            _phantom_data: PhantomData,
         }
     }
 
-    pub async fn from_relays<SamplingNetworkAdapter, SamplingStorage>(
+    #[allow(clippy::type_complexity)]
+    pub async fn from_relays<
+        SamplingNetworkAdapter,
+        SamplingStorage,
+        DaVerifierNetwork,
+        DaVerifierStorage,
+    >(
         network_relay: Relay<NetworkService<NetworkAdapter::Backend>>,
         blend_relay: Relay<
             nomos_blend_service::BlendService<BlendAdapter::Backend, BlendAdapter::Network>,
         >,
         cl_mempool_relay: Relay<TxMempoolService<ClPoolAdapter, ClPool>>,
+
         da_mempool_relay: Relay<
             DaMempoolService<
                 DaPoolAdapter,
@@ -162,14 +178,20 @@ where
                 SamplingNetworkAdapter,
                 SamplingRng,
                 SamplingStorage,
+                DaVerifierBackend,
+                DaVerifierNetwork,
+                DaVerifierStorage,
             >,
         >,
-        sampling_relay: Relay<
+        #[allow(clippy::type_complexity)] sampling_relay: Relay<
             DaSamplingService<
                 SamplingBackend,
                 SamplingNetworkAdapter,
                 SamplingRng,
                 SamplingStorage,
+                DaVerifierBackend,
+                DaVerifierNetwork,
+                DaVerifierStorage,
             >,
         >,
         storage_relay: Relay<StorageService<Storage>>,
@@ -177,6 +199,11 @@ where
     where
         SamplingNetworkAdapter: nomos_da_sampling::network::NetworkAdapter,
         SamplingStorage: nomos_da_sampling::storage::DaStorageAdapter,
+        DaVerifierStorage: nomos_da_verifier::storage::DaStorageAdapter + Send + Sync,
+        DaVerifierBackend: nomos_da_verifier::backend::VerifierBackend + Send + Sync + 'static,
+        DaVerifierBackend::Settings: Clone,
+        DaVerifierNetwork: nomos_da_verifier::network::NetworkAdapter + Send + Sync,
+        DaVerifierNetwork::Settings: Clone,
     {
         let network_relay = network_relay
             .connect()

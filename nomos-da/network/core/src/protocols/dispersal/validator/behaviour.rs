@@ -189,6 +189,7 @@ impl<M: MembershipHandler<Id = PeerId, NetworkId = SubnetworkId> + 'static> Netw
         match tasks.poll_next_unpin(cx) {
             Poll::Ready(Some(Ok((peer_id, message, stream)))) => {
                 tasks.push(Self::handle_new_stream(peer_id, stream).boxed());
+                cx.waker().wake_by_ref();
                 return Poll::Ready(ToSwarm::GenerateEvent(DispersalEvent::IncomingMessage {
                     message: Box::new(message),
                 }));
@@ -200,9 +201,9 @@ impl<M: MembershipHandler<Id = PeerId, NetworkId = SubnetworkId> + 'static> Netw
         }
         if let Poll::Ready(Some((peer_id, stream))) = incoming_streams.poll_next_unpin(cx) {
             tasks.push(Self::handle_new_stream(peer_id, stream).boxed());
+            cx.waker().wake_by_ref();
         }
-        // TODO: probably must be smarter when to wake this
-        cx.waker().wake_by_ref();
+
         Poll::Pending
     }
 }

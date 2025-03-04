@@ -27,6 +27,9 @@ pub struct KzgrsMempoolAdapter<
     SamplingNetworkAdapter,
     SamplingRng,
     SamplingStorage,
+    DaVerifierBackend,
+    DaVerifierNetwork,
+    DaVerifierStorage,
 > where
     DaPool: MemPool<BlockId = HeaderId>,
     DaPoolAdapter: MempoolAdapter<Key = DaPool::Key>,
@@ -41,6 +44,7 @@ pub struct KzgrsMempoolAdapter<
         SamplingRng,
         SamplingStorage,
     )>,
+    _phantom2: PhantomData<(DaVerifierBackend, DaVerifierNetwork, DaVerifierStorage)>,
 }
 
 #[async_trait::async_trait]
@@ -51,6 +55,9 @@ impl<
         SamplingNetworkAdapter,
         SamplingRng,
         SamplingStorage,
+        DaVerifierBackend,
+        DaVerifierNetwork,
+        DaVerifierStorage,
     > DaMempoolAdapter
     for KzgrsMempoolAdapter<
         DaPoolAdapter,
@@ -59,6 +66,9 @@ impl<
         SamplingNetworkAdapter,
         SamplingRng,
         SamplingStorage,
+        DaVerifierBackend,
+        DaVerifierNetwork,
+        DaVerifierStorage,
     >
 where
     DaPool: MemPool<BlockId = HeaderId, Key = BlobId>,
@@ -74,6 +84,11 @@ where
     SamplingBackend::BlobId: Debug + 'static,
     SamplingNetworkAdapter: nomos_da_sampling::network::NetworkAdapter + Send + Sync,
     SamplingStorage: nomos_da_sampling::storage::DaStorageAdapter + Send + Sync,
+    DaVerifierStorage: nomos_da_verifier::storage::DaStorageAdapter + Send + Sync,
+    DaVerifierBackend: nomos_da_verifier::backend::VerifierBackend + Send + Sync + 'static,
+    DaVerifierBackend::Settings: Clone,
+    DaVerifierNetwork: nomos_da_verifier::network::NetworkAdapter + Send + Sync,
+    DaVerifierNetwork::Settings: Clone,
 {
     type MempoolService = DaMempoolService<
         DaPoolAdapter,
@@ -82,6 +97,9 @@ where
         SamplingNetworkAdapter,
         SamplingRng,
         SamplingStorage,
+        DaVerifierBackend,
+        DaVerifierNetwork,
+        DaVerifierStorage,
     >;
     type BlobId = BlobId;
     type Metadata = dispersal::Metadata;
@@ -90,6 +108,7 @@ where
         Self {
             mempool_relay,
             _phantom: PhantomData,
+            _phantom2: PhantomData,
         }
     }
 

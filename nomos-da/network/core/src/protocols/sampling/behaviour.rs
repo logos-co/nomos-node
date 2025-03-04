@@ -1,5 +1,5 @@
 use std::{
-    collections::{HashMap, HashSet, VecDeque},
+    collections::{HashMap, VecDeque},
     task::{Context, Poll},
 };
 
@@ -11,7 +11,7 @@ use futures::{
     },
     future::BoxFuture,
     stream::{BoxStream, FuturesUnordered},
-    AsyncWriteExt, FutureExt, StreamExt, TryFutureExt,
+    AsyncWriteExt, FutureExt, StreamExt,
 };
 use kzgrs_backend::common::{blob::DaBlob, ColumnIndex};
 use libp2p::{
@@ -242,10 +242,12 @@ struct ResponseChannel {
     response_receiver: Receiver<BehaviourSampleRes>,
 }
 
-type StreamHandlerFutureSuccess = (BlobId, SubnetworkId, sampling::SampleResponse, SampleStream);
+type StreamWriterFutureSuccess = (BlobId, SubnetworkId, sampling::SampleResponse, SampleStream);
+type StreamWriterFutureError = (SamplingError, Option<SampleStream>);
 type OutgoingStreamHandlerFuture =
-    BoxFuture<'static, Result<StreamHandlerFutureSuccess, SamplingError>>;
-type IncomingStreamHandlerFuture = BoxFuture<'static, Result<SampleStream, SamplingError>>;
+    BoxFuture<'static, Result<StreamWriterFutureSuccess, StreamWriterFutureError>>;
+type IncomingStreamHandlerFuture =
+    BoxFuture<'static, Result<SampleStream, (SamplingError, SampleStream)>>;
 /// Executor sampling protocol
 /// Takes care of sending and replying sampling requests
 pub struct SamplingBehaviour<Membership: MembershipHandler> {
@@ -267,8 +269,8 @@ pub struct SamplingBehaviour<Membership: MembershipHandler> {
     membership: Membership,
     /// Pending blobs that need to be dispersed by `PeerId`
     to_sample: HashMap<PeerId, VecDeque<(Membership::NetworkId, BlobId)>>,
-    /// Already connected peers connection Ids
-    connected_peers: HashSet<PeerId>,
+    /// Sample streams that has no tasks and should be closed.
+    to_close: VecDeque<SampleStream>,
     /// Hook of pending samples channel
     samples_request_sender: UnboundedSender<(Membership::NetworkId, BlobId)>,
     /// Pending samples stream
@@ -292,10 +294,10 @@ where
         let incoming_tasks = FuturesUnordered::new();
 
         let to_sample = HashMap::new();
+        let to_close = VecDeque::new();
 
         let (samples_request_sender, receiver) = mpsc::unbounded_channel();
         let samples_request_stream = UnboundedReceiverStream::new(receiver).boxed();
-        let connected_peers = HashSet::new();
         Self {
             peer_id,
             addresses,
@@ -306,7 +308,7 @@ where
             incoming_tasks,
             membership,
             to_sample,
-            connected_peers,
+            to_close,
             samples_request_sender,
             samples_request_stream,
         }
@@ -340,20 +342,40 @@ where
         message: sampling::SampleRequest,
         subnetwork_id: SubnetworkId,
         blob_id: BlobId,
-    ) -> Result<StreamHandlerFutureSuccess, SamplingError> {
-        let into_sampling_error = |error: std::io::Error| -> SamplingError {
-            SamplingError::Io {
-                peer_id: stream.peer_id,
-                error,
+    ) -> Result<StreamWriterFutureSuccess, StreamWriterFutureError> {
+        if let Err(error) = pack_to_writer(&message, &mut stream.stream).await {
+            return Err((
+                SamplingError::Io {
+                    peer_id: stream.peer_id,
+                    error,
+                },
+                Some(stream),
+            ));
+        }
+
+        if let Err(error) = stream.stream.flush().await {
+            return Err((
+                SamplingError::Io {
+                    peer_id: stream.peer_id,
+                    error,
+                },
+                Some(stream),
+            ));
+        }
+
+        let response = match unpack_from_reader(&mut stream.stream).await {
+            Ok(response) => response,
+            Err(error) => {
+                return Err((
+                    SamplingError::Io {
+                        peer_id: stream.peer_id,
+                        error,
+                    },
+                    Some(stream),
+                ));
             }
         };
-        pack_to_writer(&message, &mut stream.stream)
-            .map_err(into_sampling_error)
-            .await?;
-        stream.stream.flush().await.map_err(into_sampling_error)?;
-        let response: sampling::SampleResponse = unpack_from_reader(&mut stream.stream)
-            .await
-            .map_err(into_sampling_error)?;
+
         // Safety: blob_id should always be a 32bytes hash
         Ok((blob_id, subnetwork_id, response, stream))
     }
@@ -373,8 +395,9 @@ where
     fn handle_outgoing_stream(
         outgoing_tasks: &FuturesUnordered<OutgoingStreamHandlerFuture>,
         to_sample: &mut HashMap<PeerId, VecDeque<(SubnetworkId, BlobId)>>,
-        connected_peers: &mut HashSet<PeerId>,
-        mut stream: SampleStream,
+        to_close: &mut VecDeque<SampleStream>,
+        stream: SampleStream,
+        cx: &Context<'_>,
     ) {
         let peer = stream.peer_id;
 
@@ -383,64 +406,88 @@ where
             let sample_request = sampling::SampleRequest::new(blob_id, subnetwork_id);
             outgoing_tasks
                 .push(Self::stream_sample(stream, sample_request, subnetwork_id, blob_id).boxed());
-        // if not pop stream from connected ones
+            cx.waker().wake_by_ref();
         } else {
-            tokio::task::spawn(async move {
-                if let Err(error) = stream.stream.close().await {
-                    error!("Error closing sampling stream: {error}");
-                };
-            });
-            connected_peers.remove(&peer);
+            // if not pop stream from connected ones
+            to_close.push_back(stream);
         }
     }
 
-    /// Handler incoming streams
-    /// Pull a request from the stream and replies if possible
+    /// Handler for incoming streams
+    /// Pulls a request from the stream and replies if possible
     async fn handle_incoming_stream(
         mut stream: SampleStream,
         channel: ResponseChannel,
-    ) -> Result<SampleStream, SamplingError> {
-        let request: sampling::SampleRequest = unpack_from_reader(&mut stream.stream)
-            .await
-            .map_err(|error| SamplingError::Io {
-                peer_id: stream.peer_id,
-                error,
-            })?;
-        let request = BehaviourSampleReq::try_from(request).map_err(|blob_id| {
-            SamplingError::InvalidBlobId {
-                peer_id: stream.peer_id,
-                blob_id,
+    ) -> Result<SampleStream, (SamplingError, SampleStream)> {
+        let request: sampling::SampleRequest = match unpack_from_reader(&mut stream.stream).await {
+            Ok(req) => req,
+            Err(error) => {
+                return Err((
+                    SamplingError::Io {
+                        peer_id: stream.peer_id,
+                        error,
+                    },
+                    stream,
+                ))
             }
-        })?;
-        channel
-            .request_sender
-            .send(request)
-            .map_err(|request| SamplingError::RequestChannel {
-                request,
-                peer_id: stream.peer_id,
-            })?;
-        let response: sampling::SampleResponse = channel
-            .response_receiver
-            .await
-            .map_err(|error| SamplingError::ResponseChannel {
-                error,
-                peer_id: stream.peer_id,
-            })?
-            .into();
-        pack_to_writer(&response, &mut stream.stream)
-            .map_err(|error| SamplingError::Io {
-                peer_id: stream.peer_id,
-                error,
-            })
-            .await?;
-        stream
-            .stream
-            .flush()
-            .await
-            .map_err(|error| SamplingError::Io {
-                peer_id: stream.peer_id,
-                error,
-            })?;
+        };
+
+        let request = match BehaviourSampleReq::try_from(request) {
+            Ok(req) => req,
+            Err(blob_id) => {
+                return Err((
+                    SamplingError::InvalidBlobId {
+                        peer_id: stream.peer_id,
+                        blob_id,
+                    },
+                    stream,
+                ))
+            }
+        };
+
+        if let Err(request) = channel.request_sender.send(request) {
+            return Err((
+                SamplingError::RequestChannel {
+                    request,
+                    peer_id: stream.peer_id,
+                },
+                stream,
+            ));
+        }
+
+        let response: sampling::SampleResponse = match channel.response_receiver.await {
+            Ok(resp) => resp.into(),
+            Err(error) => {
+                return Err((
+                    SamplingError::ResponseChannel {
+                        error,
+                        peer_id: stream.peer_id,
+                    },
+                    stream,
+                ))
+            }
+        };
+
+        if let Err(error) = pack_to_writer(&response, &mut stream.stream).await {
+            return Err((
+                SamplingError::Io {
+                    peer_id: stream.peer_id,
+                    error,
+                },
+                stream,
+            ));
+        }
+
+        if let Err(error) = stream.stream.flush().await {
+            return Err((
+                SamplingError::Io {
+                    peer_id: stream.peer_id,
+                    error,
+                },
+                stream,
+            ));
+        }
+
         Ok(stream)
     }
 
@@ -450,6 +497,7 @@ where
     fn schedule_incoming_stream_task(
         incoming_tasks: &FuturesUnordered<IncomingStreamHandlerFuture>,
         sample_stream: SampleStream,
+        cx: &Context<'_>,
     ) -> (Receiver<BehaviourSampleReq>, Sender<BehaviourSampleRes>) {
         let (request_sender, request_receiver) = oneshot::channel();
         let (response_sender, response_receiver) = oneshot::channel();
@@ -458,6 +506,8 @@ where
             response_receiver,
         };
         incoming_tasks.push(Self::handle_incoming_stream(sample_stream, channel).boxed());
+        // Scheduled a task, lets poll again.
+        cx.waker().wake_by_ref();
         (request_receiver, response_sender)
     }
 }
@@ -467,13 +517,10 @@ impl<Membership: MembershipHandler<Id = PeerId, NetworkId = SubnetworkId> + 'sta
 {
     /// Schedule a new task for sample the blob, if stream is not available
     /// queue messages for later processing.
-    #[expect(clippy::too_many_arguments)]
     fn sample(
         peer_id: PeerId,
         outgoing_tasks: &FuturesUnordered<OutgoingStreamHandlerFuture>,
         membership: &Membership,
-        connected_peers: &mut HashSet<PeerId>,
-        to_sample: &mut HashMap<PeerId, VecDeque<(Membership::NetworkId, BlobId)>>,
         subnetwork_id: SubnetworkId,
         blob_id: BlobId,
         control: &Control,
@@ -488,24 +535,19 @@ impl<Membership: MembershipHandler<Id = PeerId, NetworkId = SubnetworkId> + 'sta
             .copied()
             .next()
             .expect("At least a single node should be a member of the subnetwork");
-        // if its connected means we are already working on some other sample, enqueue
-        // message
-        if connected_peers.contains(&peer) {
-            to_sample
-                .entry(peer)
-                .or_default()
-                .push_back((subnetwork_id, blob_id));
-        } else {
-            connected_peers.insert(peer);
-            let control = control.clone();
-            let sample_request = sampling::SampleRequest::new(blob_id, subnetwork_id);
-            let with_dial_task: OutgoingStreamHandlerFuture = async move {
-                let stream = Self::open_stream(peer, control).await?;
-                Self::stream_sample(stream, sample_request, subnetwork_id, blob_id).await
-            }
-            .boxed();
-            outgoing_tasks.push(with_dial_task);
+        // If its connected means we are already working on some other sample, enqueue
+        // message, stream behaviour will dial peer if connection is not
+        // present.
+        let control = control.clone();
+        let sample_request = sampling::SampleRequest::new(blob_id, subnetwork_id);
+        let with_dial_task: OutgoingStreamHandlerFuture = async move {
+            let stream = Self::open_stream(peer, control)
+                .await
+                .map_err(|err| (err, None))?;
+            Self::stream_sample(stream, sample_request, subnetwork_id, blob_id).await
         }
+        .boxed();
+        outgoing_tasks.push(with_dial_task);
     }
 
     /// Auxiliary method that transforms a sample response into an event
@@ -583,9 +625,6 @@ impl<M: MembershipHandler<Id = PeerId, NetworkId = SubnetworkId> + 'static> Netw
     }
 
     fn on_swarm_event(&mut self, event: FromSwarm) {
-        if let FromSwarm::ConnectionClosed(connection_closed) = &event {
-            self.connected_peers.remove(&connection_closed.peer_id);
-        }
         self.stream_behaviour.on_swarm_event(event);
     }
 
@@ -609,8 +648,8 @@ impl<M: MembershipHandler<Id = PeerId, NetworkId = SubnetworkId> + 'static> Netw
             outgoing_tasks,
             incoming_tasks,
             to_sample,
+            to_close,
             samples_request_stream,
-            connected_peers,
             incoming_streams,
             membership,
             control,
@@ -624,8 +663,6 @@ impl<M: MembershipHandler<Id = PeerId, NetworkId = SubnetworkId> + 'static> Netw
                 *peer_id,
                 outgoing_tasks,
                 membership,
-                connected_peers,
-                to_sample,
                 subnetwork_id,
                 blob_id,
                 control,
@@ -637,12 +674,7 @@ impl<M: MembershipHandler<Id = PeerId, NetworkId = SubnetworkId> + 'static> Netw
                 Ok((blob_id, subnetwork_id, sample_response, stream)) => {
                     let peer_id = stream.peer_id;
                     // handle the free stream then return the success
-                    Self::handle_outgoing_stream(
-                        outgoing_tasks,
-                        to_sample,
-                        connected_peers,
-                        stream,
-                    );
+                    Self::handle_outgoing_stream(outgoing_tasks, to_sample, to_close, stream, cx);
                     return Self::handle_sample_response(
                         blob_id,
                         subnetwork_id,
@@ -650,10 +682,10 @@ impl<M: MembershipHandler<Id = PeerId, NetworkId = SubnetworkId> + 'static> Netw
                         peer_id,
                     );
                 }
-                // Something went up on our side of the wire, bubble it up
-                Err(error) => {
-                    if let Some(peer_id) = error.peer_id() {
-                        connected_peers.remove(peer_id);
+                Err((error, stream)) => {
+                    if let Some(stream) = stream {
+                        to_close.push_back(stream);
+                        cx.waker().wake_by_ref();
                     }
                     return Poll::Ready(ToSwarm::GenerateEvent(SamplingEvent::SamplingError {
                         error,
@@ -665,7 +697,7 @@ impl<M: MembershipHandler<Id = PeerId, NetworkId = SubnetworkId> + 'static> Netw
         if let Poll::Ready(Some((peer_id, stream))) = incoming_streams.poll_next_unpin(cx) {
             let sample_stream = SampleStream { stream, peer_id };
             let (request_receiver, response_sender) =
-                Self::schedule_incoming_stream_task(incoming_tasks, sample_stream);
+                Self::schedule_incoming_stream_task(incoming_tasks, sample_stream, cx);
             return Poll::Ready(ToSwarm::GenerateEvent(SamplingEvent::IncomingSample {
                 request_receiver,
                 response_sender,
@@ -676,13 +708,22 @@ impl<M: MembershipHandler<Id = PeerId, NetworkId = SubnetworkId> + 'static> Netw
             match res {
                 Ok(sample_stream) => {
                     let (request_receiver, response_sender) =
-                        Self::schedule_incoming_stream_task(incoming_tasks, sample_stream);
+                        Self::schedule_incoming_stream_task(incoming_tasks, sample_stream, cx);
                     return Poll::Ready(ToSwarm::GenerateEvent(SamplingEvent::IncomingSample {
                         request_receiver,
                         response_sender,
                     }));
                 }
-                Err(error) => {
+                //  Ignore `UnexpectedEof` errors and continue polling, stream is closed by the
+                //  sender after the message is sent.
+                Err((SamplingError::Io { error, .. }, stream))
+                    if error.kind() == std::io::ErrorKind::UnexpectedEof =>
+                {
+                    to_close.push_back(stream);
+                    cx.waker().wake_by_ref();
+                    return Poll::Pending;
+                }
+                Err((error, _)) => {
                     return Poll::Ready(ToSwarm::GenerateEvent(SamplingEvent::SamplingError {
                         error,
                     }))
@@ -690,25 +731,27 @@ impl<M: MembershipHandler<Id = PeerId, NetworkId = SubnetworkId> + 'static> Netw
             }
         }
         // Deal with connection as the underlying behaviour would do
-        match self.stream_behaviour.poll(cx) {
-            Poll::Ready(ToSwarm::Dial { mut opts }) => {
-                // attach known peer address if possible
-                if let Some(address) = opts
-                    .get_peer_id()
-                    .and_then(|peer_id: PeerId| self.addresses.get_address(&peer_id))
-                {
-                    opts = DialOpts::peer_id(opts.get_peer_id().unwrap())
-                        .addresses(vec![address.clone()])
-                        .build();
-                }
-                Poll::Ready(ToSwarm::Dial { opts })
+        if let Poll::Ready(ToSwarm::Dial { mut opts }) = self.stream_behaviour.poll(cx) {
+            // attach known peer address if possible
+            if let Some(address) = opts
+                .get_peer_id()
+                .and_then(|peer_id: PeerId| self.addresses.get_address(&peer_id))
+            {
+                opts = DialOpts::peer_id(opts.get_peer_id().unwrap())
+                    .addresses(vec![address.clone()])
+                    .extend_addresses_through_behaviour()
+                    .build();
+                return Poll::Ready(ToSwarm::Dial { opts });
             }
-            Poll::Pending => {
-                // TODO: probably must be smarter when to wake this
-                cx.waker().wake_by_ref();
-                Poll::Pending
-            }
-            Poll::Ready(_) => unreachable!(),
         }
+        // Discard stream, if still pending pushback to close later.
+        if let Some(mut stream) = to_close.pop_front() {
+            if stream.stream.close().poll_unpin(cx).is_pending() {
+                to_close.push_back(stream);
+                cx.waker().wake_by_ref();
+            }
+        }
+
+        Poll::Pending
     }
 }

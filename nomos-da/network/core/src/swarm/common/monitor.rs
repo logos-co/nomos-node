@@ -24,6 +24,7 @@ use crate::{
     },
 };
 
+#[derive(Debug)]
 pub enum MonitorEvent {
     ExecutorDispersal(ExecutorDispersalError),
     ValidatorDispersal(ValidatorDispersalError),
@@ -48,9 +49,14 @@ impl From<&DispersalExecutorEvent> for MonitorEvent {
     fn from(event: &DispersalExecutorEvent) -> Self {
         match event {
             DispersalExecutorEvent::DispersalSuccess { .. } => Self::Noop,
-            DispersalExecutorEvent::DispersalError { error } => {
-                Self::ExecutorDispersal(error.clone())
-            }
+            DispersalExecutorEvent::DispersalError { error } => match error {
+                // Only map Io or OpenStreamError to MonitorEvent
+                &ExecutorDispersalError::Io { .. }
+                | &ExecutorDispersalError::OpenStreamError { .. } => {
+                    Self::ExecutorDispersal(error.clone())
+                }
+                _ => Self::Noop, // All other cases return Noop
+            },
         }
     }
 }
@@ -81,7 +87,13 @@ impl From<&SamplingEvent> for MonitorEvent {
             SamplingEvent::SamplingSuccess { .. } | SamplingEvent::IncomingSample { .. } => {
                 Self::Noop
             }
-            SamplingEvent::SamplingError { error } => Self::Sampling(error.clone()),
+            SamplingEvent::SamplingError { error } => match error {
+                // Only map Io or OpenStreamError to Self
+                &SamplingError::Io { .. } | &SamplingError::OpenStream { .. } => {
+                    Self::Sampling(error.clone())
+                }
+                _ => Self::Noop, // All other cases return Noop
+            },
         }
     }
 }
@@ -246,6 +258,7 @@ where
 
     fn record_event(&mut self, event: Self::Event) -> Option<ConnectionMonitorOutput> {
         if let Some(peer_id) = event.peer_id() {
+            tracing::info!("MONITOR EVENT: {event:?}");
             let stats = self.peer_stats.entry(*peer_id).or_default();
             let now = Instant::now();
             match event {
