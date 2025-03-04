@@ -62,6 +62,7 @@ rustflags = [
   "-Aclippy::semicolon_outside_block",
   "-Aclippy::single_call_fn",
   "-Aclippy::single_char_lifetime_names",
+  "-Aclippy::unreachable",
   "-Aclippy::unseparated_literal_suffix",
   "-Aclippy::unwrap_in_result",
   "-Aclippy::use_debug",
@@ -146,6 +147,5 @@ rustflags = [
   "-Aclippy::unnecessary_safety_doc",
   "-Aclippy::unnecessary_self_imports",
   "-Aclippy::unneeded_field_pattern",
-  "-Aclippy::unreachable",
   "-Aclippy::unwrap_used",
 ]
