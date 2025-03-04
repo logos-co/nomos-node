@@ -86,7 +86,7 @@ mod tests {
             } = self;
 
             service_state_handle.state_updater.update(Self::State {
-                value: "Hello".to_string(),
+                value: "Hello".to_owned(),
             });
 
             service_state_handle.overwatch_handle.shutdown().await;

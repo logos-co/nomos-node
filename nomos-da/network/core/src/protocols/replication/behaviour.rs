@@ -303,13 +303,7 @@ mod tests {
         fn members_of(&self, subnetwork: &Self::NetworkId) -> HashSet<Self::Id> {
             self.membership
                 .iter()
-                .filter_map(|(id, nets)| {
-                    if nets.contains(subnetwork) {
-                        Some(*id)
-                    } else {
-                        None
-                    }
-                })
+                .filter_map(|(id, nets)| nets.contains(subnetwork).then_some(*id))
                 .collect()
         }
 

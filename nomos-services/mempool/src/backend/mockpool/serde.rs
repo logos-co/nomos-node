@@ -5,7 +5,7 @@ use serde::{
     Deserialize, Deserializer as DeserializerTrait, Serialize, Serializer as SerializerTrait,
 };
 
-pub(super) fn serialize_pending_items<Key, Item, Serializer>(
+pub(in super) fn serialize_pending_items<Key, Item, Serializer>(
     items: &LinkedHashMap<Key, Item>,
     serializer: Serializer,
 ) -> Result<Serializer::Ok, Serializer::Error>
@@ -17,7 +17,7 @@ where
     items.iter().collect::<Vec<_>>().serialize(serializer)
 }
 
-pub(super) fn deserialize_pending_items<'de, Key, Item, Deserializer>(
+pub(in super) fn deserialize_pending_items<'de, Key, Item, Deserializer>(
     deserializer: Deserializer,
 ) -> Result<LinkedHashMap<Key, Item>, Deserializer::Error>
 where

@@ -750,7 +750,7 @@ pub mod tests {
         ));
 
         // the evolved note is eligible after note 1 is spent
-        assert!(update_ledger(&mut ledger, h, 2, evolve(note)).is_ok());
+        update_ledger(&mut ledger, h, 2, evolve(note)).unwrap();
     }
 
     #[test]

@@ -323,7 +323,7 @@ mod tests {
         let config = MockConfig {
             predefined_messages: vec![
                 MockMessage {
-                    payload: "foo".to_string(),
+                    payload: "foo".to_owned(),
                     content_topic: MockContentTopic {
                         application_name: "mock network".into(),
                         version: 0,
@@ -333,7 +333,7 @@ mod tests {
                     timestamp: 0,
                 },
                 MockMessage {
-                    payload: "bar".to_string(),
+                    payload: "bar".to_owned(),
                     content_topic: MockContentTopic {
                         application_name: "mock network".into(),
                         version: 0,
@@ -362,9 +362,9 @@ mod tests {
         // broadcast
         for val in FOO_BROADCAST_MESSAGES {
             mock.process(MockBackendMessage::Broadcast {
-                topic: "foo".to_string(),
+                topic: "foo".to_owned(),
                 msg: MockMessage {
-                    payload: (*val).to_string(),
+                    payload: (*val).to_owned(),
                     content_topic: MockContentTopic {
                         application_name: "mock".into(),
                         version: 1,
@@ -382,9 +382,9 @@ mod tests {
 
         for val in BAR_BROADCAST_MESSAGES {
             mock.process(MockBackendMessage::Broadcast {
-                topic: "bar".to_string(),
+                topic: "bar".to_owned(),
                 msg: MockMessage {
-                    payload: (*val).to_string(),
+                    payload: (*val).to_owned(),
                     content_topic: MockContentTopic {
                         application_name: "mock".into(),
                         version: 1,
@@ -403,7 +403,7 @@ mod tests {
         // query
         let (qtx, qrx) = oneshot::channel();
         mock.process(MockBackendMessage::Query {
-            topic: "foo".to_string(),
+            topic: "foo".to_owned(),
             tx: qtx,
         })
         .await;
@@ -415,11 +415,11 @@ mod tests {
 
         // subscribe
         mock.process(MockBackendMessage::RelaySubscribe {
-            topic: "foo".to_string(),
+            topic: "foo".to_owned(),
         })
         .await;
         mock.process(MockBackendMessage::RelaySubscribe {
-            topic: "bar".to_string(),
+            topic: "bar".to_owned(),
         })
         .await;
         assert!(mock.subscribed_topics.lock().unwrap().contains("foo"));
@@ -427,13 +427,13 @@ mod tests {
 
         // unsubscribe
         mock.process(MockBackendMessage::RelayUnSubscribe {
-            topic: "foo".to_string(),
+            topic: "foo".to_owned(),
         })
         .await;
         assert!(!mock.subscribed_topics.lock().unwrap().contains("foo"));
         assert!(mock.subscribed_topics.lock().unwrap().contains("bar"));
         mock.process(MockBackendMessage::RelayUnSubscribe {
-            topic: "bar".to_string(),
+            topic: "bar".to_owned(),
         })
         .await;
         assert!(!mock.subscribed_topics.lock().unwrap().contains("foo"));

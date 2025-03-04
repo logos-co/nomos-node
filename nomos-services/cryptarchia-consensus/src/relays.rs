@@ -157,7 +157,7 @@ where
         }
     }
 
-    #[allow(clippy::type_complexity)]
+    #[expect(clippy::type_complexity)]
     pub async fn from_relays<
         SamplingNetworkAdapter,
         SamplingStorage,
@@ -183,7 +183,7 @@ where
                 DaVerifierStorage,
             >,
         >,
-        #[allow(clippy::type_complexity)] sampling_relay: Relay<
+        sampling_relay: Relay<
             DaSamplingService<
                 SamplingBackend,
                 SamplingNetworkAdapter,

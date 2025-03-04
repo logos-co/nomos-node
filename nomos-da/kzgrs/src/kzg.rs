@@ -111,7 +111,7 @@ mod test {
     #[test]
     fn test_poly_commit() {
         let poly = DensePolynomial::from_coefficients_vec((0..10).map(Fr::from).collect());
-        assert!(commit_polynomial(&poly, &GLOBAL_PARAMETERS).is_ok());
+        commit_polynomial(&poly, &GLOBAL_PARAMETERS).unwrap();
     }
 
     #[test]

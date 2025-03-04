@@ -282,7 +282,7 @@ mod tests {
         let DialError::Denied { cause } = dial(&mut dialer, &listener).unwrap_err() else {
             panic!("unexpected dial error")
         };
-        assert!(cause.downcast::<TemporarilyBlocked>().is_ok());
+        cause.downcast::<TemporarilyBlocked>().unwrap();
     }
 
     #[tokio::test]
@@ -304,12 +304,12 @@ mod tests {
         let DialError::Denied { cause } = dial(&mut dialer, &listener).unwrap_err() else {
             panic!("unexpected dial error")
         };
-        assert!(cause.downcast::<TemporarilyBlocked>().is_ok());
+        cause.downcast::<TemporarilyBlocked>().unwrap();
 
         tokio::time::sleep(Duration::from_millis(150)).await;
 
         // Attempt to dial again (should succeed)
-        assert!(dial(&mut dialer, &listener).is_ok());
+        dial(&mut dialer, &listener).unwrap();
     }
 
     #[tokio::test]
@@ -339,7 +339,7 @@ mod tests {
                 _ => None,
             })
             .await;
-        assert!(cause.downcast::<Blocked>().is_ok());
+        cause.downcast::<Blocked>().unwrap();
     }
 
     fn dial(

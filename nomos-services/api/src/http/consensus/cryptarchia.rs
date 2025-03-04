@@ -129,7 +129,6 @@ where
     Ok(receiver.await?)
 }
 
-#[allow(clippy::type_complexity)]
 pub async fn cryptarchia_headers<
     'a,
     Tx,

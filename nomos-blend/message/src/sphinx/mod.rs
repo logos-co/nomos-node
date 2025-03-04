@@ -59,7 +59,7 @@ fn parse_bytes<'a>(data: &'a [u8], sizes: &[usize]) -> Result<Vec<&'a [u8]>, Str
         .iter()
         .map(|&size| {
             if i + size > data.len() {
-                return Err("The sum of sizes exceeds the length of the input slice".to_string());
+                return Err("The sum of sizes exceeds the length of the input slice".to_owned());
             }
             let slice = &data[i..i + size];
             i += size;

@@ -1,7 +1,7 @@
 //! Serializer for wire formats.
 // TODO: we're using bincode for now, but might need strong guarantees about
 // the underlying format in the future for standardization.
-pub(crate) mod bincode;
+pub(in crate) mod bincode;
 pub mod deserialization;
 pub mod errors;
 pub mod serialization;

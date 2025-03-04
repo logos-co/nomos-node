@@ -249,11 +249,10 @@ mod test {
             })
             .collect();
 
-        assert!(bytes_to_polynomial::<BYTES_PER_FIELD_ELEMENT>(
+        bytes_to_polynomial::<BYTES_PER_FIELD_ELEMENT>(
             column2.as_bytes().as_slice(),
             column_data.domain
-        )
-        .is_err());
+        ).unwrap_err();
 
         assert!(!DaVerifier::verify_column(
             &GLOBAL_PARAMETERS,

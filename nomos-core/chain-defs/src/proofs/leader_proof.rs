@@ -170,10 +170,9 @@ mod test {
             risc0_zkvm::default_prover().as_ref(),
         )
         .unwrap();
-        assert!(proof
+        proof
             .risc0_receipt
-            .verify(nomos_risc0_proofs::PROOF_OF_LEADERSHIP_ID)
-            .is_ok());
+            .verify(nomos_risc0_proofs::PROOF_OF_LEADERSHIP_ID).unwrap();
 
         assert_eq!(
             expected_public_inputs,

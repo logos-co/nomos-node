@@ -63,4 +63,4 @@ macro_rules! adapter_for {
     };
 }
 
-pub(crate) use adapter_for;
+pub(in crate) use adapter_for;

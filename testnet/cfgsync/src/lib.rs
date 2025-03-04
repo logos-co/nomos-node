@@ -58,7 +58,7 @@ mod tests {
                 .unwrap();
         });
 
-        assert!(timeout(Duration::from_millis(50), app_ready).await.is_ok());
+        let _ = timeout(Duration::from_millis(50), app_ready).await.unwrap();
 
         let client_fn = |i| async move {
             let ip = Ipv4Addr::from_str(&format!("1.0.0.{i}")).unwrap();

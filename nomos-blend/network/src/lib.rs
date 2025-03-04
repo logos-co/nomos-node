@@ -84,9 +84,8 @@ mod test {
         };
 
         // Expect for the task to be completed within 30 seconds.
-        assert!(tokio::time::timeout(Duration::from_secs(30), task)
-            .await
-            .is_ok());
+        tokio::time::timeout(Duration::from_secs(30), task)
+            .await.unwrap();
     }
 
     /// If the peer doesn't support the blend protocol, the message should not
@@ -188,12 +187,11 @@ mod test {
         };
 
         // Expect for the task to be completed in time
-        assert!(tokio::time::timeout(
+        tokio::time::timeout(
             conn_monitor_settings.interval + Duration::from_secs(1),
             task
         )
-        .await
-        .is_ok());
+        .await.unwrap();
     }
 
     #[tokio::test]
@@ -253,12 +251,11 @@ mod test {
         };
 
         // Expect for the task to be completed in time
-        assert!(tokio::time::timeout(
+        tokio::time::timeout(
             conn_monitor_settings.interval + Duration::from_secs(1),
             task
         )
-        .await
-        .is_ok());
+        .await.unwrap();
     }
 
     fn new_blend_swarm(
