@@ -5,9 +5,11 @@ pub mod validator;
 pub mod test {
     use futures::StreamExt;
     use kzgrs_backend::common::{blob::DaBlob, Column};
-    use libp2p::{identity::Keypair, quic, swarm::SwarmEvent, Multiaddr, PeerId};
+    use libp2p::Transport;
+    use libp2p::{identity::Keypair, swarm::SwarmEvent, Multiaddr, PeerId, swarm::NetworkBehaviour};
+    use libp2p::core::{transport::MemoryTransport, upgrade::Version};
+    use std::time::Duration;
     use log::info;
-    use subnetworks_assignations::MembershipHandler;
     use tracing_subscriber::{fmt::TestWriter, EnvFilter};
 
     use crate::{
@@ -17,45 +19,31 @@ pub mod test {
             validator::behaviour::{DispersalEvent, DispersalValidatorBehaviour},
         },
         test_utils::AllNeighbours,
-        SubnetworkId,
     };
 
-    pub fn executor_swarm(
-        addressbook: AddressBook,
+    pub fn new_in_memory<TBehavior>(
         key: Keypair,
-        membership: impl MembershipHandler<NetworkId = SubnetworkId, Id = PeerId> + 'static,
-    ) -> libp2p::Swarm<
-        DispersalExecutorBehaviour<impl MembershipHandler<NetworkId = SubnetworkId, Id = PeerId>>,
-    > {
-        let peer_id = PeerId::from_public_key(&key.public());
-        libp2p::SwarmBuilder::with_existing_identity(key)
+        behavior: TBehavior,
+    ) -> libp2p::Swarm<TBehavior>
+    where
+        TBehavior: NetworkBehaviour + Send,
+    {        
+        libp2p::SwarmBuilder::with_existing_identity(key.clone())
             .with_tokio()
-            .with_other_transport(|keypair| quic::tokio::Transport::new(quic::Config::new(keypair)))
-            .unwrap()
-            .with_behaviour(|_key| {
-                DispersalExecutorBehaviour::new(peer_id, membership, addressbook)
+            .with_other_transport(|_| {
+                let transport = MemoryTransport::default()
+                    .upgrade(Version::V1)
+                    .authenticate(libp2p::plaintext::Config::new(&key))
+                    .multiplex(libp2p::yamux::Config::default())
+                    .timeout(Duration::from_secs(20));
+                   
+                Ok(transport)
             })
             .unwrap()
-            .with_swarm_config(|cfg| {
-                cfg.with_idle_connection_timeout(std::time::Duration::from_secs(u64::MAX))
-            })
-            .build()
-    }
-
-    pub fn validator_swarm(
-        key: Keypair,
-        membership: impl MembershipHandler<NetworkId = SubnetworkId, Id = PeerId> + 'static,
-    ) -> libp2p::Swarm<
-        DispersalValidatorBehaviour<impl MembershipHandler<NetworkId = SubnetworkId, Id = PeerId>>,
-    > {
-        libp2p::SwarmBuilder::with_existing_identity(key)
-            .with_tokio()
-            .with_other_transport(|keypair| quic::tokio::Transport::new(quic::Config::new(keypair)))
-            .unwrap()
-            .with_behaviour(|_key| DispersalValidatorBehaviour::new(membership))
+            .with_behaviour(|_| behavior)  
             .unwrap()
             .with_swarm_config(|cfg| {
-                cfg.with_idle_connection_timeout(std::time::Duration::from_secs(u64::MAX))
+                cfg.with_idle_connection_timeout(Duration::from_secs(u64::MAX))
             })
             .build()
     }
@@ -78,12 +66,24 @@ pub mod test {
             .into_iter()
             .collect(),
         };
-        let addr: Multiaddr = "/ip4/127.0.0.1/udp/5063/quic-v1".parse().unwrap();
+        let addr: Multiaddr = "/memory/1".parse().unwrap();
         let addr2 = addr.clone().with_p2p(validator_peer).unwrap();
         let addressbook =
             AddressBook::from_iter([(PeerId::from_public_key(&k2.public()), addr2.clone())]);
-        let mut executor = executor_swarm(addressbook, k1, neighbours.clone());
-        let mut validator = validator_swarm(k2, neighbours);
+
+        let executor_behavior = DispersalExecutorBehaviour::new(
+            PeerId::from_public_key(&k1.public()),
+            neighbours.clone(),
+            addressbook
+        );
+
+        let mut executor = new_in_memory(k1, executor_behavior);
+
+        let validator_behavior  = DispersalValidatorBehaviour::new(
+            neighbours.clone(),
+        );
+
+        let mut validator = new_in_memory(k2, validator_behavior);
 
         let msg_count = 10usize;
 
