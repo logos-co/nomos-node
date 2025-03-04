@@ -106,16 +106,13 @@ impl Stream for NtpStream {
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         // try update time
         if let Poll::Ready(Some(timestamp)) = self.interval.poll_next_unpin(cx) {
-            let seconds = Duration::from_secs(u64::from(timestamp.sec()));
+            let seconds = Duration::from_secs(timestamp.sec().into());
             let nanos_fraction =
-                Duration::from_nanos(u64::from(fraction_to_nanoseconds(timestamp.sec_fraction())));
+                Duration::from_nanos(fraction_to_nanoseconds(timestamp.sec_fraction()).into());
             let roundtrip = Duration::from_micros(timestamp.roundtrip());
 
             let date = OffsetDateTime::from_unix_timestamp_nanos(
-                (seconds + nanos_fraction + roundtrip)
-                    .as_nanos()
-                    .try_into()
-                    .expect("Failed to convert u128 to i128"),
+                (seconds + nanos_fraction + roundtrip).as_nanos() as i128,
             )
             .expect("Datetime synchronization failed");
             let current_slot = Slot::from_offset_and_config(date, self.slot_config);

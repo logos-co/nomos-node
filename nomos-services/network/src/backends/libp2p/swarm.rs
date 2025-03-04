@@ -204,7 +204,7 @@ impl SwarmHandler {
                 return;
             }
 
-            let wait = Self::exp_backoff(dial.retry_count.try_into().unwrap());
+            let wait = Self::exp_backoff(dial.retry_count);
             tracing::debug!("Retry dialing in {wait:?}: {dial:?}");
 
             let commands_tx = self.commands_tx.clone();
@@ -233,7 +233,7 @@ impl SwarmHandler {
                 }
             }
             Err(gossipsub::PublishError::InsufficientPeers) if retry_count < MAX_RETRY => {
-                let wait = Self::exp_backoff(retry_count.try_into().unwrap());
+                let wait = Self::exp_backoff(retry_count);
                 tracing::error!("failed to broadcast message to topic due to insufficient peers, trying again in {wait:?}");
 
                 let commands_tx = self.commands_tx.clone();
@@ -255,7 +255,7 @@ impl SwarmHandler {
         }
     }
 
-    const fn exp_backoff(retry: u32) -> Duration {
-        std::time::Duration::from_secs(BACKOFF.pow(retry))
+    const fn exp_backoff(retry: usize) -> Duration {
+        std::time::Duration::from_secs(BACKOFF.pow(retry as u32))
     }
 }

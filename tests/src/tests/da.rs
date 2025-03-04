@@ -110,12 +110,12 @@ async fn local_testnet() {
     let executor = &topology.executors()[0];
     let app_id = hex::decode(APP_ID).expect("Invalid APP_ID");
 
-    let mut index = 0u8;
+    let mut index = 0u64;
     loop {
         disseminate_with_metadata(
             executor,
             &generate_data(index),
-            create_metadata(&app_id, index.into()),
+            create_metadata(&app_id, index),
         )
         .await;
 
@@ -124,8 +124,8 @@ async fn local_testnet() {
     }
 }
 
-fn generate_data(index: u8) -> Vec<u8> {
-    (index..index + 31).collect()
+fn generate_data(index: u64) -> Vec<u8> {
+    (index as u8..index as u8 + 31).collect()
 }
 
 fn create_metadata(app_id: &[u8], index: u64) -> kzgrs_backend::dispersal::Metadata {

@@ -83,14 +83,8 @@ where
                 outbound: 0,
             });
 
-        stats.inbound = (isize::try_from(stats.inbound).unwrap() + inbound)
-            .max(0)
-            .try_into()
-            .unwrap();
-        stats.outbound = (isize::try_from(stats.outbound).unwrap() + outbound)
-            .max(0)
-            .try_into()
-            .unwrap();
+        stats.inbound = (stats.inbound as isize + inbound).max(0) as usize;
+        stats.outbound = (stats.outbound as isize + outbound).max(0) as usize;
     }
 
     fn select_missing_peers(

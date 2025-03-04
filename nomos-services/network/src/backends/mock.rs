@@ -374,8 +374,7 @@ mod tests {
                     timestamp: chrono::Utc::now()
                         .timestamp_nanos_opt()
                         .expect("timestamp should be in valid range")
-                        .try_into()
-                        .unwrap(),
+                        as usize,
                 },
             })
             .await;
@@ -395,8 +394,7 @@ mod tests {
                     timestamp: chrono::Utc::now()
                         .timestamp_nanos_opt()
                         .expect("timestamp should be in valid range")
-                        .try_into()
-                        .unwrap(),
+                        as usize,
                 },
             })
             .await;

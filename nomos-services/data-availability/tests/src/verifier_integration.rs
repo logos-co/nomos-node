@@ -54,7 +54,7 @@ fn test_verifier() {
         .collect::<Vec<_>>();
 
     let commitments = notes.iter().zip(&sks).map(|(n, sk)| n.commit(sk.commit()));
-    let genesis_state = LedgerState::from_commitments(commitments, ids.len().try_into().unwrap());
+    let genesis_state = LedgerState::from_commitments(commitments, (ids.len() as u32).into());
     let ledger_config = nomos_ledger::Config {
         epoch_config: EpochConfig {
             epoch_stake_distribution_stabilization: NonZero::new(3).unwrap(),

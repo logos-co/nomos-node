@@ -152,8 +152,8 @@ mod test {
 
     fn create_sampler(num_samples: usize, num_subnets: usize) -> KzgrsSamplingBackend<StdRng> {
         let settings = KzgrsSamplingBackendSettings {
-            num_samples: num_samples.try_into().unwrap(),
-            num_subnets: num_subnets.try_into().unwrap(),
+            num_samples: num_samples as u16,
+            num_subnets: num_subnets as u16,
             old_blobs_check_interval: Duration::from_millis(20),
             blobs_validity_duration: Duration::from_millis(10),
         };
@@ -308,7 +308,7 @@ mod test {
         // we already added subnet 42
         for i in 1..(subnet_num - 1) {
             let mut b = blob2.clone();
-            b.column_idx = i.try_into().unwrap();
+            b.column_idx = i as u16;
             sampler.handle_sampling_success(b1, b).await;
         }
         assert!(sampler.validated_blobs.is_empty());
@@ -327,7 +327,7 @@ mod test {
         // we should have all subnets set,
         // and the validated blobs should now have that blob
         // pending blobs should now be empty
-        blob3.column_idx = u16::try_from(subnet_num - 1).unwrap();
+        blob3.column_idx = (subnet_num - 1) as u16;
         sampler.handle_sampling_success(b1, blob3).await;
         assert!(sampler.pending_sampling_blobs.is_empty());
         assert!(sampler.validated_blobs.len() == 1);

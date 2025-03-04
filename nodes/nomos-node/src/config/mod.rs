@@ -232,7 +232,7 @@ pub fn update_network(
     }
 
     if let Some(port) = port {
-        network.backend.inner.port = port;
+        network.backend.inner.port = port as u16;
     }
 
     if let Some(node_key) = node_key {
@@ -306,7 +306,7 @@ pub fn update_cryptarchia_consensus(
     if let (Some(value), Some(nonce)) = (note_value, note_nonce) {
         let nonce = Nonce::from_bytes(<[u8; 32]>::from_hex(nonce)?);
         cryptarchia.leader_config.notes.push(NoteWitness::new(
-            u64::from(value),
+            value.into(),
             NMO_UNIT,
             CovenantProof::nop_constraint(),
             [0; 32],

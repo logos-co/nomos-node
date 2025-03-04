@@ -27,8 +27,9 @@ impl LeaderPublic {
         let total_stake_sq_big = total_stake_big.checked_mul(&total_stake_big).unwrap();
         let double_total_stake_sq_big = total_stake_sq_big.checked_mul(&U256::from_u64(2)).unwrap();
 
-        let precision_f64 = f64::MAX;
+        let precision_u64 = u64::MAX;
         let precision_big = U256::from_u64(u64::MAX);
+        let precision_f64 = precision_u64 as f64;
         let order: U256 = U256::MAX;
 
         let order_div_precision = order.checked_div(&precision_big).unwrap();

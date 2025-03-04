@@ -19,8 +19,7 @@ async fn happy_test(topology: &Topology) {
     let security_param = config.cryptarchia.config.consensus_config.security_param;
     let n_blocks = security_param.get() * CHAIN_LENGTH_MULTIPLIER;
     println!("waiting for {n_blocks} blocks");
-    let timeout = (f64::from(n_blocks)
-        / config.cryptarchia.config.consensus_config.active_slot_coeff
+    let timeout = (n_blocks as f64 / config.cryptarchia.config.consensus_config.active_slot_coeff
         * config
             .time
             .backend_settings
@@ -36,7 +35,7 @@ async fn happy_test(topology: &Topology) {
         tokio::select! {
             () = timeout => panic!("timed out waiting for nodes to produce {} blocks", n_blocks),
             () = async { while stream::iter(nodes)
-                .any(|n| async move { u32::try_from(n.consensus_info().await.height).unwrap() < n_blocks })
+                .any(|n| async move { (n.consensus_info().await.height as u32) < n_blocks })
                 .await
             {
                 println!(

@@ -55,7 +55,7 @@ impl MembershipHandler for FillFromNodeList {
             .filter_map(|(netowrk_id, subnetwork)| {
                 subnetwork
                     .contains(id)
-                    .then_some(netowrk_id.try_into().unwrap())
+                    .then_some(netowrk_id as Self::NetworkId)
             })
             .collect()
     }
@@ -78,7 +78,7 @@ impl MembershipHandler for FillFromNodeList {
     }
 
     fn last_subnetwork_id(&self) -> Self::NetworkId {
-        self.subnetwork_size.try_into().unwrap()
+        self.subnetwork_size as u16
     }
 }
 
