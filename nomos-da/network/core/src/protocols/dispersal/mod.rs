@@ -5,13 +5,9 @@ pub mod validator;
 pub mod test {
     use futures::StreamExt;
     use kzgrs_backend::common::{blob::DaBlob, Column};
-    use libp2p::core::{transport::MemoryTransport, upgrade::Version};
-    use libp2p::Transport;
-    use libp2p::{
-        identity::Keypair, swarm::NetworkBehaviour, swarm::SwarmEvent, Multiaddr, PeerId,
-    };
+    use libp2p::{swarm::SwarmEvent, Multiaddr, PeerId};
     use log::info;
-    use std::time::Duration;
+    use rand::Rng;
     use tracing_subscriber::{fmt::TestWriter, EnvFilter};
 
     use crate::{
@@ -20,32 +16,8 @@ pub mod test {
             executor::behaviour::DispersalExecutorBehaviour,
             validator::behaviour::{DispersalEvent, DispersalValidatorBehaviour},
         },
-        test_utils::AllNeighbours,
+        test_utils::{new_swarm_in_memory, AllNeighbours},
     };
-
-    pub fn new_in_memory<TBehavior>(key: Keypair, behavior: TBehavior) -> libp2p::Swarm<TBehavior>
-    where
-        TBehavior: NetworkBehaviour + Send,
-    {
-        libp2p::SwarmBuilder::with_existing_identity(key.clone())
-            .with_tokio()
-            .with_other_transport(|_| {
-                let transport = MemoryTransport::default()
-                    .upgrade(Version::V1)
-                    .authenticate(libp2p::plaintext::Config::new(&key))
-                    .multiplex(libp2p::yamux::Config::default())
-                    .timeout(Duration::from_secs(20));
-
-                Ok(transport)
-            })
-            .unwrap()
-            .with_behaviour(|_| behavior)
-            .unwrap()
-            .with_swarm_config(|cfg| {
-                cfg.with_idle_connection_timeout(Duration::from_secs(u64::MAX))
-            })
-            .build()
-    }
 
     #[tokio::test]
     async fn test_dispersal_single_node() {
@@ -65,10 +37,13 @@ pub mod test {
             .into_iter()
             .collect(),
         };
-        let addr: Multiaddr = "/memory/1".parse().unwrap();
-        let addr2 = addr.clone().with_p2p(validator_peer).unwrap();
+
+        // Generate a random peer id not to conflict with other tests
+        let p1_id = rand::thread_rng().gen::<u64>();
+        let p1_address: Multiaddr = format!("/memory/{}", p1_id).parse().unwrap();
+        let p1_addr = p1_address.clone().with_p2p(validator_peer).unwrap();
         let addressbook =
-            AddressBook::from_iter([(PeerId::from_public_key(&k2.public()), addr2.clone())]);
+            AddressBook::from_iter([(PeerId::from_public_key(&k2.public()), p1_addr.clone())]);
 
         let executor_behavior = DispersalExecutorBehaviour::new(
             PeerId::from_public_key(&k1.public()),
@@ -76,16 +51,16 @@ pub mod test {
             addressbook,
         );
 
-        let mut executor = new_in_memory(k1, executor_behavior);
+        let mut executor = new_swarm_in_memory(k1, executor_behavior);
 
         let validator_behavior = DispersalValidatorBehaviour::new(neighbours.clone());
 
-        let mut validator = new_in_memory(k2, validator_behavior);
+        let mut validator = new_swarm_in_memory(k2, validator_behavior);
 
         let msg_count = 10usize;
 
         let validator_task = async move {
-            validator.listen_on(addr).unwrap();
+            validator.listen_on(p1_addr).unwrap();
             let mut res = vec![];
             loop {
                 match validator.select_next_some().await {
