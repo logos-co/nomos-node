@@ -10,7 +10,7 @@ use tests::topology::configs::{
     api::GeneralApiConfig,
     blend::create_blend_configs,
     consensus::{create_consensus_configs, ConsensusParams},
-    da::{create_da_configs, DaParams},
+    da::{create_da_configs, DaParams, GeneralDaConfig},
     network::{create_network_configs, NetworkParams},
     time::default_time_config,
     tracing::GeneralTracingConfig,
@@ -89,16 +89,10 @@ pub fn create_node_configs(
     let mut configured_hosts = HashMap::new();
 
     // Rebuild DA address lists.
-    let peer_addresses = da_configs[0].addresses.clone();
     let host_network_init_peers = update_network_init_peers(&hosts);
-    let host_da_peer_addresses = update_da_peer_addresses(hosts.clone(), peer_addresses);
+    let host_da_peer_addresses = update_da_peer_addresses(hosts.clone(), da_configs.clone());
     let host_blend_membership =
         update_blend_membership(hosts.clone(), blend_configs[0].membership.clone());
-
-    let new_peer_addresses: HashMap<PeerId, Multiaddr> = host_da_peer_addresses
-        .into_iter()
-        .map(|(peer_id, (multiaddr, _))| (peer_id, multiaddr))
-        .collect();
 
     for (i, host) in hosts.into_iter().enumerate() {
         let consensus_config = consensus_configs[i].clone();
@@ -106,12 +100,15 @@ pub fn create_node_configs(
 
         // DA Libp2p network config.
         let mut da_config = da_configs[i].clone();
-        da_config.addresses.clone_from(&new_peer_addresses);
+        da_config.addresses.clone_from(&host_da_peer_addresses);
         da_config.listening_address = Multiaddr::from_str(&format!(
             "/ip4/0.0.0.0/udp/{}/quic-v1",
             host.da_network_port,
         ))
         .unwrap();
+        if matches!(host.kind, HostKind::Validator) {
+            da_config.policy_settings.min_dispersal_peers = 0;
+        }
 
         // Libp2p network config.
         let mut network_config = network_configs[i].clone();
@@ -241,7 +238,7 @@ mod cfgsync_tests {
     use std::{net::Ipv4Addr, num::NonZero, str::FromStr, time::Duration};
 
     use nomos_da_network_core::swarm::{DAConnectionMonitorSettings, DAConnectionPolicySettings};
-    use nomos_libp2p::{Multiaddr, Protocol};
+    use nomos_libp2p::{ed25519, libp2p, Multiaddr, PeerId, Protocol};
     use nomos_tracing_service::{
         FilterLayer, LoggerLayer, MetricsLayer, TracingLayer, TracingSettings,
     };

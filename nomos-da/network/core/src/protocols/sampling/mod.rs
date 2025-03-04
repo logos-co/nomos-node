@@ -96,7 +96,7 @@ mod test {
                         debug!("{event:?}");
                     }
                 }
-                if res.len() == MSG_COUNT as usize {
+                if res.len() == MSG_COUNT {
                     break res;
                 }
             }

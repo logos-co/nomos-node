@@ -37,7 +37,7 @@ impl Config {
 
     #[must_use]
     pub fn stake_distribution_snapshot(&self, epoch: Epoch) -> Slot {
-        ((u32::from(epoch) - 1) as u64 * self.epoch_length()).into()
+        (u64::from(u32::from(epoch) - 1) * self.epoch_length()).into()
     }
 
     #[must_use]

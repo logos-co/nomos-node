@@ -38,7 +38,7 @@ mod tests {
             num_subnets: 0,
             old_blobs_check_interval_secs: 0,
             blobs_validity_duration_secs: 0,
-            global_params_path: "".into(),
+            global_params_path: String::new(),
             balancer_interval_secs: 0,
             tracing_settings: TracingSettings::default(),
         };
@@ -73,7 +73,7 @@ mod tests {
         let tasks: Vec<_> = (0..n_hosts).map(client_fn).collect();
         let results = join_all(tasks).await;
 
-        for (my_ip, config) in results.into_iter() {
+        for (my_ip, config) in results {
             assert_eq_da_membership(my_ip, &config.unwrap());
         }
     }
@@ -97,7 +97,7 @@ mod tests {
     }
 
     pub fn extract_ip(multiaddr: &Multiaddr) -> Option<Ipv4Addr> {
-        for protocol in multiaddr.iter() {
+        for protocol in multiaddr {
             match protocol {
                 Protocol::Ip4(ip) => return Some(ip),
                 _ => continue,

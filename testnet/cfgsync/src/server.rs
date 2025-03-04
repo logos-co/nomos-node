@@ -42,11 +42,12 @@ pub struct CfgSyncConfig {
 impl CfgSyncConfig {
     pub fn load_from_file(file_path: &PathBuf) -> Result<Self, String> {
         let config_content = fs::read_to_string(file_path)
-            .map_err(|err| format!("Failed to read config file: {}", err))?;
+            .map_err(|err| format!("Failed to read config file: {err}"))?;
         serde_yaml::from_str(&config_content)
-            .map_err(|err| format!("Failed to parse config file: {}", err))
+            .map_err(|err| format!("Failed to parse config file: {err}"))
     }
 
+    #[must_use]
     pub const fn to_consensus_params(&self) -> ConsensusParams {
         ConsensusParams {
             n_participants: self.n_hosts,
@@ -55,6 +56,7 @@ impl CfgSyncConfig {
         }
     }
 
+    #[must_use]
     pub fn to_da_params(&self) -> DaParams {
         DaParams {
             subnetwork_size: self.subnetwork_size,
@@ -78,6 +80,7 @@ impl CfgSyncConfig {
         }
     }
 
+    #[must_use]
     pub fn to_tracing_settings(&self) -> TracingSettings {
         self.tracing_settings.clone()
     }
