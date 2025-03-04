@@ -172,6 +172,7 @@ mod test {
             .try_init();
         let k1 = Keypair::generate_ed25519();
         let k2 = Keypair::generate_ed25519();
+        let peer_id2 = PeerId::from_public_key(&k2.public());
 
         let neighbours = make_neighbours(&[&k1, &k2]);
         let mut swarm_1 = get_swarm(k1, neighbours.clone());
@@ -184,6 +185,7 @@ mod test {
         // returns them
         let task_1 = async move {
             swarm_1.listen_on(addr.clone()).unwrap();
+            wait_for_incoming_connection(&mut swarm_1, peer_id2).await;
             swarm_1
                 .filter_map(|event| async {
                     if let SwarmEvent::Behaviour(ReplicationEvent::IncomingMessage {
@@ -204,7 +206,7 @@ mod test {
         let (sender, mut receiver) = tokio::sync::mpsc::channel::<()>(10);
         let (terminate_sender, mut terminate_receiver) = tokio::sync::oneshot::channel::<()>();
         let task_2 = async move {
-            swarm_2.dial(addr2).unwrap();
+            swarm_2.dial_and_wait(addr2).await;
             let mut i = 0usize;
             loop {
                 tokio::select! {
@@ -227,7 +229,6 @@ mod test {
             }
         };
         let join2 = tokio::spawn(task_2);
-        tokio::time::sleep(Duration::from_secs(1)).await;
         // send 10 messages
         for _ in 0..10 {
             sender.send(()).await.unwrap();
