@@ -151,8 +151,8 @@ where
             blend_relay,
             cl_mempool_relay,
             da_mempool_relay,
-            storage_adapter,
             sampling_relay,
+            storage_adapter,
             _phantom_data: PhantomData,
         }
     }
