@@ -67,7 +67,7 @@ pub struct NetworkArgs {
     host: Option<IpAddr>,
 
     #[clap(long = "net-port", env = "NET_PORT")]
-    port: Option<u16>,
+    port: Option<usize>,
 
     // TODO: Use either the raw bytes or the key type directly to delegate error handling to clap
     #[clap(long = "net-node-key", env = "NET_NODE_KEY")]

@@ -35,7 +35,7 @@ mod test {
     use nomos_core::da::DaEncoder as _;
 
     use crate::{
-        common::blob::DaBlob,
+        common::{blob::DaBlob, ColumnIndex},
         encoder::{test::rand_data, DaEncoder, DaEncoderParams, EncodedData},
         reconstruction::reconstruct_without_missing_data,
     };
@@ -52,7 +52,7 @@ mod test {
             .enumerate()
             .map(|(idx, column)| DaBlob {
                 column,
-                column_idx: idx.try_into().unwrap(),
+                column_idx: idx as ColumnIndex,
                 column_commitment: Commitment::default(),
                 aggregated_column_commitment: Commitment::default(),
                 aggregated_column_proof: Proof::default(),

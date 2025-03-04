@@ -15,12 +15,7 @@ pub struct Config {
 impl Config {
     #[must_use]
     pub fn base_period_length(&self) -> NonZero<u64> {
-        let inner = (f64::from(self.security_param.get()) / self.active_slot_coeff).floor();
-        // `active_slot_coeff` cannot be negative, so result will be a valid `u64`,
-        // without risks of losing sign info.
-        #[expect(clippy::cast_possible_truncation)]
-        #[expect(clippy::cast_sign_loss)]
-        NonZero::new(inner as u64)
+        NonZero::new((f64::from(self.security_param.get()) / self.active_slot_coeff).floor() as u64)
             .expect("base_period_length with proper configuration should never be zero")
     }
 

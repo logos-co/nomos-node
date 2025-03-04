@@ -123,7 +123,7 @@ mod test {
     fn test_generate_proofs() {
         for size in [16, 32, 64, 128, 256] {
             let buff: Vec<_> = (0..BYTES_PER_FIELD_ELEMENT * size)
-                .map(|i| u8::try_from(i % 255).unwrap())
+                .map(|i| (i % 255) as u8)
                 .rev()
                 .collect();
             let domain = GeneralEvaluationDomain::new(size).unwrap();

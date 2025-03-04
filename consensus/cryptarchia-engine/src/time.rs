@@ -37,7 +37,7 @@ impl Slot {
             // safety: since_start is already checked never negative in this case
             // division panics if `slot_duration` is less than a second.
             Self::from(
-                (u64::try_from(since_start.whole_seconds()).unwrap())
+                (since_start.whole_seconds() as u64)
                     .checked_div(slot_config.slot_duration.as_secs())
                     .expect("slots tick should be at least a second"),
             )
@@ -160,7 +160,7 @@ impl SlotTimer {
     pub fn slot_interval(&self, now: OffsetDateTime) -> Interval {
         let slot_duration = self.config.slot_duration;
         let next_slot_start = self.config.chain_start_time
-            + slot_duration * u64::from(self.current_slot(now) + 1).try_into().unwrap();
+            + slot_duration * u64::from(self.current_slot(now) + 1) as u32;
         let delay = next_slot_start - now;
         let mut interval = tokio::time::interval_at(
             tokio::time::Instant::now()

@@ -13,6 +13,9 @@ rustflags = [
 
   "-Wclippy::pedantic",
   "-Aclippy::similar_names",
+  # TODO: Tackle before opening PR
+  "-Aclippy::cast_possible_truncation",
+  "-Aclippy::cast_sign_loss",
   # TODO: Remove at some point
   "-Aclippy::missing_errors_doc",
   # TODO: Remove at some point

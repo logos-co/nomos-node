@@ -320,7 +320,7 @@ mod test {
                 address: format!("/ip4/127.0.0.1/udp/{}/quic-v1", base_port + i)
                     .parse()
                     .unwrap(),
-                public_key: [i.try_into().unwrap(); 32],
+                public_key: [i as u8; 32],
             };
             nodes.push(node);
             keypairs.push(keypair);

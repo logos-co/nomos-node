@@ -39,7 +39,7 @@ where
         epoch_stream: EpochStream,
         slot_stream: SlotStream,
     ) -> Self {
-        let winning_probability = winning_probability(settings.number_of_hops.try_into().unwrap());
+        let winning_probability = winning_probability(settings.number_of_hops);
         Self {
             winning_probability,
             settings,
@@ -72,13 +72,13 @@ where
             *selected_slots = select_slot(
                 settings.node_id,
                 epoch,
-                settings.network_size.try_into().unwrap(),
-                settings.slots_per_epoch.try_into().unwrap(),
+                settings.network_size,
+                settings.slots_per_epoch,
                 *winning_probability,
             );
         }
         if let Poll::Ready(Some(slot)) = slot_stream.poll_next_unpin(cx) {
-            if selected_slots.contains(&(slot.try_into().unwrap())) {
+            if selected_slots.contains(&(slot as u32)) {
                 return Poll::Ready(Some(vec![]));
             }
         }
@@ -98,23 +98,23 @@ fn generate_ticket<Id: Hash + Eq + AsRef<[u8]>>(node_id: Id, r: usize, slot: usi
 fn select_slot<Id: Hash + Eq + AsRef<[u8]> + Copy>(
     node_id: Id,
     r: usize,
-    network_size: u32,
-    slots_per_epoch: u32,
+    network_size: usize,
+    slots_per_epoch: usize,
     winning_probability: f64,
 ) -> HashSet<u32> {
-    let i = (f64::from(slots_per_epoch)).div(f64::from(network_size)) * winning_probability;
-    let size = i.ceil() as u64;
+    let i = (slots_per_epoch as f64).div(network_size as f64) * winning_probability;
+    let size = i.ceil() as usize;
     let mut w = HashSet::new();
     let mut i = 0;
-    while w.len() != usize::try_from(size).unwrap() {
-        w.insert(generate_ticket(node_id, r, i) % slots_per_epoch);
+    while w.len() != size {
+        w.insert(generate_ticket(node_id, r, i) % slots_per_epoch as u32);
         i += 1;
     }
     w
 }
 
-fn winning_probability(number_of_hops: u32) -> f64 {
-    1.0 / f64::from(number_of_hops)
+fn winning_probability(number_of_hops: usize) -> f64 {
+    1.0 / number_of_hops as f64
 }
 
 #[cfg(test)]

@@ -28,7 +28,7 @@ fn compute_fk20_proofs_for_size(bencher: Bencher, size: usize) {
     bencher
         .with_inputs(|| {
             let buff: Vec<_> = (0..BYTES_PER_FIELD_ELEMENT * size)
-                .map(|i| u8::try_from(i % 255).unwrap())
+                .map(|i| (i % 255) as u8)
                 .rev()
                 .collect();
             let domain = GeneralEvaluationDomain::new(size).unwrap();
@@ -52,7 +52,7 @@ fn compute_parallel_fk20_proofs_for_size(bencher: Bencher, size: usize) {
     bencher
         .with_inputs(|| {
             let buff: Vec<_> = (0..BYTES_PER_FIELD_ELEMENT * size)
-                .map(|i| u8::try_from(i % 255).unwrap())
+                .map(|i| (i % 255) as u8)
                 .rev()
                 .collect();
             let domain = GeneralEvaluationDomain::new(size).unwrap();
@@ -73,7 +73,7 @@ fn compute_fk20_proofs_for_size_with_cache(bencher: Bencher, size: usize) {
     bencher
         .with_inputs(|| {
             let buff: Vec<_> = (0..BYTES_PER_FIELD_ELEMENT * size)
-                .map(|i| u8::try_from(i % 255).unwrap())
+                .map(|i| (i % 255) as u8)
                 .rev()
                 .collect();
             let domain = GeneralEvaluationDomain::new(size).unwrap();
@@ -98,7 +98,7 @@ fn compute_parallel_fk20_proofs_for_size_with_cache(bencher: Bencher, size: usiz
     bencher
         .with_inputs(|| {
             let buff: Vec<_> = (0..BYTES_PER_FIELD_ELEMENT * size)
-                .map(|i| u8::try_from(i % 255).unwrap())
+                .map(|i| (i % 255) as u8)
                 .rev()
                 .collect();
             let domain = GeneralEvaluationDomain::new(size).unwrap();
