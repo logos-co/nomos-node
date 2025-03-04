@@ -146,6 +146,5 @@ rustflags = [
   "-Aclippy::unnecessary_safety_comment",
   "-Aclippy::unnecessary_safety_doc",
   "-Aclippy::unnecessary_self_imports",
-  "-Aclippy::unneeded_field_pattern",
   "-Aclippy::unwrap_used",
 ]
