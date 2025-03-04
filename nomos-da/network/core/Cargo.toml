@@ -28,7 +28,7 @@ tracing-subscriber       = "0.3.18"
 [dev-dependencies]
 blake2             = "0.10"
 kzgrs-backend      = { workspace = true, features = ["testutils"] }
-libp2p             = { version = "0.55", features = ["ed25519", "macros", "noise", "ping", "quic", "tcp", "yamux"] }
-libp2p-swarm-test  = "0.5.0"
+libp2p             = { version = "0.55", features = ["ed25519", "macros", "noise", "ping", "quic", "tcp", "yamux", "plaintext"] }
+libp2p-swarm-test  = { version = "0.5.0", features = ["tokio"]}
 tokio              = { version = "1", features = ["macros", "rt-multi-thread", "time"] }
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }

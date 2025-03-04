@@ -40,10 +40,11 @@ pub mod test {
             .collect(),
         };
 
-        let mut executor = Swarm::new_ephemeral(|_| {
+        let mut executor = Swarm::new_ephemeral_tokio(|_| {
             DispersalExecutorBehaviour::new(neighbours.clone(), AddressBook::empty())
         });
-        let mut validator = Swarm::new_ephemeral(|_| DispersalValidatorBehaviour::new(neighbours));
+        let mut validator =
+            Swarm::new_ephemeral_tokio(|_| DispersalValidatorBehaviour::new(neighbours));
 
         validator.listen().with_memory_addr_external().await;
         executor

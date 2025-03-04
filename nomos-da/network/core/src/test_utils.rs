@@ -1,6 +1,10 @@
 use std::collections::HashSet;
 
+use libp2p::core::{transport::MemoryTransport, upgrade::Version};
 use libp2p::PeerId;
+use libp2p::Transport;
+use libp2p::{identity::Keypair, swarm::NetworkBehaviour};
+use std::time::Duration;
 use subnetworks_assignations::MembershipHandler;
 
 use crate::SubnetworkId;
@@ -33,4 +37,26 @@ impl MembershipHandler for AllNeighbours {
     fn last_subnetwork_id(&self) -> Self::NetworkId {
         0
     }
+}
+
+pub fn new_swarm_in_memory<TBehavior>(key: Keypair, behavior: TBehavior) -> libp2p::Swarm<TBehavior>
+where
+    TBehavior: NetworkBehaviour + Send,
+{
+    libp2p::SwarmBuilder::with_existing_identity(key.clone())
+        .with_tokio()
+        .with_other_transport(|_| {
+            let transport = MemoryTransport::default()
+                .upgrade(Version::V1)
+                .authenticate(libp2p::plaintext::Config::new(&key))
+                .multiplex(libp2p::yamux::Config::default())
+                .timeout(Duration::from_secs(20));
+
+            Ok(transport)
+        })
+        .unwrap()
+        .with_behaviour(|_| behavior)
+        .unwrap()
+        .with_swarm_config(|cfg| cfg.with_idle_connection_timeout(Duration::from_secs(u64::MAX)))
+        .build()
 }
