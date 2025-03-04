@@ -1,10 +1,11 @@
-use std::collections::HashSet;
+use std::{collections::HashSet, time::Duration};
 
-use libp2p::core::{transport::MemoryTransport, upgrade::Version};
-use libp2p::PeerId;
-use libp2p::Transport;
-use libp2p::{identity::Keypair, swarm::NetworkBehaviour};
-use std::time::Duration;
+use libp2p::{
+    core::{transport::MemoryTransport, upgrade::Version},
+    identity::Keypair,
+    swarm::NetworkBehaviour,
+    PeerId, Transport,
+};
 use subnetworks_assignations::MembershipHandler;
 
 use crate::SubnetworkId;
