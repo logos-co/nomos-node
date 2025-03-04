@@ -1,7 +1,7 @@
 use std::hint::black_box;
 
 use ark_bls12_381::{Bls12_381, Fr};
-use ark_poly::{univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain};
+use ark_poly::{univariate::DensePolynomial, EvaluationDomain as _, GeneralEvaluationDomain};
 use ark_poly_commit::kzg10::KZG10;
 use divan::{counter::ItemsCount, Bencher};
 use kzgrs::{
@@ -10,9 +10,9 @@ use kzgrs::{
     GlobalParameters, BYTES_PER_FIELD_ELEMENT,
 };
 use once_cell::sync::Lazy;
-use rand::SeedableRng;
+use rand::SeedableRng as _;
 #[cfg(feature = "parallel")]
-use rayon::iter::{IntoParallelIterator, ParallelIterator};
+use rayon::iter::{IntoParallelIterator as _, ParallelIterator as _};
 
 fn main() {
     divan::main();

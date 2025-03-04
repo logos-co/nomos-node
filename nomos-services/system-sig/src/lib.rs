@@ -1,4 +1,4 @@
-use futures::stream::StreamExt;
+use futures::stream::StreamExt as _;
 use overwatch_rs::{
     overwatch::handle::OverwatchHandle,
     services::{

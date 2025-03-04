@@ -7,9 +7,9 @@ use std::{
 use futures::future::BoxFuture;
 use overwatch_rs::services::state::NoState;
 use rand::{
-    distributions::{Distribution, WeightedIndex},
+    distributions::{Distribution as _, WeightedIndex},
     rngs::StdRng,
-    SeedableRng,
+    SeedableRng as _,
 };
 use serde::{Deserialize, Serialize};
 use tokio::sync::broadcast::{self, Receiver, Sender};

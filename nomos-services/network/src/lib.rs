@@ -3,7 +3,7 @@ use std::fmt::{self, Debug};
 
 use async_trait::async_trait;
 use backends::NetworkBackend;
-use futures::StreamExt;
+use futures::StreamExt as _;
 use overwatch_rs::{
     services::{
         relay::RelayMessage,

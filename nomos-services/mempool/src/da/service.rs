@@ -6,7 +6,7 @@ pub mod openapi {
 
 use std::fmt::Debug;
 
-use futures::StreamExt;
+use futures::StreamExt as _;
 use nomos_core::da::blob::info::DispersedBlobInfo;
 use nomos_da_sampling::{
     backend::DaSamplingServiceBackend, network::NetworkAdapter as DaSamplingNetworkAdapter,

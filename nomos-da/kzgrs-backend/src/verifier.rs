@@ -1,11 +1,11 @@
-use ark_poly::EvaluationDomain;
-use itertools::{izip, Itertools};
+use ark_poly::EvaluationDomain as _;
+use itertools::{izip, Itertools as _};
 use kzgrs::{
     bytes_to_polynomial, commit_polynomial, common::field_element_from_bytes_le,
     verify_element_proof, Commitment, GlobalParameters, PolynomialEvaluationDomain, Proof,
     BYTES_PER_FIELD_ELEMENT,
 };
-use nomos_core::da::blob::Blob;
+use nomos_core::da::blob::Blob as _;
 
 use crate::{
     common::{blob::DaBlob, hash_commitment, Chunk, Column},
@@ -144,13 +144,13 @@ impl DaVerifier {
 #[cfg(test)]
 mod test {
     use ark_bls12_381::Fr;
-    use ark_poly::{EvaluationDomain, GeneralEvaluationDomain};
+    use ark_poly::{EvaluationDomain as _, GeneralEvaluationDomain};
     use kzgrs::{
         bytes_to_polynomial, commit_polynomial, generate_element_proof,
         global_parameters_from_randomness, Commitment, GlobalParameters,
         PolynomialEvaluationDomain, Proof, BYTES_PER_FIELD_ELEMENT,
     };
-    use nomos_core::da::DaEncoder;
+    use nomos_core::da::DaEncoder as _;
     use once_cell::sync::Lazy;
 
     use crate::{

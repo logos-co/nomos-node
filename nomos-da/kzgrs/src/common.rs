@@ -1,10 +1,10 @@
 use std::fmt;
 
 use ark_bls12_381::fr::Fr;
-use ark_ff::Zero;
+use ark_ff::Zero as _;
 use ark_poly::{
     domain::general::GeneralEvaluationDomain, evaluations::univariate::Evaluations,
-    univariate::DensePolynomial, EvaluationDomain,
+    univariate::DensePolynomial, EvaluationDomain as _,
 };
 use blst::BLST_ERROR;
 use num_bigint::BigUint;
@@ -139,11 +139,11 @@ pub fn compute_roots_of_unity(size: usize) -> Vec<Fr> {
 #[cfg(test)]
 mod test {
     use ark_bls12_381::fr::Fr;
-    use ark_ff::{BigInteger, PrimeField};
-    use ark_poly::{EvaluationDomain, GeneralEvaluationDomain, Polynomial};
+    use ark_ff::{BigInteger as _, PrimeField as _};
+    use ark_poly::{EvaluationDomain as _, GeneralEvaluationDomain, Polynomial as _};
     use blst::BLST_ERROR;
     use once_cell::sync::Lazy;
-    use rand::{thread_rng, Fill};
+    use rand::{thread_rng, Fill as _};
 
     use super::{
         bytes_to_evaluations, bytes_to_polynomial, compute_roots_of_unity, BlstError, KzgRsError,

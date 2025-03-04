@@ -6,7 +6,7 @@ mod handler;
 use std::time::Duration;
 
 pub use behaviour::{Behaviour, Config, Event, IntervalStreamProvider};
-use tokio_stream::StreamExt;
+use tokio_stream::StreamExt as _;
 
 #[cfg(feature = "tokio")]
 pub struct TokioIntervalStreamProvider;
@@ -31,7 +31,7 @@ mod test {
 
     use fixed::types::U57F7;
     use libp2p::{
-        futures::StreamExt,
+        futures::StreamExt as _,
         identity::Keypair,
         swarm::{dummy, NetworkBehaviour, SwarmEvent},
         Multiaddr, PeerId, Swarm, SwarmBuilder,

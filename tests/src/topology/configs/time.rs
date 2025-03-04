@@ -1,4 +1,4 @@
-use std::{str::FromStr, time::Duration};
+use std::{str::FromStr as _, time::Duration};
 
 use time::OffsetDateTime;
 

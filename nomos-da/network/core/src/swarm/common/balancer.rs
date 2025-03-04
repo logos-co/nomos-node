@@ -5,7 +5,7 @@ use std::{
 };
 
 use libp2p::PeerId;
-use rand::seq::IteratorRandom;
+use rand::seq::IteratorRandom as _;
 use subnetworks_assignations::MembershipHandler;
 
 use crate::{
@@ -178,7 +178,7 @@ mod tests {
 
     use futures::stream;
     use libp2p::PeerId;
-    use tokio_stream::StreamExt;
+    use tokio_stream::StreamExt as _;
 
     use super::*;
 

@@ -1,6 +1,6 @@
 use std::{sync::Arc, time::Duration};
 
-use futures::StreamExt;
+use futures::StreamExt as _;
 use kzgrs_backend::{
     common::build_blob_id,
     dispersal, encoder,

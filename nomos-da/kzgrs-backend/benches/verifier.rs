@@ -8,7 +8,7 @@ use kzgrs_backend::{
     verifier::DaVerifier,
 };
 use nomos_core::da::DaEncoder as _;
-use rand::{thread_rng, RngCore};
+use rand::{thread_rng, RngCore as _};
 
 fn main() {
     divan::main();

@@ -8,7 +8,7 @@ mod tests {
     use std::{
         net::{Ipv4Addr, SocketAddr},
         num::NonZero,
-        str::FromStr,
+        str::FromStr as _,
         time::Duration,
     };
 

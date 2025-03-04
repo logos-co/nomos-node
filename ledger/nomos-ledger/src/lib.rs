@@ -5,7 +5,7 @@ mod notetree;
 
 use std::{collections::HashMap, hash::Hash};
 
-use blake2::Digest;
+use blake2::Digest as _;
 use cl::{balance::Value, note::NoteCommitment, nullifier::Nullifier};
 pub use config::Config;
 use cryptarchia_engine::{Epoch, Slot};
@@ -432,7 +432,7 @@ impl core::fmt::Debug for LedgerState {
 pub mod tests {
     use std::num::NonZero;
 
-    use blake2::Digest;
+    use blake2::Digest as _;
     use cl::{note::NoteWitness as Note, NullifierSecret};
     use cryptarchia_engine::{EpochConfig, Slot};
     use rand::thread_rng;

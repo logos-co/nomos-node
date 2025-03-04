@@ -2,7 +2,7 @@ use std::{fmt::Debug, marker::PhantomData, pin::Pin};
 
 use futures::{
     future::{AbortHandle, Abortable, Aborted},
-    Stream, StreamExt,
+    Stream, StreamExt as _,
 };
 use kzgrs_backend::common::blob::DaBlob;
 use libp2p::PeerId;

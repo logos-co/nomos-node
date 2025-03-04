@@ -8,7 +8,7 @@ use std::{
 };
 
 use cryptarchia_engine::{time::SlotConfig, EpochConfig, Slot};
-use futures::{Stream, StreamExt};
+use futures::{Stream, StreamExt as _};
 use sntpc::{fraction_to_nanoseconds, NtpResult};
 use time::OffsetDateTime;
 use tokio::time::{interval, MissedTickBehavior};

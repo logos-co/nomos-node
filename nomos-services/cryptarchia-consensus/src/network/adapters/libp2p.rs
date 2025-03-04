@@ -12,7 +12,7 @@ use overwatch_rs::{
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use tokio_stream::{
     wrappers::{errors::BroadcastStreamRecvError, BroadcastStream},
-    StreamExt,
+    StreamExt as _,
 };
 
 use crate::{

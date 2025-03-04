@@ -6,7 +6,7 @@ use nomos_network::{
 };
 use overwatch_rs::services::{relay::OutboundRelay, ServiceData};
 use serde::{de::DeserializeOwned, Serialize};
-use tokio_stream::{wrappers::BroadcastStream, StreamExt};
+use tokio_stream::{wrappers::BroadcastStream, StreamExt as _};
 
 use crate::network::NetworkAdapter;
 

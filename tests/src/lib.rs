@@ -5,14 +5,14 @@ pub mod topology;
 use std::{
     env,
     net::TcpListener,
-    ops::Mul,
+    ops::Mul as _,
     sync::atomic::{AtomicU16, Ordering},
     time::Duration,
 };
 
 use nomos_libp2p::{Multiaddr, PeerId, Swarm};
 use once_cell::sync::Lazy;
-use rand::{thread_rng, Rng};
+use rand::{thread_rng, Rng as _};
 
 static NET_PORT: Lazy<AtomicU16> =
     Lazy::new(|| AtomicU16::new(thread_rng().gen_range(8000..10000)));

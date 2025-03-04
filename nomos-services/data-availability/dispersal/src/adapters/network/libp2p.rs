@@ -1,6 +1,6 @@
 use std::{fmt::Debug, pin::Pin};
 
-use futures::{stream::BoxStream, Stream, StreamExt};
+use futures::{stream::BoxStream, Stream, StreamExt as _};
 use kzgrs_backend::common::blob::DaBlob;
 use nomos_core::da::BlobId;
 use nomos_da_network_core::{

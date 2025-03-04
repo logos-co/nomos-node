@@ -149,6 +149,5 @@ rustflags = [
   "-Aclippy::unreachable",
   "-Aclippy::unseparated_literal_suffix",
   "-Aclippy::unused_result_ok",
-  "-Aclippy::unused_trait_names",
   "-Aclippy::unwrap_used",
 ]

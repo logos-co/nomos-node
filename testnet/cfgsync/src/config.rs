@@ -1,11 +1,11 @@
-use std::{collections::HashMap, net::Ipv4Addr, str::FromStr};
+use std::{collections::HashMap, net::Ipv4Addr, str::FromStr as _};
 
 use nomos_blend::membership::Node;
 use nomos_blend_message::{sphinx::SphinxMessage, BlendMessage};
 use nomos_libp2p::{Multiaddr, PeerId};
 use nomos_node::BlendBackend;
 use nomos_tracing_service::{LoggerLayer, MetricsLayer, TracingLayer, TracingSettings};
-use rand::{thread_rng, Rng};
+use rand::{thread_rng, Rng as _};
 use tests::topology::configs::{
     api::GeneralApiConfig,
     blend::create_blend_configs,
@@ -235,7 +235,7 @@ fn update_tracing_identifier(
 
 #[cfg(test)]
 mod cfgsync_tests {
-    use std::{net::Ipv4Addr, num::NonZero, str::FromStr, time::Duration};
+    use std::{net::Ipv4Addr, num::NonZero, str::FromStr as _, time::Duration};
 
     use nomos_da_network_core::swarm::{DAConnectionMonitorSettings, DAConnectionPolicySettings};
     use nomos_libp2p::{ed25519, libp2p, Multiaddr, PeerId, Protocol};

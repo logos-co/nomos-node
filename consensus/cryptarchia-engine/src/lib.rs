@@ -239,7 +239,7 @@ where
 #[cfg(test)]
 pub mod tests {
     use std::{
-        hash::{DefaultHasher, Hash, Hasher},
+        hash::{DefaultHasher, Hash, Hasher as _},
         num::NonZero,
     };
 

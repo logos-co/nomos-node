@@ -233,7 +233,7 @@ mod tests {
         swarm::{dial_opts::DialOpts, DialError, ListenError, SwarmEvent},
         PeerId, Swarm,
     };
-    use libp2p_swarm_test::SwarmExt;
+    use libp2p_swarm_test::SwarmExt as _;
 
     use crate::maintenance::monitor::{
         Blocked, ConnectionMonitor, ConnectionMonitorBehaviour, ConnectionMonitorOutput,

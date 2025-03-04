@@ -1,7 +1,7 @@
-use std::ops::Div;
+use std::ops::Div as _;
 
-use ark_ff::{BigInteger, PrimeField};
-use ark_poly::EvaluationDomain;
+use ark_ff::{BigInteger as _, PrimeField as _};
+use ark_poly::EvaluationDomain as _;
 use kzgrs::{
     bytes_to_polynomial, commit_polynomial,
     common::bytes_to_polynomial_unchecked,
@@ -11,7 +11,7 @@ use kzgrs::{
     Proof, BYTES_PER_FIELD_ELEMENT,
 };
 #[cfg(feature = "parallel")]
-use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
+use rayon::iter::{IntoParallelRefIterator as _, ParallelIterator as _};
 
 use crate::{
     common::{blob::DaBlob, hash_commitment, Chunk, ChunksMatrix, Row},
@@ -346,10 +346,10 @@ impl nomos_core::da::DaEncoder for DaEncoder {
 
 #[cfg(test)]
 pub mod test {
-    use std::ops::Div;
+    use std::ops::Div as _;
 
-    use ark_ff::PrimeField;
-    use ark_poly::{EvaluationDomain, GeneralEvaluationDomain};
+    use ark_ff::PrimeField as _;
+    use ark_poly::{EvaluationDomain as _, GeneralEvaluationDomain};
     use itertools::izip;
     use kzgrs::{
         common::bytes_to_polynomial_unchecked, decode, verify_element_proof, FieldElement,
@@ -357,7 +357,7 @@ pub mod test {
     };
     use nomos_core::da::DaEncoder as _;
     use once_cell::sync::Lazy;
-    use rand::RngCore;
+    use rand::RngCore as _;
 
     use crate::{
         encoder::{DaEncoder, DaEncoderParams},

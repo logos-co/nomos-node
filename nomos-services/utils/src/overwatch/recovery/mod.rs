@@ -25,7 +25,7 @@ mod tests {
     use tracing;
 
     use super::*;
-    use crate::{overwatch::recovery::backends::FileBackendSettings, traits::FromSettings};
+    use crate::{overwatch::recovery::backends::FileBackendSettings, traits::FromSettings as _};
 
     #[derive(Debug, Clone, Default, Serialize, Deserialize)]
     struct MyState {

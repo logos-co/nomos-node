@@ -4,7 +4,7 @@ pub mod behaviour;
 mod test {
     use std::time::Duration;
 
-    use futures::StreamExt;
+    use futures::StreamExt as _;
     use kzgrs::{Commitment, Proof};
     use kzgrs_backend::common::{blob::DaBlob, Column};
     use libp2p::{identity::Keypair, swarm::SwarmEvent, Multiaddr, PeerId, Swarm};

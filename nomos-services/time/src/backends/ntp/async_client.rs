@@ -1,6 +1,6 @@
 use std::{net::SocketAddr, time::Duration};
 
-use futures::{stream::FuturesUnordered, StreamExt, TryStreamExt};
+use futures::{stream::FuturesUnordered, StreamExt as _, TryStreamExt as _};
 use sntpc::{get_time, Error as SntpError, NtpContext, NtpResult, StdTimestampGen};
 use tokio::{
     net::{lookup_host, ToSocketAddrs, UdpSocket},

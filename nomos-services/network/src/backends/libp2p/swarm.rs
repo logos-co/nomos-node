@@ -4,7 +4,7 @@ use nomos_libp2p::{
     gossipsub, libp2p::swarm::ConnectionId, BehaviourEvent, Multiaddr, PeerId, Swarm, SwarmEvent,
 };
 use tokio::sync::{broadcast, mpsc, oneshot};
-use tokio_stream::StreamExt;
+use tokio_stream::StreamExt as _;
 
 use super::{
     command::{Command, Dial, Topic},

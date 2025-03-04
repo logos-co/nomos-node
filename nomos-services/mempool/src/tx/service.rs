@@ -6,7 +6,7 @@ pub mod openapi {
 
 use std::{fmt::Debug, marker::PhantomData};
 
-use futures::StreamExt;
+use futures::StreamExt as _;
 use nomos_network::{NetworkMsg, NetworkService};
 use overwatch_rs::{
     services::{

@@ -4,7 +4,7 @@ use bincode::{
         WithOtherIntEncoding, WithOtherLimit, WithOtherTrailing,
     },
     de::read::SliceReader,
-    Error, ErrorKind, Options,
+    Error, ErrorKind, Options as _,
 };
 use once_cell::sync::Lazy;
 

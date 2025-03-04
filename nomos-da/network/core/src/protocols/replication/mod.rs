@@ -5,8 +5,8 @@ pub mod handler;
 mod test {
     use std::time::Duration;
 
-    use blake2::{Blake2s256, Digest};
-    use futures::StreamExt;
+    use blake2::{Blake2s256, Digest as _};
+    use futures::StreamExt as _;
     use kzgrs_backend::testutils::get_da_blob;
     use libp2p::{identity::Keypair, quic, swarm::SwarmEvent, Multiaddr, PeerId, Swarm};
     use log::info;

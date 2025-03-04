@@ -7,7 +7,7 @@ use either::Either;
 use futures::{
     future::BoxFuture,
     stream::{BoxStream, FuturesUnordered},
-    AsyncWriteExt, FutureExt, StreamExt, TryFutureExt,
+    AsyncWriteExt as _, FutureExt as _, StreamExt as _, TryFutureExt as _,
 };
 use kzgrs_backend::common::blob::DaBlob;
 use libp2p::{

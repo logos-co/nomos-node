@@ -1,4 +1,4 @@
-use nomos_core::da::DaEncoder;
+use nomos_core::da::DaEncoder as _;
 
 use crate::{common::blob::DaBlob, testutils::encoder::get_encoder};
 

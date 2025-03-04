@@ -5,8 +5,8 @@ use std::{
     time::Duration,
 };
 
-use futures::{Future, Stream, StreamExt};
-use rand::{Rng, RngCore};
+use futures::{Future as _, Stream, StreamExt as _};
+use rand::{Rng as _, RngCore};
 use serde::{Deserialize, Serialize};
 use tokio::time;
 
