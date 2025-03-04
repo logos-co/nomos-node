@@ -81,12 +81,18 @@ impl EncodedData {
     }
 }
 
+impl EncodedData {
+    #[must_use]
+    pub const fn iter(&self) -> EncodedDataIterator {
+        EncodedDataIterator::new(self)
+    }
+}
+
 impl<'a> IntoIterator for &'a EncodedData {
     type Item = DaBlob;
     type IntoIter = EncodedDataIterator<'a>;
-
     fn into_iter(self) -> Self::IntoIter {
-        EncodedDataIterator::new(self)
+        self.iter()
     }
 }
 
@@ -582,10 +588,10 @@ pub mod test {
         ];
         let encoded_data = encoder.encode(&data).unwrap();
 
-        let blobs = (&encoded_data).into_iter();
+        let blobs = encoded_data.iter();
         assert_eq!(blobs.count(), 16);
 
-        let blobs = encoded_data.into_iter();
+        let blobs = encoded_data.iter();
         assert_eq!(blobs.count(), 16);
     }
 }
