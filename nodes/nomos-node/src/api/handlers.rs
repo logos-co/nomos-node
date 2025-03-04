@@ -426,6 +426,7 @@ where
     <DaBlob as Blob>::SharedCommitments:
         serde::Serialize + DeserializeOwned + Send + Sync + 'static,
     StorageOp: StorageSerde + Send + Sync + 'static,
+    <StorageOp as StorageSerde>::Error: Send + Sync,
 {
     make_request_and_return_response!(storage::get_shared_commitments::<StorageOp, DaBlob>(
         &handle,
@@ -434,7 +435,7 @@ where
 }
 
 #[derive(Serialize, Deserialize)]
-pub struct GetLightBlobReq<B: Blob> {
+pub struct DAGetLightBlobReq<B: Blob> {
     pub blob_id: B::BlobId,
     pub column_idx: B::ColumnIndex,
 }
@@ -449,7 +450,7 @@ pub struct GetLightBlobReq<B: Blob> {
 )]
 pub async fn da_get_light_blob<StorageOp, DaBlob>(
     State(handle): State<OverwatchHandle>,
-    Json(request): Json<GetLightBlobReq<DaBlob>>,
+    Json(request): Json<DAGetLightBlobReq<DaBlob>>,
 ) -> Response
 where
     DaBlob: Blob,
@@ -457,6 +458,7 @@ where
     <DaBlob as Blob>::ColumnIndex: AsRef<[u8]> + DeserializeOwned + Send + Sync + 'static,
     <DaBlob as Blob>::LightBlob: Serialize + DeserializeOwned + Send + Sync + 'static,
     StorageOp: StorageSerde + Send + Sync + 'static,
+    <StorageOp as StorageSerde>::Error: Send + Sync,
 {
     make_request_and_return_response!(storage::get_light_blob::<StorageOp, DaBlob>(
         &handle,

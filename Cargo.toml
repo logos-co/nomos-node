@@ -1,6 +1,7 @@
 [workspace]
 exclude = ["nomos-core/risc0_proofs"]
 members = [
+  "clients/common-http-client",
   "clients/executor-http-client",
   "consensus/cryptarchia-engine",
   "ledger/nomos-ledger",
@@ -52,6 +53,7 @@ cfgsync                  = { path = "./testnet/cfgsync" }
 cl                       = { path = "./nomos-core/cl" }
 cryptarchia-consensus    = { path = "./nomos-services/cryptarchia-consensus" }
 cryptarchia-engine       = { path = "./consensus/cryptarchia-engine" }
+common-http-client       = { path = "./clients/common-http-client" }
 executor-http-client     = { path = "./clients/executor-http-client" }
 full-replication         = { path = "./nomos-da/full-replication" }
 key-management-system    = { path = "./nomos-services/key-management-system" }

@@ -211,6 +211,7 @@ where
     <Tx as nomos_core::tx::Transaction>::Hash:
         Serialize + for<'de> Deserialize<'de> + std::cmp::Ord + Debug + Send + Sync + 'static,
     DaStorageSerializer: StorageSerde + Send + Sync + 'static,
+    <DaStorageSerializer as StorageSerde>::Error: Send + Sync,
     DispersalBackend: nomos_da_dispersal::backend::DispersalBackend<
             NetworkAdapter = DispersalNetworkAdapter,
             MempoolAdapter = DispersalMempoolAdapter,
