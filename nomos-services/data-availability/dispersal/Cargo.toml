@@ -13,6 +13,7 @@ nomos-core               = { workspace = true }
 nomos-da-network-core    = { workspace = true }
 nomos-da-network-service = { workspace = true }
 nomos-da-sampling        = { workspace = true }
+nomos-da-verifier        = { workspace = true }
 nomos-mempool            = { workspace = true, features = ["libp2p"] }
 nomos-tracing            = { workspace = true }
 overwatch-rs             = { workspace = true }

@@ -101,7 +101,7 @@ impl MembershipHandler for FillWithOriginalReplication {
     }
 
     fn last_subnetwork_id(&self) -> Self::NetworkId {
-        self.subnetwork_size as u16
+        self.subnetwork_size.saturating_sub(1) as u16
     }
 }
 

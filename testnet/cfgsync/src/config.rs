@@ -103,6 +103,9 @@ pub fn create_node_configs(
             host.da_network_port,
         ))
         .unwrap();
+        if matches!(host.kind, HostKind::Validator) {
+            da_config.policy_settings.min_dispersal_peers = 0;
+        }
 
         // Libp2p network config.
         let mut network_config = network_configs[i].to_owned();

@@ -30,7 +30,7 @@ use utoipa_swagger_ui::SwaggerUi;
 
 use super::handlers::{
     add_blob, add_blob_info, add_tx, block, cl_metrics, cl_status, cryptarchia_headers,
-    cryptarchia_info, da_get_commitments, get_range, libp2p_info,
+    cryptarchia_info, da_get_commitments, da_get_light_blob, get_range, libp2p_info,
 };
 use crate::api::paths;
 
@@ -50,6 +50,8 @@ pub struct AxumBackend<
     Membership,
     DaVerifiedBlobInfo,
     DaVerifierBackend,
+    DaVerifierNetwork,
+    DaVerifierStorage,
     Tx,
     DaStorageSerializer,
     SamplingBackend,
@@ -66,6 +68,8 @@ pub struct AxumBackend<
     _membership: core::marker::PhantomData<Membership>,
     _vid: core::marker::PhantomData<DaVerifiedBlobInfo>,
     _verifier_backend: core::marker::PhantomData<DaVerifierBackend>,
+    _verifier_network: core::marker::PhantomData<DaVerifierNetwork>,
+    _verifier_storage: core::marker::PhantomData<DaVerifierStorage>,
     _tx: core::marker::PhantomData<Tx>,
     _storage_serde: core::marker::PhantomData<DaStorageSerializer>,
     _sampling_backend: core::marker::PhantomData<SamplingBackend>,
@@ -96,6 +100,8 @@ impl<
         Membership,
         DaVerifiedBlobInfo,
         DaVerifierBackend,
+        DaVerifierNetwork,
+        DaVerifierStorage,
         Tx,
         DaStorageSerializer,
         SamplingBackend,
@@ -112,6 +118,8 @@ impl<
         Membership,
         DaVerifiedBlobInfo,
         DaVerifierBackend,
+        DaVerifierNetwork,
+        DaVerifierStorage,
         Tx,
         DaStorageSerializer,
         SamplingBackend,
@@ -126,7 +134,7 @@ where
     DaBlob: Blob + Serialize + DeserializeOwned + Clone + Send + Sync + 'static,
     <DaBlob as Blob>::BlobId:
         AsRef<[u8]> + Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
-    <DaBlob as Blob>::ColumnIndex: AsRef<[u8]> + Send + Sync + 'static,
+    <DaBlob as Blob>::ColumnIndex: AsRef<[u8]> + DeserializeOwned + Send + Sync + 'static,
     DaBlob::LightBlob: Serialize + DeserializeOwned + Clone + Send + Sync + 'static,
     DaBlob::SharedCommitments: Serialize + DeserializeOwned + Clone + Send + Sync + 'static,
     DaBlobInfo: DispersedBlobInfo<BlobId = [u8; 32]>
@@ -164,6 +172,8 @@ where
     DaVerifierBackend: VerifierBackend + CoreDaVerifier<DaBlob = DaBlob> + Send + Sync + 'static,
     <DaVerifierBackend as VerifierBackend>::Settings: Clone,
     <DaVerifierBackend as CoreDaVerifier>::Error: Error,
+    DaVerifierNetwork: nomos_da_verifier::network::NetworkAdapter + Send + Sync + 'static,
+    DaVerifierStorage: nomos_da_verifier::storage::DaStorageAdapter + Send + Sync + 'static,
     Tx: Transaction
         + Clone
         + Debug
@@ -177,6 +187,7 @@ where
     <Tx as nomos_core::tx::Transaction>::Hash:
         Serialize + for<'de> Deserialize<'de> + std::cmp::Ord + Debug + Send + Sync + 'static,
     DaStorageSerializer: StorageSerde + Send + Sync + 'static,
+    <DaStorageSerializer as StorageSerde>::Error: Send + Sync,
     SamplingRng: SeedableRng + RngCore + Send + 'static,
     SamplingBackend: DaSamplingServiceBackend<
             SamplingRng,
@@ -188,6 +199,7 @@ where
     SamplingBackend::BlobId: Debug + 'static,
     SamplingNetworkAdapter: nomos_da_sampling::network::NetworkAdapter + Send + 'static,
     SamplingStorage: nomos_da_sampling::storage::DaStorageAdapter + Send + 'static,
+    DaVerifierNetwork::Settings: Clone,
     TimeBackend: nomos_time::backends::TimeBackend + Send + 'static,
     TimeBackend::Settings: Clone + Send + Sync,
 {
@@ -206,6 +218,8 @@ where
             _membership: core::marker::PhantomData,
             _vid: core::marker::PhantomData,
             _verifier_backend: core::marker::PhantomData,
+            _verifier_network: core::marker::PhantomData,
+            _verifier_storage: core::marker::PhantomData,
             _tx: core::marker::PhantomData,
             _storage_serde: core::marker::PhantomData,
             _sampling_backend: core::marker::PhantomData,
@@ -251,6 +265,9 @@ where
                         SamplingNetworkAdapter,
                         SamplingRng,
                         SamplingStorage,
+                        DaVerifierBackend,
+                        DaVerifierNetwork,
+                        DaVerifierStorage,
                         TimeBackend,
                         SIZE,
                     >,
@@ -266,6 +283,9 @@ where
                         SamplingNetworkAdapter,
                         SamplingRng,
                         SamplingStorage,
+                        DaVerifierBackend,
+                        DaVerifierNetwork,
+                        DaVerifierStorage,
                         TimeBackend,
                         SIZE,
                     >,
@@ -295,6 +315,9 @@ where
                         SamplingNetworkAdapter,
                         SamplingRng,
                         SamplingStorage,
+                        DaVerifierBackend,
+                        DaVerifierNetwork,
+                        DaVerifierStorage,
                         TimeBackend,
                         SIZE,
                     >,
@@ -315,12 +338,19 @@ where
                         SamplingNetworkAdapter,
                         SamplingRng,
                         SamplingStorage,
+                        DaVerifierBackend,
+                        DaVerifierNetwork,
+                        DaVerifierStorage,
                     >,
                 ),
             )
             .route(
                 paths::DA_GET_SHARED_COMMITMENTS,
                 routing::get(da_get_commitments::<DaStorageSerializer, DaBlob>),
+            )
+            .route(
+                paths::DA_GET_LIGHT_BLOB,
+                routing::get(da_get_light_blob::<DaStorageSerializer, DaBlob>),
             )
             .with_state(handle);
 

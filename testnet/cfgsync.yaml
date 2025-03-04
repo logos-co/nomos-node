@@ -14,6 +14,10 @@ num_subnets: 2
 old_blobs_check_interval_secs: 5
 blobs_validity_duration_secs: 60
 global_params_path: "/kzgrs_test_params"
+min_dispersal_peers: 1
+min_replication_peers: 1
+monitor_failure_time_window_secs: 5
+balancer_interval_secs: 5
 
 # Tracing
 tracing_settings:
