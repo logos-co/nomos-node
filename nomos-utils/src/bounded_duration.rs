@@ -146,7 +146,7 @@ mod test {
 
     #[test]
     fn success_deserialize() {
-        let json_value = json!("1.0");
+        let json_value = json!([1, 0]);
         let value = serde_json::to_value(json_value).unwrap();
         let _duration: MinimalBoundedDuration<1, SECOND> = serde_json::from_value(value).unwrap();
     }
