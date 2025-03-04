@@ -81,6 +81,7 @@ mod test {
 
     static MESSAGES: LazyLock<Vec<DaMessage>> = LazyLock::new(|| {
         // The fixture contains 20 messages seeded from values 0..20 for subnet 0
+        // Ad-hoc generation of those takes about 12 seconds on a Ryzen3700x
         bincode::deserialize(include_bytes!("./fixtures/messages.bincode")).unwrap()
     });
 
