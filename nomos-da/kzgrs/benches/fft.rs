@@ -7,7 +7,7 @@ fn main() {
     divan::main();
 }
 
-#[divan::bench(args = [16, 32, 64, 128, 256, 512, 1024, 2048, 4096])]
+#[divan::bench(args = [16, 32, 64, 128, 256, 512, 1_024, 2_048, 4_096])]
 fn compute_ark_fft_for_size(bencher: Bencher, size: usize) {
     bencher
         .with_inputs(|| {
