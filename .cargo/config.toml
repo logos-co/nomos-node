@@ -75,8 +75,6 @@ rustflags = [
   # TODO: Remove one by one for each commit
   "-Aclippy::arithmetic_side_effects",
   "-Aclippy::as_conversions",
-  "-Aclippy::cfg_not_test",
-  "-Aclippy::clone_on_ref_ptr",
   "-Aclippy::default_numeric_fallback",
   "-Aclippy::error_impl_error",
   "-Aclippy::exit",
@@ -97,9 +95,6 @@ rustflags = [
   "-Aclippy::partial_pub_fields",
   "-Aclippy::pathbuf_init_then_push",
   "-Aclippy::pattern_type_mismatch",
-  "-Aclippy::rc_buffer",
-  "-Aclippy::rc_mutex",
-  "-Aclippy::redundant_type_annotations",
   "-Aclippy::ref_patterns",
   "-Aclippy::renamed_function_params",
   "-Aclippy::rest_pat_in_fully_bound_structs",
@@ -107,8 +102,5 @@ rustflags = [
   "-Aclippy::shadow_reuse",
   "-Aclippy::shadow_same",
   "-Aclippy::shadow_unrelated",
-  "-Aclippy::string_add",
-  "-Aclippy::string_slice",
-  "-Aclippy::string_to_string",
   "-Aclippy::unwrap_used",
 ]

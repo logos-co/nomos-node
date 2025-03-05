@@ -63,7 +63,7 @@ impl SharedWriter {
 
     #[must_use]
     pub fn into_inner(&self) -> Arc<Mutex<dyn Write + Send + Sync>> {
-        self.inner.clone()
+        Arc::<_>::clone(&self.inner)
     }
 
     pub fn from_inner(inner: Arc<Mutex<dyn Write + Send + Sync>>) -> Self {
@@ -237,6 +237,7 @@ impl ServiceCore for Tracing {
                 .with(layers)
                 .init();
         });
+        #[expect(clippy::cfg_not_test, reason = "TODO: Remove this at some point.")]
         #[cfg(not(test))]
         tracing_subscriber::registry()
             .with(LevelFilter::from(config.level))
