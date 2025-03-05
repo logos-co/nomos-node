@@ -3,11 +3,6 @@ pub mod validator;
 
 #[cfg(test)]
 pub mod test {
-    use std::{
-        collections::HashSet,
-        sync::{Arc, Mutex},
-    };
-
     use futures::StreamExt;
     use kzgrs_backend::common::{blob::DaBlob, Column};
     use libp2p::{
@@ -35,18 +30,16 @@ pub mod test {
             .with_writer(TestWriter::default())
             .try_init();
 
-        let neighbours = AllNeighbours {
-            neighbours: Arc::new(Mutex::new(HashSet::new())),
-        };
+        let neighbours = AllNeighbours::default();
 
         let mut executor = Swarm::new_ephemeral_tokio(|k1| {
             let p1 = PeerId::from_public_key(&k1.public());
-            neighbours.neighbours.lock().unwrap().insert(p1);
+            neighbours.add_neighbour(p1);
             DispersalExecutorBehaviour::new(neighbours.clone(), AddressBook::empty())
         });
         let mut validator = Swarm::new_ephemeral_tokio(|k2| {
             let p2 = PeerId::from_public_key(&k2.public());
-            neighbours.neighbours.lock().unwrap().insert(p2);
+            neighbours.add_neighbour(p2);
             DispersalValidatorBehaviour::new(neighbours.clone())
         });
 

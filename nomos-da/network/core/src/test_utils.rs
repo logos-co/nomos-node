@@ -16,7 +16,25 @@ use crate::SubnetworkId;
 
 #[derive(Clone)]
 pub struct AllNeighbours {
-    pub neighbours: Arc<Mutex<HashSet<PeerId>>>,
+    neighbours: Arc<Mutex<HashSet<PeerId>>>,
+}
+
+impl Default for AllNeighbours {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl AllNeighbours {
+    pub fn new() -> Self {
+        Self {
+            neighbours: Arc::new(Mutex::new(HashSet::new())),
+        }
+    }
+
+    pub fn add_neighbour(&self, id: PeerId) {
+        self.neighbours.lock().unwrap().insert(id);
+    }
 }
 
 impl MembershipHandler for AllNeighbours {

@@ -2,10 +2,7 @@ pub mod behaviour;
 
 #[cfg(test)]
 mod test {
-    use std::{
-        sync::{Arc, Mutex},
-        time::Duration,
-    };
+    use std::time::Duration;
 
     use futures::StreamExt;
     use kzgrs_backend::common::{blob::DaBlob, Column};
@@ -30,16 +27,9 @@ mod test {
             .try_init();
         let k1 = Keypair::generate_ed25519();
         let k2 = Keypair::generate_ed25519();
-        let neighbours = AllNeighbours {
-            neighbours: Arc::new(Mutex::new(
-                [
-                    PeerId::from_public_key(&k1.public()),
-                    PeerId::from_public_key(&k2.public()),
-                ]
-                .into_iter()
-                .collect(),
-            )),
-        };
+        let neighbours = AllNeighbours::default();
+        neighbours.add_neighbour(PeerId::from_public_key(&k1.public()));
+        neighbours.add_neighbour(PeerId::from_public_key(&k2.public()));
 
         // Generate a random peer ids not to conflict with other tests
         let p1_id = rand::thread_rng().gen::<u64>();
