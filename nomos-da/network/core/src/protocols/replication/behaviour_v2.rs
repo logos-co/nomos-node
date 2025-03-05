@@ -15,7 +15,7 @@ use libp2p::{
     Multiaddr, PeerId, Stream,
 };
 use libp2p_stream::{Control, IncomingStreams, OpenStreamError};
-use log::{debug, error, trace};
+use log::{error, trace};
 use nomos_da_messages::packing::{pack_to_writer, unpack_from_reader};
 use subnetworks_assignations::MembershipHandler;
 use thiserror::Error;
@@ -371,8 +371,9 @@ where
                 }));
             }
             Poll::Ready(Some(Err(error))) => {
-                debug!("Error on replication stream {error:?}");
-                // TODO propagate error ?
+                return Poll::Ready(ToSwarm::GenerateEvent(ReplicationEvent::ReplicationError {
+                    error,
+                }));
             }
             _ => {}
         }
@@ -400,8 +401,9 @@ where
                 };
             }
             Poll::Ready(Some(Err(error))) => {
-                debug!("Error on replication stream {error:?}");
-                // TODO propagate error ?
+                return Poll::Ready(ToSwarm::GenerateEvent(ReplicationEvent::ReplicationError {
+                    error,
+                }));
             }
             _ => {}
         }
