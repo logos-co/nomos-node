@@ -62,6 +62,6 @@ where
         .unwrap()
         .with_behaviour(|_| behavior)
         .unwrap()
-        .with_swarm_config(|cfg| cfg.with_idle_connection_timeout(Duration::from_secs(u64::MAX)))
+        .with_swarm_config(|cfg| cfg.with_idle_connection_timeout(Duration::from_secs(20)))
         .build()
 }
