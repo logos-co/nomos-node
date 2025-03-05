@@ -20,6 +20,7 @@ impl Default for ExecutorHttpClient {
 }
 
 impl ExecutorHttpClient {
+    #[must_use]
     pub fn new(base_address: Url, basic_auth: Option<BasicAuthCredentials>) -> Self {
         Self {
             client: CommonHttpClient::new(base_address, basic_auth),
@@ -37,7 +38,16 @@ impl ExecutorHttpClient {
     {
         let req = DispersalRequest { data, metadata };
         let path = paths::DISPERSE_DATA.trim_start_matches('/');
+
+        self.client
+            .post::<DispersalRequest<Metadata>, ()>(path, &req)
+            .await
+    }
+
+    /// Get the commitments for a specific `BlobId`
+    pub async fn get_commitments<B, C>(&self, blob_id: B::BlobId) -> Result<Option<C>, Error>
     where
+        C: DeserializeOwned + Send + Sync,
         B: Blob + DeserializeOwned + Send + Sync,
         <B as Blob>::BlobId: serde::Serialize + Send + Sync,
     {

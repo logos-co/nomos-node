@@ -21,6 +21,7 @@ pub struct BasicAuthCredentials {
 }
 
 impl BasicAuthCredentials {
+    #[must_use]
     pub const fn new(username: String, password: Option<String>) -> Self {
         Self { username, password }
     }
@@ -34,6 +35,7 @@ pub struct CommonHttpClient {
 }
 
 impl CommonHttpClient {
+    #[must_use]
     pub fn new(base_address: Url, basic_auth: Option<BasicAuthCredentials>) -> Self {
         let client = ClientBuilder::new()
             .build()
@@ -81,11 +83,10 @@ impl CommonHttpClient {
 
         match status {
             StatusCode::OK => serde_json::from_str(&body)
-                .map_err(|e| Error::Server(format!("Failed to parse response: {}", e))),
+                .map_err(|e| Error::Server(format!("Failed to parse response: {e}"))),
             StatusCode::INTERNAL_SERVER_ERROR => Err(Error::Server(body)),
             _ => Err(Error::Server(format!(
-                "Unexpected response [{}]: {}",
-                status, body
+                "Unexpected response [{status}]: {body}",
             ))),
         }
     }
