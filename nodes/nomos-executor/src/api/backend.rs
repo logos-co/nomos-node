@@ -68,6 +68,7 @@ pub struct AxumBackend<
     const SIZE: usize,
 > {
     settings: AxumBackendSettings,
+    #[expect(clippy::allow_attributes_without_reason)]
     #[expect(clippy::type_complexity)]
     _phantom: core::marker::PhantomData<(
         DaAttestation,
@@ -253,7 +254,7 @@ where
         })
     }
 
-    #[expect(clippy::too_many_lines)]
+    #[expect(clippy::too_many_lines, reason = "TODO: Remove this at some point.")]
     async fn serve(self, handle: OverwatchHandle) -> Result<(), Self::Error> {
         let mut builder = CorsLayer::new();
         if self.settings.cors_origins.is_empty() {

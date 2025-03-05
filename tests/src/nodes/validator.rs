@@ -256,7 +256,7 @@ impl Validator {
 }
 
 #[must_use]
-#[expect(clippy::too_many_lines)]
+#[expect(clippy::too_many_lines, reason = "TODO: Remove this at some point.")]
 pub fn create_validator_config(config: GeneralConfig) -> Config {
     let da_policy_settings = config.da_config.policy_settings;
     Config {

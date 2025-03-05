@@ -28,7 +28,9 @@ use overwatch_rs::{
 use serde::{Deserialize, Serialize};
 use tracing::{error, Level};
 use tracing_appender::non_blocking::WorkerGuard;
-use tracing_subscriber::{filter::LevelFilter, layer::SubscriberExt as _, util::SubscriberInitExt as _};
+use tracing_subscriber::{
+    filter::LevelFilter, layer::SubscriberExt as _, util::SubscriberInitExt as _,
+};
 
 pub struct Tracing {
     service_state: OpaqueServiceStateHandle<Self>,
@@ -295,7 +297,10 @@ mod serde_level {
         })
     }
 
-    #[expect(clippy::trivially_copy_pass_by_ref)]
+    #[expect(
+        clippy::trivially_copy_pass_by_ref,
+        reason = "Function signature required by serde."
+    )]
     pub fn serialize<S>(value: &Level, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,

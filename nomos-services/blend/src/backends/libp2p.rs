@@ -26,7 +26,10 @@ use super::BlendBackend;
 
 /// A blend backend that uses the libp2p network stack.
 pub struct Libp2pBlendBackend {
-    #[expect(dead_code)]
+    #[expect(
+        dead_code,
+        reason = "We need to hold a reference to avoid the task gets dropped when it goes out of scope."
+    )]
     task: JoinHandle<()>,
     swarm_message_sender: mpsc::Sender<BlendSwarmMessage>,
     incoming_message_sender: broadcast::Sender<Vec<u8>>,
@@ -208,7 +211,10 @@ where
         }
     }
 
-    #[expect(clippy::cognitive_complexity)]
+    #[expect(
+        clippy::cognitive_complexity,
+        reason = "TODO: Remove this at some point."
+    )]
     fn handle_swarm_message(&mut self, msg: BlendSwarmMessage) {
         match msg {
             BlendSwarmMessage::Publish(msg) => {
@@ -224,7 +230,10 @@ where
         }
     }
 
-    #[expect(clippy::cognitive_complexity)]
+    #[expect(
+        clippy::cognitive_complexity,
+        reason = "TODO: Remove this at some point."
+    )]
     fn handle_event(&mut self, event: SwarmEvent<BlendBehaviourEvent>) {
         match event {
             SwarmEvent::Behaviour(BlendBehaviourEvent::Blend(

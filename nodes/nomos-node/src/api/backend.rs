@@ -230,7 +230,7 @@ where
         })
     }
 
-    #[expect(clippy::too_many_lines)]
+    #[expect(clippy::too_many_lines, reason = "TODO: Remove this at some point.")]
     async fn serve(self, handle: OverwatchHandle) -> Result<(), Self::Error> {
         let mut builder = CorsLayer::new();
         if self.settings.cors_origins.is_empty() {

@@ -49,7 +49,7 @@ pub enum Event {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct MockConfig {}
+pub struct MockConfig;
 
 #[derive(Debug)]
 pub enum Command {

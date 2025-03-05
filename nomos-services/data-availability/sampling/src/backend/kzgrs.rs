@@ -195,7 +195,7 @@ mod test {
     }
 
     #[tokio::test]
-    #[expect(clippy::too_many_lines)]
+    #[expect(clippy::too_many_lines, reason = "Test function.")]
     async fn test_sampler() {
         // fictitious number of subnets
         let subnet_num: usize = 42;

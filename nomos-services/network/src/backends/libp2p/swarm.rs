@@ -78,7 +78,10 @@ impl SwarmHandler {
         }
     }
 
-    #[expect(clippy::cognitive_complexity)]
+    #[expect(
+        clippy::cognitive_complexity,
+        reason = "TODO: Remove this at some point."
+    )]
     fn handle_event(&mut self, event: SwarmEvent<BehaviourEvent>) {
         match event {
             SwarmEvent::Behaviour(BehaviourEvent::Gossipsub(gossipsub::Event::Message {
@@ -125,7 +128,10 @@ impl SwarmHandler {
         }
     }
 
-    #[expect(clippy::cognitive_complexity)]
+    #[expect(
+        clippy::cognitive_complexity,
+        reason = "TODO: Remove this at some point."
+    )]
     fn handle_command(&mut self, command: Command) {
         match command {
             Command::Connect(dial) => {
@@ -215,7 +221,10 @@ impl SwarmHandler {
         }
     }
 
-    #[expect(clippy::cognitive_complexity)]
+    #[expect(
+        clippy::cognitive_complexity,
+        reason = "TODO: Remove this at some point."
+    )]
     fn broadcast_and_retry(&mut self, topic: Topic, message: Box<[u8]>, retry_count: usize) {
         tracing::debug!("broadcasting message to topic: {topic}");
 

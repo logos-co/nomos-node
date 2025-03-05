@@ -23,7 +23,7 @@ pub struct RocksBackendSettings {
 // more processes.
 pub struct Transaction {
     rocks: Arc<DB>,
-    #[expect(clippy::type_complexity)]
+    #[expect(clippy::type_complexity, reason = "TODO: Remove this at some point.")]
     executor: Box<dyn FnOnce(&DB) -> Result<Option<Bytes>, Error> + Send + Sync>,
 }
 

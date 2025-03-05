@@ -139,14 +139,17 @@ where
     type OutboundProtocol = ReadyUpgrade<StreamProtocol>;
     type OutboundOpenInfo = ();
 
-    #[expect(deprecated)] // Self::InboundOpenInfo is deprecated
+    #[expect(deprecated, reason = "Self::InboundOpenInfo is deprecated")]
     fn listen_protocol(&self) -> SubstreamProtocol<Self::InboundProtocol, Self::InboundOpenInfo> {
         SubstreamProtocol::new(ReadyUpgrade::new(PROTOCOL_NAME), ())
     }
 
-    #[expect(deprecated)] // Self::OutboundOpenInfo is deprecated
-    #[expect(clippy::cognitive_complexity)]
-    #[expect(clippy::too_many_lines)]
+    #[expect(deprecated, reason = "Self::OutboundOpenInfo is deprecated")]
+    #[expect(
+        clippy::cognitive_complexity,
+        reason = "TODO: Remove this at some point."
+    )]
+    #[expect(clippy::too_many_lines, reason = "TODO: Remove this at some point.")]
     fn poll(
         &mut self,
         cx: &mut Context<'_>,
@@ -306,8 +309,14 @@ where
         }
     }
 
-    #[expect(deprecated)] // Self::InboundOpenInfo and Self::OutboundOpenInfo are deprecated
-    #[expect(clippy::cognitive_complexity)]
+    #[expect(
+        deprecated,
+        reason = "Self::InboundOpenInfo and Self::OutboundOpenInfo are deprecated"
+    )]
+    #[expect(
+        clippy::cognitive_complexity,
+        reason = "TODO: Remove this at some point."
+    )]
     fn on_connection_event(
         &mut self,
         event: ConnectionEvent<

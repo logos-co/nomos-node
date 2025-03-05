@@ -49,5 +49,5 @@ macro_rules! serde_bytes_newtype {
     };
 }
 
-pub(in crate) use display_hex_bytes_newtype;
-pub(in crate) use serde_bytes_newtype;
+pub(crate) use display_hex_bytes_newtype;
+pub(crate) use serde_bytes_newtype;

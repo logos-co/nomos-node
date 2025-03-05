@@ -157,7 +157,7 @@ where
         }
     }
 
-    #[expect(clippy::type_complexity)]
+    #[expect(clippy::type_complexity, reason = "TODO: Remove this at some point.")]
     pub async fn from_relays<
         SamplingNetworkAdapter,
         SamplingStorage,

@@ -1,6 +1,6 @@
 mod command;
 mod config;
-pub(in crate) mod swarm;
+pub(crate) mod swarm;
 
 pub use nomos_libp2p::libp2p::gossipsub::{Message, TopicHash};
 use overwatch_rs::{overwatch::handle::OverwatchHandle, services::state::NoState};

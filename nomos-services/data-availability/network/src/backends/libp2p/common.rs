@@ -21,7 +21,7 @@ use tokio::sync::{
     mpsc::{error::SendError, UnboundedSender},
 };
 
-pub(in crate) const BROADCAST_CHANNEL_SIZE: usize = 128;
+pub(crate) const BROADCAST_CHANNEL_SIZE: usize = 128;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct DaNetworkBackendSettings<Membership> {
@@ -54,7 +54,7 @@ pub enum SamplingEvent {
 }
 
 /// Task that handles forwarding of events to the subscriptions channels/stream
-pub(in crate) async fn handle_validator_events_stream(
+pub(crate) async fn handle_validator_events_stream(
     events_streams: ValidatorEventsStream,
     sampling_broadcast_sender: broadcast::Sender<SamplingEvent>,
     validation_broadcast_sender: broadcast::Sender<DaBlob>,
@@ -122,7 +122,7 @@ pub(in crate) async fn handle_validator_events_stream(
     }
 }
 
-pub(in crate) async fn handle_sample_request(
+pub(crate) async fn handle_sample_request(
     sampling_request_channel: &UnboundedSender<(SubnetworkId, BlobId)>,
     subnetwork_id: SubnetworkId,
     blob_id: BlobId,
