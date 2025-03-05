@@ -1,4 +1,4 @@
-use kzgrs_backend::common::blob::DaBlob;
+use kzgrs_backend::common::blob::{DaBlob, DaLightBlob};
 use nomos_core::da::BlobId;
 use serde::{Deserialize, Serialize};
 
@@ -12,6 +12,20 @@ pub struct Blob {
 impl Blob {
     #[must_use]
     pub const fn new(blob_id: BlobId, data: DaBlob) -> Self {
+        Self { blob_id, data }
+    }
+}
+
+#[repr(C)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+pub struct LightBlob {
+    pub blob_id: BlobId,
+    pub data: DaLightBlob,
+}
+
+impl LightBlob {
+    #[must_use]
+    pub const fn new(blob_id: BlobId, data: DaLightBlob) -> Self {
         Self { blob_id, data }
     }
 }

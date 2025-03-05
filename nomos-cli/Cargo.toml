@@ -14,6 +14,7 @@ executor-http-client = { workspace = true }
 hex                  = "0.4.3"
 kzgrs-backend        = { workspace = true }
 nomos-core           = { workspace = true }
+nomos-da-messages    = { workspace = true }
 nomos-node           = { workspace = true }
 nomos-tracing        = { workspace = true }
 reqwest              = { version = "0.12", features = ["json"] }

@@ -15,7 +15,11 @@ pub trait DaVerifier {
     type DaBlob: Blob;
     type Error;
 
-    fn verify(&self, blob: &Self::DaBlob) -> Result<(), Self::Error>;
+    fn verify(
+        &self,
+        commitments: &<Self::DaBlob as Blob>::SharedCommitments,
+        light_blob: &<Self::DaBlob as Blob>::LightBlob,
+    ) -> Result<(), Self::Error>;
 }
 
 #[async_trait::async_trait]

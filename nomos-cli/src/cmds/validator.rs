@@ -5,10 +5,8 @@ use kzgrs_backend::{
     common::blob::DaBlob, dispersal::Index, reconstruction::reconstruct_without_missing_data,
 };
 use nomos_core::da::blob::metadata;
-use nomos_node::{
-    api::{handlers::GetRangeReq, paths},
-    wire,
-};
+use nomos_da_messages::http::da::GetRangeReq;
+use nomos_node::{api::paths, wire};
 use reqwest::{Client, Url};
 use serde::{de::DeserializeOwned, Serialize};
 

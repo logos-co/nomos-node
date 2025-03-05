@@ -4,7 +4,7 @@ use kzgrs_backend::{
     common::blob::DaBlob, global::global_parameters_from_file,
     verifier::DaVerifier as NomosKzgrsVerifier,
 };
-use nomos_core::da::DaVerifier;
+use nomos_core::da::{blob::Blob, DaVerifier};
 use serde::{Deserialize, Serialize};
 
 use super::VerifierBackend;
@@ -44,13 +44,16 @@ impl DaVerifier for KzgrsDaVerifier {
     type DaBlob = DaBlob;
     type Error = KzgrsDaVerifierError;
 
-    fn verify(&self, blob: &Self::DaBlob) -> Result<(), Self::Error> {
-        let blob = blob.clone();
+    fn verify(
+        &self,
+        commitments: &<Self::DaBlob as Blob>::SharedCommitments,
+        light_blob: &<Self::DaBlob as Blob>::LightBlob,
+    ) -> Result<(), Self::Error> {
         // TODO: Prepare the domain depending the size, if fixed, so fixed domain, if
         // not it needs to come with some metadata.
         let domain_size = 2usize;
         self.verifier
-            .verify(&blob, domain_size)
+            .verify(commitments, light_blob, domain_size)
             .then_some(())
             .ok_or(KzgrsDaVerifierError::VerificationError)
     }
