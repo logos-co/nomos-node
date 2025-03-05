@@ -8,11 +8,14 @@ rustflags = [
 
 [target.'cfg(all())']
 rustflags = [
+  # Nursery and allowed nursery warnings (new lints will warn by default)
   "-Wclippy::nursery",
 
+  # Pedantic and allowed pedantic warnings (new lints will warn by default)
   "-Wclippy::pedantic",
   "-Aclippy::similar_names",
 
+  # Restriction and allowed restriction warnings (new lints will warn by default)
   "-Aclippy::blanket_clippy_restriction_lints",
   "-Wclippy::restriction",
   "-Aclippy::absolute_paths",
@@ -20,11 +23,14 @@ rustflags = [
   "-Aclippy::arbitrary_source_item_ordering",
   "-Aclippy::big_endian_bytes",
   "-Aclippy::decimal_literal_representation",
+  "-Aclippy::default_numeric_fallback",
   "-Aclippy::deref_by_slicing",
   "-Aclippy::else_if_without_else",
   "-Aclippy::exhaustive_enums",
   "-Aclippy::exhaustive_structs",
+  "-Aclippy::exit",
   "-Aclippy::expect_used",
+  "-Aclippy::field_scoped_visibility_modifiers",
   "-Aclippy::float_arithmetic",
   "-Aclippy::get_unwrap",
   "-Aclippy::host_endian_bytes",
@@ -32,6 +38,7 @@ rustflags = [
   "-Aclippy::integer_division_remainder_used",
   "-Aclippy::iter_over_hash_type",
   "-Aclippy::let_underscore_must_use",
+  "-Aclippy::let_underscore_untyped",
   "-Aclippy::little_endian_bytes",
   "-Aclippy::map_err_ignore",
   "-Aclippy::min_ident_chars",
@@ -41,9 +48,11 @@ rustflags = [
   "-Aclippy::missing_trait_methods",
   "-Aclippy::mixed_read_write_in_expression",
   "-Aclippy::mod_module_files",
+  "-Aclippy::module_name_repetitions",
   "-Aclippy::modulo_arithmetic",
   "-Aclippy::panic",
   "-Aclippy::panic_in_result_fn",
+  "-Aclippy::partial_pub_fields",
   "-Aclippy::print_stderr",
   "-Aclippy::print_stdout",
   "-Aclippy::pub_use",
@@ -62,36 +71,23 @@ rustflags = [
   "-Aclippy::use_debug",
   "-Aclippy::wildcard_enum_match_arm",
 
-  # TODO: Remove at some point
+  # TODO: Address these lints at some point.
+  "-Aclippy::arithmetic_side_effects",
+  "-Aclippy::as_conversions",
   "-Aclippy::cast_possible_truncation",
   "-Aclippy::cast_possible_wrap",
   "-Aclippy::cast_precision_loss",
   "-Aclippy::cast_sign_loss",
-  "-Aclippy::large_stack_frames",
-  "-Aclippy::missing_errors_doc",
-  "-Aclippy::missing_panics_doc",
-  "-Aclippy::unimplemented",
-
-  # TODO: Remove one by one for each commit
-  "-Aclippy::arithmetic_side_effects",
-  "-Aclippy::as_conversions",
-  "-Aclippy::default_numeric_fallback",
-  "-Aclippy::error_impl_error",
-  "-Aclippy::exit",
-  "-Aclippy::field_scoped_visibility_modifiers",
-  "-Aclippy::float_cmp_const",
-  "-Aclippy::fn_to_numeric_cast_any",
-  "-Aclippy::impl_trait_in_params",
   "-Aclippy::indexing_slicing",
   "-Aclippy::integer_division",
-  "-Aclippy::let_underscore_untyped",
+  "-Aclippy::large_stack_frames",
   "-Aclippy::missing_assert_message",
-  "-Aclippy::module_name_repetitions",
-  "-Aclippy::partial_pub_fields",
+  "-Aclippy::missing_errors_doc",
+  "-Aclippy::missing_panics_doc",
   "-Aclippy::pattern_type_mismatch",
-  "-Aclippy::ref_patterns",
   "-Aclippy::shadow_reuse",
   "-Aclippy::shadow_same",
   "-Aclippy::shadow_unrelated",
+  "-Aclippy::unimplemented",
   "-Aclippy::unwrap_used",
 ]

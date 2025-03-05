@@ -16,7 +16,7 @@ use sphinx_packet::{
 use super::parse_bytes;
 
 #[derive(thiserror::Error, Debug)]
-pub enum Error {
+pub enum CipherError {
     #[error("Invalid cipher text length")]
     InvalidCipherTextLength,
     #[error("Invalid encryption param")]
@@ -25,7 +25,7 @@ pub enum Error {
     IntegrityMacVerificationFailed,
 }
 
-type Result<T> = std::result::Result<T, Error>;
+type Result<T> = std::result::Result<T, CipherError>;
 
 /// A cipher to encrypt/decrypt a list of data of the same size using a list of
 /// keys.
@@ -98,7 +98,7 @@ impl<D: ConsistentLengthLayeredCipherData> ConsistentLengthLayeredCipher<D> {
     /// Perform the layered encryption.
     pub fn encrypt(&self, params: &[EncryptionParam<D>]) -> Result<(Vec<u8>, HeaderIntegrityMac)> {
         if params.is_empty() || params.len() > self.max_layers {
-            return Err(Error::InvalidEncryptionParam);
+            return Err(CipherError::InvalidEncryptionParam);
         }
 
         Ok(params
@@ -153,7 +153,7 @@ impl<D: ConsistentLengthLayeredCipherData> ConsistentLengthLayeredCipher<D> {
         &self,
         params: &[EncryptionParam<D>],
     ) -> Result<(Vec<u8>, HeaderIntegrityMac)> {
-        let last_param = params.last().ok_or(Error::InvalidEncryptionParam)?;
+        let last_param = params.last().ok_or(CipherError::InvalidEncryptionParam)?;
 
         // Build fillers that will be appended to the last data.
         // The number of fillers must be the same as the number of intermediate layers
@@ -213,11 +213,11 @@ impl<D: ConsistentLengthLayeredCipherData> ConsistentLengthLayeredCipher<D> {
         key: &Key,
     ) -> Result<(Vec<u8>, HeaderIntegrityMac, Vec<u8>)> {
         if encrypted_total_data.len() != Self::total_size(self.max_layers) {
-            return Err(Error::InvalidCipherTextLength);
+            return Err(CipherError::InvalidCipherTextLength);
         }
         // If a wrong key is used, the decryption should fail.
         if !mac.verify(key.integrity_mac_key, encrypted_total_data) {
-            return Err(Error::IntegrityMacVerificationFailed);
+            return Err(CipherError::IntegrityMacVerificationFailed);
         }
 
         // Extend the encrypted data by the length of a single layer

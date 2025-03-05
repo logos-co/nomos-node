@@ -8,7 +8,7 @@ use tokio::{
 };
 
 #[derive(thiserror::Error, Debug)]
-pub enum Error {
+pub enum NtpError {
     #[error(transparent)]
     Io(std::io::Error),
     #[error("NTP internal error: {0:?}")]
@@ -44,18 +44,18 @@ impl AsyncNTPClient {
     pub async fn request_timestamp<T: ToSocketAddrs + Sync>(
         &self,
         pool: T,
-    ) -> Result<NtpResult, Error> {
+    ) -> Result<NtpResult, NtpError> {
         let socket = &UdpSocket::bind(self.settings.address)
             .await
-            .map_err(Error::Io)?;
-        let hosts = lookup_host(&pool).await.map_err(Error::Io)?;
+            .map_err(NtpError::Io)?;
+        let hosts = lookup_host(&pool).await.map_err(NtpError::Io)?;
         let mut checks = hosts
             .map(move |host| get_time(host, socket, self.ntp_context))
             .collect::<FuturesUnordered<_>>()
             .into_stream();
         timeout(self.settings.timeout, checks.select_next_some())
             .await
-            .map_err(Error::Timeout)?
-            .map_err(Error::Sntp)
+            .map_err(NtpError::Timeout)?
+            .map_err(NtpError::Sntp)
     }
 }

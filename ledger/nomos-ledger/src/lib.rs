@@ -104,14 +104,14 @@ where
     }
 
     #[must_use = "this returns the result of the operation, without modifying the original"]
-    pub fn try_update<LeaderProof>(
+    pub fn try_update<LeaderProof, OrphanProofs: IntoIterator<Item = (Id, OrphanProof)>>(
         &self,
         id: Id,
         parent_id: Id,
         slot: Slot,
         proof: &LeaderProof,
         // (update corresponding to the leader proof, leader proof)
-        orphan_proofs: impl IntoIterator<Item = (Id, OrphanProof)>,
+        orphan_proofs: OrphanProofs,
     ) -> Result<Self, LedgerError<Id>>
     where
         LeaderProof: leader_proof::LeaderProof,
@@ -368,8 +368,8 @@ impl LedgerState {
         }
     }
 
-    pub fn from_commitments(
-        commitments: impl IntoIterator<Item = NoteCommitment>,
+    pub fn from_commitments<Commitments: IntoIterator<Item = NoteCommitment>>(
+        commitments: Commitments,
         total_stake: Value,
     ) -> Self {
         let commitments = commitments.into_iter().collect::<NoteTree>();

@@ -19,10 +19,10 @@ pub struct SampleError {
 }
 
 impl SampleError {
-    pub fn new(
+    pub fn new<Description: Into<String>>(
         blob_id: BlobId,
         error_type: SampleErrorType,
-        error_description: impl Into<String>,
+        error_description: Description,
     ) -> Self {
         Self {
             blob_id,

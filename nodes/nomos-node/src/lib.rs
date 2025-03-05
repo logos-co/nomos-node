@@ -61,6 +61,7 @@ use rand_chacha::ChaCha20Rng;
 use serde::{de::DeserializeOwned, Serialize};
 use subnetworks_assignations::versions::v1::FillFromNodeList;
 pub use tx::Tx;
+use wire::WireError;
 
 /// Membership used by the DA Network service.
 pub type NomosDaMembership = FillFromNodeList;
@@ -208,7 +209,7 @@ pub struct Nomos {
 pub struct Wire;
 
 impl StorageSerde for Wire {
-    type Error = wire::Error;
+    type Error = WireError;
 
     fn serialize<T: Serialize>(value: T) -> Bytes {
         wire::serialize(&value).unwrap().into()

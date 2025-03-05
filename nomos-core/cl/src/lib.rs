@@ -1,6 +1,5 @@
 pub mod balance;
 pub mod bundle;
-pub mod error;
 pub mod input;
 pub mod merkle;
 pub mod note;

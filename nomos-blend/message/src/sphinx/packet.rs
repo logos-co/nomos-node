@@ -7,7 +7,7 @@ use sphinx_packet::{
     payload::{Payload, PAYLOAD_OVERHEAD_SIZE},
 };
 
-use super::{error::Error, parse_bytes, routing::EncryptedRoutingInformation};
+use super::{error::SphinxError, parse_bytes, routing::EncryptedRoutingInformation};
 use crate::sphinx::ASYM_KEY_SIZE;
 
 /// A packet that contains a header and a payload.
@@ -36,7 +36,7 @@ impl Packet {
         max_layers: usize,
         payload: &[u8],
         max_payload_size: usize,
-    ) -> Result<Self, Error> {
+    ) -> Result<Self, SphinxError> {
         // Derive `[sphinx_packet::header::keys::KeyMaterial]` for all recipients.
         let ephemeral_privkey = x25519_dalek::StaticSecret::random();
         let key_material = Self::derive_key_material(recipient_pubkeys, &ephemeral_privkey);
@@ -90,7 +90,7 @@ impl Packet {
         &self,
         private_key: &x25519_dalek::StaticSecret,
         max_layers: usize,
-    ) -> Result<UnpackedPacket, Error> {
+    ) -> Result<UnpackedPacket, SphinxError> {
         // Derive the routing keys for the recipient
         let routing_keys = sphinx_packet::header::SphinxHeader::compute_routing_keys(
             &self.header.ephemeral_public_key,
@@ -113,7 +113,7 @@ impl Packet {
                 payload,
             ))),
             FINAL_HOP => Ok(UnpackedPacket::FullyUnpacked(payload.recover_plaintext()?)),
-            _ => Err(Error::InvalidRoutingFlag(routing_info.flag)),
+            _ => Err(SphinxError::InvalidRoutingFlag(routing_info.flag)),
         }
     }
 
@@ -165,7 +165,7 @@ impl Packet {
         .collect()
     }
 
-    pub fn from_bytes(data: &[u8], max_layers: usize) -> Result<Self, Error> {
+    pub fn from_bytes(data: &[u8], max_layers: usize) -> Result<Self, SphinxError> {
         let ephemeral_public_key_size = ASYM_KEY_SIZE;
         let encrypted_routing_info_size = EncryptedRoutingInformation::size(max_layers);
         let parsed = parse_bytes(
@@ -176,7 +176,7 @@ impl Packet {
                 data.len() - ephemeral_public_key_size - encrypted_routing_info_size,
             ],
         )
-        .map_err(|_| Error::InvalidPacketBytes)?;
+        .map_err(|_| SphinxError::InvalidPacketBytes)?;
 
         Ok(Self {
             header: Header {

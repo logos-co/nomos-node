@@ -7,9 +7,9 @@ pub mod errors;
 pub mod serialization;
 // Exports
 pub use deserialization::{deserialize, deserializer};
-pub use errors::Error;
+pub use errors::WireError;
 pub use serialization::{serialize, serializer, serializer_into_buffer};
-pub type Result<T> = std::result::Result<T, Error>;
+pub type Result<T> = std::result::Result<T, WireError>;
 
 #[cfg(test)]
 mod tests {

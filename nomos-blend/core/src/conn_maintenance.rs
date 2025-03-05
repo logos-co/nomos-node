@@ -47,9 +47,9 @@ pub enum ConnectionMonitorOutput {
 }
 
 impl ConnectionMonitor {
-    pub fn new(
+    pub fn new<Stream: futures::Stream<Item = ()> + Send + 'static>(
         settings: ConnectionMonitorSettings,
-        interval: impl futures::Stream<Item = ()> + Send + 'static,
+        interval: Stream,
     ) -> Self {
         Self {
             settings,

@@ -14,10 +14,10 @@ use rand::{RngCore, SeedableRng};
 use serde::{Deserialize, Serialize};
 use tokio::sync::oneshot;
 
-pub async fn add_tx<N, A, Item, Key>(
+pub async fn add_tx<N, A, Item, Key, Converter>(
     handle: &overwatch_rs::overwatch::handle::OverwatchHandle,
     item: Item,
-    converter: impl Fn(&Item) -> Key,
+    converter: Converter,
 ) -> Result<(), super::DynError>
 where
     N: NetworkBackend,
@@ -25,6 +25,7 @@ where
     A::Settings: Send + Sync,
     Item: Clone + Debug + Send + Sync + Serialize + for<'de> Deserialize<'de> + 'static + Hash,
     Key: Clone + Debug + Ord + Hash + Send + Serialize + for<'de> Deserialize<'de> + 'static,
+    Converter: Fn(&Item) -> Key,
 {
     let relay = handle
         .relay::<TxMempoolService<A, MockPool<HeaderId, Item, Key>>>()
@@ -60,10 +61,11 @@ pub async fn add_blob_info<
     DaVerifierBackend,
     DaVerifierNetwork,
     DaVerifierStorage,
+    Converter,
 >(
     handle: &overwatch_rs::overwatch::handle::OverwatchHandle,
     item: A::Payload,
-    converter: impl Fn(&A::Payload) -> Key,
+    converter: Converter,
 ) -> Result<(), super::DynError>
 where
     N: NetworkBackend,
@@ -84,6 +86,7 @@ where
     DaVerifierBackend::Settings: Clone,
     DaVerifierStorage: nomos_da_verifier::storage::DaStorageAdapter,
     DaVerifierNetwork::Settings: Clone,
+    Converter: Fn(&A::Payload) -> Key,
 {
     let relay = handle
         .relay::<DaMempoolService<

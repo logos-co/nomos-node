@@ -1,5 +1,5 @@
 #[derive(thiserror::Error, Debug, PartialEq, Eq)]
-pub enum Error {
+pub enum MockBlendMessageError {
     #[error("Invalid blend message format")]
     InvalidBlendMessage,
     #[error("Payload is too large")]

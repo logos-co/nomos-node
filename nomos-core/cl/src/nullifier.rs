@@ -28,7 +28,7 @@ pub struct NullifierCommitment([u8; 32]);
 pub struct Nullifier([u8; 32]);
 
 impl NullifierSecret {
-    pub fn random(mut rng: impl RngCore) -> Self {
+    pub fn random<Rng: RngCore>(mut rng: Rng) -> Self {
         let mut sk = [0u8; 16];
         rng.fill_bytes(&mut sk);
         Self(sk)

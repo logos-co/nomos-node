@@ -486,6 +486,7 @@ where
         MempoolNetworkAdapter<Tx, <Tx as Transaction>::Hash>,
         Tx,
         <Tx as Transaction>::Hash,
+        _,
     >(&handle, tx, Transaction::hash))
 }
 
@@ -548,5 +549,6 @@ where
         DaVerifierBackend,
         DaVerifierNetwork,
         DaVerifierStorage,
+        _,
     >(&handle, blob_info, DispersedBlobInfo::blob_id))
 }

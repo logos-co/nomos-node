@@ -53,11 +53,11 @@ where
     Membership: MembershipHandler<NetworkId = SubnetworkId, Id = PeerId>,
     Policy: SubnetworkConnectionPolicy,
 {
-    pub fn new(
+    pub fn new<Interval: futures::Stream<Item = ()> + Send + 'static>(
         local_peer_id: PeerId,
         membership: Membership,
         policy: Policy,
-        interval: impl futures::Stream<Item = ()> + Send + 'static,
+        interval: Interval,
     ) -> Self {
         Self {
             local_peer_id,
@@ -257,7 +257,7 @@ mod tests {
         let mut cx = Context::from_waker(futures::task::noop_waker_ref());
         let poll_result = balancer.poll(&mut cx);
 
-        assert!(matches!(poll_result, Poll::Ready(ref peers) if peers.len() == 1));
+        assert!(matches!(&poll_result, Poll::Ready(peers) if peers.len() == 1));
         let Poll::Ready(peers) = poll_result else {
             panic!("Expected Poll::Ready with peers")
         };
@@ -288,7 +288,7 @@ mod tests {
         let mut cx = Context::from_waker(futures::task::noop_waker_ref());
         let poll_result = balancer.poll(&mut cx);
 
-        assert!(matches!(poll_result, Poll::Ready(ref peers) if peers.len() == 2));
+        assert!(matches!(&poll_result, Poll::Ready(peers) if peers.len() == 2));
         let Poll::Ready(peers) = poll_result else {
             panic!("Expected Poll::Ready with peers")
         };

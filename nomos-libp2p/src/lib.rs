@@ -109,10 +109,10 @@ impl Swarm {
             .subscribe(&gossipsub::IdentTopic::new(topic))
     }
 
-    pub fn broadcast(
+    pub fn broadcast<Message: Into<Vec<u8>>>(
         &mut self,
         topic: &str,
-        message: impl Into<Vec<u8>>,
+        message: Message,
     ) -> Result<MessageId, PublishError> {
         self.swarm
             .behaviour_mut()

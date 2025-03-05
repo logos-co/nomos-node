@@ -46,9 +46,9 @@ pub struct RocksBackend<SerdeOp> {
 }
 
 impl<SerdeOp> RocksBackend<SerdeOp> {
-    pub fn txn(
+    pub fn txn<Executor: FnOnce(&DB) -> Result<Option<Bytes>, Error> + Send + Sync + 'static>(
         &self,
-        executor: impl FnOnce(&DB) -> Result<Option<Bytes>, Error> + Send + Sync + 'static,
+        executor: Executor,
     ) -> Transaction {
         Transaction {
             rocks: Arc::clone(&self.rocks),

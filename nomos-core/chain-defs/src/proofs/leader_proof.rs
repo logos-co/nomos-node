@@ -10,7 +10,7 @@ pub struct Risc0LeaderProof {
 }
 
 #[derive(Debug, Error)]
-pub enum Error {
+pub enum Risc0ProofError {
     #[error("Risc0 proof failed: {0}")]
     Risc0ProofFailed(#[from] anyhow::Error),
 }
@@ -20,7 +20,7 @@ impl Risc0LeaderProof {
         public_inputs: LeaderPublic,
         private_inputs: &LeaderPrivate,
         prover: &dyn risc0_zkvm::Prover,
-    ) -> Result<Self, Error> {
+    ) -> Result<Self, Risc0ProofError> {
         let env = risc0_zkvm::ExecutorEnv::builder()
             .write(&public_inputs)
             .unwrap()
@@ -172,7 +172,8 @@ mod test {
         .unwrap();
         proof
             .risc0_receipt
-            .verify(nomos_risc0_proofs::PROOF_OF_LEADERSHIP_ID).unwrap();
+            .verify(nomos_risc0_proofs::PROOF_OF_LEADERSHIP_ID)
+            .unwrap();
 
         assert_eq!(
             expected_public_inputs,

@@ -38,7 +38,7 @@ pub struct BalanceWitness {
 }
 
 impl BalanceWitness {
-    pub fn random_blinding(mut rng: impl CryptoRngCore) -> [u8; 16] {
+    pub fn random_blinding<CryptoRng: CryptoRngCore>(mut rng: CryptoRng) -> [u8; 16] {
         let mut blinding = [0u8; 16];
         rng.fill_bytes(&mut blinding);
 
@@ -114,7 +114,7 @@ impl BalanceWitness {
         }
     }
 
-    pub fn combine(balances: impl IntoIterator<Item = Self>, blinding: [u8; 16]) -> Self {
+    pub fn combine<I: IntoIterator<Item = Self>>(balances: I, blinding: [u8; 16]) -> Self {
         let mut combined = Self::zero(blinding);
 
         for balance in balances {

@@ -2,8 +2,29 @@ pub use common_http_client::BasicAuthCredentials;
 use common_http_client::{CommonHttpClient, Error};
 use nomos_core::da::blob::Blob;
 use nomos_executor::api::{handlers::DispersalRequest, paths};
-use reqwest::Url;
-use serde::{de::DeserializeOwned, Serialize};
+use reqwest::{Client, ClientBuilder, StatusCode, Url};
+use serde::Serialize;
+
+#[derive(thiserror::Error, Debug)]
+pub enum HttpError {
+    #[error("Internal server error: {0}")]
+    Server(String),
+    #[error(transparent)]
+    Request(reqwest::Error),
+}
+
+#[derive(Clone)]
+pub struct BasicAuthCredentials {
+    username: String,
+    password: Option<String>,
+}
+
+impl BasicAuthCredentials {
+    #[must_use]
+    pub const fn new(username: String, password: Option<String>) -> Self {
+        Self { username, password }
+    }
+}
 
 #[derive(Clone)]
 pub struct ExecutorHttpClient {
@@ -32,7 +53,7 @@ impl ExecutorHttpClient {
         &self,
         data: Vec<u8>,
         metadata: Metadata,
-    ) -> Result<(), Error>
+    ) -> Result<(), HttpError>
     where
         Metadata: Serialize + Send + Sync,
     {

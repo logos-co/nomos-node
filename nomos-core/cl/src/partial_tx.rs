@@ -23,7 +23,7 @@ impl From<[u8; 32]> for PtxRoot {
 }
 
 impl PtxRoot {
-    pub fn random(mut rng: impl RngCore) -> Self {
+    pub fn random<Rng: RngCore>(mut rng: Rng) -> Self {
         let mut sk = [0u8; 32];
         rng.fill_bytes(&mut sk);
         Self(sk)
@@ -50,10 +50,10 @@ pub struct PartialTxWitness {
 }
 
 impl PartialTxWitness {
-    pub fn random(
+    pub fn random<Rng: CryptoRngCore>(
         inputs: Vec<InputWitness>,
         outputs: Vec<OutputWitness>,
-        mut rng: impl CryptoRngCore,
+        mut rng: Rng,
     ) -> Self {
         Self {
             inputs,

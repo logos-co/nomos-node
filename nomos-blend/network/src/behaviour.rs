@@ -19,7 +19,7 @@ use nomos_blend_message::BlendMessage;
 use sha2::{Digest as _, Sha256};
 
 use crate::{
-    error::Error,
+    error::BlendNetworkError,
     handler::{BlendConnectionHandler, FromBehaviour, ToBehaviour},
 };
 
@@ -64,7 +64,7 @@ pub enum Event {
     MaliciousPeer(PeerId),
     /// A peer has been detected as unhealthy.
     UnhealthyPeer(PeerId),
-    Error(Error),
+    Error(BlendNetworkError),
 }
 
 impl<M, IntervalProvider> Behaviour<M, IntervalProvider>
@@ -88,7 +88,7 @@ where
     }
 
     /// Publish a message (data or drop) to all connected peers
-    pub fn publish(&mut self, message: &[u8]) -> Result<(), Error> {
+    pub fn publish(&mut self, message: &[u8]) -> Result<(), BlendNetworkError> {
         if M::is_drop_message(message) {
             // Bypass deduplication for the drop message
             return self.forward_message(message, None);
@@ -111,14 +111,14 @@ where
 
     /// Forwards a message to all connected peers except the excluded peer.
     ///
-    /// Returns [`Error::NoPeers`] if there are no connected peers that support
-    /// the blend protocol.
+    /// Returns [`BlendNetworkError::NoPeers`] if there are no connected peers
+    /// that support the blend protocol.
     fn forward_message(
         &mut self,
         message: &[u8],
         excluded_peer: Option<PeerId>,
-    ) -> Result<(), Error> {
-        let mut num_peers = 0;
+    ) -> Result<(), BlendNetworkError> {
+        let mut num_peers = 0u16;
         self.negotiated_peers
             .keys()
             .filter(|peer_id| (excluded_peer != Some(**peer_id)))
@@ -133,7 +133,7 @@ where
             });
 
         if num_peers == 0 {
-            Err(Error::NoPeers)
+            Err(BlendNetworkError::NoPeers)
         } else {
             self.try_wake();
             Ok(())
@@ -287,12 +287,13 @@ where
             }
             ToBehaviour::IOError(error) => {
                 self.negotiated_peers.remove(&peer_id);
-                self.events
-                    .push_back(ToSwarm::GenerateEvent(Event::Error(Error::PeerIOError {
+                self.events.push_back(ToSwarm::GenerateEvent(Event::Error(
+                    BlendNetworkError::PeerIOError {
                         error,
                         peer_id,
                         connection_id,
-                    })));
+                    },
+                )));
             }
         }
 

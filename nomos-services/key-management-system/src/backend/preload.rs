@@ -44,9 +44,9 @@ impl KMSBackend for PreloadKMSBackend {
         let key = self
             .keys
             .get(&key_id)
-            .ok_or_else(|| Error::KeyNotRegistered(key_id.clone()))?;
+            .ok_or_else(|| KeyManagementError::KeyNotRegistered(key_id.clone()))?;
         if key.key_type() != key_scheme {
-            return Err(Error::KeyTypeMismatch(key.key_type(), key_scheme).into());
+            return Err(KeyManagementError::KeyTypeMismatch(key.key_type(), key_scheme).into());
         }
         Ok(key_id)
     }
@@ -55,14 +55,14 @@ impl KMSBackend for PreloadKMSBackend {
         Ok(self
             .keys
             .get(&key_id)
-            .ok_or(Error::KeyNotRegistered(key_id))?
+            .ok_or(KeyManagementError::KeyNotRegistered(key_id))?
             .as_pk())
     }
 
     fn sign(&self, key_id: Self::KeyId, data: Bytes) -> Result<Bytes, DynError> {
         self.keys
             .get(&key_id)
-            .ok_or(Error::KeyNotRegistered(key_id))?
+            .ok_or(KeyManagementError::KeyNotRegistered(key_id))?
             .sign(data)
     }
 
@@ -70,7 +70,7 @@ impl KMSBackend for PreloadKMSBackend {
         op(self
             .keys
             .get_mut(&key_id)
-            .ok_or(Error::KeyNotRegistered(key_id))?)
+            .ok_or(KeyManagementError::KeyNotRegistered(key_id))?)
         .await
     }
 }
@@ -110,7 +110,7 @@ impl Key {
 }
 
 #[derive(thiserror::Error, Debug)]
-pub enum Error {
+pub enum KeyManagementError {
     #[error("Key({0}) was not registered")]
     KeyNotRegistered(String),
     #[error("KeyType mismatch: {0:?} != {1:?}")]

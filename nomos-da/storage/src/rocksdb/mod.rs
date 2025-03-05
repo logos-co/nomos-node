@@ -7,7 +7,7 @@ pub const DA_VID_KEY_PREFIX: &str = "da/vid/";
 pub const DA_SHARED_COMMITMENTS_PREFIX: &str = concat!("da/verified/", "sc");
 pub const DA_BLOB_PREFIX: &str = concat!("da/verified/", "bl");
 
-pub fn key_bytes(prefix: &str, id: impl AsRef<[u8]>) -> Bytes {
+pub fn key_bytes<Id: AsRef<[u8]>>(prefix: &str, id: Id) -> Bytes {
     let mut buffer = BytesMut::new();
 
     buffer.extend_from_slice(prefix.as_bytes());

@@ -40,7 +40,9 @@ mod test {
     use nomos_blend_message::{mock::MockBlendMessage, BlendMessage};
     use tokio::select;
 
-    use crate::{behaviour::Config, error::Error, Behaviour, Event, TokioIntervalStreamProvider};
+    use crate::{
+        behaviour::Config, error::BlendNetworkError, Behaviour, Event, TokioIntervalStreamProvider,
+    };
 
     /// Check that a published messsage arrives in the peers successfully.
     #[tokio::test]
@@ -85,7 +87,8 @@ mod test {
 
         // Expect for the task to be completed within 30 seconds.
         tokio::time::timeout(Duration::from_secs(30), task)
-            .await.unwrap();
+            .await
+            .unwrap();
     }
 
     /// If the peer doesn't support the blend protocol, the message should not
@@ -111,7 +114,7 @@ mod test {
         loop {
             select! {
                 _ = publish_try_interval.tick() => {
-                    assert!(matches!(swarm2.behaviour_mut().publish(&msg), Err(Error::NoPeers)));
+                    assert!(matches!(swarm2.behaviour_mut().publish(&msg), Err(BlendNetworkError::NoPeers)));
                     publish_try_count += 1;
                     if publish_try_count >= 10 {
                         break;
@@ -189,9 +192,10 @@ mod test {
         // Expect for the task to be completed in time
         tokio::time::timeout(
             conn_monitor_settings.interval + Duration::from_secs(1),
-            task
+            task,
         )
-        .await.unwrap();
+        .await
+        .unwrap();
     }
 
     #[tokio::test]
@@ -253,9 +257,10 @@ mod test {
         // Expect for the task to be completed in time
         tokio::time::timeout(
             conn_monitor_settings.interval + Duration::from_secs(1),
-            task
+            task,
         )
-        .await.unwrap();
+        .await
+        .unwrap();
     }
 
     fn new_blend_swarm(

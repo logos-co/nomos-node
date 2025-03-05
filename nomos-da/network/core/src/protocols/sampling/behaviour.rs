@@ -23,7 +23,7 @@ use libp2p::{
     Multiaddr, PeerId, Stream,
 };
 use libp2p_stream::{Control, IncomingStreams, OpenStreamError};
-use nomos_core::{da::BlobId, wire};
+use nomos_core::{da::BlobId, wire::WireError};
 use nomos_da_messages::{
     common,
     packing::{pack_to_writer, unpack_from_reader},
@@ -60,7 +60,7 @@ pub enum SamplingError {
         blob_id: BlobId,
         subnetwork_id: SubnetworkId,
         peer_id: PeerId,
-        error: wire::Error,
+        error: WireError,
     },
     #[error("Error sending request: {request:?}")]
     RequestChannel {

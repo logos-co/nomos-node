@@ -8,7 +8,7 @@ use sphinx_packet::{
 };
 
 use super::{
-    error::Error,
+    error::SphinxError,
     layered_cipher::{
         ConsistentLengthLayeredCipher, ConsistentLengthLayeredCipherData, EncryptionParam, Key,
     },
@@ -27,9 +27,9 @@ impl RoutingInformation {
         Self { flag }
     }
 
-    pub const fn from_bytes(data: &[u8]) -> Result<Self, Error> {
+    pub const fn from_bytes(data: &[u8]) -> Result<Self, SphinxError> {
         if data.len() != Self::SIZE {
-            return Err(Error::InvalidEncryptedRoutingInfoLength(data.len()));
+            return Err(SphinxError::InvalidEncryptedRoutingInfoLength(data.len()));
         }
         Ok(Self { flag: data[0] })
     }
@@ -59,7 +59,7 @@ type LayeredCipher = ConsistentLengthLayeredCipher<RoutingInformation>;
 impl EncryptedRoutingInformation {
     /// Build all [`RoutingInformation`]s for the provides keys,
     /// and encrypt them using [`ConsistentLengthLayeredCipher`].
-    pub fn new(routing_keys: &[RoutingKeys], max_layers: usize) -> Result<Self, Error> {
+    pub fn new(routing_keys: &[RoutingKeys], max_layers: usize) -> Result<Self, SphinxError> {
         let cipher = LayeredCipher::new(max_layers);
         let params = routing_keys
             .iter()
@@ -91,7 +91,7 @@ impl EncryptedRoutingInformation {
         &self,
         routing_key: &RoutingKeys,
         max_layers: usize,
-    ) -> Result<(RoutingInformation, Self), Error> {
+    ) -> Result<(RoutingInformation, Self), SphinxError> {
         let cipher = LayeredCipher::new(max_layers);
         let (routing_info, next_mac, next_encrypted_routing_info) = cipher.unpack(
             &self.mac,
@@ -120,7 +120,7 @@ impl EncryptedRoutingInformation {
             .collect()
     }
 
-    pub fn from_bytes(data: &[u8], max_layers: usize) -> Result<Self, Error> {
+    pub fn from_bytes(data: &[u8], max_layers: usize) -> Result<Self, SphinxError> {
         let parsed = parse_bytes(
             data,
             &[
@@ -128,7 +128,7 @@ impl EncryptedRoutingInformation {
                 LayeredCipher::total_size(max_layers),
             ],
         )
-        .map_err(|_| Error::InvalidEncryptedRoutingInfoLength(data.len()))?;
+        .map_err(|_| SphinxError::InvalidEncryptedRoutingInfoLength(data.len()))?;
         Ok(Self {
             mac: HeaderIntegrityMac::from_bytes(parsed[0].try_into().unwrap()),
             encrypted_routing_info: parsed[1].to_vec(),

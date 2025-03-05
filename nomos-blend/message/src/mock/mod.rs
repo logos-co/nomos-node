@@ -1,6 +1,6 @@
 pub mod error;
 
-use error::Error;
+use error::MockBlendMessageError;
 
 use crate::BlendMessage;
 
@@ -22,7 +22,7 @@ pub struct MockBlendMessage;
 impl BlendMessage for MockBlendMessage {
     type PublicKey = [u8; NODE_ID_SIZE];
     type PrivateKey = [u8; NODE_ID_SIZE];
-    type Error = Error;
+    type Error = MockBlendMessageError;
     const DROP_MESSAGE: &'static [u8] = &[0; MESSAGE_SIZE];
 
     /// The length of the encoded message is fixed to [`MESSAGE_SIZE`] bytes.
@@ -36,17 +36,17 @@ impl BlendMessage for MockBlendMessage {
         // ID.
         let node_ids = public_keys;
         if node_ids.is_empty() || node_ids.len() > MAX_LAYERS {
-            return Err(Error::InvalidNumberOfLayers);
+            return Err(MockBlendMessageError::InvalidNumberOfLayers);
         }
         if payload.len() > MAX_PAYLOAD_SIZE {
-            return Err(Error::PayloadTooLarge);
+            return Err(MockBlendMessageError::PayloadTooLarge);
         }
 
         let mut message: Vec<u8> = Vec::with_capacity(MESSAGE_SIZE);
 
         for node_id in node_ids {
             if node_id == &DUMMY_NODE_ID {
-                return Err(Error::InvalidPublicKey);
+                return Err(MockBlendMessageError::InvalidPublicKey);
             }
             message.extend(node_id);
         }
@@ -65,14 +65,14 @@ impl BlendMessage for MockBlendMessage {
         private_key: &Self::PrivateKey,
     ) -> Result<(Vec<u8>, bool), Self::Error> {
         if message.len() != MESSAGE_SIZE {
-            return Err(Error::InvalidBlendMessage);
+            return Err(MockBlendMessageError::InvalidBlendMessage);
         }
 
         // In this mock, we don't decrypt anything. So, we use private key as just a
         // node ID.
         let node_id = private_key;
         if &message[0..NODE_ID_SIZE] != node_id {
-            return Err(Error::MsgUnwrapNotAllowed);
+            return Err(MockBlendMessageError::MsgUnwrapNotAllowed);
         }
 
         // If this is the last layer
@@ -89,13 +89,13 @@ impl BlendMessage for MockBlendMessage {
 }
 
 impl MockBlendMessage {
-    pub fn payload(message: &[u8]) -> Result<Vec<u8>, Error> {
+    pub fn payload(message: &[u8]) -> Result<Vec<u8>, MockBlendMessageError> {
         let padded_payload = &message[NODE_ID_SIZE * MAX_LAYERS..];
         // remove the payload padding
         padded_payload
             .iter()
             .rposition(|&x| x == PAYLOAD_PADDING_SEPARATOR)
-            .map_or(Err(Error::InvalidBlendMessage), |pos| {
+            .map_or(Err(MockBlendMessageError::InvalidBlendMessage), |pos| {
                 Ok(padded_payload[0..pos].to_vec())
             })
     }
@@ -138,7 +138,7 @@ mod tests {
         let payload = [7; 10];
         assert_eq!(
             MockBlendMessage::build_message(&payload, &node_ids),
-            Err(Error::InvalidPublicKey)
+            Err(MockBlendMessageError::InvalidPublicKey)
         );
     }
 }

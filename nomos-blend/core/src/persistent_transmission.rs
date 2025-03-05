@@ -70,10 +70,10 @@ where
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let Self {
-            ref mut scheduler,
-            ref mut stream,
-            ref mut coin,
-            ref drop_message,
+            scheduler,
+            stream,
+            coin,
+            drop_message,
             ..
         } = self.get_mut();
         if pin!(scheduler).poll_next_unpin(cx).is_pending() {

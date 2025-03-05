@@ -2,7 +2,7 @@ use serde::{de::DeserializeOwned, Deserialize};
 
 use crate::wire::{
     bincode::{BincodeDeserializer, OPTIONS},
-    Error,
+    WireError,
 };
 
 pub struct Deserializer<'de> {
@@ -14,7 +14,7 @@ impl<'de> Deserializer<'de> {
     }
 
     pub fn deserialize<T: Deserialize<'de>>(&mut self) -> crate::wire::Result<T> {
-        <T>::deserialize(&mut self.inner).map_err(Error::Deserialize)
+        <T>::deserialize(&mut self.inner).map_err(WireError::Deserialize)
     }
 }
 /// Return a deserializer for wire format

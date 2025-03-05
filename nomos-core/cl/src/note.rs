@@ -65,13 +65,13 @@ impl NoteWitness {
         }
     }
 
-    pub fn basic(value: u64, unit: Unit, rng: impl RngCore) -> Self {
+    pub fn basic<Rng: RngCore>(value: u64, unit: Unit, rng: Rng) -> Self {
         let covenant = Covenant([0u8; 32]);
         let nonce = Nonce::random(rng);
         Self::new(value, unit, covenant, [0u8; 32], nonce)
     }
 
-    pub fn stateless(value: u64, unit: Unit, covenant: Covenant, rng: impl RngCore) -> Self {
+    pub fn stateless<Rng: RngCore>(value: u64, unit: Unit, covenant: Covenant, rng: Rng) -> Self {
         Self::new(value, unit, covenant, [0u8; 32], Nonce::random(rng))
     }
 
@@ -119,7 +119,7 @@ impl NoteWitness {
 pub struct Nonce([u8; 32]);
 
 impl Nonce {
-    pub fn random(mut rng: impl RngCore) -> Self {
+    pub fn random<Rng: RngCore>(mut rng: Rng) -> Self {
         let mut nonce = [0u8; 32];
         rng.fill_bytes(&mut nonce);
         Self(nonce)

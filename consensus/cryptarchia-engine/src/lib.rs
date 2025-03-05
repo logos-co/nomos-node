@@ -65,7 +65,12 @@ where
     }
 
     #[must_use = "this returns the result of the operation, without modifying the original"]
-    fn apply_header(&self, header: Id, parent: Id, slot: Slot) -> Result<Self, Error<Id>> {
+    fn apply_header(
+        &self,
+        header: Id,
+        parent: Id,
+        slot: Slot,
+    ) -> Result<Self, CryptarchiaError<Id>> {
         let mut branches = self.branches.clone();
         let mut tips = self.tips.clone();
         // if the parent was the head of a branch, remove it as it has been superseded
@@ -73,7 +78,7 @@ where
         tips.remove(&parent);
         let length = branches
             .get(&parent)
-            .ok_or(Error::ParentMissing(parent))?
+            .ok_or(CryptarchiaError::ParentMissing(parent))?
             .length
             + 1;
         tips.insert(header);
@@ -134,7 +139,7 @@ where
 
 #[derive(Debug, Clone, Error)]
 #[cfg_attr(test, derive(PartialEq, Eq))]
-pub enum Error<Id> {
+pub enum CryptarchiaError<Id> {
     #[error("Parent block: {0:?} is not know to this node")]
     ParentMissing(Id),
     #[error("Orphan proof has was not found in the ledger: {0:?}, can't import it")]
@@ -160,7 +165,12 @@ where
     }
 
     #[must_use = "this returns the result of the operation, without modifying the original"]
-    pub fn receive_block(&self, id: Id, parent: Id, slot: Slot) -> Result<Self, Error<Id>> {
+    pub fn receive_block(
+        &self,
+        id: Id,
+        parent: Id,
+        slot: Slot,
+    ) -> Result<Self, CryptarchiaError<Id>> {
         let mut new: Self = self.clone();
         new.branches = new.branches.apply_header(id, parent, slot)?;
         new.local_chain = new.fork_choice();

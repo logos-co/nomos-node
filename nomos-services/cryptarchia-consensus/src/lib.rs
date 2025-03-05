@@ -8,7 +8,7 @@ pub mod storage;
 use core::fmt::Debug;
 use std::{collections::BTreeSet, hash::Hash, marker::PhantomData, path::PathBuf};
 
-use cryptarchia_engine::Slot;
+use cryptarchia_engine::{CryptarchiaError, Slot};
 use futures::StreamExt as _;
 pub use leadership::LeaderConfig;
 use network::NetworkAdapter;
@@ -22,7 +22,7 @@ use nomos_core::{
 use nomos_da_sampling::{
     backend::DaSamplingServiceBackend, DaSamplingService, DaSamplingServiceMsg,
 };
-use nomos_ledger::{leader_proof::LeaderProof as _, LedgerState};
+use nomos_ledger::{leader_proof::LeaderProof as _, LedgerError, LedgerState};
 use nomos_mempool::{
     backend::{MemPool, RecoverableMempool},
     network::NetworkAdapter as MempoolAdapter,
@@ -60,11 +60,11 @@ const HEADERS_LIMIT: usize = 512;
 const CRYPTARCHIA_ID: ServiceId = "Cryptarchia";
 
 #[derive(Debug, Clone, Error)]
-pub enum Error {
+pub enum CryptarchiaConsensusError {
     #[error("Ledger error: {0}")]
-    Ledger(#[from] nomos_ledger::LedgerError<HeaderId>),
+    Ledger(#[from] LedgerError<HeaderId>),
     #[error("Consensus error: {0}")]
-    Consensus(#[from] cryptarchia_engine::Error<HeaderId>),
+    Consensus(#[from] CryptarchiaError<HeaderId>),
 }
 
 struct Cryptarchia {
@@ -87,7 +87,7 @@ impl Cryptarchia {
         self.consensus.genesis()
     }
 
-    fn try_apply_header(&self, header: &Header) -> Result<Self, Error> {
+    fn try_apply_header(&self, header: &Header) -> Result<Self, CryptarchiaConsensusError> {
         let id = header.id();
         let parent = header.parent();
         let slot = header.slot();
@@ -658,7 +658,7 @@ impl<TxS, BxS, NetworkAdapterSettings, BlendAdapterSettings, TimeBackendSettings
     >
 {
     type Settings = CryptarchiaSettings<TxS, BxS, NetworkAdapterSettings, BlendAdapterSettings>;
-    type Error = Error;
+    type Error = CryptarchiaConsensusError;
 
     fn from_settings(_settings: &Self::Settings) -> Result<Self, Self::Error> {
         Ok(Self::new(None, None))
@@ -893,8 +893,8 @@ where
                 cryptarchia = new_state;
             }
             Err(
-                Error::Ledger(nomos_ledger::LedgerError::ParentNotFound(parent))
-                | Error::Consensus(cryptarchia_engine::Error::ParentMissing(parent)),
+                CryptarchiaConsensusError::Ledger(LedgerError::ParentNotFound(parent))
+                | CryptarchiaConsensusError::Consensus(CryptarchiaError::ParentMissing(parent)),
             ) => {
                 tracing::debug!("missing parent {:?}", parent);
                 // TODO: request parent block

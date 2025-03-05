@@ -35,7 +35,7 @@ impl<const SIZE: usize, B: DispersedBlobInfo> BlobSelect for FillSize<SIZE, B> {
             reason = "TODO: Replace this redundant closure with `B::size` without triggering compiler errors about B not living long enough."
         )]
         {
-            utils::select::select_from_till_fill_size::<SIZE, Self::BlobId>(
+            utils::select::select_from_till_fill_size::<SIZE, Self::BlobId, _, _>(
                 |c| c.size(),
                 certificates,
             )

@@ -3,7 +3,7 @@ use std::io;
 use libp2p::{swarm::ConnectionId, PeerId};
 
 #[derive(Debug)]
-pub enum Error {
+pub enum BlendNetworkError {
     /// There were no peers to send a message to.
     NoPeers,
     /// IO error from peer

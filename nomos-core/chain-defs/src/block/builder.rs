@@ -58,15 +58,18 @@ where
     }
 
     #[must_use]
-    pub fn with_transactions(mut self, txs: impl Iterator<Item = Tx> + 'static) -> Self {
+    pub fn with_transactions<Transactions: Iterator<Item = Tx> + 'static>(
+        mut self,
+        txs: Transactions,
+    ) -> Self {
         self.txs = Some(Box::new(txs));
         self
     }
 
     #[must_use]
-    pub fn with_blobs_info(
+    pub fn with_blobs_info<Certificates: Iterator<Item = B> + 'static>(
         mut self,
-        blobs_certificates: impl Iterator<Item = B> + 'static,
+        blobs_certificates: Certificates,
     ) -> Self {
         self.blobs = Some(Box::new(blobs_certificates));
         self

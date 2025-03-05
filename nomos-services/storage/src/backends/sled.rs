@@ -9,7 +9,7 @@ use sled::transaction::{
 use super::{StorageBackend, StorageSerde, StorageTransaction};
 
 #[derive(Debug, thiserror::Error)]
-pub enum Error {
+pub enum SledError {
     #[error(transparent)]
     Transaction(#[from] TransactionError),
     #[error(transparent)]

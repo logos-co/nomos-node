@@ -19,7 +19,7 @@ use libp2p::{
     Multiaddr, PeerId, Stream,
 };
 use libp2p_stream::{Control, OpenStreamError};
-use nomos_core::{da::BlobId, wire};
+use nomos_core::{da::BlobId, wire::WireError};
 use nomos_da_messages::{
     common::Blob,
     dispersal,
@@ -44,7 +44,7 @@ pub enum DispersalError {
     },
     #[error("Could not serialized: {error}")]
     Serialization {
-        error: wire::Error,
+        error: WireError,
         blob_id: BlobId,
         subnetwork_id: SubnetworkId,
     },

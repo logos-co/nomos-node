@@ -1,4 +1,4 @@
-use error::Error;
+use error::SphinxError;
 use packet::{Packet, UnpackedPacket};
 
 use crate::BlendMessage;
@@ -19,7 +19,7 @@ const MAX_LAYERS: usize = 5;
 impl BlendMessage for SphinxMessage {
     type PublicKey = [u8; ASYM_KEY_SIZE];
     type PrivateKey = [u8; ASYM_KEY_SIZE];
-    type Error = Error;
+    type Error = SphinxError;
 
     const DROP_MESSAGE: &'static [u8] = &[0; Packet::size(MAX_LAYERS, MAX_PAYLOAD_SIZE)];
 

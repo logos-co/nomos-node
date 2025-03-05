@@ -1,7 +1,7 @@
 use bytes::{Bytes, BytesMut};
 use risc0_zkvm::Prover;
 
-use super::Error;
+use super::TxProofError;
 use crate::{
     proofs::{balance::BalanceProof, covenant::CovenantProof, ptx::PtxProof},
     wire,
@@ -36,14 +36,14 @@ impl Bundle {
         cm_root: [u8; 32],
         covenant_proofs: Vec<Vec<CovenantProof>>,
         prover: &dyn Prover,
-    ) -> Result<Self, Error> {
+    ) -> Result<Self, TxProofError> {
         if bundle_witness.partial_witnesses().len() != covenant_proofs.len()
             || covenant_proofs
                 .iter()
                 .zip(bundle_witness.partial_witnesses())
                 .any(|(covenant_proofs, ptx)| covenant_proofs.len() != ptx.inputs.len())
         {
-            return Err(Error::InvalidWitness);
+            return Err(TxProofError::InvalidWitness);
         }
 
         let ptx_proofs = bundle_witness
