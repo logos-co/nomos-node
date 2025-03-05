@@ -1,4 +1,7 @@
-use std::path::{Path, PathBuf};
+use std::{
+    collections::HashSet,
+    path::{Path, PathBuf},
+};
 
 use nomos_core::{
     header::HeaderId,
@@ -71,10 +74,7 @@ fn test_mockmempool() {
             },
         ];
 
-        let exp_txns = predefined_messages
-            .iter()
-            .cloned()
-            .collect::<std::collections::HashSet<_>>();
+        let exp_txns: HashSet<MockMessage> = predefined_messages.iter().cloned().collect();
 
         let app = OverwatchRunner::<MockPoolNode>::run(
             MockPoolNodeServiceSettings {
@@ -126,11 +126,11 @@ fn test_mockmempool() {
                     .await
                     .unwrap();
 
-                let items = mrx
+                let items: HashSet<MockMessage> = mrx
                     .await
                     .unwrap()
                     .map(|msg| msg.message().clone())
-                    .collect::<std::collections::HashSet<_>>();
+                    .collect();
 
                 if items.len() == exp_txns.len() {
                     assert_eq!(exp_txns, items);

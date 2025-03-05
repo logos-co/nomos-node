@@ -118,10 +118,10 @@ mod test {
     fn note_commitment_leaves(
         note_commitments: &[cl::NoteCommitment],
     ) -> [[u8; 32]; MAX_NOTE_COMMS] {
-        let note_comm_bytes = note_commitments
+        let note_comm_bytes: Vec<Vec<u8>> = note_commitments
             .iter()
             .map(|c| c.as_bytes().to_vec())
-            .collect::<Vec<_>>();
+            .collect();
         cl::merkle::padded_leaves::<MAX_NOTE_COMMS>(&note_comm_bytes)
     }
 

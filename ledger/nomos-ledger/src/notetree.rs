@@ -13,10 +13,7 @@ pub struct NoteTree {
 fn note_commitment_leaves(
     commitments: &rpds::VectorSync<NoteCommitment>,
 ) -> [[u8; 32]; MAX_NOTE_COMMS] {
-    let note_comm_bytes = commitments
-        .iter()
-        .map(|c| c.as_bytes().to_vec())
-        .collect::<Vec<_>>();
+    let note_comm_bytes: Vec<Vec<u8>> = commitments.iter().map(|c| c.as_bytes().to_vec()).collect();
     cl::merkle::padded_leaves::<MAX_NOTE_COMMS>(&note_comm_bytes)
 }
 
