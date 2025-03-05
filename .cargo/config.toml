@@ -9,19 +9,9 @@ rustflags = [
 [target.'cfg(all())']
 rustflags = [
   "-Wclippy::nursery",
-  "-Aclippy::large_stack_frames",
 
   "-Wclippy::pedantic",
   "-Aclippy::similar_names",
-  # TODO: Tackle before opening PR
-  "-Aclippy::cast_possible_truncation",
-  "-Aclippy::cast_sign_loss",
-  "-Aclippy::cast_precision_loss",
-  "-Aclippy::cast_possible_wrap",
-  # TODO: Remove at some point
-  "-Aclippy::missing_errors_doc",
-  # TODO: Remove at some point
-  "-Aclippy::missing_panics_doc",
 
   "-Aclippy::blanket_clippy_restriction_lints",
   "-Wclippy::restriction",
@@ -70,7 +60,15 @@ rustflags = [
   "-Aclippy::unwrap_in_result",
   "-Aclippy::use_debug",
   "-Aclippy::wildcard_enum_match_arm",
+
   # TODO: Remove at some point
+  "-Aclippy::cast_possible_truncation",
+  "-Aclippy::cast_possible_wrap",
+  "-Aclippy::cast_precision_loss",
+  "-Aclippy::cast_sign_loss",
+  "-Aclippy::large_stack_frames",
+  "-Aclippy::missing_errors_doc",
+  "-Aclippy::missing_panics_doc",
   "-Aclippy::unimplemented",
 
   # TODO: Remove one by one for each commit
