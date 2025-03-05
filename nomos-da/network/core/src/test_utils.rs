@@ -1,4 +1,8 @@
-use std::{collections::HashSet, time::Duration};
+use std::{
+    collections::HashSet,
+    sync::{Arc, Mutex},
+    time::Duration,
+};
 
 use libp2p::{
     core::{transport::MemoryTransport, upgrade::Version},
@@ -12,7 +16,7 @@ use crate::SubnetworkId;
 
 #[derive(Clone)]
 pub struct AllNeighbours {
-    pub neighbours: HashSet<PeerId>,
+    pub neighbours: Arc<Mutex<HashSet<PeerId>>>,
 }
 
 impl MembershipHandler for AllNeighbours {
@@ -28,11 +32,11 @@ impl MembershipHandler for AllNeighbours {
     }
 
     fn members_of(&self, _network_id: &Self::NetworkId) -> HashSet<Self::Id> {
-        self.neighbours.clone()
+        self.neighbours.lock().unwrap().clone()
     }
 
     fn members(&self) -> HashSet<Self::Id> {
-        self.neighbours.clone()
+        self.neighbours.lock().unwrap().clone()
     }
 
     fn last_subnetwork_id(&self) -> Self::NetworkId {

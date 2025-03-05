@@ -3,7 +3,10 @@ pub mod handler;
 
 #[cfg(test)]
 mod test {
-    use std::time::Duration;
+    use std::{
+        sync::{Arc, Mutex},
+        time::Duration,
+    };
 
     use blake2::{Blake2s256, Digest};
     use futures::StreamExt;
@@ -55,12 +58,14 @@ mod test {
         let k2 = libp2p::identity::Keypair::generate_ed25519();
 
         let neighbours = AllNeighbours {
-            neighbours: [
-                PeerId::from_public_key(&k1.public()),
-                PeerId::from_public_key(&k2.public()),
-            ]
-            .into_iter()
-            .collect(),
+            neighbours: Arc::new(Mutex::new(
+                [
+                    PeerId::from_public_key(&k1.public()),
+                    PeerId::from_public_key(&k2.public()),
+                ]
+                .into_iter()
+                .collect(),
+            )),
         };
         let mut swarm_1 = get_swarm(k1, neighbours.clone());
         let mut swarm_2 = get_swarm(k2, neighbours);

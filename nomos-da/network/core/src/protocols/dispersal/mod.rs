@@ -3,6 +3,11 @@ pub mod validator;
 
 #[cfg(test)]
 pub mod test {
+    use std::{
+        collections::HashSet,
+        sync::{Arc, Mutex},
+    };
+
     use futures::StreamExt;
     use kzgrs_backend::common::{blob::DaBlob, Column};
     use libp2p::{
@@ -29,22 +34,21 @@ pub mod test {
             .compact()
             .with_writer(TestWriter::default())
             .try_init();
-        let k1 = libp2p::identity::Keypair::generate_ed25519();
-        let k2 = libp2p::identity::Keypair::generate_ed25519();
+
         let neighbours = AllNeighbours {
-            neighbours: [
-                PeerId::from_public_key(&k1.public()),
-                PeerId::from_public_key(&k2.public()),
-            ]
-            .into_iter()
-            .collect(),
+            neighbours: Arc::new(Mutex::new(HashSet::new())),
         };
 
-        let mut executor = Swarm::new_ephemeral_tokio(|_| {
+        let mut executor = Swarm::new_ephemeral_tokio(|k1| {
+            let p1 = PeerId::from_public_key(&k1.public());
+            neighbours.neighbours.lock().unwrap().insert(p1);
             DispersalExecutorBehaviour::new(neighbours.clone(), AddressBook::empty())
         });
-        let mut validator =
-            Swarm::new_ephemeral_tokio(|_| DispersalValidatorBehaviour::new(neighbours));
+        let mut validator = Swarm::new_ephemeral_tokio(|k2| {
+            let p2 = PeerId::from_public_key(&k2.public());
+            neighbours.neighbours.lock().unwrap().insert(p2);
+            DispersalValidatorBehaviour::new(neighbours.clone())
+        });
 
         validator.listen().with_memory_addr_external().await;
         executor
