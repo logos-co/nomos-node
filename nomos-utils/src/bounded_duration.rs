@@ -152,7 +152,7 @@ mod test {
     }
 
     #[test]
-    #[should_panic]
+    #[should_panic(expected = "Minimal duration is 1d but got 1s")]
     fn fail_deserialize_with_type_bound() {
         let value = serde_json::to_value(Duration::seconds(1)).unwrap();
 
@@ -175,7 +175,7 @@ mod test {
     }
 
     #[test]
-    #[should_panic]
+    #[should_panic(expected = "Minimal duration is 1s but got 10ms")]
     fn deserialize_proxy_type_fails() {
         let foo = Foo {
             duration: Duration::milliseconds(10),
