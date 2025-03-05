@@ -228,11 +228,13 @@ where
                     .push_back(message.clone());
             });
 
-        self.wake();
+        self.try_wake();
     }
 
-    fn wake(&mut self) {
-        self.waker.as_ref().map(Waker::wake_by_ref);
+    pub fn try_wake(&mut self) {
+        if let Some(waker) = self.waker.take() {
+            waker.wake();
+        }
     }
 
     /// Try to read a single message from the incoming stream
@@ -456,14 +458,12 @@ where
             should_wake = true;
         }
 
-        // Initialize the waker on the first Pending poll
-        if self.waker.is_none() {
-            self.waker = Some(cx.waker().clone());
-        }
+        // Always use the waker from the most recent context
+        self.waker = Some(cx.waker().clone());
 
         // Only wake if we have a reason to
         if should_wake {
-            self.wake();
+            self.try_wake();
         }
 
         Poll::Pending
