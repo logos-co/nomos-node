@@ -104,9 +104,9 @@ impl NetworkBackend for MockExecutorBackend {
 
     async fn subscribe(
         &mut self,
-        kind: Self::EventKind,
+        event: Self::EventKind,
     ) -> Pin<Box<dyn Stream<Item = Self::NetworkEvent> + Send>> {
-        match kind {
+        match event {
             EventKind::Dispersal | EventKind::Sample => Box::pin(
                 BroadcastStream::new(self.events_tx.subscribe())
                     .filter_map(|event| async { event.ok() }),

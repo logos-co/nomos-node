@@ -42,7 +42,7 @@ pub struct DaBlob {
 
 impl DaBlob {
     #[must_use]
-    pub fn id(&self) -> Vec<u8> {
+    pub fn get_id(&self) -> Vec<u8> {
         build_blob_id(&self.aggregated_column_commitment, &self.rows_commitments).into()
     }
 

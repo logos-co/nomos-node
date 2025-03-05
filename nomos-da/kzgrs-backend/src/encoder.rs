@@ -79,9 +79,7 @@ impl EncodedData {
                 .collect(),
         })
     }
-}
 
-impl EncodedData {
     #[must_use]
     pub const fn iter(&self) -> EncodedDataIterator {
         EncodedDataIterator::new(self)
@@ -297,9 +295,9 @@ impl nomos_core::da::DaEncoder for DaEncoder {
     type EncodedData = EncodedData;
     type Error = KzgRsError;
 
-    fn encode(&self, data: &[u8]) -> Result<EncodedData, KzgRsError> {
+    fn encode(&self, b: &[u8]) -> Result<EncodedData, KzgRsError> {
         let global_parameters = &self.params.global_parameters;
-        let chunked_data = self.chunkify(data);
+        let chunked_data = self.chunkify(b);
         let row_domain = PolynomialEvaluationDomain::new(self.params.column_count)
             .expect("Domain should be able to build");
         let column_domain = PolynomialEvaluationDomain::new(chunked_data.len())
@@ -332,7 +330,7 @@ impl nomos_core::da::DaEncoder for DaEncoder {
             self.params.toeplitz1cache.as_ref(),
         );
         Ok(EncodedData {
-            data: data.to_vec(),
+            data: b.to_vec(),
             chunked_data,
             extended_data,
             row_commitments,

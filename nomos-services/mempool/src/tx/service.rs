@@ -109,14 +109,14 @@ where
 {
     fn init(
         service_state: ServiceStateHandle<Self::Message, Self::Settings, Self::State>,
-        init_state: Self::State,
+        initial_state: Self::State,
     ) -> Result<Self, overwatch_rs::DynError> {
         tracing::trace!(
             "Initializing TxMempoolService with initial state {:#?}",
-            init_state.pool
+            initial_state.pool
         );
         let settings = service_state.settings_reader.get_updated_settings();
-        let recovered_pool = init_state.pool.map_or_else(
+        let recovered_pool = initial_state.pool.map_or_else(
             || Pool::new(settings.pool.clone()),
             |recovered_pool| Pool::recover(settings.pool.clone(), recovered_pool),
         );

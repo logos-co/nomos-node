@@ -16,7 +16,7 @@ impl Cli {
     }
 
     #[must_use]
-    pub const fn command(&self) -> &Command {
+    pub const fn get_command(&self) -> &Command {
         &self.command
     }
 }

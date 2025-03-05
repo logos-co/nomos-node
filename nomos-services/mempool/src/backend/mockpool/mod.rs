@@ -50,7 +50,7 @@ impl<BlockId, Item, Key> MockPool<BlockId, Item, Key> {
     }
 
     #[must_use]
-    pub const fn last_item_timestamp(&self) -> u64 {
+    pub const fn get_last_item_timestamp(&self) -> u64 {
         self.last_item_timestamp
     }
 }
@@ -106,7 +106,7 @@ where
     Key: Hash + Eq + Clone,
 {
     #[must_use]
-    pub fn new() -> Self {
+    pub fn new_empty() -> Self {
         Self::default()
     }
 }
@@ -123,7 +123,7 @@ where
     type BlockId = BlockId;
 
     fn new(_settings: Self::Settings) -> Self {
-        Self::new()
+        Self::new_empty()
     }
 
     fn add_item<I: Into<Self::Item>>(
@@ -154,16 +154,16 @@ where
         Box::new(pending_items.into_iter())
     }
 
-    fn mark_in_block(&mut self, keys: &[Self::Key], block: BlockId) {
-        let mut items_in_block = Vec::with_capacity(keys.len());
-        for key in keys {
+    fn mark_in_block(&mut self, items: &[Self::Key], block: BlockId) {
+        let mut items_in_block = Vec::with_capacity(items.len());
+        for key in items {
             if let Some(item) = self.pending_items.remove(key) {
                 items_in_block.push(item);
             }
         }
         let block_entry = self.in_block_items.entry(block).or_default();
         self.in_block_items_by_id
-            .extend(keys.iter().cloned().map(|key| (key, block)));
+            .extend(items.iter().cloned().map(|key| (key, block)));
         block_entry.append(&mut items_in_block);
     }
 
@@ -174,8 +174,8 @@ where
         })
     }
 
-    fn prune(&mut self, keys: &[Self::Key]) {
-        for key in keys {
+    fn prune(&mut self, items: &[Self::Key]) {
+        for key in items {
             self.pending_items.remove(key);
         }
     }

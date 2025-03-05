@@ -64,9 +64,9 @@ impl NetworkBackend for Libp2p {
 
     async fn subscribe(
         &mut self,
-        kind: Self::EventKind,
+        event: Self::EventKind,
     ) -> broadcast::Receiver<Self::NetworkEvent> {
-        match kind {
+        match event {
             EventKind::Message => {
                 tracing::debug!("processed subscription to incoming messages");
                 self.events_tx.subscribe()

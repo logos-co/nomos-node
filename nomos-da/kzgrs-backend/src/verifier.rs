@@ -251,8 +251,9 @@ mod test {
 
         bytes_to_polynomial::<BYTES_PER_FIELD_ELEMENT>(
             column2.as_bytes().as_slice(),
-            column_data.domain
-        ).unwrap_err();
+            column_data.domain,
+        )
+        .unwrap_err();
 
         assert!(!DaVerifier::verify_column(
             &GLOBAL_PARAMETERS,
@@ -361,9 +362,10 @@ mod test {
         let encoder = &ENCODER;
         let data = rand_data(32);
         let domain_size = 16usize;
-        let verifiers: Vec<DaVerifier> = (0..16)
-            .map(|_| DaVerifier::new(GLOBAL_PARAMETERS.clone()))
-            .collect();
+        let verifiers: Vec<DaVerifier> =
+            std::iter::repeat_with(|| DaVerifier::new(GLOBAL_PARAMETERS.clone()))
+                .take(16)
+                .collect();
         let encoded_data = encoder.encode(&data).unwrap();
         for (i, column) in encoded_data.extended_data.columns().enumerate() {
             println!("{i}");

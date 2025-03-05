@@ -25,11 +25,11 @@ pub enum NetworkMsg<B: NetworkBackend> {
 }
 
 impl<B: NetworkBackend> Debug for NetworkMsg<B> {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Self::Process(msg) => write!(fmt, "NetworkMsg::Process({msg:?})"),
+            Self::Process(msg) => write!(f, "NetworkMsg::Process({msg:?})"),
             Self::Subscribe { kind, sender } => write!(
-                fmt,
+                f,
                 "NetworkMsg::Subscribe{{ kind: {kind:?}, sender: {sender:?}}}"
             ),
         }
@@ -44,8 +44,8 @@ pub struct NetworkConfig<B: NetworkBackend> {
 }
 
 impl<B: NetworkBackend> Debug for NetworkConfig<B> {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
-        write!(fmt, "NetworkConfig {{ backend: {:?}}}", self.backend)
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "NetworkConfig {{ backend: {:?}}}", self.backend)
     }
 }
 

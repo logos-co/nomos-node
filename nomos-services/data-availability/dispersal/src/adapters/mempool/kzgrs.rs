@@ -104,9 +104,9 @@ where
     type BlobId = BlobId;
     type Metadata = dispersal::Metadata;
 
-    fn new(mempool_relay: OutboundRelay<<Self::MempoolService as ServiceData>::Message>) -> Self {
+    fn new(outbound_relay: OutboundRelay<<Self::MempoolService as ServiceData>::Message>) -> Self {
         Self {
-            mempool_relay,
+            mempool_relay: outbound_relay,
             _phantom: PhantomData,
             _phantom2: PhantomData,
         }

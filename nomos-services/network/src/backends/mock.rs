@@ -302,8 +302,8 @@ impl NetworkBackend for Mock {
         };
     }
 
-    async fn subscribe(&mut self, kind: Self::EventKind) -> Receiver<Self::NetworkEvent> {
-        match kind {
+    async fn subscribe(&mut self, event: Self::EventKind) -> Receiver<Self::NetworkEvent> {
+        match event {
             EventKind::Message => {
                 debug!("processed subscription to incoming messages");
                 self.message_event.subscribe()

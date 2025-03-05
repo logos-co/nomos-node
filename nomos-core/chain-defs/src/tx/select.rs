@@ -12,7 +12,7 @@ pub struct FillSize<const SIZE: usize, Tx> {
 
 impl<const SIZE: usize, Tx> FillSize<SIZE, Tx> {
     #[must_use]
-    pub const fn new() -> Self {
+    pub const fn new_empty() -> Self {
         Self { _tx: PhantomData }
     }
 }
@@ -22,7 +22,7 @@ impl<const SIZE: usize, Tx: Transaction> TxSelect for FillSize<SIZE, Tx> {
     type Settings = ();
 
     fn new((): Self::Settings) -> Self {
-        Self::new()
+        Self::new_empty()
     }
 
     fn select_tx_from<'i, I: Iterator<Item = Self::Tx> + 'i>(

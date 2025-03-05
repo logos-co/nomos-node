@@ -55,10 +55,10 @@ where
     type Block = Block<Tx, BlobCertificate>;
 
     async fn new(
-        storage_relay: OutboundRelay<<StorageService<Self::Backend> as ServiceData>::Message>,
+        network_relay: OutboundRelay<<StorageService<Self::Backend> as ServiceData>::Message>,
     ) -> Self {
         Self {
-            storage_relay,
+            storage_relay: network_relay,
             _tx: PhantomData,
             _blob_certificate: PhantomData,
         }

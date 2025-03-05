@@ -193,29 +193,29 @@ where
     fn handle_established_inbound_connection(
         &mut self,
         connection_id: ConnectionId,
-        peer_id: PeerId,
+        peer: PeerId,
         _local_addr: &Multiaddr,
         _remote_addr: &Multiaddr,
     ) -> Result<THandler<Self>, ConnectionDenied> {
-        if !self.is_neighbour(&peer_id) {
-            trace!("refusing connection to {peer_id}");
+        if !self.is_neighbour(&peer) {
+            trace!("refusing connection to {peer}");
             return Ok(Either::Right(libp2p::swarm::dummy::ConnectionHandler));
         }
-        trace!("{}, Connected to {peer_id}", self.local_peer_id);
-        self.connected.insert(peer_id, connection_id);
+        trace!("{}, Connected to {peer}", self.local_peer_id);
+        self.connected.insert(peer, connection_id);
         Ok(Either::Left(ReplicationHandler::new()))
     }
 
     fn handle_established_outbound_connection(
         &mut self,
         connection_id: ConnectionId,
-        peer_id: PeerId,
+        peer: PeerId,
         _addr: &Multiaddr,
         _role_override: Endpoint,
         _port_use: PortUse,
     ) -> Result<THandler<Self>, ConnectionDenied> {
-        trace!("{}, Connected to {peer_id}", self.local_peer_id);
-        self.connected.insert(peer_id, connection_id);
+        trace!("{}, Connected to {peer}", self.local_peer_id);
+        self.connected.insert(peer, connection_id);
         Ok(Either::Left(ReplicationHandler::new()))
     }
 
@@ -292,18 +292,18 @@ mod tests {
         type NetworkId = SubnetworkId;
         type Id = PeerId;
 
-        fn membership(&self, peer_id: &PeerId) -> HashSet<Self::NetworkId> {
-            self.membership.get(peer_id).cloned().unwrap_or_default()
+        fn membership(&self, id: &PeerId) -> HashSet<Self::NetworkId> {
+            self.membership.get(id).cloned().unwrap_or_default()
         }
 
         fn is_allowed(&self, _id: &Self::Id) -> bool {
             unimplemented!()
         }
 
-        fn members_of(&self, subnetwork: &Self::NetworkId) -> HashSet<Self::Id> {
+        fn members_of(&self, network_id: &Self::NetworkId) -> HashSet<Self::Id> {
             self.membership
                 .iter()
-                .filter_map(|(id, nets)| nets.contains(subnetwork).then_some(*id))
+                .filter_map(|(id, nets)| nets.contains(network_id).then_some(*id))
                 .collect()
         }
 

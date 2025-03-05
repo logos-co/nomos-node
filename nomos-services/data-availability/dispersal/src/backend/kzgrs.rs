@@ -101,11 +101,11 @@ where
     type BlobId = BlobId;
 
     fn init(
-        settings: Self::Settings,
+        config: Self::Settings,
         network_adapter: Self::NetworkAdapter,
         mempool_adapter: Self::MempoolAdapter,
     ) -> Self {
-        let encoder_settings = &settings.encoder_settings;
+        let encoder_settings = &config.encoder_settings;
         let global_params = kzgrs_backend::global::global_parameters_from_file(
             &encoder_settings.global_params_path,
         )
@@ -116,7 +116,7 @@ where
             global_params,
         ));
         Self {
-            settings,
+            settings: config,
             network_adapter: Arc::new(network_adapter),
             mempool_adapter,
             encoder: Arc::new(encoder),

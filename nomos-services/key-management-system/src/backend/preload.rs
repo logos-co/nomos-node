@@ -39,14 +39,14 @@ impl KMSBackend for PreloadKMSBackend {
     fn register(
         &mut self,
         key_id: Self::KeyId,
-        key_type: Self::SupportedKeyTypes,
+        key_scheme: Self::SupportedKeyTypes,
     ) -> Result<Self::KeyId, DynError> {
         let key = self
             .keys
             .get(&key_id)
             .ok_or_else(|| Error::KeyNotRegistered(key_id.clone()))?;
-        if key.key_type() != key_type {
-            return Err(Error::KeyTypeMismatch(key.key_type(), key_type).into());
+        if key.key_type() != key_scheme {
+            return Err(Error::KeyTypeMismatch(key.key_type(), key_scheme).into());
         }
         Ok(key_id)
     }
@@ -173,9 +173,12 @@ mod tests {
 
         let key_id = "blend/not_registered".to_owned();
         backend
-            .register(key_id.clone(), SupportedKeyTypes::Ed25519).unwrap_err();
+            .register(key_id.clone(), SupportedKeyTypes::Ed25519)
+            .unwrap_err();
         backend.public_key(key_id.clone()).unwrap_err();
-        backend.sign(key_id.clone(), Bytes::from("data")).unwrap_err();
+        backend
+            .sign(key_id.clone(), Bytes::from("data"))
+            .unwrap_err();
         assert!(backend
             .execute(
                 key_id,

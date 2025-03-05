@@ -89,12 +89,12 @@ impl NetworkAdapter for MockAdapter {
         )))
     }
 
-    async fn send(&self, msg: Self::Payload) {
+    async fn send(&self, payload: Self::Payload) {
         if let Err((e, _)) = self
             .network_relay
             .send(NetworkMsg::Process(MockBackendMessage::Broadcast {
                 topic: MOCK_PUB_SUB_TOPIC.into(),
-                msg: msg.message().clone(),
+                msg: payload.message().clone(),
             }))
             .await
         {

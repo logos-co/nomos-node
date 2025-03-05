@@ -12,7 +12,7 @@ pub struct FillSize<const SIZE: usize, B> {
 
 impl<const SIZE: usize, B> FillSize<SIZE, B> {
     #[must_use]
-    pub const fn new() -> Self {
+    pub const fn new_empty() -> Self {
         Self { _blob: PhantomData }
     }
 }
@@ -23,7 +23,7 @@ impl<const SIZE: usize, B: DispersedBlobInfo> BlobSelect for FillSize<SIZE, B> {
     type Settings = ();
 
     fn new(_settings: Self::Settings) -> Self {
-        Self::new()
+        Self::new_empty()
     }
 
     fn select_blob_from<'i, I: Iterator<Item = Self::BlobId> + 'i>(

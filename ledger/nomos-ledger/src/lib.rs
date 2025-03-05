@@ -683,7 +683,7 @@ pub mod tests {
 
     #[test]
     fn test_epoch_transition() {
-        let notes = (0..4).map(|_| note()).collect::<Vec<_>>();
+        let notes: Vec<_> = std::iter::repeat_with(note).take(4).collect();
         let note_4 = note();
         let note_5 = note();
         let (mut ledger, genesis) = ledger(&notes.iter().copied().map(commit).collect::<Vec<_>>());

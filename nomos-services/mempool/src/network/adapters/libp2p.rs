@@ -71,8 +71,8 @@ where
         )))
     }
 
-    async fn send(&self, item: Item) {
-        if let Ok(wire) = wire::serialize(&item) {
+    async fn send(&self, payload: Item) {
+        if let Ok(wire) = wire::serialize(&payload) {
             if let Err((e, _)) = self
                 .network_relay
                 .send(NetworkMsg::Process(Command::Broadcast {

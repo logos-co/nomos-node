@@ -216,7 +216,7 @@ where
                 subnetwork_id,
                 da_blob,
             } => {
-                info_with_id!(&da_blob.id(), "RequestDispersal");
+                info_with_id!(&da_blob.get_id(), "RequestDispersal");
                 if let Err(e) = self.dispersal_blobs_sender.send((subnetwork_id, *da_blob)) {
                     error!("Could not send internal blob to underlying dispersal behaviour: {e}");
                 }

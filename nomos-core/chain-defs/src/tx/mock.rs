@@ -33,7 +33,7 @@ impl<M: Serialize> MockTransaction<M> {
         self.id
     }
 
-    fn as_bytes(&self) -> Bytes {
+    fn _as_bytes(&self) -> Bytes {
         let mut buff = BytesMut::new();
         wire::serializer_into_buffer(&mut buff)
             .serialize_into(&self)
@@ -47,7 +47,7 @@ impl<M: Serialize> Transaction for MockTransaction<M> {
     type Hash = MockTxId;
 
     fn as_bytes(&self) -> Bytes {
-        Self::as_bytes(self)
+        Self::_as_bytes(self)
     }
 }
 

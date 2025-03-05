@@ -70,17 +70,6 @@ pub struct ReplicationHandler {
     outgoing_messages: Vec<DaMessage>,
 }
 
-impl ReplicationHandler {
-    #[must_use]
-    pub fn new() -> Self {
-        Self {
-            inbound: None,
-            outbound: None,
-            outgoing_messages: Vec::default(),
-        }
-    }
-}
-
 impl Default for ReplicationHandler {
     fn default() -> Self {
         Self::new()
@@ -96,6 +85,15 @@ fn read_message(mut stream: Stream) -> impl Future<Output = Result<(DaMessage, S
 }
 
 impl ReplicationHandler {
+    #[must_use]
+    pub fn new() -> Self {
+        Self {
+            inbound: None,
+            outbound: None,
+            outgoing_messages: Vec::default(),
+        }
+    }
+
     fn send_pending_messages(
         &mut self,
         mut stream: Stream,

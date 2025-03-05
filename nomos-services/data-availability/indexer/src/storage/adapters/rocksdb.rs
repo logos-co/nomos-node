@@ -57,9 +57,9 @@ where
         }
     }
 
-    async fn add_index(&self, info: &Self::Info) -> Result<(), DynError> {
+    async fn add_index(&self, vid: &Self::Info) -> Result<(), DynError> {
         // Check if Info in a block is something that the node've seen before.
-        let blob_key = key_bytes(DA_BLOB_PREFIX, info.blob_id().as_ref());
+        let blob_key = key_bytes(DA_BLOB_PREFIX, vid.blob_id().as_ref());
         let (reply_tx, reply_rx) = tokio::sync::oneshot::channel();
         self.storage_relay
             .send(StorageMsg::LoadPrefix {
@@ -74,7 +74,7 @@ where
             return Ok(());
         }
 
-        let (app_id, idx) = info.metadata();
+        let (app_id, idx) = vid.metadata();
         let vid_key = key_bytes(
             DA_VID_KEY_PREFIX,
             [app_id.clone().as_ref(), idx.as_ref()].concat(),
@@ -82,7 +82,7 @@ where
 
         // We are only persisting the id part of Info, the metadata can be derived from
         // the key.
-        let value = Bytes::from(info.blob_id().to_vec());
+        let value = Bytes::from(vid.blob_id().to_vec());
 
         self.storage_relay
             .send(StorageMsg::Store {
@@ -96,7 +96,7 @@ where
     async fn get_range_stream(
         &self,
         app_id: <Self::Info as Metadata>::AppId,
-        index_range: Range<<Self::Info as Metadata>::Index>,
+        range: Range<<Self::Info as Metadata>::Index>,
     ) -> Box<dyn Stream<Item = (<Self::Info as Metadata>::Index, Vec<Self::Blob>)> + Unpin + Send>
     {
         let futures = FuturesUnordered::new();
@@ -106,8 +106,8 @@ where
         // For index_range to be used as Range with the stepping capabilities (eg. `for
         // idx in item_range`), Metadata::Index needs to implement `Step` trait,
         // which is unstable. See issue #42168 <https://github.com/rust-lang/rust/issues/42168> for more information.
-        let mut current_index = index_range.start.clone();
-        while current_index <= index_range.end {
+        let mut current_index = range.start.clone();
+        while current_index <= range.end {
             let idx = current_index.clone();
             let app_id = app_id.clone();
 

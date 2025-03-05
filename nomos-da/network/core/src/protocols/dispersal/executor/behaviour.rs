@@ -276,7 +276,7 @@ where
         message: DaBlob,
         subnetwork_id: SubnetworkId,
     ) -> Result<StreamHandlerFutureSuccess, DispersalError> {
-        let blob_id = message.id();
+        let blob_id = message.get_id();
         let blob_id: BlobId = blob_id.clone().try_into().unwrap();
         let message = dispersal::DispersalRequest::new(Blob::new(blob_id, message), subnetwork_id);
         let peer_id = stream.peer_id;
