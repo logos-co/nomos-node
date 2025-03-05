@@ -65,7 +65,6 @@ rustflags = [
   "-Aclippy::single_char_lifetime_names",
   "-Aclippy::std_instead_of_alloc",
   "-Aclippy::std_instead_of_core",
-  "-Aclippy::unreachable",
   "-Aclippy::unseparated_literal_suffix",
   "-Aclippy::unwrap_in_result",
   "-Aclippy::use_debug",
@@ -89,5 +88,6 @@ rustflags = [
   "-Aclippy::shadow_same",
   "-Aclippy::shadow_unrelated",
   "-Aclippy::unimplemented",
+  "-Aclippy::unreachable",
   "-Aclippy::unwrap_used",
 ]
