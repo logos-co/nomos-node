@@ -181,7 +181,7 @@ where
     // prune all states deeper than 'depth' with regard to the current
     // local chain except for states belonging to the local chain
     pub fn prune_forks(&mut self, _depth: u64) {
-        todo!()
+        unimplemented!()
     }
 
     pub const fn genesis(&self) -> Id {

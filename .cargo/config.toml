@@ -70,6 +70,8 @@ rustflags = [
   "-Aclippy::unwrap_in_result",
   "-Aclippy::use_debug",
   "-Aclippy::wildcard_enum_match_arm",
+  # TODO: Remove at some point
+  "-Aclippy::unimplemented",
 
   # TODO: Remove one by one for each commit
   "-Aclippy::allow_attributes_without_reason",
@@ -125,9 +127,7 @@ rustflags = [
   "-Aclippy::string_to_string",
   "-Aclippy::suspicious_xor_used_as_pow",
   "-Aclippy::tests_outside_test_module",
-  "-Aclippy::todo",
   "-Aclippy::undocumented_unsafe_blocks",
-  "-Aclippy::unimplemented",
   "-Aclippy::unnecessary_safety_comment",
   "-Aclippy::unnecessary_safety_doc",
   "-Aclippy::unnecessary_self_imports",
