@@ -4,6 +4,10 @@ const fn receive_utxo(note: cl::NoteWitness, nf_pk: cl::NullifierCommitment) -> 
     cl::OutputWitness::new(note, nf_pk)
 }
 
+#[expect(
+    clippy::tests_outside_test_module,
+    reason = "Clippy false positive for integration tests"
+)]
 #[test]
 fn test_simple_transfer() {
     let nmo = derive_unit("NMO");

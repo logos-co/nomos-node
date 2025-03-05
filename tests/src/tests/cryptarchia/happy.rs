@@ -1,3 +1,5 @@
+#![expect(clippy::tests_outside_test_module, reason = "This is a testing crate")]
+
 use std::{collections::HashSet, time::Duration};
 
 use futures::stream::{self, StreamExt as _};

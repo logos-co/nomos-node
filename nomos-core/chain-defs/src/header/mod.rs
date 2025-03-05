@@ -171,11 +171,18 @@ display_hex_bytes_newtype!(ContentId);
 serde_bytes_newtype!(HeaderId, 32);
 serde_bytes_newtype!(ContentId, 32);
 
-#[test]
-fn test_serde() {
-    assert_eq!(
-        crate::wire::deserialize::<HeaderId>(&crate::wire::serialize(&HeaderId([0; 32])).unwrap())
+#[cfg(test)]
+mod tests {
+    use crate::header::HeaderId;
+
+    #[test]
+    fn test_serde() {
+        assert_eq!(
+            crate::wire::deserialize::<HeaderId>(
+                &crate::wire::serialize(&HeaderId([0; 32])).unwrap()
+            )
             .unwrap(),
-        HeaderId([0; 32])
-    );
+            HeaderId([0; 32])
+        );
+    }
 }

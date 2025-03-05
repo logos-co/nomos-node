@@ -1,3 +1,5 @@
+#![expect(clippy::tests_outside_test_module, reason = "This is a testing crate")]
+
 use std::time::Duration;
 
 use kzgrs_backend::reconstruction::reconstruct_without_missing_data;
@@ -87,6 +89,7 @@ async fn local_testnet() {
     let app_id = hex::decode(APP_ID).expect("Invalid APP_ID");
 
     let mut index = 0u64;
+    #[expect(clippy::infinite_loop, reason = "Test function.")]
     loop {
         disseminate_with_metadata(
             executor,

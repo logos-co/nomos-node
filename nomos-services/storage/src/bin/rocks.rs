@@ -18,6 +18,7 @@ pub fn rocksdb_ro() {
     let r = db.get_cf(da_cf, b"da1").unwrap().unwrap();
     assert_eq!(r, b"da1data");
 
+    #[expect(clippy::infinite_loop, reason = "Loop to mock a long running program")]
     loop {
         std::thread::sleep(std::time::Duration::from_secs(1));
     }
@@ -38,7 +39,7 @@ pub fn rocksdb_rw() {
     let da_cf = db.cf_handle("da").unwrap();
     db.put_cf(da_cf, b"da1", b"da1data").unwrap();
 
-    // A loop to mock a long running program
+    #[expect(clippy::infinite_loop, reason = "Loop to mock a long running program")]
     loop {
         std::thread::sleep(std::time::Duration::from_secs(1));
     }

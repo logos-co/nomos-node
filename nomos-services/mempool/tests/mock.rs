@@ -52,6 +52,10 @@ fn get_test_random_path() -> PathBuf {
     PathBuf::from(Alphanumeric.sample_string(&mut rand::thread_rng(), 5)).with_extension(".json")
 }
 
+#[expect(
+    clippy::tests_outside_test_module,
+    reason = "Clippy false positive for integration tests"
+)]
 #[test]
 fn test_mockmempool() {
     let recovery_file_path = get_test_random_path();

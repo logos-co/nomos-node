@@ -184,6 +184,10 @@ impl Mock {
     async fn run_endless_producer(&self, weights: &[usize]) -> Result<(), overwatch_rs::DynError> {
         let dist = WeightedIndex::new(weights.iter())?;
         let mut rng = StdRng::seed_from_u64(self.config.seed);
+        #[expect(
+            clippy::infinite_loop,
+            reason = "Loop lifetime managed in the calling context"
+        )]
         loop {
             let idx = dist.sample(&mut rng);
             tokio::time::sleep(self.config.duration).await;

@@ -376,7 +376,7 @@ where
             }
         };
 
-        // Safety: blob_id should always be a 32bytes hash
+        // blob_id should always be a 32bytes hash
         Ok((blob_id, subnetwork_id, response, stream))
     }
 

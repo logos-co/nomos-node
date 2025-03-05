@@ -38,7 +38,7 @@ impl Slot {
             // current slot is behind the start time, so return default 0
             Self::genesis()
         } else {
-            // safety: since_start is already checked never negative in this case
+            // since_start is already checked never negative in this case
             // division panics if `slot_duration` is less than a second.
             Self::from(
                 (since_start.whole_seconds() as u64)

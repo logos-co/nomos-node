@@ -267,6 +267,10 @@ where
     }
 
     pub async fn run(mut self) {
+        #[expect(
+            clippy::infinite_loop,
+            reason = "Loop lifetime managed in the calling context"
+        )]
         loop {
             if let Some(event) = self.swarm.next().await {
                 debug!("Da swarm event received: {event:?}");

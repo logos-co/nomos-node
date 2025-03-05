@@ -94,6 +94,10 @@ impl Backend for WebServer {
     }
 }
 
+#[expect(
+    clippy::tests_outside_test_module,
+    reason = "Clippy false positive for integration tests"
+)]
 #[test]
 fn test_todo() {
     let addr = SocketAddr::new(Ipv4Addr::LOCALHOST.into(), 8080);
