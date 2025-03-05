@@ -1,13 +1,40 @@
-use std::collections::HashSet;
+use std::{
+    collections::HashSet,
+    sync::{Arc, Mutex},
+    time::Duration,
+};
 
-use libp2p::PeerId;
+use libp2p::{
+    core::{transport::MemoryTransport, upgrade::Version},
+    identity::Keypair,
+    swarm::NetworkBehaviour,
+    PeerId, Transport,
+};
 use subnetworks_assignations::MembershipHandler;
 
 use crate::SubnetworkId;
 
 #[derive(Clone)]
 pub struct AllNeighbours {
-    pub neighbours: HashSet<PeerId>,
+    neighbours: Arc<Mutex<HashSet<PeerId>>>,
+}
+
+impl Default for AllNeighbours {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl AllNeighbours {
+    pub fn new() -> Self {
+        Self {
+            neighbours: Arc::new(Mutex::new(HashSet::new())),
+        }
+    }
+
+    pub fn add_neighbour(&self, id: PeerId) {
+        self.neighbours.lock().unwrap().insert(id);
+    }
 }
 
 impl MembershipHandler for AllNeighbours {
@@ -23,14 +50,36 @@ impl MembershipHandler for AllNeighbours {
     }
 
     fn members_of(&self, _network_id: &Self::NetworkId) -> HashSet<Self::Id> {
-        self.neighbours.clone()
+        self.neighbours.lock().unwrap().clone()
     }
 
     fn members(&self) -> HashSet<Self::Id> {
-        self.neighbours.clone()
+        self.neighbours.lock().unwrap().clone()
     }
 
     fn last_subnetwork_id(&self) -> Self::NetworkId {
         0
     }
+}
+
+pub fn new_swarm_in_memory<TBehavior>(key: Keypair, behavior: TBehavior) -> libp2p::Swarm<TBehavior>
+where
+    TBehavior: NetworkBehaviour + Send,
+{
+    libp2p::SwarmBuilder::with_existing_identity(key.clone())
+        .with_tokio()
+        .with_other_transport(|_| {
+            let transport = MemoryTransport::default()
+                .upgrade(Version::V1)
+                .authenticate(libp2p::plaintext::Config::new(&key))
+                .multiplex(libp2p::yamux::Config::default())
+                .timeout(Duration::from_secs(20));
+
+            Ok(transport)
+        })
+        .unwrap()
+        .with_behaviour(|_| behavior)
+        .unwrap()
+        .with_swarm_config(|cfg| cfg.with_idle_connection_timeout(Duration::from_secs(20)))
+        .build()
 }

@@ -195,11 +195,11 @@ mod tests {
 
     #[tokio::test]
     async fn test_balancer_dials_provided_peers() {
-        let mut dialer = Swarm::new_ephemeral(|_| {
+        let mut dialer = Swarm::new_ephemeral_tokio(|_| {
             ConnectionBalancerBehaviour::new(AddressBook::empty(), MockBalancer::default())
         });
 
-        let mut listener = Swarm::new_ephemeral(|_| {
+        let mut listener = Swarm::new_ephemeral_tokio(|_| {
             ConnectionBalancerBehaviour::new(AddressBook::empty(), MockBalancer::default())
         });
 
@@ -258,7 +258,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_balancer_dials_all_peers_from_poll() {
-        let mut dialer = Swarm::new_ephemeral(|_| {
+        let mut dialer = Swarm::new_ephemeral_tokio(|_| {
             ConnectionBalancerBehaviour::new(AddressBook::empty(), MockBalancer::default())
         });
 
