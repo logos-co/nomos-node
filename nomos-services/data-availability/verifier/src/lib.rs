@@ -5,6 +5,7 @@ pub mod storage;
 use std::{
     error::Error,
     fmt::{Debug, Formatter},
+    sync::Arc,
 };
 
 use backend::VerifierBackend;
@@ -29,18 +30,19 @@ use tokio_stream::StreamExt;
 use tracing::{error, instrument};
 
 const DA_VERIFIER_TAG: ServiceId = "DA-Verifier";
-pub enum DaVerifierMsg<B, A> {
+pub enum DaVerifierMsg<B: Blob, A> {
     AddBlob {
         blob: B,
         reply_channel: Sender<Option<A>>,
     },
     VerifyBlob {
-        blob: B,
-        reply_channel: Sender<Result<B, DynError>>,
+        commitments: Arc<B::SharedCommitments>,
+        light_blob: Arc<B::LightBlob>,
+        reply_channel: Sender<Result<(), DynError>>,
     },
 }
 
-impl<B: 'static, A: 'static> Debug for DaVerifierMsg<B, A> {
+impl<B: Blob + 'static, A: 'static> Debug for DaVerifierMsg<B, A> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::AddBlob { .. } => {
@@ -53,7 +55,7 @@ impl<B: 'static, A: 'static> Debug for DaVerifierMsg<B, A> {
     }
 }
 
-impl<B: 'static, A: 'static> RelayMessage for DaVerifierMsg<B, A> {}
+impl<B: Blob + 'static, A: 'static> RelayMessage for DaVerifierMsg<B, A> {}
 
 pub struct DaVerifierService<Backend, N, S>
 where
@@ -95,8 +97,12 @@ where
             info_with_id!(blob.id().as_ref(), "VerifierBlobExists");
         } else {
             info_with_id!(blob.id().as_ref(), "VerifierAddBlob");
-            verifier.verify(&blob)?;
-            storage_adapter.add_blob(blob).await?;
+            let (blob_id, column_idx) = (blob.id(), blob.column_idx());
+            let (light_blob, commitments) = blob.into_blob_and_shared_commitments();
+            verifier.verify(&commitments, &light_blob)?;
+            storage_adapter
+                .add_blob(blob_id, column_idx, commitments, light_blob)
+                .await?;
         }
         Ok(())
     }
@@ -123,7 +129,7 @@ impl<Backend, N, S> ServiceCore for DaVerifierService<Backend, N, S>
 where
     Backend: VerifierBackend + Send + Sync + 'static,
     Backend::Settings: Clone + Send + Sync + 'static,
-    Backend::DaBlob: Debug + Send + Sync + 'static,
+    Backend::DaBlob: Blob + Debug + Send + Sync + 'static,
     Backend::Error: Error + Send + Sync + 'static,
     <Backend::DaBlob as Blob>::BlobId: AsRef<[u8]> + Debug + Send + Sync + 'static,
     N: NetworkAdapter<Blob = Backend::DaBlob> + Send + Sync + 'static,
@@ -204,16 +210,15 @@ where
                                 },
                             };
                         },
-                        DaVerifierMsg::VerifyBlob { blob, reply_channel } => {
-                            let blob_id = blob.id();
-                            match verifier.verify(&blob) {
+                        DaVerifierMsg::VerifyBlob {commitments,  light_blob, reply_channel } => {
+                            match verifier.verify(&commitments, &light_blob) {
                                 Ok(()) => {
-                                    if let Err(err) = reply_channel.send(Ok(blob)) {
+                                    if let Err(err) = reply_channel.send(Ok(())) {
                                         error!("Error replying verification {err:?}");
                                     }
                                 },
                                 Err(err) => {
-                                    error!("Error verifying blob {blob_id:?} due to {err:?}");
+                                    error!("Error verifying blob due to {err:?}");
                                     if let Err(err) = reply_channel.send(Err(err.into())) {
                                         error!("Error replying verification {err:?}");
                                     }

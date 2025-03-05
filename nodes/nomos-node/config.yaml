@@ -201,6 +201,9 @@ da_sampling:
   network_adapter_settings: null
   storage_adapter_settings:
     blob_storage_directory: ./
+  api_settings:
+    addresses:
+      127.0.0.1:8722
 http:
   backend_settings:
     address: 127.0.0.1:8722

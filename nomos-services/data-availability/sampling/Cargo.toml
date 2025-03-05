@@ -10,6 +10,7 @@ futures                  = "0.3"
 hex                      = "0.4.3"
 kzgrs-backend            = { workspace = true }
 libp2p-identity          = { version = "0.2" }
+common-http-client       = { workspace = true }
 nomos-core               = { workspace = true }
 nomos-da-network-core    = { workspace = true }
 nomos-da-network-service = { workspace = true }
@@ -19,6 +20,7 @@ nomos-storage            = { workspace = true }
 nomos-tracing            = { workspace = true }
 overwatch-rs             = { workspace = true }
 rand                     = "0.8.5"
+reqwest                  = "0.12"
 serde                    = { version = "1.0", features = ["derive"] }
 services-utils           = { workspace = true }
 subnetworks-assignations = { workspace = true }
@@ -28,6 +30,7 @@ tracing                  = "0.1"
 
 [dev-dependencies]
 kzgrs = { workspace = true }
+wiremock = "0.6.3"
 
 [features]
 default         = ["libp2p"]

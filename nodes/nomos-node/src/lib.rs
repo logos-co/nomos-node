@@ -27,7 +27,7 @@ pub use nomos_da_network_service::{
     backends::libp2p::validator::DaNetworkValidatorBackend, NetworkService as DaNetworkService,
 };
 use nomos_da_sampling::{
-    backend::kzgrs::KzgrsSamplingBackend,
+    api::http::HttApiBackend, backend::kzgrs::KzgrsSamplingBackend,
     network::adapters::validator::Libp2pAdapter as SamplingLibp2pAdapter,
     storage::adapters::rocksdb::RocksAdapter as SamplingStorageAdapter, DaSamplingService,
 };
@@ -81,7 +81,8 @@ pub type NomosApiService = ApiService<
         nomos_da_sampling::network::adapters::validator::Libp2pAdapter<NomosDaMembership>,
         ChaCha20Rng,
         SamplingStorageAdapter<DaBlob, Wire>,
-        nomos_time::backends::system_time::SystemTimeBackend,
+        SystemTimeBackend,
+        HttApiBackend,
         MB16,
     >,
 >;
@@ -112,7 +113,8 @@ pub type Cryptarchia<SamplingAdapter> = cryptarchia_consensus::CryptarchiaConsen
     KzgrsDaVerifier,
     VerifierNetworkAdapter<NomosDaMembership>,
     VerifierStorageAdapter<DaBlob, Wire>,
-    nomos_time::backends::system_time::SystemTimeBackend,
+    SystemTimeBackend,
+    HttApiBackend,
 >;
 
 pub type NodeCryptarchia =
@@ -133,6 +135,7 @@ pub type DaMempool = DaMempoolService<
     KzgrsDaVerifier,
     VerifierNetworkAdapter<NomosDaMembership>,
     VerifierStorageAdapter<DaBlob, Wire>,
+    HttApiBackend,
 >;
 
 pub type DaIndexer<SamplingAdapter> = DataIndexerService<
@@ -161,7 +164,8 @@ pub type DaIndexer<SamplingAdapter> = DataIndexerService<
     KzgrsDaVerifier,
     VerifierNetworkAdapter<NomosDaMembership>,
     VerifierStorageAdapter<DaBlob, Wire>,
-    nomos_time::backends::system_time::SystemTimeBackend,
+    SystemTimeBackend,
+    HttApiBackend,
 >;
 
 pub type NodeDaIndexer =
@@ -175,6 +179,7 @@ pub type DaSampling<SamplingAdapter> = DaSamplingService<
     KzgrsDaVerifier,
     VerifierNetworkAdapter<NomosDaMembership>,
     VerifierStorageAdapter<DaBlob, Wire>,
+    HttApiBackend,
 >;
 
 pub type NodeDaSampling = DaSampling<SamplingLibp2pAdapter<NomosDaMembership>>;

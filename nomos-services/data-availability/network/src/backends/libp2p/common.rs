@@ -1,7 +1,10 @@
-use std::{fmt::Debug, time::Duration};
+use std::{fmt::Debug, sync::Arc, time::Duration};
 
 use futures::StreamExt;
-use kzgrs_backend::common::{blob::DaBlob, ColumnIndex};
+use kzgrs_backend::common::{
+    blob::{DaBlob, DaLightBlob},
+    ColumnIndex,
+};
 use log::error;
 use nomos_core::da::BlobId;
 use nomos_da_network_core::{
@@ -41,12 +44,15 @@ pub struct DaNetworkBackendSettings<Membership> {
 #[derive(Debug, Clone)]
 pub enum SamplingEvent {
     /// A success sampling
-    SamplingSuccess { blob_id: BlobId, blob: Box<DaBlob> },
+    SamplingSuccess {
+        blob_id: BlobId,
+        light_blob: Arc<DaLightBlob>,
+    },
     /// Incoming sampling request
     SamplingRequest {
         blob_id: BlobId,
         column_idx: ColumnIndex,
-        response_sender: mpsc::Sender<Option<DaBlob>>,
+        response_sender: mpsc::Sender<Option<DaLightBlob>>,
     },
     /// A failed sampling error
     SamplingError { error: SamplingError },
@@ -69,8 +75,8 @@ pub(crate) async fn handle_validator_events_stream(
         tokio::select! {
             Some(sampling_event) = StreamExt::next(&mut sampling_events_receiver) => {
                 match sampling_event {
-                    sampling::behaviour::SamplingEvent::SamplingSuccess{ blob_id, blob , .. } => {
-                        if let Err(e) = sampling_broadcast_sender.send(SamplingEvent::SamplingSuccess {blob_id, blob}){
+                    sampling::behaviour::SamplingEvent::SamplingSuccess{ blob_id, light_blob , .. } => {
+                        if let Err(e) = sampling_broadcast_sender.send(SamplingEvent::SamplingSuccess {blob_id, light_blob}){
                             error!("Error in internal broadcast of sampling success: {e:?}");
                         }
                     }

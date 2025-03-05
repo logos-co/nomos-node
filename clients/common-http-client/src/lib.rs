@@ -1,10 +1,14 @@
+use std::{fmt::Debug, sync::Arc};
+
 use nomos_core::da::blob::Blob;
-use nomos_node::api::{
-    handlers::{DABlobCommitmentsRequest, DAGetLightBlobReq},
-    paths,
-};
+use nomos_da_messages::http::da::{DABlobCommitmentsRequest, DAGetLightBlobReq};
 use reqwest::{Client, ClientBuilder, RequestBuilder, StatusCode, Url};
 use serde::{de::DeserializeOwned, Serialize};
+
+// These could be moved into shared location, perhaps to upcoming `nomos-lib`
+const DA_GET_SHARED_COMMITMENTS: &str = "/da/get-commitments";
+
+const DA_GET_LIGHT_BLOB: &str = "/da/get-blob";
 
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
@@ -29,19 +33,20 @@ impl BasicAuthCredentials {
 
 #[derive(Clone)]
 pub struct CommonHttpClient {
-    client: Client,
+    client: Arc<Client>,
     base_address: Url,
     basic_auth: Option<BasicAuthCredentials>,
 }
 
 impl CommonHttpClient {
     #[must_use]
-    pub fn new(base_address: Url, basic_auth: Option<BasicAuthCredentials>) -> Self {
+    pub fn new(base_address: &str, basic_auth: Option<BasicAuthCredentials>) -> Self {
         let client = ClientBuilder::new()
             .build()
             .expect("Client from default settings should be able to build");
+        let base_address = base_address.parse().expect("Invalid base address");
         Self {
-            client,
+            client: Arc::new(client),
             base_address,
             basic_auth,
         }
@@ -92,14 +97,17 @@ impl CommonHttpClient {
     }
 
     /// Get the commitments for a Blob
-    pub async fn get_commitments<B, C>(&self, blob_id: B::BlobId) -> Result<Option<C>, Error>
+    pub async fn get_commitments<B>(
+        &self,
+        blob_id: B::BlobId,
+    ) -> Result<Option<B::SharedCommitments>, Error>
     where
-        C: DeserializeOwned + Send + Sync,
-        B: Blob + DeserializeOwned + Send + Sync,
+        B: Blob,
+        B::SharedCommitments: DeserializeOwned + Send + Sync,
         <B as Blob>::BlobId: serde::Serialize + Send + Sync,
     {
         let request: DABlobCommitmentsRequest<B> = DABlobCommitmentsRequest { blob_id };
-        let path = paths::DA_GET_SHARED_COMMITMENTS.trim_start_matches('/');
+        let path = DA_GET_SHARED_COMMITMENTS.trim_start_matches('/');
         self.get(path, &request).await
     }
 
@@ -119,7 +127,7 @@ impl CommonHttpClient {
             blob_id,
             column_idx,
         };
-        let path = paths::DA_GET_LIGHT_BLOB.trim_start_matches('/');
+        let path = DA_GET_LIGHT_BLOB.trim_start_matches('/');
         self.get(path, &request).await
     }
 }

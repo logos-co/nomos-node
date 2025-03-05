@@ -1,8 +1,8 @@
 # Config file reference can be found at https://embarkstudios.github.io/cargo-deny/checks/cfg.html.
 
 [graph]
-all-features        = true
-exclude-dev         = true
+all-features = true
+exclude-dev = true
 no-default-features = true
 
 [advisories]
@@ -13,12 +13,13 @@ ignore = [
   { id = "RUSTSEC-2024-0384", reason = "`instant` is unmaintained; consider using an alternative. Use `cargo tree -p instant -i > tmp.txt` to check the dependency tree." },
   { id = "RUSTSEC-2024-0388", reason = "`derivative` is unmaintained; consider using an alternative. Use `cargo tree -p derivative -i > tmp.txt` to check the dependency tree." },
   { id = "RUSTSEC-2024-0436", reason = "`paste` has a security vulnerability; consider using an alternative. Use `cargo tree -p paste -i > tmp.txt` to check the dependency tree." },
+  { id = "RUSTSEC-2025-0009", reason = "Some AES functions may panic when overflow checking is enabled. `ring::aead::quic::HeaderProtectionKey::new_mask()` may panic when overflowchecking is enabled." }
 ]
 yanked = "deny"
 
 [bans]
 allow-wildcard-paths = false
-multiple-versions    = "allow"
+multiple-versions = "allow"
 
 [licenses]
 allow = [
@@ -40,12 +41,12 @@ private = { ignore = false }
 unused-allowed-license = "deny"
 
 [[licenses.clarify]]
-expression    = "MIT AND ISC AND OpenSSL"
+expression = "MIT AND ISC AND OpenSSL"
 license-files = [{ path = "LICENSE", hash = 0xbd0eed23 }]
-name          = "ring"
+name = "ring"
 
 [sources]
-unknown-git      = "deny"
+unknown-git = "deny"
 unknown-registry = "deny"
 
 [sources.allow-org]

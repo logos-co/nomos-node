@@ -126,7 +126,7 @@ pub struct DaLightBlob {
     pub rows_proofs: Vec<Proof>,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Eq, PartialEq, Serialize, Deserialize)]
 pub struct DaBlobSharedCommitments {
     #[serde(
         serialize_with = "serialize_canonical",
