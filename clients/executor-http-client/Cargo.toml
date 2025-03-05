@@ -5,8 +5,9 @@ name    = "executor-http-client"
 version = "0.1.0"
 
 [dependencies]
-nomos-core     = { workspace = true }
-nomos-executor = { workspace = true }
-reqwest        = "0.12"
-serde          = "1.0"
-thiserror      = "1.0"
+nomos-core          = { workspace = true }
+common-http-client  = { workspace = true }
+nomos-executor      = { workspace = true }
+reqwest             = "0.12"
+serde               = "1.0"
+thiserror           = "1.0"

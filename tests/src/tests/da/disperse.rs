@@ -1,34 +1,10 @@
 use std::time::Duration;
 
-use executor_http_client::ExecutorHttpClient;
 use kzgrs_backend::reconstruction::reconstruct_without_missing_data;
-use reqwest::{ClientBuilder, Url};
 use tests::{
-    adjust_timeout,
-    nodes::executor::Executor,
+    common::da::{disseminate_with_metadata, wait_for_indexed_blob, APP_ID},
     topology::{Topology, TopologyConfig},
 };
-
-const APP_ID: &str = "fd3384e132ad02a56c78f45547ee40038dc79002b90d29ed90e08eee762ae715";
-const DA_TESTS_TIMEOUT: u64 = 120;
-
-async fn disseminate_with_metadata(
-    executor: &Executor,
-    data: &[u8],
-    metadata: kzgrs_backend::dispersal::Metadata,
-) {
-    let executor_config = executor.config();
-
-    let client = ClientBuilder::new()
-        .build()
-        .expect("Client from default settings should be able to build");
-
-    let backend_address = executor_config.http.backend_settings.address;
-    let exec_url = Url::parse(&format!("http://{backend_address}")).unwrap();
-    let client = ExecutorHttpClient::new(client, exec_url, None);
-
-    client.publish_blob(data.to_vec(), metadata).await.unwrap();
-}
 
 #[ignore = "for manual usage, disseminate_retrieve_reconstruct is preferred for ci"]
 #[tokio::test]
@@ -52,6 +28,7 @@ async fn disseminate_and_retrieve() {
     let executor_blobs = executor
         .get_indexer_range(app_id.clone().try_into().unwrap(), from..to)
         .await;
+
     let validator_blobs = validator
         .get_indexer_range(app_id.try_into().unwrap(), from..to)
         .await;
@@ -87,23 +64,7 @@ async fn disseminate_retrieve_reconstruct() {
     let from = 0u64.to_be_bytes();
     let to = 1u64.to_be_bytes();
 
-    let blobs_fut = async {
-        let mut num_blobs = 0;
-        while num_blobs < num_subnets {
-            let executor_blobs = executor.get_indexer_range(app_id, from..to).await;
-            num_blobs = executor_blobs
-                .into_iter()
-                .filter(|(i, _)| i == &from)
-                .flat_map(|(_, blobs)| blobs)
-                .count();
-        }
-    };
-
-    let timeout = adjust_timeout(Duration::from_secs(DA_TESTS_TIMEOUT));
-    assert!(
-        tokio::time::timeout(timeout, blobs_fut).await.is_ok(),
-        "timed out waiting for indexed blob"
-    );
+    wait_for_indexed_blob(executor, app_id, from, to, num_subnets).await;
 
     let executor_blobs = executor.get_indexer_range(app_id, from..to).await;
     let executor_idx_0_blobs: Vec<_> = executor_blobs

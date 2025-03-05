@@ -37,7 +37,7 @@ impl Disseminate {
             .username
             .map(|u| BasicAuthCredentials::new(u, self.password.clone()));
 
-        let client = ExecutorHttpClient::new(reqwest::Client::new(), self.addr.clone(), basic_auth);
+        let client = ExecutorHttpClient::new(self.addr.clone(), basic_auth);
 
         let mut bytes: Vec<u8> = if let Some(data) = &self.data {
             data.clone().into_bytes()
