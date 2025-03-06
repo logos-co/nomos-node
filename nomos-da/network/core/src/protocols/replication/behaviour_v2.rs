@@ -5,7 +5,7 @@ use std::{
 
 use either::Either;
 use futures::{future::BoxFuture, stream::FuturesUnordered, AsyncWriteExt, FutureExt, StreamExt};
-use indexmap::IndexSet;
+use indexmap::{IndexMap, IndexSet};
 use libp2p::{
     core::{transport::PortUse, Endpoint},
     swarm::{
@@ -140,7 +140,9 @@ pub struct ReplicationBehaviour<Membership> {
     connected: HashSet<PeerId>,
     /// Pending outgoing messages are stored here, they are then consumed by
     /// each respective outgoing stream
-    pending_outgoing_messages: VecDeque<(PeerId, DaMessage)>,
+    pending_outgoing_messages: IndexMap<PeerId, VecDeque<DaMessage>>,
+    /// The last peer whose pending message was scheduled for sending
+    previous_scheduled_pending: Option<PeerId>,
     /// Indicates which outgoing streams which are currently idle or busy
     outgoing_streams: HashMap<PeerId, StreamState>,
     /// TODO
@@ -171,6 +173,7 @@ impl<Membership> ReplicationBehaviour<Membership> {
             membership,
             connected: Default::default(),
             pending_outgoing_messages: Default::default(),
+            previous_scheduled_pending: None,
             outgoing_streams: Default::default(),
             outgoing_tasks,
             seen_message_cache: Default::default(),
@@ -214,7 +217,7 @@ where
     }
 
     pub fn send_message(&mut self, message: DaMessage) {
-        // push a message in the queue for every single peer connected that is a member
+        // Push a message in the queue for every single peer connected that is a member
         // of the selected subnetwork_id
         let peers = self.no_loopback_member_peers_of(&message.subnetwork_id);
 
@@ -223,7 +226,9 @@ where
             .filter(|peer_id| peers.contains(peer_id))
             .for_each(|peer_id| {
                 self.pending_outgoing_messages
-                    .push_back((*peer_id, message.clone()));
+                    .entry(*peer_id)
+                    .or_default()
+                    .push_back(message.clone());
             });
 
         self.try_wake();
@@ -331,8 +336,28 @@ where
 
     fn on_swarm_event(&mut self, event: FromSwarm) {
         if let FromSwarm::ConnectionClosed(ConnectionClosed { peer_id, .. }) = event {
-            self.pending_outgoing_messages
-                .retain(|(id, _)| id != &peer_id);
+            self.connected.remove(&peer_id);
+            self.outgoing_streams.remove(&peer_id);
+            self.previous_scheduled_pending.map(|last| {
+                if last == peer_id {
+                    let mut i = self
+                        .pending_outgoing_messages
+                        .get_index_of(&peer_id)
+                        .expect("Peer to be present");
+                    // Move the marker back one step, so that the search for the next peer in poll()
+                    // continues where we left off, wrap around if necessary
+                    if i == 0 {
+                        i = self.pending_outgoing_messages.len() - 1;
+                    } else {
+                        i -= 1;
+                    }
+                    self.previous_scheduled_pending = self
+                        .pending_outgoing_messages
+                        .get_index(i)
+                        .map(|(id, _)| *id);
+                }
+            });
+            self.pending_outgoing_messages.shift_remove(&peer_id);
         }
         self.stream_behaviour.on_swarm_event(event)
     }
@@ -387,22 +412,22 @@ where
         // we can write the next pending message to this stream if there is one
         match self.outgoing_tasks.poll_next_unpin(cx) {
             Poll::Ready(Some(Ok((peer_id, stream)))) => {
-                let i = self
+                match self
                     .pending_outgoing_messages
-                    .iter()
-                    .enumerate()
-                    .find_map(|(i, (id, _))| (id == &peer_id).then_some(i));
-                if let Some(i) = i {
-                    let (_, message) = self
-                        .pending_outgoing_messages
-                        .remove(i)
-                        .expect("Message is in the queue");
-                    self.outgoing_tasks
-                        .push(Box::pin(Self::try_write_message(peer_id, message, stream)));
-                    should_wake = true;
-                } else {
-                    self.outgoing_streams
-                        .insert(peer_id, StreamState::Idle(stream));
+                    .get_mut(&peer_id)
+                    .expect("At least one message for this peer has been sent")
+                    .pop_front()
+                {
+                    Some(message) => {
+                        self.outgoing_tasks
+                            .push(Box::pin(Self::try_write_message(peer_id, message, stream)));
+
+                        should_wake = true;
+                    }
+                    None => {
+                        self.outgoing_streams
+                            .insert(peer_id, StreamState::Idle(stream));
+                    }
                 }
             }
             Poll::Ready(Some(Err(error))) => {
@@ -412,37 +437,71 @@ where
             }
             _ => {}
         }
-        // Schedule writing pending messages to connected peers if possible,
-        // ie. if the streams for those peers are idle or haven't even been opened yet,
-        // one message at a time
-        if let Some(peer_id) = self.pending_outgoing_messages.front().map(|(id, _)| *id) {
-            match self.outgoing_streams.entry(peer_id) {
-                Entry::Occupied(mut entry) => {
-                    match entry.get_mut().take() {
-                        StreamState::Idle(stream) => {
-                            let (_, message) = self
-                                .pending_outgoing_messages
-                                .pop_front()
-                                .expect("Message is in the queue");
-                            self.outgoing_tasks
-                                .push(Box::pin(Self::try_write_message(peer_id, message, stream)));
 
-                            should_wake = true;
-                        }
-                        StreamState::Busy => {
-                            // We are already sending a message on this stream,
-                            // so any pending messages need to wait
-                        }
-                    }
+        /// Find the next peer after the previous one that has at least one
+        /// pending message and its associated stream is idle or hasn't been
+        /// opened yet. Iterate over all peers, starting with the one
+        /// after the previous peer, wrap around and finish with the
+        /// previous peer at the end. This ensures we're fair scheduling one
+        /// message per peer at a time, iterating the peers in a round-robin
+        /// fashion.
+        fn next_pending(
+            previous: &Option<PeerId>,
+            pending_outgoing_messages: &IndexMap<PeerId, VecDeque<DaMessage>>,
+            mut is_stream_idle_fn: impl FnMut(&PeerId) -> bool,
+        ) -> Option<PeerId> {
+            match previous {
+                Some(previous) => {
+                    let i = pending_outgoing_messages
+                        .get_index_of(previous)
+                        .expect("Peer to be present");
+                    pending_outgoing_messages[i + 1..]
+                        .iter()
+                        .chain(pending_outgoing_messages[..=i].iter())
+                        .find_map(|(id, messages)| {
+                            (!messages.is_empty() && is_stream_idle_fn(id)).then_some(*id)
+                        })
                 }
+                None => pending_outgoing_messages.iter().find_map(|(id, messages)| {
+                    (!messages.is_empty() && is_stream_idle_fn(id)).then_some(*id)
+                }),
+            }
+        }
+
+        // Pick the next peer that has a pending message and an idle or unopened stream
+        // and schedule writing the message to it.
+        let next = next_pending(
+            &self.previous_scheduled_pending,
+            &self.pending_outgoing_messages,
+            |id| {
+                matches!(
+                    self.outgoing_streams.get(id),
+                    Some(StreamState::Idle(_)) | None
+                )
+            },
+        );
+
+        if let Some(peer_id) = next {
+            let message = self
+                .pending_outgoing_messages
+                .get_mut(&peer_id)
+                .expect("Peer is in the map")
+                .pop_front()
+                .expect("Message is in the queue");
+            match self.outgoing_streams.entry(peer_id) {
+                Entry::Occupied(mut entry) => match entry.get_mut().take() {
+                    StreamState::Idle(stream) => {
+                        self.outgoing_tasks
+                            .push(Box::pin(Self::try_write_message(peer_id, message, stream)));
+                    }
+                    StreamState::Busy => {
+                        unreachable!("The stream is idle, ensured by next_pending()")
+                    }
+                },
                 // If there is no stream for this peer yet, try to open one, and then write the
                 // first message into it
                 Entry::Vacant(entry) => {
                     entry.insert(StreamState::Busy);
-                    let (_, message) = self
-                        .pending_outgoing_messages
-                        .pop_front()
-                        .expect("Message is in the queue");
                     let control = self.control.clone();
                     self.outgoing_tasks.push(Box::pin(async move {
                         let stream = Self::try_open_stream(peer_id, control).await?;
@@ -450,12 +509,14 @@ where
                             Self::try_write_message(peer_id, message, stream).await?;
                         Ok((peer_id, stream))
                     }));
-                    self.outgoing_streams.insert(peer_id, StreamState::Busy);
-
-                    should_wake = true;
                 }
             }
+
+            should_wake = true;
         }
+
+        self.previous_scheduled_pending = next;
+
         // Schedule reading from any new incoming streams if possible
         if let Poll::Ready(Some((peer_id, stream))) = self.incoming_streams.poll_next_unpin(cx) {
             self.incoming_tasks
