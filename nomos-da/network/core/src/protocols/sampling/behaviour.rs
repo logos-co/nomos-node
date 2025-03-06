@@ -35,7 +35,7 @@ use tokio::sync::{mpsc, mpsc::UnboundedSender};
 use tokio_stream::wrappers::UnboundedReceiverStream;
 use tracing::error;
 
-use crate::{address_book::AddressBook, protocol::SAMPLING_PROTOCOL, SubnetworkId};
+use crate::{protocol::SAMPLING_PROTOCOL, SubnetworkId};
 
 #[derive(Debug, Error)]
 pub enum SamplingError {
@@ -253,8 +253,7 @@ type IncomingStreamHandlerFuture =
 pub struct SamplingBehaviour<Membership: MembershipHandler> {
     /// Self peer id
     peer_id: PeerId,
-    /// Addresses of known peers in the DA network
-    addresses: AddressBook,
+
     /// Underlying stream behaviour
     stream_behaviour: libp2p_stream::Behaviour,
     /// Incoming sample request streams
@@ -282,7 +281,7 @@ where
     Membership: MembershipHandler + 'static,
     Membership::NetworkId: Send,
 {
-    pub fn new(peer_id: PeerId, membership: Membership, addresses: AddressBook) -> Self {
+    pub fn new(peer_id: PeerId, membership: Membership) -> Self {
         let stream_behaviour = libp2p_stream::Behaviour::new();
         let mut control = stream_behaviour.new_control();
 
@@ -300,7 +299,6 @@ where
         let samples_request_stream = UnboundedReceiverStream::new(receiver).boxed();
         Self {
             peer_id,
-            addresses,
             stream_behaviour,
             incoming_streams,
             control,
@@ -735,7 +733,7 @@ impl<M: MembershipHandler<Id = PeerId, NetworkId = SubnetworkId> + 'static> Netw
             // attach known peer address if possible
             if let Some(address) = opts
                 .get_peer_id()
-                .and_then(|peer_id: PeerId| self.addresses.get_address(&peer_id))
+                .and_then(|peer_id: PeerId| self.membership.get_address(&peer_id))
             {
                 opts = DialOpts::peer_id(opts.get_peer_id().unwrap())
                     .addresses(vec![address.clone()])

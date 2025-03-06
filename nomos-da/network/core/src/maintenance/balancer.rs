@@ -16,8 +16,7 @@ use libp2p::{
     },
     Multiaddr, PeerId,
 };
-
-use crate::address_book::AddressBook;
+use subnetworks_assignations::MembershipHandler;
 
 pub enum ConnectionEvent {
     OpenInbound(PeerId),
@@ -31,29 +30,25 @@ pub trait ConnectionBalancer {
     fn poll(&mut self, cx: &mut Context<'_>) -> Poll<VecDeque<PeerId>>;
 }
 
-pub struct ConnectionBalancerBehaviour<Balancer> {
-    addresses: AddressBook,
+pub struct ConnectionBalancerBehaviour<Balancer, Membership> {
+    membership: Membership,
     balancer: Balancer,
     peers_to_dial: VecDeque<PeerId>,
     waker: Option<Waker>,
 }
 
-impl<Balancer> ConnectionBalancerBehaviour<Balancer>
+impl<Balancer, Membership> ConnectionBalancerBehaviour<Balancer, Membership>
 where
     Balancer: ConnectionBalancer,
+    Membership: MembershipHandler,
 {
-    pub fn new(addresses: AddressBook, balancer: Balancer) -> Self {
-        tracing::info!("Balancer address book: {addresses:?}");
+    pub fn new(membership: Membership, balancer: Balancer) -> Self {
         Self {
-            addresses,
+            membership,
             balancer,
             peers_to_dial: VecDeque::new(),
             waker: None,
         }
-    }
-
-    pub fn update_addresses(&mut self, addresses: AddressBook) {
-        self.addresses = addresses;
     }
 
     fn record_event(&mut self, event: ConnectionEvent) {
@@ -64,9 +59,10 @@ where
     }
 }
 
-impl<Balancer> NetworkBehaviour for ConnectionBalancerBehaviour<Balancer>
+impl<Balancer, Membership> NetworkBehaviour for ConnectionBalancerBehaviour<Balancer, Membership>
 where
     Balancer: ConnectionBalancer + 'static,
+    Membership: MembershipHandler + 'static,
 {
     type ConnectionHandler = dummy::ConnectionHandler;
     type ToSwarm = Infallible;
@@ -130,7 +126,7 @@ where
         }
 
         if let Some(peer) = self.peers_to_dial.pop_front() {
-            if let Some(addr) = self.addresses.get_address(&peer) {
+            if let Some(addr) = self.membership.get_address(&peer) {
                 let opts = DialOpts::peer_id(peer)
                     .addresses(vec![addr.clone()])
                     .extend_addresses_through_behaviour()
@@ -147,7 +143,7 @@ where
 #[cfg(test)]
 mod tests {
     use std::{
-        collections::{HashSet, VecDeque},
+        collections::{HashMap, HashSet, VecDeque},
         time::Duration,
     };
 
@@ -159,6 +155,7 @@ mod tests {
     use tokio::time::timeout;
 
     use super::*;
+    use crate::test_utils::AllNeighbours;
 
     #[derive(Default)]
     struct MockBalancer {
@@ -195,25 +192,27 @@ mod tests {
 
     #[tokio::test]
     async fn test_balancer_dials_provided_peers() {
+        let membership_dialer = AllNeighbours::default();
+
         let mut dialer = Swarm::new_ephemeral_tokio(|_| {
-            ConnectionBalancerBehaviour::new(AddressBook::empty(), MockBalancer::default())
+            ConnectionBalancerBehaviour::new(membership_dialer.clone(), MockBalancer::default())
         });
 
         let mut listener = Swarm::new_ephemeral_tokio(|_| {
-            ConnectionBalancerBehaviour::new(AddressBook::empty(), MockBalancer::default())
+            ConnectionBalancerBehaviour::new(AllNeighbours::default(), MockBalancer::default())
         });
 
         let dialer_peer = *dialer.local_peer_id();
         let listener_peer = *listener.local_peer_id();
         listener.listen().with_memory_addr_external().await;
 
-        let address_book: AddressBook = listener
+        let address_book = listener
             .external_addresses()
             .cloned()
             .map(|addr| (listener_peer, addr))
             .collect();
 
-        dialer.behaviour_mut().update_addresses(address_book);
+        membership_dialer.update_addresses(address_book);
         // Using balancer `peer_to_connect` we are populating the peers list that will
         // be returned when the balancer is polled by the dialer.
         dialer
@@ -257,21 +256,23 @@ mod tests {
 
     #[tokio::test]
     async fn test_balancer_dials_all_peers_from_poll() {
+        let membership_dialer = AllNeighbours::default();
+
         let mut dialer = Swarm::new_ephemeral_tokio(|_| {
-            ConnectionBalancerBehaviour::new(AddressBook::empty(), MockBalancer::default())
+            ConnectionBalancerBehaviour::new(membership_dialer.clone(), MockBalancer::default())
         });
 
         let peer1 = PeerId::random();
         let peer2 = PeerId::random();
         let peer3 = PeerId::random();
 
-        let address_book = AddressBook::from_iter(vec![
+        let addresses = vec![
             (peer1, "/ip4/127.0.0.1/tcp/4001".parse().unwrap()),
             (peer2, "/ip4/127.0.0.1/tcp/4002".parse().unwrap()),
             (peer3, "/ip4/127.0.0.1/tcp/4003".parse().unwrap()),
-        ]);
+        ];
 
-        dialer.behaviour_mut().update_addresses(address_book);
+        membership_dialer.update_addresses(addresses);
 
         dialer.behaviour_mut().balancer.peer_to_connect(peer1);
         dialer.behaviour_mut().balancer.peer_to_connect(peer2);

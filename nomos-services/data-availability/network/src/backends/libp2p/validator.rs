@@ -88,7 +88,6 @@ where
         let (mut validator_swarm, validator_events_stream) = ValidatorSwarm::new(
             keypair,
             config.membership.clone(),
-            config.addresses.clone().into_iter().collect(),
             config.policy_settings,
             config.monitor_settings,
             config.balancer_interval,

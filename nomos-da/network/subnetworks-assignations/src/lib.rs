@@ -2,6 +2,9 @@ pub mod versions;
 
 use std::{collections::HashSet, hash::Hash};
 
+use libp2p::Multiaddr;
+use libp2p_identity::PeerId;
+
 pub trait MembershipHandler {
     /// Subnetworks Id type
     type NetworkId: Eq + Hash;
@@ -26,4 +29,6 @@ pub trait MembershipHandler {
     fn members(&self) -> HashSet<Self::Id>;
 
     fn last_subnetwork_id(&self) -> Self::NetworkId;
+
+    fn get_address(&self, peer_id: &PeerId) -> Option<Multiaddr>;
 }

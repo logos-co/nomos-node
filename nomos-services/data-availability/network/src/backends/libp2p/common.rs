@@ -1,4 +1,4 @@
-use std::{collections::HashMap, fmt::Debug, time::Duration};
+use std::{fmt::Debug, time::Duration};
 
 use futures::StreamExt;
 use kzgrs_backend::common::{blob::DaBlob, ColumnIndex};
@@ -14,7 +14,7 @@ use nomos_da_network_core::{
     },
     SubnetworkId,
 };
-use nomos_libp2p::{ed25519, secret_key_serde, Multiaddr, PeerId};
+use nomos_libp2p::{ed25519, secret_key_serde, Multiaddr};
 use serde::{Deserialize, Serialize};
 use tokio::sync::{
     broadcast, mpsc,
@@ -30,7 +30,6 @@ pub struct DaNetworkBackendSettings<Membership> {
     pub node_key: ed25519::SecretKey,
     /// Membership of DA network `PoV` set
     pub membership: Membership,
-    pub addresses: HashMap<PeerId, Multiaddr>,
     pub listening_address: Multiaddr,
     pub policy_settings: DAConnectionPolicySettings,
     pub monitor_settings: DAConnectionMonitorSettings,

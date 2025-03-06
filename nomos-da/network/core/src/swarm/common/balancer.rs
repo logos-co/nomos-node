@@ -235,6 +235,10 @@ mod tests {
         fn last_subnetwork_id(&self) -> Self::NetworkId {
             self.last_subnet_id as u16
         }
+
+        fn get_address(&self, peer_id: &PeerId) -> Option<libp2p::Multiaddr> {
+            unimplemented!()
+        }
     }
 
     #[tokio::test]

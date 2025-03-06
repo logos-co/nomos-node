@@ -100,7 +100,9 @@ pub fn create_node_configs(
 
         // DA Libp2p network config.
         let mut da_config = da_configs[i].clone();
-        da_config.addresses.clone_from(&host_da_peer_addresses);
+        da_config.membership = da_config
+            .membership
+            .clone_with_different_addressbook(host_da_peer_addresses.clone());
         da_config.listening_address = Multiaddr::from_str(&format!(
             "/ip4/0.0.0.0/udp/{}/quic-v1",
             host.da_network_port,
@@ -242,6 +244,7 @@ mod cfgsync_tests {
     use nomos_tracing_service::{
         FilterLayer, LoggerLayer, MetricsLayer, TracingLayer, TracingSettings,
     };
+    use subnetworks_assignations::MembershipHandler;
     use tests::topology::configs::{consensus::ConsensusParams, da::DaParams, GeneralConfig};
     use tracing::Level;
 
@@ -308,8 +311,12 @@ mod cfgsync_tests {
             config.da_config.node_key.clone(),
         ));
         let my_peer_id = PeerId::from_public_key(&key.public());
-        let my_multiaddr = config.da_config.addresses.get(&my_peer_id).unwrap();
-        let my_multiaddr_ip = extract_ip(my_multiaddr).unwrap();
+        let my_multiaddr = config
+            .da_config
+            .membership
+            .get_address(&my_peer_id)
+            .unwrap();
+        let my_multiaddr_ip = extract_ip(&my_multiaddr).unwrap();
         assert_eq!(
             my_ip, my_multiaddr_ip,
             "DA membership ip doesn't match host ip"

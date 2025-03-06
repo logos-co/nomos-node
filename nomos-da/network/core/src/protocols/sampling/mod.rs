@@ -83,9 +83,6 @@ mod test {
             .try_init();
         let k1 = Keypair::generate_ed25519();
         let k2 = Keypair::generate_ed25519();
-        let neighbours = AllNeighbours::default();
-        neighbours.add_neighbour(PeerId::from_public_key(&k1.public()));
-        neighbours.add_neighbour(PeerId::from_public_key(&k2.public()));
 
         // Generate a random peer ids not to conflict with other tests
         let p1_id = rand::thread_rng().gen::<u64>();
@@ -94,22 +91,25 @@ mod test {
         let p2_id = rand::thread_rng().gen::<u64>();
         let p2_address: Multiaddr = format!("/memory/{p2_id}").parse().unwrap();
 
+        let neighbours_p1 = AllNeighbours::default();
+        neighbours_p1.add_neighbour(PeerId::from_public_key(&k1.public()));
+        neighbours_p1.add_neighbour(PeerId::from_public_key(&k2.public()));
         let p1_addresses = vec![(PeerId::from_public_key(&k2.public()), p2_address.clone())];
-        let p2_addresses = vec![(PeerId::from_public_key(&k1.public()), p1_address.clone())];
+        neighbours_p1.update_addresses(p1_addresses);
 
-        let p1_behavior = SamplingBehaviour::new(
-            PeerId::from_public_key(&k1.public()),
-            neighbours.clone(),
-            p1_addresses.into_iter().collect(),
-        );
+        let neighbours_p2 = AllNeighbours::default();
+        neighbours_p2.add_neighbour(PeerId::from_public_key(&k1.public()));
+        neighbours_p2.add_neighbour(PeerId::from_public_key(&k2.public()));
+        let p2_addresses = vec![(PeerId::from_public_key(&k1.public()), p1_address.clone())];
+        neighbours_p2.update_addresses(p2_addresses);
+
+        let p1_behavior =
+            SamplingBehaviour::new(PeerId::from_public_key(&k1.public()), neighbours_p1.clone());
 
         let mut p1 = new_swarm_in_memory(&k1, p1_behavior);
 
-        let p2_behavior = SamplingBehaviour::new(
-            PeerId::from_public_key(&k2.public()),
-            neighbours.clone(),
-            p2_addresses.into_iter().collect(),
-        );
+        let p2_behavior =
+            SamplingBehaviour::new(PeerId::from_public_key(&k2.public()), neighbours_p1.clone());
         let mut p2 = new_swarm_in_memory(&k2, p2_behavior);
 
         let request_sender_1 = p1.behaviour().sample_request_channel();

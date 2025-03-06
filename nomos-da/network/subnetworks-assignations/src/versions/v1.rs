@@ -1,5 +1,6 @@
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
+use libp2p::Multiaddr;
 use libp2p_identity::PeerId;
 use serde::{Deserialize, Serialize};
 
@@ -8,18 +9,37 @@ use crate::MembershipHandler;
 /// Fill a `N` sized set of "subnetworks" from a list of peer ids members
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
 pub struct FillFromNodeList {
-    pub assignations: Vec<HashSet<PeerId>>,
-    pub subnetwork_size: usize,
-    pub dispersal_factor: usize,
+    assignations: Vec<HashSet<PeerId>>,
+    subnetwork_size: usize,
+    dispersal_factor: usize,
+    addressbook: HashMap<PeerId, Multiaddr>,
 }
 
 impl FillFromNodeList {
     #[must_use]
-    pub fn new(peers: &[PeerId], subnetwork_size: usize, dispersal_factor: usize) -> Self {
+    pub fn new(
+        peers: &[PeerId],
+        addressbook: HashMap<PeerId, Multiaddr>,
+        subnetwork_size: usize,
+        dispersal_factor: usize,
+    ) -> Self {
         Self {
             assignations: Self::fill(peers, subnetwork_size, dispersal_factor),
             subnetwork_size,
             dispersal_factor,
+            addressbook,
+        }
+    }
+
+    pub fn clone_with_different_addressbook(
+        &self,
+        addressbook: HashMap<PeerId, Multiaddr>,
+    ) -> Self {
+        Self {
+            assignations: self.assignations.clone(),
+            subnetwork_size: self.subnetwork_size,
+            dispersal_factor: self.dispersal_factor,
+            addressbook,
         }
     }
 
@@ -80,10 +100,16 @@ impl MembershipHandler for FillFromNodeList {
     fn last_subnetwork_id(&self) -> Self::NetworkId {
         self.subnetwork_size.saturating_sub(1) as u16
     }
+
+    fn get_address(&self, peer_id: &PeerId) -> Option<Multiaddr> {
+        self.addressbook.get(peer_id).cloned()
+    }
 }
 
 #[cfg(test)]
 mod test {
+    use std::collections::HashMap;
+
     use libp2p_identity::PeerId;
 
     use crate::versions::v1::FillFromNodeList;
@@ -93,7 +119,12 @@ mod test {
         let nodes: Vec<_> = std::iter::repeat_with(PeerId::random).take(100).collect();
         let dispersal_factor = 2;
         let subnetwork_size = 1024;
-        let distribution = FillFromNodeList::new(&nodes, subnetwork_size, dispersal_factor);
+        let distribution = FillFromNodeList::new(
+            &nodes,
+            HashMap::default(),
+            subnetwork_size,
+            dispersal_factor,
+        );
         assert_eq!(distribution.assignations.len(), subnetwork_size);
         for subnetwork in &distribution.assignations {
             assert_eq!(subnetwork.len(), dispersal_factor);

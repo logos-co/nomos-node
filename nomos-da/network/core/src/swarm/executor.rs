@@ -76,7 +76,6 @@ where
     pub fn new(
         key: Keypair,
         membership: Membership,
-        addresses: AddressBook,
         policy_settings: DAConnectionPolicySettings,
         monitor_settings: DAConnectionMonitorSettings,
         balancer_interval: Duration,
@@ -109,14 +108,7 @@ where
 
         (
             Self {
-                swarm: Self::build_swarm(
-                    key,
-                    membership,
-                    addresses,
-                    balancer,
-                    monitor,
-                    redial_cooldown,
-                ),
+                swarm: Self::build_swarm(key, membership, balancer, monitor, redial_cooldown),
                 sampling_events_sender,
                 validation_events_sender,
                 dispersal_events_sender,
@@ -133,7 +125,6 @@ where
     fn build_swarm(
         key: Keypair,
         membership: Membership,
-        addresses: AddressBook,
         balancer: ConnectionBalancer<Membership>,
         monitor: ConnectionMonitor<Membership>,
         redial_cooldown: Duration,
@@ -148,14 +139,7 @@ where
             .with_tokio()
             .with_quic()
             .with_behaviour(|key| {
-                ExecutorBehaviour::new(
-                    key,
-                    membership,
-                    addresses,
-                    balancer,
-                    monitor,
-                    redial_cooldown,
-                )
+                ExecutorBehaviour::new(key, membership, balancer, monitor, redial_cooldown)
             })
             .expect("Validator behaviour should build")
             .with_swarm_config(|cfg| {
