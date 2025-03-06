@@ -15,7 +15,7 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::broadcast::{self, Receiver, Sender};
 use tracing::debug;
 
-use super::*;
+use super::{fmt, oneshot, Debug, NetworkBackend, OverwatchHandle};
 
 const BROADCAST_CHANNEL_BUF: usize = 16;
 
@@ -29,6 +29,7 @@ pub struct MockContentTopic {
 }
 
 impl MockContentTopic {
+    #[must_use]
     pub const fn new(
         application_name: &'static str,
         version: usize,
@@ -48,6 +49,7 @@ pub struct MockPubSubTopic {
 }
 
 impl MockPubSubTopic {
+    #[must_use]
     pub const fn new(topic_name: &'static str) -> Self {
         Self {
             topic_name: Cow::Borrowed(topic_name),
@@ -69,6 +71,7 @@ pub struct MockMessage {
 }
 
 impl MockMessage {
+    #[must_use]
     pub const fn new(
         payload: String,
         content_topic: MockContentTopic,
@@ -83,10 +86,12 @@ impl MockMessage {
         }
     }
 
+    #[must_use]
     pub const fn content_topic(&self) -> &MockContentTopic {
         &self.content_topic
     }
 
+    #[must_use]
     pub fn payload(&self) -> String {
         self.payload.clone()
     }
@@ -255,7 +260,7 @@ impl NetworkBackend for Mock {
                 tracing::info!("booting producer");
                 let this = self.clone();
                 match (spawner)(Box::pin(async move { this.run_producer_handler().await })) {
-                    Ok(_) => {}
+                    Ok(()) => {}
                     Err(e) => {
                         tracing::error!("error booting producer: {:?}", e);
                     }
@@ -309,7 +314,11 @@ mod tests {
 
     use super::*;
 
+    static FOO_BROADCAST_MESSAGES: &[&str] = &["foo1", "foo2"];
+    static BAR_BROADCAST_MESSAGES: &[&str] = &["bar1"];
+
     #[tokio::test]
+    #[expect(clippy::too_many_lines)]
     async fn test_mock_network() {
         let config = MockConfig {
             predefined_messages: vec![
@@ -350,15 +359,12 @@ mod tests {
             task.run_producer_handler().await.unwrap();
         });
 
-        static FOO_BROADCAST_MESSAGES: &[&str] = &["foo1", "foo2"];
-        static BAR_BROADCAST_MESSAGES: &[&str] = &["bar1"];
-
         // broadcast
         for val in FOO_BROADCAST_MESSAGES {
             mock.process(MockBackendMessage::Broadcast {
                 topic: "foo".to_string(),
                 msg: MockMessage {
-                    payload: val.to_string(),
+                    payload: (*val).to_string(),
                     content_topic: MockContentTopic {
                         application_name: "mock".into(),
                         version: 1,
@@ -378,7 +384,7 @@ mod tests {
             mock.process(MockBackendMessage::Broadcast {
                 topic: "bar".to_string(),
                 msg: MockMessage {
-                    payload: val.to_string(),
+                    payload: (*val).to_string(),
                     content_topic: MockContentTopic {
                         application_name: "mock".into(),
                         version: 1,

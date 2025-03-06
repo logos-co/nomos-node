@@ -153,7 +153,7 @@ where
             da_mempool_relay,
             sampling_relay,
             storage_adapter,
-            _phantom_data: Default::default(),
+            _phantom_data: PhantomData,
         }
     }
 

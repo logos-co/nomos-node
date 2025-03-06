@@ -10,4 +10,16 @@ rustflags = [
 rustflags = [
   "-Wclippy::nursery",
   "-Aclippy::large_stack_frames",
+
+  "-Wclippy::pedantic",
+  "-Aclippy::similar_names",
+  # TODO: Tackle before opening PR
+  "-Aclippy::cast_possible_truncation",
+  "-Aclippy::cast_sign_loss",
+  "-Aclippy::cast_precision_loss",
+  "-Aclippy::cast_possible_wrap",
+  # TODO: Remove at some point
+  "-Aclippy::missing_errors_doc",
+  # TODO: Remove at some point
+  "-Aclippy::missing_panics_doc",
 ]

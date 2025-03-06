@@ -135,7 +135,7 @@ where
             sampling_request_channel,
             sampling_broadcast_receiver,
             verifying_broadcast_receiver,
-            _membership: Default::default(),
+            _membership: PhantomData,
         }
     }
 

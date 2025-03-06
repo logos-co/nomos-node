@@ -28,6 +28,7 @@ pub struct DaEncoderParams {
 impl DaEncoderParams {
     pub const MAX_BLS12_381_ENCODING_CHUNK_SIZE: usize = 31;
 
+    #[must_use]
     pub fn new(column_count: usize, with_cache: bool, global_parameters: GlobalParameters) -> Self {
         let toeplitz1cache =
             with_cache.then(|| Toeplitz1Cache::with_size(&global_parameters, column_count));
@@ -61,6 +62,7 @@ pub struct EncodedData {
 impl EncodedData {
     /// Returns a `DaBlob` for the given index.
     /// If the index is out of bounds, returns `None`.
+    #[must_use]
     pub fn to_da_blob(&self, index: usize) -> Option<DaBlob> {
         let column = self.extended_data.columns().nth(index)?;
         Some(DaBlob {
@@ -73,18 +75,24 @@ impl EncodedData {
             rows_proofs: self
                 .rows_proofs
                 .iter()
-                .map(|proofs| proofs.get(index).cloned().unwrap())
+                .map(|proofs| proofs.get(index).copied().unwrap())
                 .collect(),
         })
+    }
+}
+
+impl EncodedData {
+    #[must_use]
+    pub const fn iter(&self) -> EncodedDataIterator {
+        EncodedDataIterator::new(self)
     }
 }
 
 impl<'a> IntoIterator for &'a EncodedData {
     type Item = DaBlob;
     type IntoIter = EncodedDataIterator<'a>;
-
     fn into_iter(self) -> Self::IntoIter {
-        EncodedDataIterator::new(self)
+        self.iter()
     }
 }
 
@@ -109,6 +117,7 @@ pub struct EncodedDataIterator<'a> {
 }
 
 impl<'a> EncodedDataIterator<'a> {
+    #[must_use]
     pub const fn new(encoded_data: &'a EncodedData) -> Self {
         Self {
             encoded_data,
@@ -132,6 +141,7 @@ pub struct DaEncoder {
 }
 
 impl DaEncoder {
+    #[must_use]
     pub const fn new(settings: DaEncoderParams) -> Self {
         Self { params: settings }
     }
@@ -214,8 +224,8 @@ impl DaEncoder {
         global_parameters: &GlobalParameters,
         polynomials: &[Polynomial],
         toeplitz1cache: Option<&Toeplitz1Cache>,
-    ) -> Result<Vec<Vec<Proof>>, KzgRsError> {
-        Ok({
+    ) -> Vec<Vec<Proof>> {
+        {
             #[cfg(not(feature = "parallel"))]
             {
                 polynomials.iter()
@@ -226,7 +236,7 @@ impl DaEncoder {
             }
         }
         .map(|poly| fk20_batch_generate_elements_proofs(poly, global_parameters, toeplitz1cache))
-        .collect())
+        .collect()
     }
 
     #[expect(clippy::type_complexity)]
@@ -263,12 +273,8 @@ impl DaEncoder {
         global_parameters: &GlobalParameters,
         polynomial: &Polynomial,
         toeplitz1cache: Option<&Toeplitz1Cache>,
-    ) -> Result<Vec<Proof>, KzgRsError> {
-        Ok(fk20_batch_generate_elements_proofs(
-            polynomial,
-            global_parameters,
-            toeplitz1cache,
-        ))
+    ) -> Vec<Proof> {
+        fk20_batch_generate_elements_proofs(polynomial, global_parameters, toeplitz1cache)
     }
 
     fn evals_to_chunk_matrix(evals: &[Evaluations]) -> ChunksMatrix {
@@ -309,7 +315,7 @@ impl nomos_core::da::DaEncoder for DaEncoder {
             global_parameters,
             &row_polynomials,
             self.params.toeplitz1cache.as_ref(),
-        )?;
+        );
         let (_column_polynomials, column_commitments): (Vec<_>, Vec<_>) =
             Self::compute_kzg_column_commitments(global_parameters, &extended_data, column_domain)?
                 .into_iter()
@@ -324,7 +330,7 @@ impl nomos_core::da::DaEncoder for DaEncoder {
             global_parameters,
             &aggregated_polynomial,
             self.params.toeplitz1cache.as_ref(),
-        )?;
+        );
         Ok(EncodedData {
             data: data.to_vec(),
             chunked_data,
@@ -363,6 +369,7 @@ pub mod test {
         Lazy::new(|| DaEncoderParams::default_with(DOMAIN_SIZE));
     pub static ENCODER: Lazy<DaEncoder> = Lazy::new(|| DaEncoder::new(PARAMS.clone()));
 
+    #[must_use]
     pub fn rand_data(elements_count: usize) -> Vec<u8> {
         let mut buff = vec![0; elements_count * DaEncoderParams::MAX_BLS12_381_ENCODING_CHUNK_SIZE];
         rand::thread_rng().fill_bytes(&mut buff);
@@ -437,7 +444,7 @@ pub mod test {
             for (c1, c2) in izip!(r1.iter(), r2.iter()) {
                 assert_eq!(c1, c2);
             }
-            let points: Vec<_> = evals.evals.iter().cloned().map(Some).collect();
+            let points: Vec<_> = evals.evals.iter().copied().map(Some).collect();
             let poly_2 = decode(r1.len(), &points, domain);
             let (poly_1, _) = bytes_to_polynomial_unchecked::<BYTES_PER_FIELD_ELEMENT>(
                 r1.as_bytes().as_ref(),
@@ -460,8 +467,7 @@ pub mod test {
         let (_evals, polynomials): (Vec<_>, Vec<_>) = poly_data.into_iter().unzip();
         let extended_evaluations = DaEncoder::rs_encode_rows(&polynomials, domain);
         let extended_matrix = DaEncoder::evals_to_chunk_matrix(&extended_evaluations);
-        let proofs =
-            DaEncoder::compute_rows_proofs(&GLOBAL_PARAMETERS, &polynomials, None).unwrap();
+        let proofs = DaEncoder::compute_rows_proofs(&GLOBAL_PARAMETERS, &polynomials, None);
 
         let checks = izip!(matrix.iter(), &commitments, &proofs);
         for (row, commitment, proofs) in checks {
@@ -540,7 +546,7 @@ pub mod test {
                 domain,
             )
             .unwrap();
-        DaEncoder::compute_aggregated_column_proofs(&GLOBAL_PARAMETERS, &polynomial, None).unwrap();
+        DaEncoder::compute_aggregated_column_proofs(&GLOBAL_PARAMETERS, &polynomial, None);
     }
 
     #[test]
@@ -582,10 +588,10 @@ pub mod test {
         ];
         let encoded_data = encoder.encode(&data).unwrap();
 
-        let blobs = (&encoded_data).into_iter();
+        let blobs = encoded_data.iter();
         assert_eq!(blobs.count(), 16);
 
-        let blobs = encoded_data.into_iter();
+        let blobs = encoded_data.iter();
         assert_eq!(blobs.count(), 16);
     }
 }

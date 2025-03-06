@@ -116,7 +116,7 @@ where
             service_state,
             network_relay,
             mempool_relay,
-            _backend: Default::default(),
+            _backend: PhantomData,
         })
     }
 

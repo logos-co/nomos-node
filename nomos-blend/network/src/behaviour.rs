@@ -73,6 +73,7 @@ where
     M::PublicKey: PartialEq,
     IntervalProvider: IntervalStreamProvider,
 {
+    #[must_use]
     pub fn new(config: Config) -> Self {
         let duplicate_cache = TimedCache::with_lifespan(config.duplicate_cache_lifespan);
         Self {
@@ -87,13 +88,13 @@ where
     }
 
     /// Publish a message (data or drop) to all connected peers
-    pub fn publish(&mut self, message: Vec<u8>) -> Result<(), Error> {
-        if M::is_drop_message(&message) {
+    pub fn publish(&mut self, message: &[u8]) -> Result<(), Error> {
+        if M::is_drop_message(message) {
             // Bypass deduplication for the drop message
             return self.forward_message(message, None);
         }
 
-        let msg_id = Self::message_id(&message);
+        let msg_id = Self::message_id(message);
         // If the message was already seen, don't forward it again
         if self.duplicate_cache.cache_get(&msg_id).is_some() {
             return Ok(());
@@ -114,7 +115,7 @@ where
     /// the blend protocol.
     fn forward_message(
         &mut self,
-        message: Vec<u8>,
+        message: &[u8],
         excluded_peer: Option<PeerId>,
     ) -> Result<(), Error> {
         let mut num_peers = 0;
@@ -126,7 +127,7 @@ where
                 self.events.push_back(ToSwarm::NotifyHandler {
                     peer_id: *peer_id,
                     handler: NotifyHandler::Any,
-                    event: FromBehaviour::Message(message.clone()),
+                    event: FromBehaviour::Message(message.to_vec()),
                 });
                 num_peers += 1;
             });
@@ -145,6 +146,7 @@ where
         hasher.finalize().to_vec()
     }
 
+    #[must_use]
     pub fn num_healthy_peers(&self) -> usize {
         self.negotiated_peers
             .iter()
@@ -250,7 +252,7 @@ where
 
                 // Forward the message immediately to the rest of connected peers
                 // without any processing for the fast propagation.
-                if let Err(e) = self.forward_message(message.clone(), Some(peer_id)) {
+                if let Err(e) = self.forward_message(&message, Some(peer_id)) {
                     tracing::error!("Failed to forward message: {e:?}");
                 }
 

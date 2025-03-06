@@ -13,7 +13,7 @@ use crypto::Blake2b;
 use leader_proof::OrphanProof;
 use nomos_proof_statements::leadership::LeaderPublic;
 pub use notetree::NoteTree;
-use rpds::HashTrieSetSync;
+use rpds::{HashTrieSet, HashTrieSetSync};
 use thiserror::Error;
 
 #[derive(Clone, Debug, Error)]
@@ -70,14 +70,17 @@ impl EpochState {
         }
     }
 
+    #[must_use]
     pub const fn epoch(&self) -> Epoch {
         self.epoch
     }
 
+    #[must_use]
     pub const fn nonce(&self) -> &[u8; 32] {
         &self.nonce
     }
 
+    #[must_use]
     pub const fn total_stake(&self) -> Value {
         self.total_stake
     }
@@ -152,6 +155,7 @@ where
         self.states.get(id)
     }
 
+    #[must_use]
     pub const fn config(&self) -> &Config {
         &self.config
     }
@@ -346,6 +350,7 @@ impl LedgerState {
         Ok(self)
     }
 
+    #[must_use]
     pub fn is_nullified(&self, nullifier: &Nullifier) -> bool {
         self.nullifiers.contains(nullifier)
     }
@@ -371,41 +376,46 @@ impl LedgerState {
         Self {
             lead_commitments: commitments.clone(),
             spend_commitments: commitments,
-            nullifiers: Default::default(),
+            nullifiers: HashTrieSet::default(),
             nonce: [0; 32],
             slot: 0.into(),
             next_epoch_state: EpochState {
                 epoch: 1.into(),
                 nonce: [0; 32],
-                commitments: Default::default(),
+                commitments: NoteTree::default(),
                 total_stake,
             },
             epoch_state: EpochState {
                 epoch: 0.into(),
                 nonce: [0; 32],
-                commitments: Default::default(),
+                commitments: NoteTree::default(),
                 total_stake,
             },
         }
     }
 
+    #[must_use]
     pub const fn slot(&self) -> Slot {
         self.slot
     }
 
+    #[must_use]
     pub const fn epoch_state(&self) -> &EpochState {
         &self.epoch_state
     }
 
+    #[must_use]
     pub const fn next_epoch_state(&self) -> &EpochState {
         &self.next_epoch_state
     }
 
+    #[must_use]
     pub const fn lead_commitments(&self) -> &NoteTree {
         &self.lead_commitments
     }
 }
 
+#[expect(clippy::missing_fields_in_debug)]
 impl core::fmt::Debug for LedgerState {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("LedgerState")
@@ -426,6 +436,7 @@ pub mod tests {
     use cl::{note::NoteWitness as Note, NullifierSecret};
     use cryptarchia_engine::{EpochConfig, Slot};
     use rand::thread_rng;
+    use rpds::HashTrieSet;
 
     use super::*;
     use crate::{crypto::Blake2b, leader_proof::LeaderProof, Config, LedgerError};
@@ -564,6 +575,7 @@ pub mod tests {
         Ok(id)
     }
 
+    #[must_use]
     pub const fn config() -> Config {
         Config {
             epoch_config: EpochConfig {
@@ -578,23 +590,24 @@ pub mod tests {
         }
     }
 
+    #[must_use]
     pub fn genesis_state(commitments: &[NoteCommitment]) -> LedgerState {
         LedgerState {
-            lead_commitments: commitments.iter().cloned().collect(),
-            spend_commitments: commitments.iter().cloned().collect(),
-            nullifiers: Default::default(),
+            lead_commitments: commitments.iter().copied().collect(),
+            spend_commitments: commitments.iter().copied().collect(),
+            nullifiers: HashTrieSet::default(),
             nonce: [0; 32],
             slot: 0.into(),
             next_epoch_state: EpochState {
                 epoch: 1.into(),
                 nonce: [0; 32],
-                commitments: commitments.iter().cloned().collect(),
+                commitments: commitments.iter().copied().collect(),
                 total_stake: 1,
             },
             epoch_state: EpochState {
                 epoch: 0.into(),
                 nonce: [0; 32],
-                commitments: commitments.iter().cloned().collect(),
+                commitments: commitments.iter().copied().collect(),
                 total_stake: 1,
             },
         }

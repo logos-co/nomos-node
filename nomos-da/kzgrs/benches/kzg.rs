@@ -2,7 +2,10 @@ use ark_bls12_381::{Bls12_381, Fr};
 use ark_poly::{univariate::DensePolynomial, EvaluationDomain, GeneralEvaluationDomain};
 use ark_poly_commit::kzg10::{UniversalParams, KZG10};
 use divan::{black_box, counter::ItemsCount, Bencher};
-use kzgrs::{common::bytes_to_polynomial_unchecked, kzg::*};
+use kzgrs::{
+    common::bytes_to_polynomial_unchecked,
+    kzg::{commit_polynomial, generate_element_proof, verify_element_proof},
+};
 use once_cell::sync::Lazy;
 use rand::RngCore;
 #[cfg(feature = "parallel")]
@@ -11,7 +14,7 @@ use rayon::iter::IntoParallelIterator;
 use rayon::iter::ParallelIterator;
 
 fn main() {
-    divan::main()
+    divan::main();
 }
 
 // This allocator setting seems like it doesn't work on windows. Disable for
@@ -32,7 +35,7 @@ fn rand_data_elements(elements_count: usize, chunk_size: usize) -> Vec<u8> {
 
 const CHUNK_SIZE: usize = 31;
 
-#[divan::bench(args = [16, 32, 64, 128, 256, 512, 1024, 2048, 4096])]
+#[divan::bench(args = [16, 32, 64, 128, 256, 512, 1_024, 2_048, 4_096])]
 fn commit_single_polynomial_with_element_count(bencher: Bencher, element_count: usize) {
     bencher
         .with_inputs(|| {
@@ -45,7 +48,7 @@ fn commit_single_polynomial_with_element_count(bencher: Bencher, element_count: 
 }
 
 #[cfg(feature = "parallel")]
-#[divan::bench(args = [16, 32, 64, 128, 256, 512, 1024, 2048, 4096])]
+#[divan::bench(args = [16, 32, 64, 128, 256, 512, 1_024, 2_048, 4_096])]
 fn commit_polynomial_with_element_count_parallelized(bencher: Bencher, element_count: usize) {
     let threads = 8usize;
     bencher
@@ -63,7 +66,7 @@ fn commit_polynomial_with_element_count_parallelized(bencher: Bencher, element_c
         });
 }
 
-#[divan::bench(args = [128, 256, 512, 1024, 2048, 4096])]
+#[divan::bench(args = [128, 256, 512, 1_024, 2_048, 4_096])]
 fn compute_single_proof(bencher: Bencher, element_count: usize) {
     bencher
         .with_inputs(|| {
@@ -86,7 +89,7 @@ fn compute_single_proof(bencher: Bencher, element_count: usize) {
         });
 }
 
-#[divan::bench(args = [128, 256, 512, 1024], sample_count = 3, sample_size = 5)]
+#[divan::bench(args = [128, 256, 512, 1_024], sample_count = 3, sample_size = 5)]
 fn compute_batch_proofs(bencher: Bencher, element_count: usize) {
     bencher
         .with_inputs(|| {
@@ -112,7 +115,7 @@ fn compute_batch_proofs(bencher: Bencher, element_count: usize) {
 // improvements are probably come up from this. But it should help reusing the
 // same thread pool for all jobs saving a little time.
 #[cfg(feature = "parallel")]
-#[divan::bench(args = [128, 256, 512, 1024], sample_count = 3, sample_size = 5)]
+#[divan::bench(args = [128, 256, 512, 1_024], sample_count = 3, sample_size = 5)]
 fn compute_parallelize_batch_proofs(bencher: Bencher, element_count: usize) {
     bencher
         .with_inputs(|| {

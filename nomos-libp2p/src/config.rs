@@ -173,7 +173,7 @@ mod tests {
 
     #[test]
     fn config_serde() {
-        let config: SwarmConfig = Default::default();
+        let config = SwarmConfig::default();
 
         let serialized = serde_json::to_string(&config).unwrap();
         println!("{serialized}");

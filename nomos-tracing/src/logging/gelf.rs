@@ -11,7 +11,7 @@ pub struct GelfConfig {
 }
 
 pub fn create_gelf_layer(
-    config: GelfConfig,
+    config: &GelfConfig,
     handle: &Handle,
 ) -> Result<tracing_gelf::Logger, Box<dyn Error + Send + Sync>> {
     let (layer, mut task) = tracing_gelf::Logger::builder()
@@ -22,11 +22,10 @@ pub fn create_gelf_layer(
         loop {
             if task.connect().await.0.is_empty() {
                 break;
-            } else {
-                eprintln!("Failed to connect to graylog");
-                let delay = Duration::from_secs(GELF_RECONNECT_INTERVAL);
-                tokio::time::sleep(delay).await;
             }
+            eprintln!("Failed to connect to graylog");
+            let delay = Duration::from_secs(GELF_RECONNECT_INTERVAL);
+            tokio::time::sleep(delay).await;
         }
     });
 

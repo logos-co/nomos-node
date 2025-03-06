@@ -15,6 +15,7 @@ impl Cli {
         self.command.run()
     }
 
+    #[must_use]
     pub const fn command(&self) -> &Command {
         &self.command
     }

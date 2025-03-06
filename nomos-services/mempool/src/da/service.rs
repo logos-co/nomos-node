@@ -1,4 +1,4 @@
-/// Re-export for OpenAPI
+/// Re-export for `OpenAPI`
 #[cfg(feature = "openapi")]
 pub mod openapi {
     pub use crate::backend::Status;
@@ -214,7 +214,7 @@ where
                     tracing::info!(counter.da_mempool_pending_items = pool.pending_item_count());
                 }
                 Some(msg) = lifecycle_stream.next() =>  {
-                    if lifecycle::should_stop_service::<Self>(&msg).await {
+                    if lifecycle::should_stop_service::<Self>(&msg) {
                         break;
                     }
                 }

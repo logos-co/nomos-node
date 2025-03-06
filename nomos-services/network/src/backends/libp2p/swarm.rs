@@ -72,7 +72,7 @@ impl SwarmHandler {
                     self.handle_event(event);
                 }
                 Some(command) = self.commands_rx.recv() => {
-                    self.handle_command(command).await;
+                    self.handle_command(command);
                 }
             }
         }
@@ -125,13 +125,14 @@ impl SwarmHandler {
         }
     }
 
-    async fn handle_command(&mut self, command: Command) {
+    #[expect(clippy::cognitive_complexity)]
+    fn handle_command(&mut self, command: Command) {
         match command {
             Command::Connect(dial) => {
                 self.connect(dial);
             }
             Command::Broadcast { topic, message } => {
-                self.broadcast_and_retry(topic, message, 0).await;
+                self.broadcast_and_retry(topic, message, 0);
             }
             Command::Subscribe(topic) => {
                 tracing::debug!("subscribing to topic: {topic}");
@@ -158,7 +159,7 @@ impl SwarmHandler {
                 message,
                 retry_count,
             } => {
-                self.broadcast_and_retry(topic, message, retry_count).await;
+                self.broadcast_and_retry(topic, message, retry_count);
             }
         }
     }
@@ -173,7 +174,7 @@ impl SwarmHandler {
     fn connect(&mut self, dial: Dial) {
         tracing::debug!("Connecting to {}", dial.addr);
 
-        match self.swarm.connect(dial.addr.clone()) {
+        match self.swarm.connect(&dial.addr) {
             Ok(connection_id) => {
                 // Dialing has been scheduled. The result will be notified as a SwarmEvent.
                 self.pending_dials.insert(connection_id, dial);
@@ -214,7 +215,8 @@ impl SwarmHandler {
         }
     }
 
-    async fn broadcast_and_retry(&mut self, topic: Topic, message: Box<[u8]>, retry_count: usize) {
+    #[expect(clippy::cognitive_complexity)]
+    fn broadcast_and_retry(&mut self, topic: Topic, message: Box<[u8]>, retry_count: usize) {
         tracing::debug!("broadcasting message to topic: {topic}");
 
         match self.swarm.broadcast(&topic, message.to_vec()) {

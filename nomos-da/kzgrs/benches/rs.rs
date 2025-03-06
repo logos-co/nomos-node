@@ -1,14 +1,17 @@
 use ark_bls12_381::Fr;
 use ark_poly::{EvaluationDomain, GeneralEvaluationDomain};
 use divan::{black_box, counter::BytesCount, Bencher};
-use kzgrs::{common::bytes_to_polynomial, rs::*};
+use kzgrs::{
+    common::bytes_to_polynomial,
+    rs::{decode, encode},
+};
 use rand::{thread_rng, RngCore};
 
 fn main() {
-    divan::main()
+    divan::main();
 }
 
-#[divan::bench(args = [3224])]
+#[divan::bench(args = [3_224])]
 fn rs_encode(bencher: Bencher, size: usize) {
     bencher
         .with_inputs(move || {
@@ -22,10 +25,10 @@ fn rs_encode(bencher: Bencher, size: usize) {
             let (_, poly) = bytes_to_polynomial::<31>(buff, domain).unwrap();
             let domain = GeneralEvaluationDomain::<Fr>::new(size * 2).unwrap();
             black_box(move || encode(&poly, domain))
-        })
+        });
 }
 
-#[divan::bench(args = [16399, 32798, 65565, 131099, 262167, 524241, 1048606], sample_size = 10, sample_count = 100)]
+#[divan::bench(args = [16_399, 32_798, 65_565, 131_099, 262_167, 524_241, 1_048_606], sample_size = 10, sample_count = 100)]
 fn rs_decode(bencher: Bencher, size: usize) {
     bencher
         .with_inputs(move || {
@@ -46,5 +49,5 @@ fn rs_decode(bencher: Bencher, size: usize) {
                     .collect();
                 decode(size, &missing_data, domain)
             })
-        })
+        });
 }

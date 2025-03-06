@@ -128,7 +128,7 @@ impl<R: Rng + Sync + Send> DaSamplingServiceBackend<R> for KzgrsSamplingBackend<
     }
 
     fn prune(&mut self) {
-        self.prune_by_time()
+        self.prune_by_time();
     }
 }
 
@@ -140,6 +140,7 @@ mod test {
         time::{Duration, Instant},
     };
 
+    use kzgrs::{Commitment, Proof};
     use kzgrs_backend::common::{blob::DaBlob, Column};
     use nomos_core::da::BlobId;
     use rand::{prelude::*, rngs::StdRng};
@@ -170,7 +171,7 @@ mod test {
         let state = backend.init_sampling(blob_id).await;
 
         if let SamplingState::Init(subnets) = state {
-            let unique_subnet_ids: HashSet<_> = subnets.iter().cloned().collect();
+            let unique_subnet_ids: HashSet<_> = subnets.iter().copied().collect();
 
             assert_eq!(
                 unique_subnet_ids.len(),
@@ -194,6 +195,7 @@ mod test {
     }
 
     #[tokio::test]
+    #[expect(clippy::too_many_lines)]
     async fn test_sampler() {
         // fictitious number of subnets
         let subnet_num: usize = 42;
@@ -207,9 +209,9 @@ mod test {
         let blob = DaBlob {
             column_idx: 42,
             column: Column(vec![]),
-            column_commitment: Default::default(),
-            aggregated_column_commitment: Default::default(),
-            aggregated_column_proof: Default::default(),
+            column_commitment: Commitment::default(),
+            aggregated_column_commitment: Commitment::default(),
+            aggregated_column_proof: Proof::default(),
             rows_commitments: vec![],
             rows_proofs: vec![],
         };
@@ -357,7 +359,7 @@ mod test {
         // second set: will fail for expired
         let ctx11 = SamplingContext {
             subnets: HashSet::new(),
-            started: Instant::now() - Duration::from_secs(1),
+            started: Instant::now().checked_sub(Duration::from_secs(1)).unwrap(),
         };
         let ctx12 = ctx11.clone();
         let ctx13 = ctx11.clone();

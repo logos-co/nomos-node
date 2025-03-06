@@ -17,6 +17,7 @@ pub struct DaVerifier {
 }
 
 impl DaVerifier {
+    #[must_use]
     pub const fn new(global_parameters: GlobalParameters) -> Self {
         Self { global_parameters }
     }
@@ -105,6 +106,7 @@ impl DaVerifier {
         true
     }
 
+    #[must_use]
     pub fn verify(&self, blob: &DaBlob, rows_domain_size: usize) -> bool {
         let rows_domain = PolynomialEvaluationDomain::new(rows_domain_size)
             .expect("Domain should be able to build");
@@ -298,7 +300,7 @@ mod test {
             rows_proofs: encoded_data
                 .rows_proofs
                 .iter()
-                .map(|proofs| proofs.get(index).cloned().unwrap())
+                .map(|proofs| proofs.get(index).copied().unwrap())
                 .collect(),
         };
         // Happy case
@@ -327,7 +329,7 @@ mod test {
         assert!(chunks_not_verified);
 
         // Proofs altered
-        let mut modified_proofs = da_blob.rows_proofs.to_vec();
+        let mut modified_proofs = da_blob.rows_proofs.clone();
         modified_proofs.swap(0, 1);
 
         let chunks_not_verified = !DaVerifier::verify_chunks(
@@ -341,7 +343,7 @@ mod test {
         assert!(chunks_not_verified);
 
         // Commitments altered
-        let mut modified_commitments = da_blob.rows_commitments.to_vec();
+        let mut modified_commitments = da_blob.rows_commitments.clone();
         modified_commitments.swap(0, 1);
 
         let chunks_not_verified = !DaVerifier::verify_chunks(
@@ -379,7 +381,7 @@ mod test {
                 rows_proofs: encoded_data
                     .rows_proofs
                     .iter()
-                    .map(|proofs| proofs.get(i).cloned().unwrap())
+                    .map(|proofs| proofs.get(i).copied().unwrap())
                     .collect(),
             };
             assert!(verifier.verify(&da_blob, domain_size));

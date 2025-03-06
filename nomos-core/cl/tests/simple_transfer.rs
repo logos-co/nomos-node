@@ -31,5 +31,5 @@ fn test_simple_transfer() {
 
     let bundle = cl::BundleWitness::new(vec![ptx_witness]);
 
-    assert!(bundle.balance().is_zero())
+    assert!(bundle.balance().is_zero());
 }

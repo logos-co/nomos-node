@@ -2,6 +2,7 @@ use nomos_core::da::DaEncoder;
 
 use crate::{common::blob::DaBlob, testutils::encoder::get_encoder};
 
+#[must_use]
 pub fn get_default_da_blob_data() -> Vec<u8> {
     vec![
         49u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8,
@@ -29,7 +30,7 @@ pub fn get_da_blob(data: Option<Vec<u8>>) -> DaBlob {
         rows_proofs: encoded_data
             .rows_proofs
             .iter()
-            .map(|proofs| proofs.get(index).cloned().unwrap())
+            .map(|proofs| proofs.get(index).copied().unwrap())
             .collect(),
     };
 

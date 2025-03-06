@@ -25,6 +25,7 @@ pub struct FileBackend<State, RecoverySettings, Serializer> {
 }
 
 impl<State, RecoverySettings, Serializer> FileBackend<State, RecoverySettings, Serializer> {
+    #[must_use]
     pub const fn recovery_file(&self) -> &PathBuf {
         &self.recovery_file
     }
@@ -40,9 +41,9 @@ where
     fn from_settings(settings: &Self::Settings) -> Self {
         Self {
             recovery_file: settings.recovery_file().clone(),
-            state: Default::default(),
-            serializer: Default::default(),
-            recovery_settings: Default::default(),
+            state: PhantomData,
+            serializer: PhantomData,
+            recovery_settings: PhantomData,
         }
     }
 }

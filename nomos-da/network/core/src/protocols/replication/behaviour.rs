@@ -35,6 +35,7 @@ pub enum ReplicationError {
 }
 
 impl ReplicationError {
+    #[must_use]
     pub const fn peer_id(&self) -> Option<&PeerId> {
         match self {
             Self::Io { peer_id, .. } => Some(peer_id),
@@ -53,7 +54,7 @@ impl Clone for ReplicationError {
     }
 }
 
-/// Nomos DA BroadcastEvents to be bubble up to logic layers
+/// Nomos DA `BroadcastEvents` to be bubble up to logic layers
 #[derive(Debug)]
 pub enum ReplicationEvent {
     IncomingMessage {
@@ -72,10 +73,11 @@ impl From<ReplicationError> for ReplicationEvent {
 }
 
 impl ReplicationEvent {
+    #[must_use]
     pub fn blob_size(&self) -> Option<usize> {
         match self {
             Self::IncomingMessage { message, .. } => Some(message.blob.data.column_len()),
-            _ => None,
+            Self::ReplicationError { .. } => None,
         }
     }
 }
@@ -109,9 +111,9 @@ impl<Membership> ReplicationBehaviour<Membership> {
         Self {
             local_peer_id: peer_id,
             membership,
-            connected: Default::default(),
-            outgoing_events: Default::default(),
-            seen_message_cache: Default::default(),
+            connected: HashMap::default(),
+            outgoing_events: VecDeque::default(),
+            seen_message_cache: IndexSet::default(),
             waker: None,
         }
     }
@@ -135,26 +137,26 @@ where
             > 0
     }
 
-    fn no_loopback_member_peers_of(&self, subnetwork: &SubnetworkId) -> HashSet<PeerId> {
-        let mut peers = self.membership.members_of(subnetwork);
+    fn no_loopback_member_peers_of(&self, subnetwork: SubnetworkId) -> HashSet<PeerId> {
+        let mut peers = self.membership.members_of(&subnetwork);
         // no loopback
         peers.remove(&self.local_peer_id);
         peers
     }
 
-    fn replicate_message(&mut self, message: DaMessage) {
+    fn replicate_message(&mut self, message: &DaMessage) {
         let message_id = (message.blob.blob_id.to_vec(), message.subnetwork_id);
         if self.seen_message_cache.contains(&message_id) {
             return;
         }
         self.seen_message_cache.insert(message_id);
-        self.send_message(message)
+        self.send_message(message);
     }
 
-    pub fn send_message(&mut self, message: DaMessage) {
+    pub fn send_message(&mut self, message: &DaMessage) {
         // push a message in the queue for every single peer connected that is a member
         // of the selected subnetwork_id
-        let peers = self.no_loopback_member_peers_of(&message.subnetwork_id);
+        let peers = self.no_loopback_member_peers_of(message.subnetwork_id);
 
         let connected_peers: Vec<_> = self
             .connected
@@ -169,7 +171,7 @@ where
                 event: Either::Left(BehaviourEventToHandler::OutgoingMessage {
                     message: message.clone(),
                 }),
-            })
+            });
         }
         self.try_wake();
     }
@@ -235,7 +237,7 @@ where
         };
         match event {
             HandlerEventToBehaviour::IncomingMessage { message } => {
-                self.replicate_message(message.clone());
+                self.replicate_message(&message);
                 self.outgoing_events.push_back(ToSwarm::GenerateEvent(
                     ReplicationEvent::IncomingMessage {
                         peer_id,
@@ -371,7 +373,7 @@ mod tests {
                 peer_id_j,
                 &Multiaddr::empty(),
                 Endpoint::Dialer,
-                Default::default(),
+                PortUse::default(),
             )
             .unwrap();
 
@@ -417,7 +419,7 @@ mod tests {
         let mut all_behaviours = subnet_0_behaviours;
         all_behaviours.extend(subnet_1_behaviours);
 
-        for behaviour in all_behaviours.iter_mut() {
+        for behaviour in &mut all_behaviours {
             let membership_handler = MockMembershipHandler {
                 membership: membership.clone(),
             };
@@ -432,7 +434,7 @@ mod tests {
 
         // Simulate sending a message from the first behavior.
         let message = DaMessage::new(Blob::new(BlobId::from([0; 32]), get_da_blob(None)), 0);
-        all_behaviours[0].replicate_message(message.clone());
+        all_behaviours[0].replicate_message(&message);
 
         let waker = Arc::new(TestWaker);
         let waker_ref = waker_ref(&waker);

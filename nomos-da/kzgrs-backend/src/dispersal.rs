@@ -13,6 +13,7 @@ pub struct BlobInfo {
 }
 
 impl BlobInfo {
+    #[must_use]
     pub const fn new(id: BlobId, metadata: Metadata) -> Self {
         Self { id, metadata }
     }
@@ -49,6 +50,7 @@ impl blob::metadata::Metadata for BlobInfo {
 pub struct Index([u8; 8]);
 
 impl Index {
+    #[must_use]
     pub const fn to_u64(self) -> u64 {
         u64::from_be_bytes(self.0)
     }
@@ -61,11 +63,15 @@ pub struct Metadata {
 }
 
 impl Metadata {
+    #[must_use]
     pub const fn new(app_id: [u8; 32], index: Index) -> Self {
         Self { app_id, index }
     }
 
-    pub const fn size(&self) -> usize {
+    // `std::mem::size_of_val` is not yet stable as a const fn
+    #[expect(clippy::missing_const_for_fn)]
+    #[must_use]
+    pub fn size(&self) -> usize {
         std::mem::size_of_val(&self.app_id) + std::mem::size_of_val(&self.index)
     }
 }
@@ -130,7 +136,7 @@ mod tests {
                 rows_proofs: encoded_data
                     .rows_proofs
                     .iter()
-                    .map(|proofs| proofs.get(i).cloned().unwrap())
+                    .map(|proofs| proofs.get(i).copied().unwrap())
                     .collect(),
             };
             attestations.push(verifier.verify(&da_blob, domain_size));

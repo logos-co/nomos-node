@@ -107,8 +107,8 @@ where
     fn new(mempool_relay: OutboundRelay<<Self::MempoolService as ServiceData>::Message>) -> Self {
         Self {
             mempool_relay,
-            _phantom: Default::default(),
-            _phantom2: Default::default(),
+            _phantom: PhantomData,
+            _phantom2: PhantomData,
         }
     }
 
@@ -130,6 +130,6 @@ where
         receiver
             .await
             .map_err(|e| Box::new(e) as DynError)?
-            .map_err(|_| "Failed to receive response from the mempool".into())
+            .map_err(|()| "Failed to receive response from the mempool".into())
     }
 }

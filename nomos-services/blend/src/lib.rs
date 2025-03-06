@@ -189,13 +189,13 @@ where
                     }
                 }
                 Some(msg) = cover_traffic.next() => {
-                    Self::wrap_and_send_to_persistent_transmission(msg, &mut cryptographic_processor, &persistent_sender);
+                    Self::wrap_and_send_to_persistent_transmission(&msg, &mut cryptographic_processor, &persistent_sender);
                 }
                 Some(msg) = local_messages.next() => {
-                    Self::wrap_and_send_to_persistent_transmission(msg, &mut cryptographic_processor, &persistent_sender);
+                    Self::wrap_and_send_to_persistent_transmission(&msg, &mut cryptographic_processor, &persistent_sender);
                 }
                 Some(msg) = lifecycle_stream.next() => {
-                    if lifecycle::should_stop_service::<Self>(&msg).await {
+                    if lifecycle::should_stop_service::<Self>(&msg) {
                         // TODO: Maybe add a call to backend to handle this. Maybe trying to save unprocessed messages?
                         break;
                     }
@@ -216,7 +216,7 @@ where
     Network::BroadcastSettings: Clone + Debug + Serialize + DeserializeOwned,
 {
     fn wrap_and_send_to_persistent_transmission(
-        message: Vec<u8>,
+        message: &[u8],
         cryptographic_processor: &mut CryptographicProcessor<
             Backend::NodeId,
             ChaCha12Rng,
@@ -224,7 +224,7 @@ where
         >,
         persistent_sender: &mpsc::UnboundedSender<Vec<u8>>,
     ) {
-        match cryptographic_processor.wrap_message(&message) {
+        match cryptographic_processor.wrap_message(message) {
             Ok(wrapped_message) => {
                 if let Err(e) = persistent_sender.send(wrapped_message) {
                     tracing::error!("Error sending message to persistent stream: {e}");
@@ -311,7 +311,7 @@ where
             self.message_blend.cryptographic_processor.private_key,
         ))
         .to_bytes();
-        Membership::new(self.membership.clone(), public_key)
+        Membership::new(self.membership.clone(), &public_key)
     }
 }
 

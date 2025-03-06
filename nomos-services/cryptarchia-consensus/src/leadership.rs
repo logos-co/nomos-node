@@ -105,7 +105,7 @@ impl Leader {
                 let res = tokio::task::spawn_blocking(move || {
                     Risc0LeaderProof::prove(
                         public_inputs,
-                        LeaderPrivate { input },
+                        &LeaderPrivate { input },
                         risc0_zkvm::default_prover().as_ref(),
                     )
                 })

@@ -564,7 +564,7 @@ where
                     }
                 }
                 Some(msg) = lifecycle_stream.next() => {
-                    if lifecycle::should_stop_service::<Self>(&msg).await {
+                    if lifecycle::should_stop_service::<Self>(&msg) {
                         break;
                     }
                 }

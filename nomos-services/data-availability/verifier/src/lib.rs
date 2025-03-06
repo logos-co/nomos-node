@@ -204,7 +204,7 @@ where
                         DaVerifierMsg::VerifyBlob { blob, reply_channel } => {
                             let blob_id = blob.id();
                             match verifier.verify(&blob) {
-                                Ok(_) => {
+                                Ok(()) => {
                                     if let Err(err) = reply_channel.send(Ok(blob)) {
                                         error!("Error replying verification {err:?}");
                                     }
@@ -221,7 +221,7 @@ where
                     }
                 }
                 Some(msg) = lifecycle_stream.next() => {
-                    if lifecycle::should_stop_service::<Self>(&msg).await {
+                    if lifecycle::should_stop_service::<Self>(&msg) {
                         break;
                     }
                 }

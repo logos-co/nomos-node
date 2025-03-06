@@ -11,7 +11,7 @@ use tests::topology::configs::{
     blend::create_blend_configs,
     consensus::{create_consensus_configs, ConsensusParams},
     da::{create_da_configs, DaParams, GeneralDaConfig},
-    network::create_network_configs,
+    network::{create_network_configs, NetworkParams},
     time::default_time_config,
     tracing::GeneralTracingConfig,
     GeneralConfig,
@@ -39,6 +39,7 @@ pub struct Host {
 }
 
 impl Host {
+    #[must_use]
     pub const fn default_validator_from_ip(ip: Ipv4Addr, identifier: String) -> Self {
         Self {
             kind: HostKind::Validator,
@@ -50,6 +51,7 @@ impl Host {
         }
     }
 
+    #[must_use]
     pub const fn default_executor_from_ip(ip: Ipv4Addr, identifier: String) -> Self {
         Self {
             kind: HostKind::Executor,
@@ -62,10 +64,11 @@ impl Host {
     }
 }
 
+#[must_use]
 pub fn create_node_configs(
-    consensus_params: ConsensusParams,
-    da_params: DaParams,
-    tracing_settings: TracingSettings,
+    consensus_params: &ConsensusParams,
+    da_params: &DaParams,
+    tracing_settings: &TracingSettings,
     hosts: Vec<Host>,
 ) -> HashMap<Host, GeneralConfig> {
     let mut ids = vec![[0; 32]; consensus_params.n_participants];
@@ -75,7 +78,7 @@ pub fn create_node_configs(
 
     let consensus_configs = create_consensus_configs(&ids, consensus_params);
     let da_configs = create_da_configs(&ids, da_params);
-    let network_configs = create_network_configs(&ids, Default::default());
+    let network_configs = create_network_configs(&ids, &NetworkParams::default());
     let blend_configs = create_blend_configs(&ids);
     let api_configs = ids
         .iter()
@@ -86,18 +89,18 @@ pub fn create_node_configs(
     let mut configured_hosts = HashMap::new();
 
     // Rebuild DA address lists.
-    let host_network_init_peers = update_network_init_peers(hosts.clone());
+    let host_network_init_peers = update_network_init_peers(&hosts);
     let host_da_peer_addresses = update_da_peer_addresses(hosts.clone(), da_configs.clone());
     let host_blend_membership =
         update_blend_membership(hosts.clone(), blend_configs[0].membership.clone());
 
     for (i, host) in hosts.into_iter().enumerate() {
-        let consensus_config = consensus_configs[i].to_owned();
-        let api_config = api_configs[i].to_owned();
+        let consensus_config = consensus_configs[i].clone();
+        let api_config = api_configs[i].clone();
 
         // DA Libp2p network config.
-        let mut da_config = da_configs[i].to_owned();
-        da_config.addresses = host_da_peer_addresses.clone();
+        let mut da_config = da_configs[i].clone();
+        da_config.addresses.clone_from(&host_da_peer_addresses);
         da_config.listening_address = Multiaddr::from_str(&format!(
             "/ip4/0.0.0.0/udp/{}/quic-v1",
             host.da_network_port,
@@ -108,16 +111,18 @@ pub fn create_node_configs(
         }
 
         // Libp2p network config.
-        let mut network_config = network_configs[i].to_owned();
+        let mut network_config = network_configs[i].clone();
         network_config.swarm_config.host = Ipv4Addr::from_str("0.0.0.0").unwrap();
         network_config.swarm_config.port = host.network_port;
-        network_config.initial_peers = host_network_init_peers.clone();
+        network_config
+            .initial_peers
+            .clone_from(&host_network_init_peers);
 
         // Blend config.
-        let mut blend_config = blend_configs[i].to_owned();
+        let mut blend_config = blend_configs[i].clone();
         blend_config.backend.listening_address =
             Multiaddr::from_str(&format!("/ip4/0.0.0.0/udp/{}/quic-v1", host.blend_port)).unwrap();
-        blend_config.membership = host_blend_membership.clone();
+        blend_config.membership.clone_from(&host_blend_membership);
 
         // Tracing config.
         let tracing_config =
@@ -143,7 +148,7 @@ pub fn create_node_configs(
     configured_hosts
 }
 
-fn update_network_init_peers(hosts: Vec<Host>) -> Vec<Multiaddr> {
+fn update_network_init_peers(hosts: &[Host]) -> Vec<Multiaddr> {
     hosts
         .iter()
         .map(|h| nomos_libp2p::Swarm::multiaddr(h.ip, h.network_port))
@@ -203,17 +208,17 @@ fn update_tracing_identifier(
         tracing_settings: TracingSettings {
             logger: match settings.logger {
                 LoggerLayer::Loki(mut config) => {
-                    config.host_identifier = identifier.clone();
+                    config.host_identifier.clone_from(&identifier);
                     LoggerLayer::Loki(config)
                 }
                 other => other,
             },
             tracing: match settings.tracing {
                 TracingLayer::Otlp(mut config) => {
-                    config.service_name = identifier.clone();
+                    config.service_name.clone_from(&identifier);
                     TracingLayer::Otlp(config)
                 }
-                other => other,
+                other @ TracingLayer::None => other,
             },
             filter: settings.filter,
             metrics: match settings.metrics {
@@ -221,7 +226,7 @@ fn update_tracing_identifier(
                     config.host_identifier = identifier;
                     MetricsLayer::Otlp(config)
                 }
-                other => other,
+                other @ MetricsLayer::None => other,
             },
             level: settings.level,
         },
@@ -232,6 +237,7 @@ fn update_tracing_identifier(
 mod cfgsync_tests {
     use std::{net::Ipv4Addr, num::NonZero, str::FromStr, time::Duration};
 
+    use nomos_da_network_core::swarm::{DAConnectionMonitorSettings, DAConnectionPolicySettings};
     use nomos_libp2p::{ed25519, libp2p, Multiaddr, PeerId, Protocol};
     use nomos_tracing_service::{
         FilterLayer, LoggerLayer, MetricsLayer, TracingLayer, TracingSettings,
@@ -256,25 +262,25 @@ mod cfgsync_tests {
             .collect();
 
         let configs = create_node_configs(
-            ConsensusParams {
+            &ConsensusParams {
                 n_participants: 10,
                 security_param: NonZero::new(10).unwrap(),
                 active_slot_coeff: 0.9,
             },
-            DaParams {
+            &DaParams {
                 subnetwork_size: 2,
                 dispersal_factor: 1,
                 num_samples: 1,
                 num_subnets: 2,
                 old_blobs_check_interval: Duration::from_secs(5),
                 blobs_validity_duration: Duration::from_secs(u64::MAX),
-                global_params_path: "".into(),
-                policy_settings: Default::default(),
-                monitor_settings: Default::default(),
+                global_params_path: String::new(),
+                policy_settings: DAConnectionPolicySettings::default(),
+                monitor_settings: DAConnectionMonitorSettings::default(),
                 balancer_interval: Duration::ZERO,
                 redial_cooldown: Duration::ZERO,
             },
-            TracingSettings {
+            &TracingSettings {
                 logger: LoggerLayer::None,
                 tracing: TracingLayer::None,
                 filter: FilterLayer::None,
@@ -284,7 +290,7 @@ mod cfgsync_tests {
             hosts,
         );
 
-        for (host, config) in configs.iter() {
+        for (host, config) in &configs {
             let network_port = config.network_config.swarm_config.port;
             let da_network_port = extract_port(&config.da_config.listening_address);
             let blend_port = extract_port(&config.blend_config.backend.listening_address);

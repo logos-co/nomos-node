@@ -72,12 +72,12 @@ where
 {
     fn connection_number_deviation(
         &self,
-        subnetwork_id: &SubnetworkId,
+        subnetwork_id: SubnetworkId,
         stats: &SubnetworkStats,
     ) -> SubnetworkDeviation {
         let is_member = self
             .membership
-            .is_member_of(&self.local_peer_id, subnetwork_id);
+            .is_member_of(&self.local_peer_id, &subnetwork_id);
 
         let required_connections = if is_member {
             self.settings

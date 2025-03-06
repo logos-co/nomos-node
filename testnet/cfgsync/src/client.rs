@@ -17,7 +17,7 @@ pub async fn get_config<Config: DeserializeOwned>(
         .json(&ClientIp { ip, identifier })
         .send()
         .await
-        .map_err(|err| format!("Failed to send IP announcement: {}", err))?;
+        .map_err(|err| format!("Failed to send IP announcement: {err}"))?;
 
     if !response.status().is_success() {
         return Err(format!("Server error: {:?}", response.status()));
@@ -26,5 +26,5 @@ pub async fn get_config<Config: DeserializeOwned>(
     response
         .json::<Config>()
         .await
-        .map_err(|err| format!("Failed to parse response: {}", err))
+        .map_err(|err| format!("Failed to parse response: {err}"))
 }

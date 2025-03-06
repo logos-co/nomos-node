@@ -34,7 +34,7 @@ pub struct SubnetworkDeviation {
 pub trait SubnetworkConnectionPolicy {
     fn connection_number_deviation(
         &self,
-        subnetwork_id: &SubnetworkId,
+        subnetwork_id: SubnetworkId,
         stats: &SubnetworkStats,
     ) -> SubnetworkDeviation;
 }
@@ -89,10 +89,10 @@ where
 
     fn select_missing_peers(
         &self,
-        subnetwork_id: &SubnetworkId,
+        subnetwork_id: SubnetworkId,
         missing_count: usize,
     ) -> Vec<PeerId> {
-        let candidates = self.membership.members_of(subnetwork_id);
+        let candidates = self.membership.members_of(&subnetwork_id);
         candidates
             .into_iter()
             .filter(|peer| !self.connected_peers.contains(peer) && *peer != self.local_peer_id)
@@ -148,14 +148,14 @@ where
                     });
                 let deviation = self
                     .policy
-                    .connection_number_deviation(&subnetwork_id, stats);
+                    .connection_number_deviation(subnetwork_id, stats);
 
                 // In DA balancer implementation we are only concerned about missing peer
                 // connections. Sampling protocol requires to allow any number of peers to
                 // request for a sample, which requires to allow any number of
                 // peers to connect at any given time.
                 let ConnectionDeviation::Missing(missing_count) = deviation.outbound;
-                peers_to_connect.extend(self.select_missing_peers(&subnetwork_id, missing_count));
+                peers_to_connect.extend(self.select_missing_peers(subnetwork_id, missing_count));
             }
 
             if peers_to_connect.is_empty() {
@@ -189,7 +189,7 @@ mod tests {
     impl SubnetworkConnectionPolicy for MockPolicy {
         fn connection_number_deviation(
             &self,
-            _id: &SubnetworkId,
+            _id: SubnetworkId,
             _stats: &SubnetworkStats,
         ) -> SubnetworkDeviation {
             SubnetworkDeviation {
@@ -258,9 +258,8 @@ mod tests {
         let poll_result = balancer.poll(&mut cx);
 
         assert!(matches!(poll_result, Poll::Ready(ref peers) if peers.len() == 1));
-        let peers = match poll_result {
-            Poll::Ready(peers) => peers,
-            _ => panic!("Expected Poll::Ready with peers"),
+        let Poll::Ready(peers) = poll_result else {
+            panic!("Expected Poll::Ready with peers")
         };
 
         assert_eq!(peers.len(), 1);
@@ -290,9 +289,8 @@ mod tests {
         let poll_result = balancer.poll(&mut cx);
 
         assert!(matches!(poll_result, Poll::Ready(ref peers) if peers.len() == 2));
-        let peers = match poll_result {
-            Poll::Ready(peers) => peers,
-            _ => panic!("Expected Poll::Ready with peers"),
+        let Poll::Ready(peers) = poll_result else {
+            panic!("Expected Poll::Ready with peers")
         };
 
         assert_eq!(peers.len(), 2);

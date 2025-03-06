@@ -7,6 +7,7 @@ pub struct FisherYatesShuffle {
 }
 
 impl FisherYatesShuffle {
+    #[must_use]
     pub const fn new(entropy: [u8; 32]) -> Self {
         Self { entropy }
     }

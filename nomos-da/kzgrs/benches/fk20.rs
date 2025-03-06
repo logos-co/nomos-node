@@ -15,7 +15,7 @@ use rand::SeedableRng;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 
 fn main() {
-    divan::main()
+    divan::main();
 }
 
 static GLOBAL_PARAMETERS: Lazy<GlobalParameters> = Lazy::new(|| {
@@ -23,7 +23,7 @@ static GLOBAL_PARAMETERS: Lazy<GlobalParameters> = Lazy::new(|| {
     KZG10::<Bls12_381, DensePolynomial<Fr>>::setup(4096, true, &mut rng).unwrap()
 });
 
-#[divan::bench(args = [16, 32, 64, 128, 256, 512, 1024, 2048, 4096], sample_count = 10, sample_size = 10)]
+#[divan::bench(args = [16, 32, 64, 128, 256, 512, 1_024, 2_048, 4_096], sample_count = 10, sample_size = 10)]
 fn compute_fk20_proofs_for_size(bencher: Bencher, size: usize) {
     bencher
         .with_inputs(|| {
@@ -46,7 +46,7 @@ fn compute_fk20_proofs_for_size(bencher: Bencher, size: usize) {
 }
 
 #[cfg(feature = "parallel")]
-#[divan::bench(args = [16, 32, 64, 128, 256, 512, 1024, 2048, 4096], sample_count = 10, sample_size = 10)]
+#[divan::bench(args = [16, 32, 64, 128, 256, 512, 1_024, 2_048, 4_096], sample_count = 10, sample_size = 10)]
 fn compute_parallel_fk20_proofs_for_size(bencher: Bencher, size: usize) {
     let thread_count: usize = rayon::max_num_threads().min(rayon::current_num_threads());
     bencher
@@ -62,13 +62,13 @@ fn compute_parallel_fk20_proofs_for_size(bencher: Bencher, size: usize) {
         .input_counter(move |_| ItemsCount::new(size * thread_count))
         .bench_refs(|poly| {
             (0..thread_count).into_par_iter().for_each(|_| {
-                fk20_batch_generate_elements_proofs(poly, &GLOBAL_PARAMETERS, None);
+                let _ = fk20_batch_generate_elements_proofs(poly, &GLOBAL_PARAMETERS, None);
             });
-            black_box(())
+            black_box(());
         });
 }
 
-#[divan::bench(args = [16, 32, 64, 128, 256, 512, 1024, 2048, 4096], sample_count = 10, sample_size = 10)]
+#[divan::bench(args = [16, 32, 64, 128, 256, 512, 1_024, 2_048, 4_096], sample_count = 10, sample_size = 10)]
 fn compute_fk20_proofs_for_size_with_cache(bencher: Bencher, size: usize) {
     bencher
         .with_inputs(|| {
@@ -92,7 +92,7 @@ fn compute_fk20_proofs_for_size_with_cache(bencher: Bencher, size: usize) {
 }
 
 #[cfg(feature = "parallel")]
-#[divan::bench(args = [16, 32, 64, 128, 256, 512, 1024, 2048, 4096], sample_count = 10, sample_size = 10)]
+#[divan::bench(args = [16, 32, 64, 128, 256, 512, 1_024, 2_048, 4_096], sample_count = 10, sample_size = 10)]
 fn compute_parallel_fk20_proofs_for_size_with_cache(bencher: Bencher, size: usize) {
     let thread_count: usize = rayon::max_num_threads().min(rayon::current_num_threads());
     bencher
@@ -109,8 +109,8 @@ fn compute_parallel_fk20_proofs_for_size_with_cache(bencher: Bencher, size: usiz
         .input_counter(move |_| ItemsCount::new(size * thread_count))
         .bench_refs(|(poly, cache)| {
             (0..thread_count).into_par_iter().for_each(|_| {
-                fk20_batch_generate_elements_proofs(poly, &GLOBAL_PARAMETERS, Some(cache));
+                let _ = fk20_batch_generate_elements_proofs(poly, &GLOBAL_PARAMETERS, Some(cache));
             });
-            black_box(())
+            black_box(());
         });
 }

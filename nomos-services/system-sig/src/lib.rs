@@ -16,7 +16,7 @@ pub struct SystemSig {
 
 impl SystemSig {
     async fn ctrlc_signal_received(overwatch_handle: &OverwatchHandle) {
-        overwatch_handle.kill().await
+        overwatch_handle.kill().await;
     }
 }
 
@@ -45,11 +45,11 @@ impl ServiceCore for SystemSig {
         #[expect(clippy::redundant_pub_crate)]
         loop {
             tokio::select! {
-                _ = &mut ctrlc => {
+                () = &mut ctrlc => {
                     Self::ctrlc_signal_received(&service_state.overwatch_handle).await;
                 }
                 Some(msg) = lifecycle_stream.next() => {
-                    if  lifecycle::should_stop_service::<Self>(&msg).await {
+                    if  lifecycle::should_stop_service::<Self>(&msg) {
                         break;
                     }
                 }

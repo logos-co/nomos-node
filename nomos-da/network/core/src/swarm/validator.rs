@@ -206,7 +206,7 @@ where
             self.swarm.behaviour_mut().monitor_behaviour_mut(),
             MonitorEvent::from(&event),
         );
-        handle_sampling_event(&self.sampling_events_sender, event).await
+        handle_sampling_event(&self.sampling_events_sender, event).await;
     }
 
     async fn handle_dispersal_event(&mut self, event: DispersalEvent) {
@@ -219,7 +219,7 @@ where
             self.swarm.behaviour_mut().replication_behaviour_mut(),
             event,
         )
-        .await
+        .await;
     }
 
     async fn handle_replication_event(&mut self, event: ReplicationEvent) {
@@ -227,7 +227,7 @@ where
             self.swarm.behaviour_mut().monitor_behaviour_mut(),
             MonitorEvent::from(&event),
         );
-        handle_replication_event(&self.validation_events_sender, event).await
+        handle_replication_event(&self.validation_events_sender, event).await;
     }
 
     async fn handle_behaviour_event(
@@ -274,20 +274,20 @@ where
                     SwarmEvent::Behaviour(behaviour_event) => {
                         self.handle_behaviour_event(behaviour_event).await;
                     }
-                    SwarmEvent::ConnectionEstablished { .. } => {}
-                    SwarmEvent::ConnectionClosed { .. } => {}
-                    SwarmEvent::IncomingConnection { .. } => {}
-                    SwarmEvent::IncomingConnectionError { .. } => {}
-                    SwarmEvent::OutgoingConnectionError { .. } => {}
-                    SwarmEvent::NewListenAddr { .. } => {}
-                    SwarmEvent::ExpiredListenAddr { .. } => {}
-                    SwarmEvent::ListenerClosed { .. } => {}
-                    SwarmEvent::ListenerError { .. } => {}
-                    SwarmEvent::Dialing { .. } => {}
-                    SwarmEvent::NewExternalAddrCandidate { .. } => {}
-                    SwarmEvent::ExternalAddrConfirmed { .. } => {}
-                    SwarmEvent::ExternalAddrExpired { .. } => {}
-                    SwarmEvent::NewExternalAddrOfPeer { .. } => {}
+                    SwarmEvent::ConnectionEstablished { .. }
+                    | SwarmEvent::ConnectionClosed { .. }
+                    | SwarmEvent::IncomingConnection { .. }
+                    | SwarmEvent::IncomingConnectionError { .. }
+                    | SwarmEvent::OutgoingConnectionError { .. }
+                    | SwarmEvent::NewListenAddr { .. }
+                    | SwarmEvent::ExpiredListenAddr { .. }
+                    | SwarmEvent::ListenerClosed { .. }
+                    | SwarmEvent::ListenerError { .. }
+                    | SwarmEvent::Dialing { .. }
+                    | SwarmEvent::NewExternalAddrCandidate { .. }
+                    | SwarmEvent::ExternalAddrConfirmed { .. }
+                    | SwarmEvent::ExternalAddrExpired { .. }
+                    | SwarmEvent::NewExternalAddrOfPeer { .. } => {}
                     event => {
                         debug!("Unsupported validator swarm event: {event:?}");
                     }

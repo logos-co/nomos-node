@@ -49,10 +49,10 @@ impl AsyncNTPClient {
             .await
             .map_err(Error::Io)?;
         let hosts = lookup_host(&pool).await.map_err(Error::Io)?;
-        let mut checks = FuturesUnordered::from_iter(
-            hosts.map(move |host| get_time(host, socket, self.ntp_context)),
-        )
-        .into_stream();
+        let mut checks = hosts
+            .map(move |host| get_time(host, socket, self.ntp_context))
+            .collect::<FuturesUnordered<_>>()
+            .into_stream();
         timeout(self.settings.timeout, checks.select_next_some())
             .await
             .map_err(Error::Timeout)?

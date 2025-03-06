@@ -10,6 +10,7 @@ pub struct ReplicationRequest {
 }
 
 impl ReplicationRequest {
+    #[must_use]
     pub const fn new(blob: Blob, subnetwork_id: SubnetworkId) -> Self {
         Self {
             blob,

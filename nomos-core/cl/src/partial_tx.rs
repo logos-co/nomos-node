@@ -29,6 +29,7 @@ impl PtxRoot {
         Self(sk)
     }
 
+    #[must_use]
     pub fn hex(&self) -> String {
         hex::encode(self.0)
     }
@@ -61,21 +62,26 @@ impl PartialTxWitness {
         }
     }
 
+    #[must_use]
     pub fn balance(&self) -> BalanceWitness {
         BalanceWitness::from_ptx(self, self.balance_blinding)
     }
 
     pub fn commit(&self) -> PartialTx {
         PartialTx {
-            inputs: Vec::from_iter(self.inputs.iter().map(InputWitness::commit)),
-            outputs: Vec::from_iter(self.outputs.iter().map(OutputWitness::commit)),
+            inputs: self.inputs.iter().map(InputWitness::commit).collect(),
+            outputs: self.outputs.iter().map(OutputWitness::commit).collect(),
             balance: self.balance().commit(),
         }
     }
 
+    #[must_use]
     pub fn input_witness(&self, idx: usize) -> PartialTxInputWitness {
-        let input_bytes =
-            Vec::from_iter(self.inputs.iter().map(|i| i.commit().to_bytes().to_vec()));
+        let input_bytes: Vec<Vec<u8>> = self
+            .inputs
+            .iter()
+            .map(|i| i.commit().to_bytes().to_vec())
+            .collect();
         let input_merkle_leaves = merkle::padded_leaves::<MAX_INPUTS>(&input_bytes);
 
         let path = merkle::path(input_merkle_leaves, idx);
@@ -83,9 +89,13 @@ impl PartialTxWitness {
         PartialTxInputWitness { input, path }
     }
 
+    #[must_use]
     pub fn output_witness(&self, idx: usize) -> PartialTxOutputWitness {
-        let output_bytes =
-            Vec::from_iter(self.outputs.iter().map(|o| o.commit().to_bytes().to_vec()));
+        let output_bytes: Vec<Vec<u8>> = self
+            .outputs
+            .iter()
+            .map(|o| o.commit().to_bytes().to_vec())
+            .collect();
         let output_merkle_leaves = merkle::padded_leaves::<MAX_OUTPUTS>(&output_bytes);
 
         let path = merkle::path(output_merkle_leaves, idx);
@@ -96,23 +106,28 @@ impl PartialTxWitness {
 
 impl PartialTx {
     pub fn input_root(&self) -> [u8; 32] {
-        let input_bytes =
-            Vec::from_iter(self.inputs.iter().map(Input::to_bytes).map(Vec::from_iter));
+        let input_bytes: Vec<Vec<u8>> = self
+            .inputs
+            .iter()
+            .map(Input::to_bytes)
+            .map(Vec::from_iter)
+            .collect();
         let input_merkle_leaves = merkle::padded_leaves(&input_bytes);
         merkle::root::<MAX_INPUTS>(input_merkle_leaves)
     }
 
     pub fn output_root(&self) -> [u8; 32] {
-        let output_bytes = Vec::from_iter(
-            self.outputs
-                .iter()
-                .map(Output::to_bytes)
-                .map(Vec::from_iter),
-        );
+        let output_bytes: Vec<Vec<u8>> = self
+            .outputs
+            .iter()
+            .map(Output::to_bytes)
+            .map(Vec::from_iter)
+            .collect();
         let output_merkle_leaves = merkle::padded_leaves(&output_bytes);
         merkle::root::<MAX_OUTPUTS>(output_merkle_leaves)
     }
 
+    #[must_use]
     pub fn root(&self) -> PtxRoot {
         let input_root = self.input_root();
         let output_root = self.output_root();
@@ -129,6 +144,7 @@ pub struct PartialTxInputWitness {
 }
 
 impl PartialTxInputWitness {
+    #[must_use]
     pub fn input_root(&self) -> [u8; 32] {
         let leaf = merkle::leaf(&self.input.commit().to_bytes());
         merkle::path_root(leaf, &self.path)
@@ -143,6 +159,7 @@ pub struct PartialTxOutputWitness {
 }
 
 impl PartialTxOutputWitness {
+    #[must_use]
     pub fn output_root(&self) -> [u8; 32] {
         let leaf = merkle::leaf(&self.output.commit().to_bytes());
         merkle::path_root(leaf, &self.path)

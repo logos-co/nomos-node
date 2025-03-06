@@ -84,8 +84,9 @@ impl From<&ReplicationEvent> for MonitorEvent {
 impl From<&SamplingEvent> for MonitorEvent {
     fn from(event: &SamplingEvent) -> Self {
         match event {
-            SamplingEvent::SamplingSuccess { .. } => Self::Noop,
-            SamplingEvent::IncomingSample { .. } => Self::Noop,
+            SamplingEvent::SamplingSuccess { .. } | SamplingEvent::IncomingSample { .. } => {
+                Self::Noop
+            }
             SamplingEvent::SamplingError { error } => match error {
                 // Only map Io or OpenStreamError to Self
                 &SamplingError::Io { .. } | &SamplingError::OpenStream { .. } => {

@@ -60,11 +60,11 @@ impl Disseminate {
         let metadata = Metadata::new(app_id, self.index.into());
 
         let (res_sender, res_receiver) = std::sync::mpsc::channel();
-        std::thread::spawn(move || disperse_data(res_sender, client, bytes, metadata));
+        std::thread::spawn(move || disperse_data(&res_sender, &client, bytes, metadata));
 
         match res_receiver.recv() {
             Ok(update) => match update {
-                Ok(_) => tracing::info!("Data successfully disseminated."),
+                Ok(()) => tracing::info!("Data successfully disseminated."),
                 Err(e) => {
                     tracing::error!("Error disseminating data: {e}");
                     return Err(e.into());
@@ -83,14 +83,14 @@ impl Disseminate {
 
 #[tokio::main]
 async fn disperse_data(
-    res_sender: Sender<Result<(), String>>,
-    client: ExecutorHttpClient,
+    res_sender: &Sender<Result<(), String>>,
+    client: &ExecutorHttpClient,
     bytes: Vec<u8>,
     metadata: Metadata,
 ) {
     let res = client
         .publish_blob(bytes, metadata)
         .await
-        .map_err(|err| format!("Failed to publish blob: {:?}", err));
+        .map_err(|err| format!("Failed to publish blob: {err:?}"));
     res_sender.send(res).unwrap();
 }

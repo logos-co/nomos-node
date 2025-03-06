@@ -34,10 +34,12 @@ impl NullifierSecret {
         Self(sk)
     }
 
+    #[must_use]
     pub const fn zero() -> Self {
         Self([0u8; 16])
     }
 
+    #[must_use]
     pub fn commit(&self) -> NullifierCommitment {
         let mut hasher = Sha256::new();
         hasher.update(b"NOMOS_CL_NULL_COMMIT");
@@ -47,26 +49,31 @@ impl NullifierSecret {
         NullifierCommitment(commit_bytes)
     }
 
+    #[must_use]
     pub const fn from_bytes(bytes: [u8; 16]) -> Self {
         Self(bytes)
     }
 }
 
 impl NullifierCommitment {
+    #[must_use]
     pub const fn as_bytes(&self) -> &[u8; 32] {
         &self.0
     }
 
+    #[must_use]
     pub fn hex(&self) -> String {
         hex::encode(self.0)
     }
 
+    #[must_use]
     pub const fn from_bytes(bytes: [u8; 32]) -> Self {
         Self(bytes)
     }
 }
 
 impl Nullifier {
+    #[must_use]
     pub fn new(sk: NullifierSecret, note_cm: NoteCommitment) -> Self {
         let mut hasher = Sha256::new();
         hasher.update(b"NOMOS_CL_NULLIFIER");
@@ -77,6 +84,7 @@ impl Nullifier {
         Self(nf_bytes)
     }
 
+    #[must_use]
     pub const fn as_bytes(&self) -> &[u8; 32] {
         &self.0
     }

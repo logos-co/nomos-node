@@ -76,19 +76,21 @@ pub enum SamplingError {
 }
 
 impl SamplingError {
+    #[must_use]
     pub const fn peer_id(&self) -> Option<&PeerId> {
         match self {
-            Self::Io { peer_id, .. } => Some(peer_id),
-            Self::Protocol { peer_id, .. } => Some(peer_id),
-            Self::OpenStream { peer_id, .. } => Some(peer_id),
-            Self::Deserialize { peer_id, .. } => Some(peer_id),
-            Self::RequestChannel { peer_id, .. } => Some(peer_id),
-            Self::ResponseChannel { peer_id, .. } => Some(peer_id),
-            Self::InvalidBlobId { peer_id, .. } => Some(peer_id),
-            Self::BlobNotFound { peer_id, .. } => Some(peer_id),
+            Self::Io { peer_id, .. }
+            | Self::Protocol { peer_id, .. }
+            | Self::OpenStream { peer_id, .. }
+            | Self::Deserialize { peer_id, .. }
+            | Self::RequestChannel { peer_id, .. }
+            | Self::ResponseChannel { peer_id, .. }
+            | Self::InvalidBlobId { peer_id, .. }
+            | Self::BlobNotFound { peer_id, .. } => Some(peer_id),
         }
     }
 
+    #[must_use]
     pub const fn blob_id(&self) -> Option<&BlobId> {
         match self {
             Self::Deserialize { blob_id, .. } => Some(blob_id),
@@ -265,7 +267,7 @@ pub struct SamplingBehaviour<Membership: MembershipHandler> {
     incoming_tasks: FuturesUnordered<IncomingStreamHandlerFuture>,
     /// Subnetworks membership information
     membership: Membership,
-    /// Pending blobs that need to be dispersed by PeerId
+    /// Pending blobs that need to be dispersed by `PeerId`
     to_sample: HashMap<PeerId, VecDeque<(Membership::NetworkId, BlobId)>>,
     /// Sample streams that has no tasks and should be closed.
     to_close: VecDeque<SampleStream>,
@@ -385,7 +387,7 @@ where
     ) -> Option<(SubnetworkId, BlobId)> {
         to_sample
             .get_mut(peer_id)
-            .and_then(|queue| queue.pop_front())
+            .and_then(std::collections::VecDeque::pop_front)
     }
 
     /// Handle outgoing stream
@@ -554,24 +556,24 @@ impl<Membership: MembershipHandler<Id = PeerId, NetworkId = SubnetworkId> + 'sta
         subnetwork_id: SubnetworkId,
         sample_response: sampling::SampleResponse,
         peer_id: PeerId,
-    ) -> Option<Poll<ToSwarm<<Self as NetworkBehaviour>::ToSwarm, THandlerInEvent<Self>>>> {
+    ) -> Poll<ToSwarm<<Self as NetworkBehaviour>::ToSwarm, THandlerInEvent<Self>>> {
         match sample_response {
-            sampling::SampleResponse::Error(error) => Some(Poll::Ready(ToSwarm::GenerateEvent(
-                SamplingEvent::SamplingError {
+            sampling::SampleResponse::Error(error) => {
+                Poll::Ready(ToSwarm::GenerateEvent(SamplingEvent::SamplingError {
                     error: SamplingError::Protocol {
                         subnetwork_id,
                         error,
                         peer_id,
                     },
-                },
-            ))),
-            sampling::SampleResponse::Blob(blob) => Some(Poll::Ready(ToSwarm::GenerateEvent(
-                SamplingEvent::SamplingSuccess {
+                }))
+            }
+            sampling::SampleResponse::Blob(blob) => {
+                Poll::Ready(ToSwarm::GenerateEvent(SamplingEvent::SamplingSuccess {
                     blob_id,
                     subnetwork_id,
                     blob: Box::new(blob.data),
-                },
-            ))),
+                }))
+            }
         }
     }
 }
@@ -634,7 +636,7 @@ impl<M: MembershipHandler<Id = PeerId, NetworkId = SubnetworkId> + 'static> Netw
     ) {
         let Either::Left(event) = event;
         self.stream_behaviour
-            .on_connection_handler_event(peer_id, connection_id, event)
+            .on_connection_handler_event(peer_id, connection_id, event);
     }
 
     fn poll(
@@ -673,15 +675,12 @@ impl<M: MembershipHandler<Id = PeerId, NetworkId = SubnetworkId> + 'static> Netw
                     let peer_id = stream.peer_id;
                     // handle the free stream then return the success
                     Self::handle_outgoing_stream(outgoing_tasks, to_sample, to_close, stream, cx);
-                    // return an error if there was an error on the other side of the wire
-                    if let Some(event) = Self::handle_sample_response(
+                    return Self::handle_sample_response(
                         blob_id,
                         subnetwork_id,
                         sample_response,
                         peer_id,
-                    ) {
-                        return event;
-                    }
+                    );
                 }
                 Err((error, stream)) => {
                     if let Some(stream) = stream {

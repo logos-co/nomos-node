@@ -26,6 +26,7 @@ impl Default for AllNeighbours {
 }
 
 impl AllNeighbours {
+    #[must_use]
     pub fn new() -> Self {
         Self {
             neighbours: Arc::new(Mutex::new(HashSet::new())),
@@ -62,7 +63,10 @@ impl MembershipHandler for AllNeighbours {
     }
 }
 
-pub fn new_swarm_in_memory<TBehavior>(key: Keypair, behavior: TBehavior) -> libp2p::Swarm<TBehavior>
+pub fn new_swarm_in_memory<TBehavior>(
+    key: &Keypair,
+    behavior: TBehavior,
+) -> libp2p::Swarm<TBehavior>
 where
     TBehavior: NetworkBehaviour + Send,
 {
@@ -71,7 +75,7 @@ where
         .with_other_transport(|_| {
             let transport = MemoryTransport::default()
                 .upgrade(Version::V1)
-                .authenticate(libp2p::plaintext::Config::new(&key))
+                .authenticate(libp2p::plaintext::Config::new(key))
                 .multiplex(libp2p::yamux::Config::default())
                 .timeout(Duration::from_secs(20));
 

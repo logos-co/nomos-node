@@ -4,6 +4,7 @@ pub mod validator;
 #[cfg(test)]
 pub mod test {
     use futures::StreamExt;
+    use kzgrs::{Commitment, Proof};
     use kzgrs_backend::common::{blob::DaBlob, Column};
     use libp2p::{
         swarm::{dial_opts::DialOpts, SwarmEvent},
@@ -95,14 +96,14 @@ pub mod test {
                     DaBlob {
                         column_idx: 0,
                         column: Column(vec![]),
-                        column_commitment: Default::default(),
-                        aggregated_column_commitment: Default::default(),
-                        aggregated_column_proof: Default::default(),
+                        column_commitment: Commitment::default(),
+                        aggregated_column_commitment: Commitment::default(),
+                        aggregated_column_proof: Proof::default(),
                         rows_commitments: vec![],
                         rows_proofs: vec![],
                     },
                 ))
-                .unwrap()
+                .unwrap();
         }
 
         assert_eq!(join_validator.await.unwrap().len(), msg_count);

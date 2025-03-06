@@ -128,9 +128,9 @@ impl BlendBehaviour {
                 ),
             limits: libp2p::connection_limits::Behaviour::new(
                 ConnectionLimits::default()
-                    .with_max_established(Some(config.max_peering_degree as u32))
-                    .with_max_established_incoming(Some(config.max_peering_degree as u32))
-                    .with_max_established_outgoing(Some(config.max_peering_degree as u32))
+                    .with_max_established(Some(config.max_peering_degree.into()))
+                    .with_max_established_incoming(Some(config.max_peering_degree.into()))
+                    .with_max_established_outgoing(Some(config.max_peering_degree.into()))
                     // Blend protocol restricts the number of connections per peer to 1.
                     .with_max_established_per_peer(Some(1)),
             ),
@@ -199,7 +199,7 @@ where
         loop {
             tokio::select! {
                 Some(msg) = self.swarm_messages_receiver.recv() => {
-                    self.handle_swarm_message(msg).await;
+                    self.handle_swarm_message(msg);
                 }
                 Some(event) = self.swarm.next() => {
                     self.handle_event(event);
@@ -208,11 +208,12 @@ where
         }
     }
 
-    async fn handle_swarm_message(&mut self, msg: BlendSwarmMessage) {
+    #[expect(clippy::cognitive_complexity)]
+    fn handle_swarm_message(&mut self, msg: BlendSwarmMessage) {
         match msg {
             BlendSwarmMessage::Publish(msg) => {
                 let msg_size = msg.len();
-                if let Err(e) = self.swarm.behaviour_mut().blend.publish(msg) {
+                if let Err(e) = self.swarm.behaviour_mut().blend.publish(&msg) {
                     tracing::error!("Failed to publish message to blend network: {e:?}");
                     tracing::info!(counter.failed_outbound_messages = 1);
                 } else {

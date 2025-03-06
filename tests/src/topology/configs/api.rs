@@ -7,6 +7,7 @@ pub struct GeneralApiConfig {
     pub address: SocketAddr,
 }
 
+#[must_use]
 pub fn create_api_configs(ids: &[[u8; 32]]) -> Vec<GeneralApiConfig> {
     ids.iter()
         .map(|_| GeneralApiConfig {

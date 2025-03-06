@@ -5,6 +5,7 @@ use crate::common::{blob::DaBlob, Chunk};
 /// Reconstruct original data from a set of `DaBlob`
 /// Warning! This does not interpolate so it should not be used on blobs which
 /// doesn't represent the original set of data.
+#[must_use]
 pub fn reconstruct_without_missing_data(blobs: &[DaBlob]) -> Vec<u8> {
     // pick positions from columns
     let mut data: Vec<((usize, usize), Vec<u8>)> = blobs
@@ -14,7 +15,7 @@ pub fn reconstruct_without_missing_data(blobs: &[DaBlob]) -> Vec<u8> {
                 .iter()
                 .map(Chunk::as_bytes)
                 .enumerate()
-                .map(|(row, data)| ((row, blob.column_idx as usize), data.to_vec()))
+                .map(|(row, data)| ((row, blob.column_idx as usize), data))
         })
         .collect();
     data.sort_unstable_by_key(|(k, _)| *k);
@@ -30,6 +31,7 @@ pub fn reconstruct_without_missing_data(blobs: &[DaBlob]) -> Vec<u8> {
 
 #[cfg(test)]
 mod test {
+    use kzgrs::{Commitment, Proof};
     use nomos_core::da::DaEncoder as _;
 
     use crate::{
@@ -51,9 +53,9 @@ mod test {
             .map(|(idx, column)| DaBlob {
                 column,
                 column_idx: idx as ColumnIndex,
-                column_commitment: Default::default(),
-                aggregated_column_commitment: Default::default(),
-                aggregated_column_proof: Default::default(),
+                column_commitment: Commitment::default(),
+                aggregated_column_commitment: Commitment::default(),
+                aggregated_column_proof: Proof::default(),
                 rows_commitments: vec![],
                 rows_proofs: vec![],
             })

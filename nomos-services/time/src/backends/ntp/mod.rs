@@ -106,9 +106,9 @@ impl Stream for NtpStream {
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         // try update time
         if let Poll::Ready(Some(timestamp)) = self.interval.poll_next_unpin(cx) {
-            let seconds = Duration::from_secs(timestamp.sec() as u64);
+            let seconds = Duration::from_secs(timestamp.sec().into());
             let nanos_fraction =
-                Duration::from_nanos(fraction_to_nanoseconds(timestamp.sec_fraction()) as u64);
+                Duration::from_nanos(fraction_to_nanoseconds(timestamp.sec_fraction()).into());
             let roundtrip = Duration::from_micros(timestamp.roundtrip());
 
             let date = OffsetDateTime::from_unix_timestamp_nanos(

@@ -11,6 +11,7 @@ pub type Unit = [u8; 32];
 pub struct Balance([u8; 32]);
 
 impl Balance {
+    #[must_use]
     pub const fn to_bytes(&self) -> [u8; 32] {
         self.0
     }
@@ -24,6 +25,7 @@ pub struct UnitBalance {
 }
 
 impl UnitBalance {
+    #[must_use]
     pub const fn is_zero(&self) -> bool {
         self.pos == self.neg
     }
@@ -43,21 +45,23 @@ impl BalanceWitness {
         blinding
     }
 
+    #[must_use]
     pub fn zero(blinding: [u8; 16]) -> Self {
         Self {
-            balances: Default::default(),
+            balances: Vec::default(),
             blinding,
         }
     }
 
+    #[must_use]
     pub fn from_ptx(ptx: &PartialTxWitness, blinding: [u8; 16]) -> Self {
         let mut balance = Self::zero(blinding);
 
-        for input in ptx.inputs.iter() {
+        for input in &ptx.inputs {
             balance.insert_negative(input.note.unit, input.note.value);
         }
 
-        for output in ptx.outputs.iter() {
+        for output in &ptx.outputs {
             balance.insert_positive(output.note.unit, output.note.value);
         }
 
@@ -67,7 +71,7 @@ impl BalanceWitness {
     }
 
     pub fn insert_positive(&mut self, unit: Unit, value: Value) {
-        for unit_bal in self.balances.iter_mut() {
+        for unit_bal in &mut self.balances {
             if unit_bal.unit == unit {
                 unit_bal.pos += value;
                 return;
@@ -83,7 +87,7 @@ impl BalanceWitness {
     }
 
     pub fn insert_negative(&mut self, unit: Unit, value: Value) {
-        for unit_bal in self.balances.iter_mut() {
+        for unit_bal in &mut self.balances {
             if unit_bal.unit == unit {
                 unit_bal.neg += value;
                 return;
@@ -114,7 +118,7 @@ impl BalanceWitness {
         let mut combined = Self::zero(blinding);
 
         for balance in balances {
-            for unit_bal in balance.balances.iter() {
+            for unit_bal in &balance.balances {
                 if unit_bal.pos > unit_bal.neg {
                     combined.insert_positive(unit_bal.unit, unit_bal.pos - unit_bal.neg);
                 } else {
@@ -128,15 +132,17 @@ impl BalanceWitness {
         combined
     }
 
+    #[must_use]
     pub fn is_zero(&self) -> bool {
         self.balances.is_empty()
     }
 
+    #[must_use]
     pub fn commit(&self) -> Balance {
         let mut hasher = Sha256::new();
         hasher.update(b"NOMOS_CL_BAL_COMMIT");
 
-        for unit_balance in self.balances.iter() {
+        for unit_balance in &self.balances {
             hasher.update(unit_balance.unit);
             hasher.update(unit_balance.pos.to_le_bytes());
             hasher.update(unit_balance.neg.to_le_bytes());

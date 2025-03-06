@@ -61,11 +61,12 @@ pub enum DispersalError {
 }
 
 impl DispersalError {
+    #[must_use]
     pub const fn blob_id(&self) -> Option<BlobId> {
         match self {
-            Self::Io { blob_id, .. } => Some(*blob_id),
-            Self::Serialization { blob_id, .. } => Some(*blob_id),
-            Self::Protocol {
+            Self::Io { blob_id, .. }
+            | Self::Serialization { blob_id, .. }
+            | Self::Protocol {
                 error: dispersal::DispersalError { blob_id, .. },
                 ..
             } => Some(*blob_id),
@@ -73,19 +74,20 @@ impl DispersalError {
         }
     }
 
+    #[must_use]
     pub const fn subnetwork_id(&self) -> Option<SubnetworkId> {
         match self {
-            Self::Io { subnetwork_id, .. } => Some(*subnetwork_id),
-            Self::Serialization { subnetwork_id, .. } => Some(*subnetwork_id),
-            Self::Protocol { subnetwork_id, .. } => Some(*subnetwork_id),
+            Self::Io { subnetwork_id, .. }
+            | Self::Serialization { subnetwork_id, .. }
+            | Self::Protocol { subnetwork_id, .. } => Some(*subnetwork_id),
             Self::OpenStreamError { .. } => None,
         }
     }
 
+    #[must_use]
     pub const fn peer_id(&self) -> Option<&PeerId> {
         match self {
-            Self::Io { peer_id, .. } => Some(peer_id),
-            Self::OpenStreamError { peer_id, .. } => Some(peer_id),
+            Self::Io { peer_id, .. } | Self::OpenStreamError { peer_id, .. } => Some(peer_id),
             _ => None,
         }
     }
@@ -180,7 +182,7 @@ pub struct DispersalExecutorBehaviour<Membership: MembershipHandler> {
     membership: Membership,
     /// Addresses of known peers in the DA network
     addresses: AddressBook,
-    /// Pending blobs that need to be dispersed by PeerId
+    /// Pending blobs that need to be dispersed by `PeerId`
     to_disperse: HashMap<PeerId, VecDeque<(Membership::NetworkId, DaBlob)>>,
     /// Pending blobs from disconnected networks
     disconnected_pending_blobs: HashMap<Membership::NetworkId, VecDeque<DaBlob>>,
@@ -336,7 +338,7 @@ where
     ) -> Option<(SubnetworkId, DaBlob)> {
         to_disperse
             .get_mut(peer_id)
-            .and_then(|queue| queue.pop_front())
+            .and_then(std::collections::VecDeque::pop_front)
     }
 
     pub fn try_wake(&mut self) {
@@ -358,7 +360,7 @@ impl<Membership: MembershipHandler<Id = PeerId, NetworkId = SubnetworkId> + 'sta
         connected_peers: &HashMap<PeerId, ConnectionId>,
         to_disperse: &mut HashMap<PeerId, VecDeque<(Membership::NetworkId, DaBlob)>>,
         subnetwork_id: SubnetworkId,
-        blob: DaBlob,
+        blob: &DaBlob,
     ) {
         let members = membership.members_of(&subnetwork_id);
         let peers = members
@@ -480,7 +482,7 @@ impl<M: MembershipHandler<Id = PeerId, NetworkId = SubnetworkId> + 'static> Netw
     ) {
         let Either::Left(event) = event;
         self.stream_behaviour
-            .on_connection_handler_event(peer_id, connection_id, event)
+            .on_connection_handler_event(peer_id, connection_id, event);
     }
 
     fn poll(
@@ -542,7 +544,7 @@ impl<M: MembershipHandler<Id = PeerId, NetworkId = SubnetworkId> + 'static> Netw
                     connected_peers,
                     to_disperse,
                     subnetwork_id,
-                    blob,
+                    &blob,
                 );
             } else {
                 let entry = disconnected_pending_blobs.entry(subnetwork_id).or_default();

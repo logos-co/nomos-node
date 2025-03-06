@@ -207,12 +207,11 @@ mod tests {
         let listener_peer = *listener.local_peer_id();
         listener.listen().with_memory_addr_external().await;
 
-        let address_book = AddressBook::from_iter(
-            listener
-                .external_addresses()
-                .cloned()
-                .map(|addr| (listener_peer, addr)),
-        );
+        let address_book: AddressBook = listener
+            .external_addresses()
+            .cloned()
+            .map(|addr| (listener_peer, addr))
+            .collect();
 
         dialer.behaviour_mut().update_addresses(address_book);
         // Using balancer `peer_to_connect` we are populating the peers list that will

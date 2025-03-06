@@ -6,7 +6,7 @@ use std::pin::Pin;
 use futures::Stream;
 use overwatch_rs::{overwatch::handle::OverwatchHandle, services::state::ServiceState};
 
-use super::*;
+use super::Debug;
 
 #[async_trait::async_trait]
 pub trait NetworkBackend {

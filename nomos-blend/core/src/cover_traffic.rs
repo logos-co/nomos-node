@@ -2,7 +2,7 @@ use std::{
     collections::HashSet,
     hash::Hash,
     marker::PhantomData,
-    ops::{DerefMut, Div},
+    ops::Div,
     pin::Pin,
     task::{Context, Poll},
 };
@@ -45,8 +45,8 @@ where
             settings,
             epoch_stream,
             slot_stream,
-            selected_slots: Default::default(),
-            _message: Default::default(),
+            selected_slots: HashSet::default(),
+            _message: PhantomData,
         }
     }
 }
@@ -67,7 +67,7 @@ where
             slot_stream,
             selected_slots,
             ..
-        } = self.deref_mut();
+        } = &mut *self;
         if let Poll::Ready(Some(epoch)) = epoch_stream.poll_next_unpin(cx) {
             *selected_slots = select_slot(
                 settings.node_id,

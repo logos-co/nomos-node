@@ -20,6 +20,7 @@ impl Default for ExecutorHttpClient {
 }
 
 impl ExecutorHttpClient {
+    #[must_use]
     pub fn new(base_address: Url, basic_auth: Option<BasicAuthCredentials>) -> Self {
         Self {
             client: CommonHttpClient::new(base_address, basic_auth),

@@ -33,16 +33,18 @@ pub struct TopologyConfig {
 }
 
 impl TopologyConfig {
+    #[must_use]
     pub fn two_validators() -> Self {
         Self {
             n_validators: 2,
             n_executors: 0,
             consensus_params: ConsensusParams::default_for_participants(2),
-            da_params: Default::default(),
-            network_params: Default::default(),
+            da_params: DaParams::default(),
+            network_params: NetworkParams::default(),
         }
     }
 
+    #[must_use]
     pub fn validator_and_executor() -> Self {
         Self {
             n_validators: 1,
@@ -63,10 +65,11 @@ impl TopologyConfig {
                 balancer_interval: Duration::from_secs(5),
                 ..Default::default()
             },
-            network_params: Default::default(),
+            network_params: NetworkParams::default(),
         }
     }
 
+    #[must_use]
     pub fn validators_and_executor(num_validators: usize, num_subnets: usize) -> Self {
         let dispersal_factor = num_validators.add(1).saturating_div(num_subnets);
         Self {
@@ -88,7 +91,7 @@ impl TopologyConfig {
                 balancer_interval: Duration::from_secs(5),
                 ..Default::default()
             },
-            network_params: Default::default(),
+            network_params: NetworkParams::default(),
         }
     }
 }
@@ -112,9 +115,9 @@ impl Topology {
             thread_rng().fill(id);
         }
 
-        let consensus_configs = create_consensus_configs(&ids, config.consensus_params);
-        let da_configs = create_da_configs(&ids, config.da_params);
-        let network_configs = create_network_configs(&ids, config.network_params);
+        let consensus_configs = create_consensus_configs(&ids, &config.consensus_params);
+        let da_configs = create_da_configs(&ids, &config.da_params);
+        let network_configs = create_network_configs(&ids, &config.network_params);
         let blend_configs = create_blend_configs(&ids);
         let api_configs = create_api_configs(&ids);
         let tracing_configs = create_tracing_configs(&ids);
@@ -123,29 +126,29 @@ impl Topology {
         let mut validators = Vec::new();
         for i in 0..config.n_validators {
             let config = create_validator_config(GeneralConfig {
-                consensus_config: consensus_configs[i].to_owned(),
-                da_config: da_configs[i].to_owned(),
-                network_config: network_configs[i].to_owned(),
-                blend_config: blend_configs[i].to_owned(),
-                api_config: api_configs[i].to_owned(),
-                tracing_config: tracing_configs[i].to_owned(),
+                consensus_config: consensus_configs[i].clone(),
+                da_config: da_configs[i].clone(),
+                network_config: network_configs[i].clone(),
+                blend_config: blend_configs[i].clone(),
+                api_config: api_configs[i].clone(),
+                tracing_config: tracing_configs[i].clone(),
                 time_config: time_config.clone(),
             });
-            validators.push(Validator::spawn(config).await)
+            validators.push(Validator::spawn(config).await);
         }
 
         let mut executors = Vec::new();
         for i in config.n_validators..n_participants {
             let config = create_executor_config(GeneralConfig {
-                consensus_config: consensus_configs[i].to_owned(),
-                da_config: da_configs[i].to_owned(),
-                network_config: network_configs[i].to_owned(),
-                blend_config: blend_configs[i].to_owned(),
-                api_config: api_configs[i].to_owned(),
-                tracing_config: tracing_configs[i].to_owned(),
+                consensus_config: consensus_configs[i].clone(),
+                da_config: da_configs[i].clone(),
+                network_config: network_configs[i].clone(),
+                blend_config: blend_configs[i].clone(),
+                api_config: api_configs[i].clone(),
+                tracing_config: tracing_configs[i].clone(),
                 time_config: time_config.clone(),
             });
-            executors.push(Executor::spawn(config).await)
+            executors.push(Executor::spawn(config).await);
         }
 
         Self {
@@ -154,10 +157,12 @@ impl Topology {
         }
     }
 
+    #[must_use]
     pub fn validators(&self) -> &[Validator] {
         &self.validators
     }
 
+    #[must_use]
     pub fn executors(&self) -> &[Executor] {
         &self.executors
     }

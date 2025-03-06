@@ -4,7 +4,7 @@ use bincode::{
         WithOtherIntEncoding, WithOtherLimit, WithOtherTrailing,
     },
     de::read::SliceReader,
-    Options,
+    Error, ErrorKind, Options,
 };
 use once_cell::sync::Lazy;
 
@@ -32,9 +32,8 @@ pub static OPTIONS: Lazy<BincodeOptions> = Lazy::new(|| {
 pub type BincodeDeserializer<'de> = bincode::Deserializer<SliceReader<'de>, BincodeOptions>;
 pub type BincodeSerializer<T> = bincode::Serializer<T, BincodeOptions>;
 
-pub fn clone_bincode_error(error: &bincode::Error) -> bincode::Error {
-    use bincode::ErrorKind;
-    Box::new(match error.as_ref() {
+pub fn clone_bincode_error(error: &Error) -> ErrorKind {
+    match error.as_ref() {
         ErrorKind::Io(error) => ErrorKind::Io(std::io::Error::new(error.kind(), error.to_string())),
         ErrorKind::InvalidUtf8Encoding(error) => ErrorKind::InvalidUtf8Encoding(*error),
         ErrorKind::InvalidBoolEncoding(bool) => ErrorKind::InvalidBoolEncoding(*bool),
@@ -44,5 +43,5 @@ pub fn clone_bincode_error(error: &bincode::Error) -> bincode::Error {
         ErrorKind::SizeLimit => ErrorKind::SizeLimit,
         ErrorKind::SequenceMustHaveLength => ErrorKind::SequenceMustHaveLength,
         ErrorKind::Custom(custom) => ErrorKind::Custom(custom.clone()),
-    })
+    }
 }

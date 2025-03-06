@@ -14,6 +14,7 @@ pub struct FillFromNodeList {
 }
 
 impl FillFromNodeList {
+    #[must_use]
     pub fn new(peers: &[PeerId], subnetwork_size: usize, dispersal_factor: usize) -> Self {
         Self {
             assignations: Self::fill(peers, subnetwork_size, dispersal_factor),

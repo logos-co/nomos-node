@@ -31,11 +31,14 @@ pub struct Metadata {
 }
 
 impl Metadata {
+    #[must_use]
     pub const fn new(app_id: [u8; 32], index: Index) -> Self {
         Self { app_id, index }
     }
 
-    const fn size(&self) -> usize {
+    // `std::mem::size_of_val` is not yet stable as a const fn
+    #[expect(clippy::missing_const_for_fn)]
+    fn size(&self) -> usize {
         std::mem::size_of_val(&self.app_id) + std::mem::size_of_val(&self.index)
     }
 }
@@ -48,6 +51,7 @@ pub struct BlobInfo {
 }
 
 impl BlobInfo {
+    #[must_use]
     pub const fn new(id: [u8; 32], metadata: Metadata) -> Self {
         Self { id, metadata }
     }

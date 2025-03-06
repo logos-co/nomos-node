@@ -39,7 +39,7 @@ impl<SerdeOp: StorageSerde + Send + Sync + 'static> StorageBackend for MockStora
     fn new(_config: Self::Settings) -> Result<Self, Self::Error> {
         Ok(Self {
             inner: HashMap::new(),
-            _serde_op: Default::default(),
+            _serde_op: PhantomData,
         })
     }
 

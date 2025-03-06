@@ -5,6 +5,7 @@ mod test {
     use std::time::Duration;
 
     use futures::StreamExt;
+    use kzgrs::{Commitment, Proof};
     use kzgrs_backend::common::{blob::DaBlob, Column};
     use libp2p::{identity::Keypair, swarm::SwarmEvent, Multiaddr, PeerId, Swarm};
     use log::debug;
@@ -19,45 +20,8 @@ mod test {
     };
 
     #[tokio::test]
+    #[expect(clippy::too_many_lines)]
     async fn test_sampling_two_peers() {
-        let _ = tracing_subscriber::fmt()
-            .with_env_filter(EnvFilter::from_default_env())
-            .compact()
-            .with_writer(TestWriter::default())
-            .try_init();
-        let k1 = Keypair::generate_ed25519();
-        let k2 = Keypair::generate_ed25519();
-        let neighbours = AllNeighbours::default();
-        neighbours.add_neighbour(PeerId::from_public_key(&k1.public()));
-        neighbours.add_neighbour(PeerId::from_public_key(&k2.public()));
-
-        // Generate a random peer ids not to conflict with other tests
-        let p1_id = rand::thread_rng().gen::<u64>();
-        let p1_address: Multiaddr = format!("/memory/{}", p1_id).parse().unwrap();
-
-        let p2_id = rand::thread_rng().gen::<u64>();
-        let p2_address: Multiaddr = format!("/memory/{}", p2_id).parse().unwrap();
-
-        let p1_addresses = vec![(PeerId::from_public_key(&k2.public()), p2_address.clone())];
-        let p2_addresses = vec![(PeerId::from_public_key(&k1.public()), p1_address.clone())];
-
-        let p1_behavior = SamplingBehaviour::new(
-            PeerId::from_public_key(&k1.public()),
-            neighbours.clone(),
-            p1_addresses.into_iter().collect(),
-        );
-
-        let mut p1 = new_swarm_in_memory(k1.clone(), p1_behavior);
-
-        let p2_behavior = SamplingBehaviour::new(
-            PeerId::from_public_key(&k2.public()),
-            neighbours.clone(),
-            p2_addresses.into_iter().collect(),
-        );
-        let mut p2 = new_swarm_in_memory(k2.clone(), p2_behavior);
-
-        let request_sender_1 = p1.behaviour().sample_request_channel();
-        let request_sender_2 = p2.behaviour().sample_request_channel();
         const MSG_COUNT: usize = 10;
         async fn test_sampling_swarm(
             mut swarm: Swarm<
@@ -84,14 +48,14 @@ mod test {
                                 blob: Box::new(DaBlob {
                                     column: Column(vec![]),
                                     column_idx: 0,
-                                    column_commitment: Default::default(),
-                                    aggregated_column_commitment: Default::default(),
-                                    aggregated_column_proof: Default::default(),
+                                    column_commitment: Commitment::default(),
+                                    aggregated_column_commitment: Commitment::default(),
+                                    aggregated_column_proof: Proof::default(),
                                     rows_commitments: vec![],
                                     rows_proofs: vec![],
                                 }),
                             })
-                            .unwrap()
+                            .unwrap();
                     }
                     Some(SwarmEvent::Behaviour(SamplingEvent::SamplingSuccess {
                         blob_id, ..
@@ -111,6 +75,45 @@ mod test {
                 }
             }
         }
+
+        let _ = tracing_subscriber::fmt()
+            .with_env_filter(EnvFilter::from_default_env())
+            .compact()
+            .with_writer(TestWriter::default())
+            .try_init();
+        let k1 = Keypair::generate_ed25519();
+        let k2 = Keypair::generate_ed25519();
+        let neighbours = AllNeighbours::default();
+        neighbours.add_neighbour(PeerId::from_public_key(&k1.public()));
+        neighbours.add_neighbour(PeerId::from_public_key(&k2.public()));
+
+        // Generate a random peer ids not to conflict with other tests
+        let p1_id = rand::thread_rng().gen::<u64>();
+        let p1_address: Multiaddr = format!("/memory/{p1_id}").parse().unwrap();
+
+        let p2_id = rand::thread_rng().gen::<u64>();
+        let p2_address: Multiaddr = format!("/memory/{p2_id}").parse().unwrap();
+
+        let p1_addresses = vec![(PeerId::from_public_key(&k2.public()), p2_address.clone())];
+        let p2_addresses = vec![(PeerId::from_public_key(&k1.public()), p1_address.clone())];
+
+        let p1_behavior = SamplingBehaviour::new(
+            PeerId::from_public_key(&k1.public()),
+            neighbours.clone(),
+            p1_addresses.into_iter().collect(),
+        );
+
+        let mut p1 = new_swarm_in_memory(&k1, p1_behavior);
+
+        let p2_behavior = SamplingBehaviour::new(
+            PeerId::from_public_key(&k2.public()),
+            neighbours.clone(),
+            p2_addresses.into_iter().collect(),
+        );
+        let mut p2 = new_swarm_in_memory(&k2, p2_behavior);
+
+        let request_sender_1 = p1.behaviour().sample_request_channel();
+        let request_sender_2 = p2.behaviour().sample_request_channel();
         let _p1_address = p1_address.clone();
         let _p2_address = p2_address.clone();
 
