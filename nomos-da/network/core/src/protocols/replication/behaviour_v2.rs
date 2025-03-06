@@ -145,10 +145,9 @@ pub struct ReplicationBehaviour<Membership> {
     previous_scheduled_pending: Option<PeerId>,
     /// Indicates which outgoing streams which are currently idle or busy
     outgoing_streams: HashMap<PeerId, StreamState>,
-    /// TODO
+    /// Holds tasks for writing messages the the outgoing streams
     outgoing_tasks: FuturesUnordered<OutgoingTask>,
-    /// Seen messages cache holds a record of seen messages, messages will be
-    /// removed from this set after some time to keep it
+    /// Seen messages cache holds a record of seen messages
     seen_message_cache: IndexSet<(Vec<u8>, SubnetworkId)>,
     /// Waker that handles polling
     waker: Option<Waker>,
@@ -240,7 +239,7 @@ where
         }
     }
 
-    /// Try to read a single message from the incoming stream
+    /// Attempt to read a single message from the incoming stream
     async fn try_read_message(
         peer_id: PeerId,
         mut stream: Stream,
@@ -251,7 +250,8 @@ where
         Ok((peer_id, message, stream))
     }
 
-    /// Open a new stream from the underlying control to the provided peer
+    /// Attempt to open a new stream from the underlying control to the provided
+    /// peer
     async fn try_open_stream(
         peer_id: PeerId,
         mut control: Control,
@@ -263,7 +263,7 @@ where
         Ok(stream)
     }
 
-    /// TODO
+    /// Attempt to write a message to the given stream
     async fn try_write_message(
         peer_id: PeerId,
         message: DaMessage,
@@ -389,7 +389,7 @@ where
                 // Replicate the message to all connected peers from the same subnet if we
                 // haven't seen it yet
                 self.replicate_message(message.clone());
-                // Wait for any next incoming message on the same stream
+                // Schedule waiting for any next incoming message on the same stream
                 self.incoming_tasks
                     .push(Self::try_read_message(peer_id, stream).boxed());
                 // Signal to the swarm that we've received the message but poll the other tasks
@@ -438,39 +438,9 @@ where
             _ => {}
         }
 
-        /// Find the next peer after the previous one that has at least one
-        /// pending message and its associated stream is idle or hasn't been
-        /// opened yet. Iterate over all peers, starting with the one
-        /// after the previous peer, wrap around and finish with the
-        /// previous peer at the end. This ensures we're fair scheduling one
-        /// message per peer at a time, iterating the peers in a round-robin
-        /// fashion.
-        fn next_pending(
-            previous: &Option<PeerId>,
-            pending_outgoing_messages: &IndexMap<PeerId, VecDeque<DaMessage>>,
-            mut is_stream_idle_fn: impl FnMut(&PeerId) -> bool,
-        ) -> Option<PeerId> {
-            match previous {
-                Some(previous) => {
-                    let i = pending_outgoing_messages
-                        .get_index_of(previous)
-                        .expect("Peer to be present");
-                    pending_outgoing_messages[i + 1..]
-                        .iter()
-                        .chain(pending_outgoing_messages[..=i].iter())
-                        .find_map(|(id, messages)| {
-                            (!messages.is_empty() && is_stream_idle_fn(id)).then_some(*id)
-                        })
-                }
-                None => pending_outgoing_messages.iter().find_map(|(id, messages)| {
-                    (!messages.is_empty() && is_stream_idle_fn(id)).then_some(*id)
-                }),
-            }
-        }
-
         // Pick the next peer that has a pending message and an idle or unopened stream
         // and schedule writing the message to it.
-        let next = next_pending(
+        let next_peer = next_pending(
             &self.previous_scheduled_pending,
             &self.pending_outgoing_messages,
             |id| {
@@ -481,7 +451,7 @@ where
             },
         );
 
-        if let Some(peer_id) = next {
+        if let Some(peer_id) = next_peer {
             let message = self
                 .pending_outgoing_messages
                 .get_mut(&peer_id)
@@ -515,7 +485,7 @@ where
             should_wake = true;
         }
 
-        self.previous_scheduled_pending = next;
+        self.previous_scheduled_pending = next_peer;
 
         // Schedule reading from any new incoming streams if possible
         if let Poll::Ready(Some((peer_id, stream))) = self.incoming_streams.poll_next_unpin(cx) {
@@ -537,5 +507,104 @@ where
         }
 
         Poll::Pending
+    }
+}
+
+/// Find the next peer after the previous one that has at least one
+/// pending message and its associated stream is idle or hasn't been
+/// opened yet. Iterate over all peers, starting with the one
+/// after the previous peer, wrap around and finish with the
+/// previous peer at the end. This ensures we're fair scheduling one
+/// message per peer at a time, iterating the peers in a round-robin
+/// fashion.
+fn next_pending<K, M>(
+    previous: &Option<K>,
+    pending_outgoing_messages: &IndexMap<K, VecDeque<M>>,
+    mut is_stream_idle_fn: impl FnMut(&K) -> bool,
+) -> Option<K>
+where
+    K: Copy + Eq + std::hash::Hash,
+{
+    match previous {
+        Some(previous) => {
+            let i = pending_outgoing_messages
+                .get_index_of(previous)
+                .expect("Peer to be present");
+            pending_outgoing_messages[i + 1..]
+                .iter()
+                .chain(pending_outgoing_messages[..=i].iter())
+                .find_map(|(id, messages)| {
+                    (!messages.is_empty() && is_stream_idle_fn(id)).then_some(*id)
+                })
+        }
+        None => pending_outgoing_messages.iter().find_map(|(id, messages)| {
+            (!messages.is_empty() && is_stream_idle_fn(id)).then_some(*id)
+        }),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::VecDeque;
+
+    use indexmap::IndexMap;
+    use rstest::rstest;
+
+    #[rstest]
+    #[case(None, vec![], None, None)]
+    // One peer, previous peer is not set
+    //
+    // Peer does not have pending messages and the stream is busy
+    #[case(None, vec![(0, vec![])], None, None)]
+    // Peer does not have pending messages and the stream is idle
+    #[case(None, vec![(0, vec![])], Some(0), None)]
+    // Peer has pending messages and the stream is busy
+    #[case(None, vec![(0, vec![()])], None, None)]
+    // Peer has pending messages and the stream is idle
+    #[case(None, vec![(0, vec![()])], Some(0), Some(0))]
+    // One peer, previous peer is set
+    //
+    // Peer does not have pending messages and the stream is busy
+    #[case(Some(0), vec![(0, vec![])], None, None)]
+    // Peer does not have pending messages and the stream is idle
+    #[case(Some(0), vec![(0, vec![])], Some(0), None)]
+    // Peer has pending messages and the stream is busy
+    #[case(Some(0), vec![(0, vec![()])], None, None)]
+    // Peer has pending messages and the stream is idle
+    #[case(Some(0), vec![(0, vec![()])], Some(0), Some(0))]
+    // Multiple peers
+    //
+    // Advances from peer 0 to 1
+    #[case(Some(0), vec![(0, vec![()]), (1, vec![()])], Some(1), Some(1))]
+    // Wraps around from peer 0, via peer 1, to peer 0
+    #[case(Some(0), vec![(0, vec![()]), (1, vec![()])], Some(0), Some(0))]
+    // Wraps around from peer 1 to peer 0
+    #[case(Some(1), vec![(0, vec![()]), (1, vec![()])], Some(0), Some(0))]
+    // Wraps around from peer 1, via peer 0, to peer 1
+    #[case(Some(1), vec![(0, vec![()]), (1, vec![()])], Some(1), Some(1))]
+    // All streams busy
+    #[case(Some(0), vec![(0, vec![()]), (1, vec![()])], None, None)]
+    // All queues empty
+    #[case(Some(1), vec![(0, vec![]), (1, vec![])], Some(0), None)]
+    fn test_next_pending(
+        #[case] previous: Option<usize>,
+        #[case] pending_outgoing_messages: Vec<(usize, Vec<()>)>,
+        #[case] idle_stream: Option<usize>,
+        #[case] expected_next: Option<usize>,
+    ) {
+        let pending_outgoing_messages: IndexMap<usize, VecDeque<()>> = pending_outgoing_messages
+            .into_iter()
+            .map(|(id, messages)| (id, messages.into_iter().collect()))
+            .collect();
+        let actual_next =
+            super::next_pending(
+                &previous,
+                &pending_outgoing_messages,
+                |peer_id| match idle_stream {
+                    Some(idle_stream) => idle_stream == *peer_id,
+                    None => false,
+                },
+            );
+        assert_eq!(actual_next, expected_next);
     }
 }
