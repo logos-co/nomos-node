@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use kzgrs_backend::reconstruction::reconstruct_without_missing_data;
+use kzgrs_backend::{dispersal::Index, reconstruction::reconstruct_without_missing_data};
 use tests::{
     common::da::{disseminate_with_metadata, wait_for_indexed_blob, APP_ID},
     topology::{Topology, TopologyConfig},
@@ -54,29 +54,34 @@ async fn disseminate_retrieve_reconstruct() {
     let executor = &topology.executors()[0];
     let num_subnets = executor.config().da_network.backend.num_subnets as usize;
 
-    let data = [1u8; 31];
     let app_id = hex::decode(APP_ID).unwrap();
     let app_id: [u8; 32] = app_id.clone().try_into().unwrap();
-    let metadata = kzgrs_backend::dispersal::Metadata::new(app_id, 0u64.into());
+    let data = [1u8; 31 * 5];
 
-    disseminate_with_metadata(executor, &data, metadata).await;
+    for i in 0..5 {
+        let data_size = 31 * (i + 1);
+        println!("{i} - disseminating {data_size} bytes");
+        let data = &data[..data_size]; // test increasing size data
+        let metadata = kzgrs_backend::dispersal::Metadata::new(app_id, Index::from(i as u64));
+        disseminate_with_metadata(executor, data, metadata).await;
 
-    let from = 0u64.to_be_bytes();
-    let to = 1u64.to_be_bytes();
+        let from = i.to_be_bytes();
+        let to = (i + 1).to_be_bytes();
 
-    wait_for_indexed_blob(executor, app_id, from, to, num_subnets).await;
+        wait_for_indexed_blob(executor, app_id, from, to, num_subnets).await;
 
-    let executor_blobs = executor.get_indexer_range(app_id, from..to).await;
-    let executor_idx_0_blobs: Vec<_> = executor_blobs
-        .iter()
-        .filter(|(i, _)| i == &from)
-        .flat_map(|(_, blobs)| blobs)
-        .collect();
+        let executor_blobs = executor.get_indexer_range(app_id, from..to).await;
+        let executor_idx_0_blobs: Vec<_> = executor_blobs
+            .iter()
+            .filter(|(i, _)| i == &from)
+            .flat_map(|(_, blobs)| blobs)
+            .collect();
 
-    // Reconstruction is performed from the one of the two blobs.
-    let blobs = vec![executor_idx_0_blobs[0].clone()];
-    let reconstructed = reconstruct_without_missing_data(&blobs);
-    assert_eq!(reconstructed, data);
+        // Reconstruction is performed from the one of the two blobs.
+        let blobs = vec![executor_idx_0_blobs[0].clone()];
+        let reconstructed = reconstruct_without_missing_data(&blobs);
+        assert_eq!(reconstructed, data);
+    }
 }
 
 #[ignore = "for local debugging"]
