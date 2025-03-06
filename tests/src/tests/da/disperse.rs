@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use kzgrs_backend::reconstruction::reconstruct_without_missing_data;
+use kzgrs_backend::{dispersal::Index, reconstruction::reconstruct_without_missing_data};
 use tests::{
     common::da::{disseminate_with_metadata, wait_for_indexed_blob, APP_ID},
     topology::{Topology, TopologyConfig},
@@ -54,11 +54,11 @@ async fn disseminate_retrieve_reconstruct() {
     let executor = &topology.executors()[0];
     let num_subnets = executor.config().da_network.backend.num_subnets as usize;
 
-    let data = [1u8; 31];
     let app_id = hex::decode(APP_ID).unwrap();
     let app_id: [u8; 32] = app_id.clone().try_into().unwrap();
-    let metadata = kzgrs_backend::dispersal::Metadata::new(app_id, 0u64.into());
+    let data = [1u8; 31 * 5];
 
+    let metadata = kzgrs_backend::dispersal::Metadata::new(app_id, Index::from(0));
     disseminate_with_metadata(executor, &data, metadata).await;
 
     let from = 0u64.to_be_bytes();

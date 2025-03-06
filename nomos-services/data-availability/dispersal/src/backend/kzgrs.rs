@@ -54,7 +54,7 @@ where
 
     async fn disperse(&self, encoded_data: Self::EncodedData) -> Result<(), Self::Error> {
         let adapter = self.adapter.as_ref();
-        let encoded_size = encoded_data.extended_data.len();
+        let num_columns = encoded_data.column_commitments.len();
         let blob_id = build_blob_id(
             &encoded_data.aggregated_column_commitment,
             &encoded_data.row_commitments,
@@ -74,7 +74,7 @@ where
                     _ => None,
                 }
             })
-            .take(encoded_size)
+            .take(num_columns)
             .collect();
         // timeout when collecting positive responses
         tokio::time::timeout(self.timeout, valid_responses)
