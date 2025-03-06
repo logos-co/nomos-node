@@ -89,10 +89,10 @@ mod test {
 
         // Generate a random peer ids not to conflict with other tests
         let p1_id = rand::thread_rng().gen::<u64>();
-        let p1_address: Multiaddr = format!("/memory/{}", p1_id).parse().unwrap();
+        let p1_address: Multiaddr = format!("/memory/{p1_id}").parse().unwrap();
 
         let p2_id = rand::thread_rng().gen::<u64>();
-        let p2_address: Multiaddr = format!("/memory/{}", p2_id).parse().unwrap();
+        let p2_address: Multiaddr = format!("/memory/{p2_id}").parse().unwrap();
 
         let p1_addresses = vec![(PeerId::from_public_key(&k2.public()), p2_address.clone())];
         let p2_addresses = vec![(PeerId::from_public_key(&k1.public()), p1_address.clone())];
@@ -103,14 +103,14 @@ mod test {
             p1_addresses.into_iter().collect(),
         );
 
-        let mut p1 = new_swarm_in_memory(k1.clone(), p1_behavior);
+        let mut p1 = new_swarm_in_memory(&k1, p1_behavior);
 
         let p2_behavior = SamplingBehaviour::new(
             PeerId::from_public_key(&k2.public()),
             neighbours.clone(),
             p2_addresses.into_iter().collect(),
         );
-        let mut p2 = new_swarm_in_memory(k2.clone(), p2_behavior);
+        let mut p2 = new_swarm_in_memory(&k2, p2_behavior);
 
         let request_sender_1 = p1.behaviour().sample_request_channel();
         let request_sender_2 = p2.behaviour().sample_request_channel();
