@@ -55,14 +55,10 @@ mod test {
         let k1 = libp2p::identity::Keypair::generate_ed25519();
         let k2 = libp2p::identity::Keypair::generate_ed25519();
 
-        let neighbours = AllNeighbours {
-            neighbours: [
-                PeerId::from_public_key(&k1.public()),
-                PeerId::from_public_key(&k2.public()),
-            ]
-            .into_iter()
-            .collect(),
-        };
+        let neighbours = AllNeighbours::default();
+        neighbours.add_neighbour(PeerId::from_public_key(&k1.public()));
+        neighbours.add_neighbour(PeerId::from_public_key(&k2.public()));
+
         let mut swarm_1 = get_swarm(k1, neighbours.clone());
         let mut swarm_2 = get_swarm(k2, neighbours);
 

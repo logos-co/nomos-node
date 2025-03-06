@@ -266,10 +266,10 @@ mod tests {
 
     #[tokio::test]
     async fn test_cannot_dial_unhealthy_peer() {
-        let mut dialer = Swarm::new_ephemeral(|_| {
+        let mut dialer = Swarm::new_ephemeral_tokio(|_| {
             ConnectionMonitorBehaviour::new(MockMonitor::default(), Duration::from_secs(1))
         });
-        let mut listener = Swarm::new_ephemeral(|_| {
+        let mut listener = Swarm::new_ephemeral_tokio(|_| {
             ConnectionMonitorBehaviour::new(MockMonitor::default(), Duration::from_secs(1))
         });
         listener.listen().with_memory_addr_external().await;
@@ -287,10 +287,10 @@ mod tests {
 
     #[tokio::test]
     async fn test_can_dial_unhealthy_peer_after_cooldown() {
-        let mut dialer = Swarm::new_ephemeral(|_| {
+        let mut dialer = Swarm::new_ephemeral_tokio(|_| {
             ConnectionMonitorBehaviour::new(MockMonitor::default(), Duration::from_millis(100))
         });
-        let mut listener = Swarm::new_ephemeral(|_| {
+        let mut listener = Swarm::new_ephemeral_tokio(|_| {
             ConnectionMonitorBehaviour::new(MockMonitor::default(), Duration::from_millis(100))
         });
         listener.listen().with_memory_addr_external().await;
@@ -314,10 +314,10 @@ mod tests {
 
     #[tokio::test]
     async fn test_cannot_accept_malicious_peer() {
-        let mut dialer = Swarm::new_ephemeral(|_| {
+        let mut dialer = Swarm::new_ephemeral_tokio(|_| {
             ConnectionMonitorBehaviour::new(MockMonitor::default(), Duration::ZERO)
         });
-        let mut listener = Swarm::new_ephemeral(|_| {
+        let mut listener = Swarm::new_ephemeral_tokio(|_| {
             ConnectionMonitorBehaviour::new(MockMonitor::default(), Duration::ZERO)
         });
         listener.listen().with_memory_addr_external().await;
