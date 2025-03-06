@@ -52,7 +52,7 @@ impl<SerdeOp> core::fmt::Debug for SledBackend<SerdeOp> {
 #[async_trait]
 impl<SerdeOp: StorageSerde + Send + Sync + 'static> StorageBackend for SledBackend<SerdeOp> {
     type Settings = SledBackendSettings;
-    type Error = Error;
+    type Error = SledError;
     type Transaction = SledTransaction;
     type SerdeOperator = SerdeOp;
 

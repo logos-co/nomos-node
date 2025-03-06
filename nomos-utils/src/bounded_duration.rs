@@ -26,9 +26,10 @@ use time::Duration;
 ///         duration: Duration,
 ///     }
 /// ```
-// The `TimeTag` trait is not public, is just to tie up types for
-// `MinimalBoundedDuration` and its implemented only by the supported types.
-#[expect(private_bounds)]
+#[expect(
+    private_bounds,
+    reason = "The `TimeTag` trait is not public, is just to tie up types for `MinimalBoundedDuration` and its implemented only by the supported types."
+)]
 #[derive(Serialize)]
 #[serde(transparent)]
 pub struct MinimalBoundedDuration<const MIN_DURATION: usize, TAG: TimeTag> {
@@ -65,8 +66,8 @@ pub type DAY = BoundTag<'d'>;
 fn fill_duration_measure<T: TimeTag>() -> Result<String, impl Display> {
     match T::inner() {
         v @ ('d' | 'h' | 'm' | 's') => Ok(v.to_string()),
-        'l' => Ok("ms".to_string()),
-        'n' => Ok("ns".to_string()),
+        'l' => Ok("ms".to_owned()),
+        'n' => Ok("ns".to_owned()),
         other => Err(format!("'{other}' measure not supported")),
     }
 }
@@ -106,7 +107,7 @@ impl<'de, const MIN_DURATION: usize, TAG: TimeTag> Deserialize<'de>
         let parsed_duration =
             humantime::parse_duration(format!("{MIN_DURATION}{reformat_measure}").as_str())
                 .map_err(Error::custom)?;
-        let min_duration: Duration = Duration::new(
+        let min_duration = Duration::new(
             parsed_duration
                 .as_secs()
                 .try_into()
