@@ -338,26 +338,11 @@ where
         if let FromSwarm::ConnectionClosed(ConnectionClosed { peer_id, .. }) = event {
             self.connected.remove(&peer_id);
             self.outgoing_streams.remove(&peer_id);
-            self.previous_scheduled_pending.map(|last| {
-                if last == peer_id {
-                    let mut i = self
-                        .pending_outgoing_messages
-                        .get_index_of(&peer_id)
-                        .expect("Peer to be present");
-                    // Move the marker back one step, so that the search for the next peer in poll()
-                    // continues where we left off, wrap around if necessary
-                    if i == 0 {
-                        i = self.pending_outgoing_messages.len() - 1;
-                    } else {
-                        i -= 1;
-                    }
-                    self.previous_scheduled_pending = self
-                        .pending_outgoing_messages
-                        .get_index(i)
-                        .map(|(id, _)| *id);
-                }
-            });
-            self.pending_outgoing_messages.shift_remove(&peer_id);
+            self.previous_scheduled_pending = on_disconnected(
+                self.previous_scheduled_pending,
+                &mut self.pending_outgoing_messages,
+                &peer_id,
+            );
         }
         self.stream_behaviour.on_swarm_event(event)
     }
@@ -543,6 +528,44 @@ where
     }
 }
 
+/// If the marker points to a peer that has been disconnected, the marker needs
+/// to be moved back one step, so that the search for the next peer in poll()
+/// continues where we left off last time. This function returns the corrected
+/// marker value.
+fn on_disconnected<P, Q>(
+    previous_scheduled_pending: Option<P>,
+    pending_outgoing_messages: &mut IndexMap<P, Q>,
+    peer_id: &P,
+) -> Option<P>
+where
+    P: Copy + Eq + std::hash::Hash,
+{
+    // Store marker index
+    let i = previous_scheduled_pending.map(|id| {
+        pending_outgoing_messages
+            .get_index_of(&id)
+            .expect("Peer to be present")
+    });
+    // Remove disconnected peer and its pending messages
+    pending_outgoing_messages.shift_remove(peer_id);
+    // If the marker pointed to the disconnected peer, move it backwards one step,
+    // wrapping around if necessary
+    previous_scheduled_pending.and_then(|id| {
+        if id == *peer_id {
+            let i = i.expect("Valid index");
+            if i == 0 {
+                pending_outgoing_messages.last().map(|(id, _)| *id)
+            } else {
+                pending_outgoing_messages
+                    .get_index(i - 1)
+                    .map(|(id, _)| *id)
+            }
+        } else {
+            None
+        }
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use std::collections::VecDeque;
@@ -606,5 +629,39 @@ mod tests {
                 },
             );
         assert_eq!(actual_next, expected_next);
+    }
+
+    #[rstest]
+    /// Marker is not set, peer 0 is disconnected
+    #[case(None, vec![(0, ())], 0, None, vec![])]
+    /// Marker is set to peer 0, peer 0 is disconnected, marker is cleared
+    #[case(Some(0), vec![(0, ())], 0, None, vec![])]
+    /// Marker is set to peer 1, peer 1 is disconnected, marker is moved
+    /// backwards to peer 0
+    #[case(Some(0), vec![(0, ()), (1, ())], 0, Some(1), vec![(1, ())])]
+    /// Marker is set to peer 0, peer 0 is disconnected, marker is moved
+    /// backwards to peer 1 (wrapping around)
+    #[case(Some(0), vec![(0, ()), (1, ())], 0, Some(1), vec![(1, ())])]
+    fn test_on_disconnected(
+        #[case] last_scheduled_peer: Option<usize>,
+        #[case] pending_outgoing_messages: Vec<(usize, ())>,
+        #[case] disconnected_peer: usize,
+        #[case] expected_last_scheduled_peer: Option<usize>,
+        #[case] expected_pending_outgoing_messages: Vec<(usize, ())>,
+    ) {
+        let mut pending_outgoing_messages: IndexMap<usize, ()> =
+            pending_outgoing_messages.into_iter().collect();
+        let actual = super::on_disconnected(
+            last_scheduled_peer,
+            &mut pending_outgoing_messages,
+            &disconnected_peer,
+        );
+        assert_eq!(actual, expected_last_scheduled_peer);
+        assert_eq!(
+            pending_outgoing_messages,
+            expected_pending_outgoing_messages
+                .into_iter()
+                .collect::<IndexMap<usize, ()>>()
+        );
     }
 }
