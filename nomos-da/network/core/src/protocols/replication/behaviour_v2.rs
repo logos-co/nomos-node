@@ -140,7 +140,7 @@ pub struct ReplicationBehaviour<Membership> {
     connected: HashSet<PeerId>,
     /// Pending outgoing messages are stored here, they are then consumed by
     /// each respective outgoing stream
-    pending_outgoing_messages: HashMap<PeerId, VecDeque<DaMessage>>,
+    pending_outgoing_messages: VecDeque<(PeerId, DaMessage)>,
     /// Indicates which outgoing streams which are currently idle or busy
     outgoing_streams: HashMap<PeerId, StreamState>,
     /// TODO
@@ -223,9 +223,7 @@ where
             .filter(|peer_id| peers.contains(peer_id))
             .for_each(|peer_id| {
                 self.pending_outgoing_messages
-                    .entry(*peer_id)
-                    .or_default()
-                    .push_back(message.clone());
+                    .push_back((*peer_id, message.clone()));
             });
 
         self.try_wake();
@@ -333,7 +331,8 @@ where
 
     fn on_swarm_event(&mut self, event: FromSwarm) {
         if let FromSwarm::ConnectionClosed(ConnectionClosed { peer_id, .. }) = event {
-            self.connected.remove(&peer_id);
+            self.pending_outgoing_messages
+                .retain(|(id, _)| id != &peer_id);
         }
         self.stream_behaviour.on_swarm_event(event)
     }
@@ -354,6 +353,10 @@ where
         cx: &mut Context<'_>,
     ) -> Poll<ToSwarm<Self::ToSwarm, THandlerInEvent<Self>>> {
         let mut should_wake = false;
+        // The incoming message to be returned to the swarm **after** all the polling is
+        // done, this way we don't starve the tasks that are polled later in the
+        // sequence
+        let mut incoming_message = None;
 
         // Check if we've received any new messages
         match self.incoming_tasks.poll_next_unpin(cx) {
@@ -364,11 +367,14 @@ where
                 // Wait for any next incoming message on the same stream
                 self.incoming_tasks
                     .push(Self::try_read_message(peer_id, stream).boxed());
-                // Signal to the swarm that we've received the message
-                return Poll::Ready(ToSwarm::GenerateEvent(ReplicationEvent::IncomingMessage {
-                    peer_id,
-                    message: Box::new(message),
-                }));
+                // Signal to the swarm that we've received the message but poll the other tasks
+                // as well first
+                incoming_message = Some(Poll::Ready(ToSwarm::GenerateEvent(
+                    ReplicationEvent::IncomingMessage {
+                        peer_id,
+                        message: Box::new(message),
+                    },
+                )));
             }
             Poll::Ready(Some(Err(error))) => {
                 return Poll::Ready(ToSwarm::GenerateEvent(ReplicationEvent::ReplicationError {
@@ -381,24 +387,23 @@ where
         // we can write the next pending message to this stream if there is one
         match self.outgoing_tasks.poll_next_unpin(cx) {
             Poll::Ready(Some(Ok((peer_id, stream)))) => {
-                match self
+                let i = self
                     .pending_outgoing_messages
-                    .get_mut(&peer_id)
-                    .expect("At least one message has already been queued for this peer")
-                    .pop_front()
-                {
-                    // There is at least one more message to send, keep the stream busy
-                    Some(message) => {
-                        self.outgoing_tasks
-                            .push(Box::pin(Self::try_write_message(peer_id, message, stream)));
-                        should_wake = true;
-                    }
-                    // No more messages to send, put the stream back in the idle state
-                    None => {
-                        self.outgoing_streams
-                            .insert(peer_id, StreamState::Idle(stream));
-                    }
-                };
+                    .iter()
+                    .enumerate()
+                    .find_map(|(i, (id, _))| (id == &peer_id).then_some(i));
+                if let Some(i) = i {
+                    let (_, message) = self
+                        .pending_outgoing_messages
+                        .remove(i)
+                        .expect("Message is in the queue");
+                    self.outgoing_tasks
+                        .push(Box::pin(Self::try_write_message(peer_id, message, stream)));
+                    should_wake = true;
+                } else {
+                    self.outgoing_streams
+                        .insert(peer_id, StreamState::Idle(stream));
+                }
             }
             Poll::Ready(Some(Err(error))) => {
                 return Poll::Ready(ToSwarm::GenerateEvent(ReplicationEvent::ReplicationError {
@@ -408,21 +413,19 @@ where
             _ => {}
         }
         // Schedule writing pending messages to connected peers if possible,
-        // ie. if the streams for those peers are idle or haven't even been opened yet
-        for (peer_id, messages) in &mut self.pending_outgoing_messages {
-            if messages.is_empty() {
-                continue;
-            }
-
-            match self.outgoing_streams.entry(*peer_id) {
+        // ie. if the streams for those peers are idle or haven't even been opened yet,
+        // one message at a time
+        if let Some(peer_id) = self.pending_outgoing_messages.front().map(|(id, _)| *id) {
+            match self.outgoing_streams.entry(peer_id) {
                 Entry::Occupied(mut entry) => {
                     match entry.get_mut().take() {
                         StreamState::Idle(stream) => {
-                            let message = messages
+                            let (_, message) = self
+                                .pending_outgoing_messages
                                 .pop_front()
-                                .expect("At least one message is queued");
+                                .expect("Message is in the queue");
                             self.outgoing_tasks
-                                .push(Box::pin(Self::try_write_message(*peer_id, message, stream)));
+                                .push(Box::pin(Self::try_write_message(peer_id, message, stream)));
 
                             should_wake = true;
                         }
@@ -436,12 +439,11 @@ where
                 // first message into it
                 Entry::Vacant(entry) => {
                     entry.insert(StreamState::Busy);
-                    let message = messages
+                    let (_, message) = self
+                        .pending_outgoing_messages
                         .pop_front()
-                        .expect("At least one message is queued");
+                        .expect("Message is in the queue");
                     let control = self.control.clone();
-                    // Avoid "coercion requires that `'1` must outlive `'static`" compilation error
-                    let peer_id = *peer_id;
                     self.outgoing_tasks.push(Box::pin(async move {
                         let stream = Self::try_open_stream(peer_id, control).await?;
                         let (peer_id, stream) =
@@ -449,6 +451,7 @@ where
                         Ok((peer_id, stream))
                     }));
                     self.outgoing_streams.insert(peer_id, StreamState::Busy);
+
                     should_wake = true;
                 }
             }
@@ -458,6 +461,10 @@ where
             self.incoming_tasks
                 .push(Self::try_read_message(peer_id, stream).boxed());
             should_wake = true;
+        }
+
+        if let Some(incoming_message) = incoming_message {
+            return incoming_message;
         }
 
         // Always use the waker from the most recent context
