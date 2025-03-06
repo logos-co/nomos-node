@@ -17,6 +17,7 @@ nomos-core               = { workspace = true }
 nomos-da-messages        = { workspace = true }
 rand                     = "0.8"
 rand_chacha              = "0.3"
+rstest                   = "0.25"
 serde                    = "1.0"
 subnetworks-assignations = { workspace = true }
 thiserror                = "1.0"
