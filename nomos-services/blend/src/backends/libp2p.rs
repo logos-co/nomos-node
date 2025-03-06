@@ -16,21 +16,13 @@ use nomos_libp2p::{secret_key_serde, NetworkBehaviour};
 use overwatch_rs::overwatch::handle::OverwatchHandle;
 use rand::RngCore;
 use serde::{Deserialize, Serialize};
-use tokio::{
-    sync::{broadcast, mpsc},
-    task::JoinHandle,
-};
+use tokio::sync::{broadcast, mpsc};
 use tokio_stream::wrappers::BroadcastStream;
 
 use super::BlendBackend;
 
 /// A blend backend that uses the libp2p network stack.
 pub struct Libp2pBlendBackend {
-    #[expect(
-        dead_code,
-        reason = "We need to hold a reference to avoid the task gets dropped when it goes out of scope."
-    )]
-    task: JoinHandle<()>,
     swarm_message_sender: mpsc::Sender<BlendSwarmMessage>,
     incoming_message_sender: broadcast::Sender<Vec<u8>>,
 }
@@ -73,12 +65,11 @@ impl BlendBackend for Libp2pBlendBackend {
             incoming_message_sender.clone(),
         );
 
-        let task = overwatch_handle.runtime().spawn(async move {
+        overwatch_handle.runtime().spawn(async move {
             swarm.run().await;
         });
 
         Self {
-            task,
             swarm_message_sender,
             incoming_message_sender,
         }
