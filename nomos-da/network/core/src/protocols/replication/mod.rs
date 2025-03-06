@@ -23,7 +23,6 @@ mod test {
     };
 
     #[tokio::test]
-    #[expect(clippy::too_many_lines, reason = "Test function.")]
     async fn test_connects_and_receives_replication_messages() {
         fn get_swarm(
             key: Keypair,

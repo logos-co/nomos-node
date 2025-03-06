@@ -1,30 +1,9 @@
 pub use common_http_client::BasicAuthCredentials;
-use common_http_client::{CommonHttpClient, Error};
+use common_http_client::{CommonHttpClient, HttpError};
 use nomos_core::da::blob::Blob;
 use nomos_executor::api::{handlers::DispersalRequest, paths};
-use reqwest::{Client, ClientBuilder, StatusCode, Url};
-use serde::Serialize;
-
-#[derive(thiserror::Error, Debug)]
-pub enum HttpError {
-    #[error("Internal server error: {0}")]
-    Server(String),
-    #[error(transparent)]
-    Request(reqwest::Error),
-}
-
-#[derive(Clone)]
-pub struct BasicAuthCredentials {
-    username: String,
-    password: Option<String>,
-}
-
-impl BasicAuthCredentials {
-    #[must_use]
-    pub const fn new(username: String, password: Option<String>) -> Self {
-        Self { username, password }
-    }
-}
+use reqwest::Url;
+use serde::{de::DeserializeOwned, Serialize};
 
 #[derive(Clone)]
 pub struct ExecutorHttpClient {
@@ -66,7 +45,7 @@ impl ExecutorHttpClient {
     }
 
     /// Get the commitments for a specific `BlobId`
-    pub async fn get_commitments<B, C>(&self, blob_id: B::BlobId) -> Result<Option<C>, Error>
+    pub async fn get_commitments<B, C>(&self, blob_id: B::BlobId) -> Result<Option<C>, HttpError>
     where
         C: DeserializeOwned + Send + Sync,
         B: Blob + DeserializeOwned + Send + Sync,
@@ -80,7 +59,7 @@ impl ExecutorHttpClient {
         &self,
         blob_id: B::BlobId,
         column_idx: B::ColumnIndex,
-    ) -> Result<Option<C>, Error>
+    ) -> Result<Option<C>, HttpError>
     where
         C: DeserializeOwned + Send + Sync,
         B: Blob + DeserializeOwned + Send + Sync,

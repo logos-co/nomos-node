@@ -9,7 +9,7 @@ mod test {
     use kzgrs_backend::common::{blob::DaBlob, Column};
     use libp2p::{identity::Keypair, swarm::SwarmEvent, Multiaddr, PeerId, Swarm};
     use log::debug;
-    use rand::Rng;
+    use rand::Rng as _;
     use subnetworks_assignations::MembershipHandler;
     use tracing_subscriber::{fmt::TestWriter, EnvFilter};
 

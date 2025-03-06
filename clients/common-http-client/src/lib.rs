@@ -7,7 +7,7 @@ use reqwest::{Client, ClientBuilder, RequestBuilder, StatusCode, Url};
 use serde::{de::DeserializeOwned, Serialize};
 
 #[derive(thiserror::Error, Debug)]
-pub enum Error {
+pub enum HttpError {
     #[error("Internal server error: {0}")]
     Server(String),
     #[error(transparent)]
@@ -46,10 +46,12 @@ impl CommonHttpClient {
             basic_auth,
         }
     }
-}
 
-impl CommonHttpClient {
-    pub async fn post<Req, Res>(&self, request_path: &str, request_body: &Req) -> Result<Res, Error>
+    pub async fn post<Req, Res>(
+        &self,
+        request_path: &str,
+        request_body: &Req,
+    ) -> Result<Res, HttpError>
     where
         Req: Serialize + ?Sized + Send + Sync,
         Res: DeserializeOwned + Send + Sync,
@@ -59,7 +61,11 @@ impl CommonHttpClient {
         self.execute_request::<Res>(request).await
     }
 
-    pub async fn get<Req, Res>(&self, request_path: &str, request_body: &Req) -> Result<Res, Error>
+    pub async fn get<Req, Res>(
+        &self,
+        request_path: &str,
+        request_body: &Req,
+    ) -> Result<Res, HttpError>
     where
         Req: Serialize + ?Sized + Send + Sync,
         Res: DeserializeOwned + Send + Sync,
@@ -72,27 +78,27 @@ impl CommonHttpClient {
     async fn execute_request<Res: DeserializeOwned>(
         &self,
         mut request: RequestBuilder,
-    ) -> Result<Res, Error> {
+    ) -> Result<Res, HttpError> {
         if let Some(basic_auth) = &self.basic_auth {
             request = request.basic_auth(&basic_auth.username, basic_auth.password.as_deref());
         }
 
-        let response = request.send().await.map_err(Error::Request)?;
+        let response = request.send().await.map_err(HttpError::Request)?;
         let status = response.status();
-        let body = response.text().await.map_err(Error::Request)?;
+        let body = response.text().await.map_err(HttpError::Request)?;
 
         match status {
             StatusCode::OK => serde_json::from_str(&body)
-                .map_err(|e| Error::Server(format!("Failed to parse response: {e}"))),
-            StatusCode::INTERNAL_SERVER_ERROR => Err(Error::Server(body)),
-            _ => Err(Error::Server(format!(
+                .map_err(|e| HttpError::Server(format!("Failed to parse response: {e}"))),
+            StatusCode::INTERNAL_SERVER_ERROR => Err(HttpError::Server(body)),
+            _ => Err(HttpError::Server(format!(
                 "Unexpected response [{status}]: {body}",
             ))),
         }
     }
 
     /// Get the commitments for a Blob
-    pub async fn get_commitments<B, C>(&self, blob_id: B::BlobId) -> Result<Option<C>, Error>
+    pub async fn get_commitments<B, C>(&self, blob_id: B::BlobId) -> Result<Option<C>, HttpError>
     where
         C: DeserializeOwned + Send + Sync,
         B: Blob + DeserializeOwned + Send + Sync,
@@ -108,7 +114,7 @@ impl CommonHttpClient {
         &self,
         blob_id: B::BlobId,
         column_idx: B::ColumnIndex,
-    ) -> Result<Option<C>, Error>
+    ) -> Result<Option<C>, HttpError>
     where
         C: DeserializeOwned + Send + Sync,
         B: Blob + DeserializeOwned + Send + Sync,

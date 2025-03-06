@@ -1,12 +1,16 @@
 use common_http_client::CommonHttpClient;
 use kzgrs_backend::common::blob::{DaBlob, DaBlobSharedCommitments, DaLightBlob};
-use nomos_core::da::blob::Blob;
+use nomos_core::da::blob::Blob as _;
 use reqwest::Url;
 use tests::{
     common::da::{disseminate_with_metadata, wait_for_indexed_blob, APP_ID},
     topology::{Topology, TopologyConfig},
 };
 
+#[expect(
+    clippy::tests_outside_test_module,
+    reason = "Clippy false positive for integration tests"
+)]
 #[tokio::test]
 async fn test_get_blob_data() {
     let topology = Topology::spawn(TopologyConfig::validator_and_executor()).await;
@@ -41,14 +45,14 @@ async fn test_get_blob_data() {
 
     let client = CommonHttpClient::new(exec_url, None);
     let commitments = client
-        .get_commitments::<DaBlob, DaBlobSharedCommitments>(blob.id().try_into().unwrap())
+        .get_commitments::<DaBlob, DaBlobSharedCommitments>(blob.id())
         .await
         .unwrap();
 
     assert!(commitments.is_some());
 
     let blob_data = client
-        .get_blob::<DaBlob, DaLightBlob>(blob.id().try_into().unwrap(), blob.column_idx())
+        .get_blob::<DaBlob, DaLightBlob>(blob.id(), blob.column_idx())
         .await
         .unwrap();
 
