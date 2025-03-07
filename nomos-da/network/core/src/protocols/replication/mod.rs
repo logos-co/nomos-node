@@ -63,15 +63,13 @@ mod test {
 
         while let Some(expected_message) = expected_messages.front() {
             loop {
-                match swarm.select_next_some().await {
-                    SwarmEvent::Behaviour(ReplicationEvent::IncomingMessage {
-                        message, ..
-                    }) => {
-                        if &message == expected_message {
-                            break;
-                        }
+                if let SwarmEvent::Behaviour(ReplicationEvent::IncomingMessage {
+                    message, ..
+                }) = swarm.select_next_some().await
+                {
+                    if &message == expected_message {
+                        break;
                     }
-                    _ => {}
                 }
             }
 
