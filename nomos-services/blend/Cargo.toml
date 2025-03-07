@@ -7,7 +7,7 @@ version = "0.1.0"
 [dependencies]
 async-trait         = "0.1"
 futures             = "0.3"
-libp2p              = { version = "0.55", features = ["ed25519"] }
+libp2p              = { workspace = true, features = ["ed25519"] }
 nomos-blend         = { workspace = true }
 nomos-blend-message = { workspace = true }
 nomos-blend-network = { workspace = true, features = ["tokio"] }
