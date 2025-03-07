@@ -251,29 +251,23 @@ where
         peers
     }
 
-    fn replicate_message(&mut self, message: &DaMessage) {
-        let message_id = (message.blob.blob_id.to_vec(), message.subnetwork_id);
-        if self.seen_message_cache.contains(&message_id) {
-            return;
-        }
-        self.seen_message_cache.insert(message_id);
-        self.send_message(message);
-    }
-
     pub fn send_message(&mut self, message: &DaMessage) {
-        // Push a message in the queue for every single peer connected that is a member
-        // of the selected subnetwork_id
-        let peers = self.no_loopback_member_peers_of(message.subnetwork_id);
+        let message_id = (message.blob.blob_id.to_vec(), message.subnetwork_id);
+        if self.seen_message_cache.insert(message_id) {
+            // Push a message in the queue for every single peer connected that is a member
+            // of the selected subnetwork_id
+            let peers = self.no_loopback_member_peers_of(message.subnetwork_id);
 
-        self.connected
-            .iter()
-            .filter(|peer_id| peers.contains(peer_id))
-            .for_each(|peer_id| {
-                self.pending_outbound
-                    .enqueue_message(*peer_id, message.clone());
-            });
+            self.connected
+                .iter()
+                .filter(|peer_id| peers.contains(peer_id))
+                .for_each(|peer_id| {
+                    self.pending_outbound
+                        .enqueue_message(*peer_id, message.clone());
+                });
 
-        self.try_wake();
+            self.try_wake();
+        }
     }
 
     pub fn try_wake(&mut self) {
@@ -408,7 +402,7 @@ where
             Poll::Ready(Some(Ok((peer_id, message, stream)))) => {
                 // Replicate the message to all connected peers from the same subnet if we
                 // haven't seen it yet
-                self.replicate_message(&message);
+                self.send_message(&message);
                 // Schedule waiting for any next incoming message on the same stream
                 self.incoming_tasks
                     .push(Self::try_read_message(peer_id, stream).boxed());
