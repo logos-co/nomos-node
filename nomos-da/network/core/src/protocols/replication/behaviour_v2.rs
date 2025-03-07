@@ -101,7 +101,7 @@ impl ReplicationEvent {
 }
 
 type IncomingTask = BoxFuture<'static, Result<(PeerId, DaMessage, Stream), ReplicationError>>;
-type OutgoingTask = BoxFuture<'static, Result<(PeerId, Stream), ReplicationError>>;
+type OutboundTask = BoxFuture<'static, Result<(PeerId, Stream), ReplicationError>>;
 
 enum StreamState {
     Idle(Stream),
@@ -116,6 +116,46 @@ impl StreamState {
     }
 }
 
+#[derive(Default)]
+struct PendingOutbound {
+    /// Pending outbound message queues for each peer
+    messages: IndexMap<PeerId, VecDeque<DaMessage>>,
+    /// The last peer whose pending message was scheduled for sending
+    last_scheduled: Option<PeerId>,
+}
+
+impl PendingOutbound {
+    /// Appends a message to the peer's pending queue. Lazily creates the queue
+    /// for the peer upon the first call.
+    fn enqueue_message(&mut self, peer_id: PeerId, message: DaMessage) {
+        self.messages.entry(peer_id).or_default().push_back(message);
+    }
+
+    /// ### Panics
+    ///
+    /// [`Self::enqueue_message`] must be called at least once for the peer
+    /// before calling this method or it will panic.
+    fn dequeue_message(&mut self, peer_id: &PeerId) -> Option<DaMessage> {
+        self.messages
+            .get_mut(peer_id)
+            .expect("Peer is in the map")
+            .pop_front()
+    }
+
+    /// Do internal housekeeping when a peer disconnects.
+    fn on_disconnected(&mut self, peer_id: &PeerId) {
+        self.last_scheduled = on_disconnected(&mut self.messages, self.last_scheduled, peer_id);
+    }
+
+    /// Find the next peer whose pending message can be scheduled for writing to
+    /// the peer's stream. Peers are iterated in a round-robin fashion.
+    fn next_peer(&mut self, is_stream_idle_fn: impl FnMut(&PeerId) -> bool) -> Option<PeerId> {
+        let next = next_peer(&self.last_scheduled, &self.messages, is_stream_idle_fn);
+        self.last_scheduled = next;
+        next
+    }
+}
+
 /// Nomos DA broadcast network behaviour
 /// This item handles the logic of the nomos da subnetworks broadcasting
 /// DA subnetworks are a logical distribution of subsets.
@@ -127,7 +167,7 @@ pub struct ReplicationBehaviour<Membership> {
     local_peer_id: PeerId,
     /// Underlying stream behaviour
     stream_behaviour: libp2p_stream::Behaviour,
-    /// Used to open new outgoing streams from the stream behaviour
+    /// Used to open new outbound streams from the stream behaviour
     control: Control,
     /// Provides inbound streams that are accepted by the stream behaviour
     incoming_streams: IncomingStreams,
@@ -138,15 +178,13 @@ pub struct ReplicationBehaviour<Membership> {
     membership: Membership,
     /// Relation of connected peers of replication subnetworks
     connected: HashSet<PeerId>,
-    /// Pending outgoing messages are stored here, they are then consumed by
-    /// each respective outgoing stream
-    pending_outgoing_messages: IndexMap<PeerId, VecDeque<DaMessage>>,
-    /// The last peer whose pending message was scheduled for sending
-    previous_scheduled_pending: Option<PeerId>,
-    /// Indicates which outgoing streams which are currently idle or busy
-    outgoing_streams: HashMap<PeerId, StreamState>,
-    /// Holds tasks for writing messages the the outgoing streams
-    outgoing_tasks: FuturesUnordered<OutgoingTask>,
+    /// Pending outbound messages are stored here, they are then consumed by
+    /// each respective outbound stream
+    pending_outbound: PendingOutbound,
+    /// Indicates which outbound streams are currently idle or busy
+    outbound_streams: HashMap<PeerId, StreamState>,
+    /// Holds tasks for writing messages to the outbound streams
+    outbound_tasks: FuturesUnordered<OutboundTask>,
     /// Seen messages cache holds a record of seen messages
     seen_message_cache: IndexSet<(Vec<u8>, SubnetworkId)>,
     /// Waker that handles polling
@@ -161,7 +199,7 @@ impl<Membership> ReplicationBehaviour<Membership> {
             .accept(REPLICATION_PROTOCOL)
             .expect("A unique protocol can be accepted only once");
         let incoming_tasks = FuturesUnordered::new();
-        let outgoing_tasks = FuturesUnordered::new();
+        let outbound_tasks = FuturesUnordered::new();
 
         Self {
             local_peer_id: peer_id,
@@ -171,10 +209,9 @@ impl<Membership> ReplicationBehaviour<Membership> {
             incoming_tasks,
             membership,
             connected: Default::default(),
-            pending_outgoing_messages: Default::default(),
-            previous_scheduled_pending: None,
-            outgoing_streams: Default::default(),
-            outgoing_tasks,
+            pending_outbound: Default::default(),
+            outbound_streams: Default::default(),
+            outbound_tasks,
             seen_message_cache: Default::default(),
             waker: None,
         }
@@ -224,10 +261,8 @@ where
             .iter()
             .filter(|peer_id| peers.contains(peer_id))
             .for_each(|peer_id| {
-                self.pending_outgoing_messages
-                    .entry(*peer_id)
-                    .or_default()
-                    .push_back(message.clone());
+                self.pending_outbound
+                    .enqueue_message(*peer_id, message.clone());
             });
 
         self.try_wake();
@@ -337,12 +372,8 @@ where
     fn on_swarm_event(&mut self, event: FromSwarm) {
         if let FromSwarm::ConnectionClosed(ConnectionClosed { peer_id, .. }) = event {
             self.connected.remove(&peer_id);
-            self.outgoing_streams.remove(&peer_id);
-            self.previous_scheduled_pending = on_disconnected(
-                self.previous_scheduled_pending,
-                &mut self.pending_outgoing_messages,
-                &peer_id,
-            );
+            self.outbound_streams.remove(&peer_id);
+            self.pending_outbound.on_disconnected(&peer_id);
         }
         self.stream_behaviour.on_swarm_event(event)
     }
@@ -393,24 +424,19 @@ where
             }
             _ => {}
         }
-        // If any of the busy outgoing streams has finished sending a message,
+        // If any of the busy outbound streams has finished sending a message,
         // we can write the next pending message to this stream if there is one
-        match self.outgoing_tasks.poll_next_unpin(cx) {
+        match self.outbound_tasks.poll_next_unpin(cx) {
             Poll::Ready(Some(Ok((peer_id, stream)))) => {
-                match self
-                    .pending_outgoing_messages
-                    .get_mut(&peer_id)
-                    .expect("At least one message for this peer has been sent")
-                    .pop_front()
-                {
+                match self.pending_outbound.dequeue_message(&peer_id) {
                     Some(message) => {
-                        self.outgoing_tasks
+                        self.outbound_tasks
                             .push(Box::pin(Self::try_write_message(peer_id, message, stream)));
 
                         should_wake = true;
                     }
                     None => {
-                        self.outgoing_streams
+                        self.outbound_streams
                             .insert(peer_id, StreamState::Idle(stream));
                     }
                 }
@@ -424,33 +450,28 @@ where
         }
 
         // Pick the next peer that has a pending message and an idle or unopened stream
-        // and schedule writing the message to it.
-        let next_peer = next_pending(
-            &self.previous_scheduled_pending,
-            &self.pending_outgoing_messages,
-            |id| {
-                matches!(
-                    self.outgoing_streams.get(id),
-                    Some(StreamState::Idle(_)) | None
-                )
-            },
-        );
+        // and schedule writing a message to it.
+        let next_peer = self.pending_outbound.next_peer(|id| {
+            matches!(
+                self.outbound_streams.get(id),
+                Some(StreamState::Idle(_)) | None
+            )
+        });
 
         if let Some(peer_id) = next_peer {
             let message = self
-                .pending_outgoing_messages
-                .get_mut(&peer_id)
-                .expect("Peer is in the map")
-                .pop_front()
-                .expect("Message is in the queue");
-            match self.outgoing_streams.entry(peer_id) {
+                .pending_outbound
+                .dequeue_message(&peer_id)
+                .expect("Message is in the queue, ensured by PendingOutbound::next_peer()");
+
+            match self.outbound_streams.entry(peer_id) {
                 Entry::Occupied(mut entry) => match entry.get_mut().take() {
                     StreamState::Idle(stream) => {
-                        self.outgoing_tasks
+                        self.outbound_tasks
                             .push(Box::pin(Self::try_write_message(peer_id, message, stream)));
                     }
                     StreamState::Busy => {
-                        unreachable!("The stream is idle, ensured by next_pending()")
+                        unreachable!("The stream is idle, ensured by PendingOutbound::next_peer()")
                     }
                 },
                 // If there is no stream for this peer yet, try to open one, and then write the
@@ -458,7 +479,7 @@ where
                 Entry::Vacant(entry) => {
                     entry.insert(StreamState::Busy);
                     let control = self.control.clone();
-                    self.outgoing_tasks.push(Box::pin(async move {
+                    self.outbound_tasks.push(Box::pin(async move {
                         let stream = Self::try_open_stream(peer_id, control).await?;
                         let (peer_id, stream) =
                             Self::try_write_message(peer_id, message, stream).await?;
@@ -469,8 +490,6 @@ where
 
             should_wake = true;
         }
-
-        self.previous_scheduled_pending = next_peer;
 
         // Schedule reading from any new incoming streams if possible
         if let Poll::Ready(Some((peer_id, stream))) = self.incoming_streams.poll_next_unpin(cx) {
@@ -502,9 +521,9 @@ where
 /// previous peer at the end. This ensures we're fair scheduling one
 /// message per peer at a time, iterating the peers in a round-robin
 /// fashion.
-fn next_pending<K, M>(
+fn next_peer<K, M>(
     previous: &Option<K>,
-    pending_outgoing_messages: &IndexMap<K, VecDeque<M>>,
+    pending_outbound_messages: &IndexMap<K, VecDeque<M>>,
     mut is_stream_idle_fn: impl FnMut(&K) -> bool,
 ) -> Option<K>
 where
@@ -512,17 +531,17 @@ where
 {
     match previous {
         Some(previous) => {
-            let i = pending_outgoing_messages
+            let i = pending_outbound_messages
                 .get_index_of(previous)
                 .expect("Peer to be present");
-            pending_outgoing_messages[i + 1..]
+            pending_outbound_messages[i + 1..]
                 .iter()
-                .chain(pending_outgoing_messages[..=i].iter())
+                .chain(pending_outbound_messages[..=i].iter())
                 .find_map(|(id, messages)| {
                     (!messages.is_empty() && is_stream_idle_fn(id)).then_some(*id)
                 })
         }
-        None => pending_outgoing_messages.iter().find_map(|(id, messages)| {
+        None => pending_outbound_messages.iter().find_map(|(id, messages)| {
             (!messages.is_empty() && is_stream_idle_fn(id)).then_some(*id)
         }),
     }
@@ -533,32 +552,26 @@ where
 /// continues where we left off last time. This function returns the corrected
 /// marker value.
 fn on_disconnected<P, Q>(
-    previous_scheduled_pending: Option<P>,
-    pending_outgoing_messages: &mut IndexMap<P, Q>,
-    peer_id: &P,
+    messages: &mut IndexMap<P, Q>,
+    last_scheduled: Option<P>,
+    disconnected: &P,
 ) -> Option<P>
 where
     P: Copy + Eq + std::hash::Hash,
 {
     // Store marker index
-    let i = previous_scheduled_pending.map(|id| {
-        pending_outgoing_messages
-            .get_index_of(&id)
-            .expect("Peer to be present")
-    });
+    let i = last_scheduled.map(|id| messages.get_index_of(&id).expect("Peer to be present"));
     // Remove disconnected peer and its pending messages
-    pending_outgoing_messages.shift_remove(peer_id);
+    messages.shift_remove(disconnected);
     // If the marker pointed to the disconnected peer, move it backwards one step,
     // wrapping around if necessary
-    previous_scheduled_pending.and_then(|id| {
-        if id == *peer_id {
+    last_scheduled.and_then(|id| {
+        if id == *disconnected {
             let i = i.expect("Valid index");
             if i == 0 {
-                pending_outgoing_messages.last().map(|(id, _)| *id)
+                messages.last().map(|(id, _)| *id)
             } else {
-                pending_outgoing_messages
-                    .get_index(i - 1)
-                    .map(|(id, _)| *id)
+                messages.get_index(i - 1).map(|(id, _)| *id)
             }
         } else {
             None
@@ -611,18 +624,18 @@ mod tests {
     #[case(Some(1), vec![(0, vec![]), (1, vec![])], Some(0), None)]
     fn test_next_pending(
         #[case] previous: Option<usize>,
-        #[case] pending_outgoing_messages: Vec<(usize, Vec<()>)>,
+        #[case] pending_outbound_messages: Vec<(usize, Vec<()>)>,
         #[case] idle_stream: Option<usize>,
         #[case] expected_next: Option<usize>,
     ) {
-        let pending_outgoing_messages: IndexMap<usize, VecDeque<()>> = pending_outgoing_messages
+        let pending_outbound_messages: IndexMap<usize, VecDeque<()>> = pending_outbound_messages
             .into_iter()
             .map(|(id, messages)| (id, messages.into_iter().collect()))
             .collect();
         let actual_next =
-            super::next_pending(
+            super::next_peer(
                 &previous,
-                &pending_outgoing_messages,
+                &pending_outbound_messages,
                 |peer_id| match idle_stream {
                     Some(idle_stream) => idle_stream == *peer_id,
                     None => false,
@@ -644,22 +657,22 @@ mod tests {
     #[case(Some(0), vec![(0, ()), (1, ())], 0, Some(1), vec![(1, ())])]
     fn test_on_disconnected(
         #[case] last_scheduled_peer: Option<usize>,
-        #[case] pending_outgoing_messages: Vec<(usize, ())>,
+        #[case] pending_messages: Vec<(usize, ())>,
         #[case] disconnected_peer: usize,
         #[case] expected_last_scheduled_peer: Option<usize>,
-        #[case] expected_pending_outgoing_messages: Vec<(usize, ())>,
+        #[case] expected_pending_messages: Vec<(usize, ())>,
     ) {
-        let mut pending_outgoing_messages: IndexMap<usize, ()> =
-            pending_outgoing_messages.into_iter().collect();
+        let mut pending_outbound_messages: IndexMap<usize, ()> =
+            pending_messages.into_iter().collect();
         let actual = super::on_disconnected(
+            &mut pending_outbound_messages,
             last_scheduled_peer,
-            &mut pending_outgoing_messages,
             &disconnected_peer,
         );
         assert_eq!(actual, expected_last_scheduled_peer);
         assert_eq!(
-            pending_outgoing_messages,
-            expected_pending_outgoing_messages
+            pending_outbound_messages,
+            expected_pending_messages
                 .into_iter()
                 .collect::<IndexMap<usize, ()>>()
         );
