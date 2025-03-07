@@ -73,7 +73,7 @@ impl Clone for ReplicationError {
     }
 }
 
-/// Nomos DA BroadcastEvents to be bubble up to logic layers
+/// Nomos DA BroadcastEvents to be bubbled up to logic layers
 #[derive(Debug)]
 pub enum ReplicationEvent {
     IncomingMessage {
@@ -116,6 +116,8 @@ impl StreamState {
     }
 }
 
+/// Holds pending outbound messages for each peer and manages which message
+/// should be scheduled next for writing to an outbound stream.
 #[derive(Default)]
 struct PendingOutbound {
     /// Pending outbound message queues for each peer
@@ -156,8 +158,8 @@ impl PendingOutbound {
     }
 }
 
-/// Nomos DA broadcast network behaviour
-/// This item handles the logic of the nomos da subnetworks broadcasting
+/// Nomos DA broadcast network behaviour.
+/// This item handles the logic of the nomos da subnetworks broadcasting.
 /// DA subnetworks are a logical distribution of subsets.
 /// A node just connects and accepts connections to other nodes that are in the
 /// same subsets. A node forwards messages to all connected peers which are
@@ -176,7 +178,7 @@ pub struct ReplicationBehaviour<Membership> {
     /// Membership handler, membership handles the subsets logics on who is
     /// where in the nomos DA subnetworks
     membership: Membership,
-    /// Relation of connected peers of replication subnetworks
+    /// Currently connected peers
     connected: HashSet<PeerId>,
     /// Pending outbound messages are stored here, they are then consumed by
     /// each respective outbound stream
@@ -285,8 +287,7 @@ where
         Ok((peer_id, message, stream))
     }
 
-    /// Attempt to open a new stream from the underlying control to the provided
-    /// peer
+    /// Attempt to open a new stream from the underlying control to the peer
     async fn try_open_stream(
         peer_id: PeerId,
         mut control: Control,
@@ -514,13 +515,11 @@ where
     }
 }
 
-/// Find the next peer after the previous one that has at least one
-/// pending message and its associated stream is idle or hasn't been
-/// opened yet. Iterate over all peers, starting with the one
-/// after the previous peer, wrap around and finish with the
-/// previous peer at the end. This ensures we're fair scheduling one
-/// message per peer at a time, iterating the peers in a round-robin
-/// fashion.
+/// Find the next peer that has at least one pending message and its associated
+/// stream is idle or hasn't been opened yet. Iterate over all peers, starting
+/// with the one after the previous peer, wrap around and finish with the
+/// previous peer at the end. This ensures we're fair scheduling one message per
+/// peer at a time, iterating the peers in a round-robin fashion.
 fn next_peer<K, M>(
     previous: &Option<K>,
     pending_outbound_messages: &IndexMap<K, VecDeque<M>>,
@@ -547,10 +546,10 @@ where
     }
 }
 
-/// If the marker points to a peer that has been disconnected, the marker needs
-/// to be moved back one step, so that the search for the next peer in poll()
-/// continues where we left off last time. This function returns the corrected
-/// marker value.
+/// If the `last_scheduled` marker points to a peer that has been disconnected,
+/// the marker needs to be moved back one step, so that the search for the next
+/// peer in `poll()` continues where we left off last time. This function
+/// returns the corrected marker value.
 fn on_disconnected<P, Q>(
     messages: &mut IndexMap<P, Q>,
     last_scheduled: Option<P>,
@@ -622,7 +621,7 @@ mod tests {
     #[case(Some(0), vec![(0, vec![()]), (1, vec![()])], None, None)]
     // All queues empty
     #[case(Some(1), vec![(0, vec![]), (1, vec![])], Some(0), None)]
-    fn test_next_pending(
+    fn test_next_peer(
         #[case] previous: Option<usize>,
         #[case] pending_outbound_messages: Vec<(usize, Vec<()>)>,
         #[case] idle_stream: Option<usize>,
