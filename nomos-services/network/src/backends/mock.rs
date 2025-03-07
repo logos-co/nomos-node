@@ -116,7 +116,7 @@ pub struct MockConfig {
 
 pub enum MockBackendMessage {
     BootProducer {
-        #[expect(clippy::type_complexity)]
+        #[expect(clippy::type_complexity, reason = "TODO: Address this at some point.")]
         spawner: Box<
             dyn Fn(
                     BoxFuture<'static, Result<(), overwatch_rs::DynError>>,
@@ -318,7 +318,7 @@ mod tests {
     static BAR_BROADCAST_MESSAGES: &[&str] = &["bar1"];
 
     #[tokio::test]
-    #[expect(clippy::too_many_lines)]
+    #[expect(clippy::too_many_lines, reason = "Test function")]
     async fn test_mock_network() {
         let config = MockConfig {
             predefined_messages: vec![

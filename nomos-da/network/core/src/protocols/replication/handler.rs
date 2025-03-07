@@ -21,7 +21,10 @@ use crate::protocol::REPLICATION_PROTOCOL;
 pub type DaMessage = nomos_da_messages::replication::ReplicationRequest;
 
 /// Events that bubbles up from the `BroadcastHandler` to the `NetworkBehaviour`
-#[expect(clippy::large_enum_variant)]
+#[expect(
+    clippy::large_enum_variant,
+    reason = "TODO: Address this at some point."
+)]
 #[derive(Debug)]
 pub enum HandlerEventToBehaviour {
     IncomingMessage { message: DaMessage },
@@ -186,12 +189,12 @@ impl ConnectionHandler for ReplicationHandler {
     type InboundOpenInfo = ();
     type OutboundOpenInfo = ();
 
-    #[expect(deprecated)]
+    #[expect(deprecated, reason = "Self::InboundProtocol is deprecated.")]
     fn listen_protocol(&self) -> SubstreamProtocol<Self::InboundProtocol, Self::InboundOpenInfo> {
         SubstreamProtocol::new(ReadyUpgrade::new(REPLICATION_PROTOCOL), ())
     }
 
-    #[expect(deprecated)]
+    #[expect(deprecated, reason = "Self::OutboundProtocol is deprecated.")]
     fn poll(
         &mut self,
         cx: &mut Context<'_>,

@@ -69,8 +69,6 @@ rustflags = [
   "-Aclippy::wildcard_enum_match_arm",
 
   # TODO: Address these lints at some point.
-  "-Aclippy::allow_attributes",
-  "-Aclippy::allow_attributes_without_reason",
   "-Aclippy::arithmetic_side_effects",
   "-Aclippy::as_conversions",
   "-Aclippy::as_pointer_underscore",

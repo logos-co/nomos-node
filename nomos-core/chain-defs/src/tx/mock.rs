@@ -51,7 +51,10 @@ impl<M: Serialize> Transaction for MockTransaction<M> {
     }
 }
 
-#[expect(clippy::fallible_impl_from)]
+#[expect(
+    clippy::fallible_impl_from,
+    reason = "`TryFrom` impl conflicting with blanket impl."
+)]
 impl<M: Serialize> From<M> for MockTransaction<M> {
     fn from(msg: M) -> Self {
         let id = MockTxId::try_from(serialize(&msg).unwrap().as_slice()).unwrap();

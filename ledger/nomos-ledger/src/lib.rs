@@ -415,7 +415,10 @@ impl LedgerState {
     }
 }
 
-#[expect(clippy::missing_fields_in_debug)]
+#[expect(
+    clippy::missing_fields_in_debug,
+    reason = "No epoch info in debug output."
+)]
 impl core::fmt::Debug for LedgerState {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("LedgerState")
