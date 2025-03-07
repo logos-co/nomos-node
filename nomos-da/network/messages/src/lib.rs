@@ -1,5 +1,6 @@
 pub mod common;
 pub mod dispersal;
+pub mod http;
 pub mod packing;
 pub mod replication;
 pub mod sampling;

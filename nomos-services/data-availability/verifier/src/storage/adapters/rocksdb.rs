@@ -48,33 +48,31 @@ where
         }
     }
 
-    async fn add_blob(&self, blob: Self::Blob) -> Result<(), DynError> {
-        let blob_id = blob.id();
-        let column_idx = blob.column_idx();
-        let (light_blob, shared_commitments) = blob.into_blob_and_shared_commitments();
+    async fn add_blob(
+        &self,
+        blob_id: <Self::Blob as Blob>::BlobId,
+        column_idx: <Self::Blob as Blob>::ColumnIndex,
+        shared_commitments: <Self::Blob as Blob>::SharedCommitments,
+        light_blob: <Self::Blob as Blob>::LightBlob,
+    ) -> Result<(), DynError> {
+        let blob_idx = create_blob_idx(blob_id.as_ref(), column_idx.as_ref());
+        let blob_key = key_bytes(DA_BLOB_PREFIX, blob_idx);
+        let shared_commitments_key = key_bytes(DA_SHARED_COMMITMENTS_PREFIX, &blob_id);
 
         try_join!(
-            {
-                // Store the blob in the storage backend.
-                let blob_idx = create_blob_idx(blob_id.as_ref(), column_idx.as_ref());
-                let blob_key = key_bytes(DA_BLOB_PREFIX, blob_idx);
-                self.storage_relay.send(StorageMsg::Store {
-                    key: blob_key,
-                    value: S::serialize(light_blob),
-                })
-            },
-            {
-                let shared_commitments_key = key_bytes(DA_SHARED_COMMITMENTS_PREFIX, &blob_id);
-                self.storage_relay.send(StorageMsg::Store {
-                    key: shared_commitments_key,
-                    value: S::serialize(shared_commitments),
-                })
-            }
+            self.storage_relay.send(StorageMsg::Store {
+                key: blob_key,
+                value: S::serialize(light_blob),
+            }),
+            self.storage_relay.send(StorageMsg::Store {
+                key: shared_commitments_key,
+                value: S::serialize(shared_commitments),
+            })
         )
-        .map(|_| ())
-        .map_err(|e| format!("Failed to store blob in storage adapter: {e:?}").into())
-    }
+        .map_err(|(e, _)| DynError::from(e))?;
 
+        Ok(())
+    }
     async fn get_blob(
         &self,
         blob_id: <Self::Blob as Blob>::BlobId,
