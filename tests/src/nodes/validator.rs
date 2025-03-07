@@ -114,7 +114,6 @@ impl Validator {
             .clone_into(&mut config.da_indexer.storage.blob_storage_directory);
 
         serde_yaml::to_writer(&mut file, &config).unwrap();
-        println!("debug config path: {}", config_path.display());
         let child = Command::new(std::env::current_dir().unwrap().join(BIN_PATH))
             .arg(&config_path)
             .current_dir(dir.path())
