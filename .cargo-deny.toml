@@ -12,6 +12,9 @@ ignore = [
   { id = "RUSTSEC-2024-0370", reason = "`proc-macro-error` is unmaintained; consider using an alternative. Use `cargo tree -p proc-macro-error -i > tmp.txt` to check the dependency tree." },
   { id = "RUSTSEC-2024-0384", reason = "`instant` is unmaintained; consider using an alternative. Use `cargo tree -p instant -i > tmp.txt` to check the dependency tree." },
   { id = "RUSTSEC-2024-0388", reason = "`derivative` is unmaintained; consider using an alternative. Use `cargo tree -p derivative -i > tmp.txt` to check the dependency tree." },
+  { id = "RUSTSEC-2024-0436", reason = "`paste` has a security vulnerability; consider using an alternative. Use `cargo tree -p paste -i > tmp.txt` to check the dependency tree." },
+  { id = "RUSTSEC-2025-0009", reason = "`ring@0.17.9` has a security vulnerability; consider using an alternative. Use `cargo tree -p ring@0.17.9 -i > tmp.txt` to check the dependency tree." },
+  { id = "RUSTSEC-2025-0010", reason = "`ring@0.16.20` is unmaintained; consider using an alternative. Use `cargo tree -p ring@0.16.20 -i > tmp.txt` to check the dependency tree." },
 ]
 yanked = "deny"
 
