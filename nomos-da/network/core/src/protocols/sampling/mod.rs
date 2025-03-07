@@ -20,7 +20,7 @@ mod test {
     };
 
     #[tokio::test]
-    #[expect(clippy::too_many_lines)]
+    #[expect(clippy::too_many_lines, reason = "TODO: Test function")]
     async fn test_sampling_two_peers() {
         const MSG_COUNT: usize = 10;
         async fn test_sampling_swarm(

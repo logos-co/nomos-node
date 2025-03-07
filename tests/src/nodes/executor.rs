@@ -172,7 +172,7 @@ impl Executor {
 }
 
 #[must_use]
-#[expect(clippy::too_many_lines)]
+#[expect(clippy::too_many_lines, reason = "TODO: Address this at some point.")]
 pub fn create_executor_config(config: GeneralConfig) -> Config {
     Config {
         network: NetworkConfig {

@@ -26,9 +26,10 @@ use time::Duration;
 ///         duration: Duration,
 ///     }
 /// ```
-// The `TimeTag` trait is not public, is just to tie up types for
-// `MinimalBoundedDuration` and its implemented only by the supported types.
-#[expect(private_bounds)]
+#[expect(
+    private_bounds,
+    reason = "The `TimeTag` trait is not public, is just to tie up types for `MinimalBoundedDuration` and its implemented only by the supported types."
+)]
 #[derive(Serialize)]
 #[serde(transparent)]
 pub struct MinimalBoundedDuration<const MIN_DURATION: usize, TAG: TimeTag> {

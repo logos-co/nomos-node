@@ -30,9 +30,10 @@ impl<const SIZE: usize, B: DispersedBlobInfo> BlobSelect for FillSize<SIZE, B> {
         &self,
         certificates: I,
     ) -> impl Iterator<Item = Self::BlobId> + 'i {
-        #[expect(clippy::redundant_closure_for_method_calls)]
-        // TODO: Replace this redundant closure with `B::size` without triggering compiler errors
-        // about B not living long enough.
+        #[expect(
+            clippy::redundant_closure_for_method_calls,
+            reason = "TODO: Replace this redundant closure with `B::size` without triggering compiler errors about B not living long enough."
+        )]
         {
             utils::select::select_from_till_fill_size::<SIZE, Self::BlobId>(
                 |c| c.size(),
