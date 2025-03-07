@@ -10,7 +10,7 @@ fixed                    = { version = "1", features = ["serde-str"] }
 futures                  = "0.3"
 indexmap                 = "2.2"
 kzgrs-backend            = { workspace = true }
-libp2p                   = { version = "0.55", features = ["macros", "quic", "tokio"] }
+libp2p                   = { workspace = true, features = ["macros", "quic", "tokio"] }
 libp2p-stream            = "0.3.0-alpha"
 log                      = "0.4"
 nomos-core               = { workspace = true }
@@ -29,7 +29,7 @@ tracing-subscriber       = "0.3.18"
 blake2             = "0.10"
 kzgrs              = { workspace = true }
 kzgrs-backend      = { workspace = true, features = ["testutils"] }
-libp2p             = { version = "0.55", features = ["ed25519", "macros", "noise", "ping", "quic", "tcp", "yamux", "plaintext"] }
+libp2p             = { workspace = true, features = ["ed25519", "macros", "noise", "ping", "quic", "tcp", "yamux", "plaintext"] }
 libp2p-swarm-test  = { version = "0.5.0", features = ["tokio"]}
 tokio              = { version = "1", features = ["macros", "rt-multi-thread", "time"] }
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }

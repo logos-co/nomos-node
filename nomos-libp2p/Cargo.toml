@@ -8,7 +8,7 @@ version = "0.1.0"
 blake2    = { version = "0.10" }
 futures   = "0.3"
 hex       = "0.4.3"
-libp2p    = { version = "0.55", features = ["dns", "gossipsub", "macros", "quic", "secp256k1", "tokio"] }
+libp2p    = { workspace = true, features = ["dns", "gossipsub", "macros", "quic", "secp256k1", "tokio"] }
 log       = "0.4.19"
 multiaddr = "0.18"
 serde     = { version = "1.0.166", features = ["derive"] }
