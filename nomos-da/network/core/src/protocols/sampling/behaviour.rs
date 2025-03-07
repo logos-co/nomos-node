@@ -736,7 +736,7 @@ impl<M: MembershipHandler<Id = PeerId, NetworkId = SubnetworkId> + 'static> Netw
                 .and_then(|peer_id: PeerId| self.membership.get_address(&peer_id))
             {
                 opts = DialOpts::peer_id(opts.get_peer_id().unwrap())
-                    .addresses(vec![address.clone()])
+                    .addresses(vec![address])
                     .extend_addresses_through_behaviour()
                     .build();
                 return Poll::Ready(ToSwarm::Dial { opts });

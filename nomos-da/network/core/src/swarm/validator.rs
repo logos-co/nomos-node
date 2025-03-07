@@ -19,7 +19,6 @@ use tokio_stream::wrappers::{IntervalStream, UnboundedReceiverStream};
 
 use super::ConnectionBalancer;
 use crate::{
-    address_book::AddressBook,
     behaviour::validator::{ValidatorBehaviour, ValidatorBehaviourEvent},
     protocols::{
         dispersal::validator::behaviour::DispersalEvent, replication::behaviour::ReplicationEvent,

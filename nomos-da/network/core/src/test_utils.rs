@@ -39,8 +39,8 @@ impl AllNeighbours {
         self.neighbours.lock().unwrap().insert(id);
     }
 
-    pub fn update_addresses(&self, _addressbook: Vec<(PeerId, libp2p::Multiaddr)>) {
-        self.addresses.lock().unwrap().extend(_addressbook);
+    pub fn update_addresses(&self, addressbook: Vec<(PeerId, libp2p::Multiaddr)>) {
+        self.addresses.lock().unwrap().extend(addressbook);
     }
 }
 

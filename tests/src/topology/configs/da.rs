@@ -115,7 +115,7 @@ pub fn create_da_configs(ids: &[[u8; 32]], da_params: &DaParams) -> Vec<GeneralD
 
     let membership = NomosDaMembership::new(
         &peer_ids,
-        addresses.clone(),
+        addresses,
         da_params.subnetwork_size,
         da_params.dispersal_factor,
     );

@@ -128,7 +128,7 @@ where
         if let Some(peer) = self.peers_to_dial.pop_front() {
             if let Some(addr) = self.membership.get_address(&peer) {
                 let opts = DialOpts::peer_id(peer)
-                    .addresses(vec![addr.clone()])
+                    .addresses(vec![addr])
                     .extend_addresses_through_behaviour()
                     .build();
                 return Poll::Ready(ToSwarm::Dial { opts });
