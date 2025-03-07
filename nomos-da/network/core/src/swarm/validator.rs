@@ -19,7 +19,6 @@ use tokio_stream::wrappers::{IntervalStream, UnboundedReceiverStream};
 
 use super::ConnectionBalancer;
 use crate::{
-    address_book::AddressBook,
     behaviour::validator::{ValidatorBehaviour, ValidatorBehaviourEvent},
     protocols::{
         dispersal::validator::behaviour::DispersalEvent, replication::behaviour::ReplicationEvent,
@@ -70,7 +69,6 @@ where
     pub fn new(
         key: Keypair,
         membership: Membership,
-        addresses: AddressBook,
         policy_settings: DAConnectionPolicySettings,
         monitor_settings: DAConnectionMonitorSettings,
         balancer_interval: Duration,
@@ -103,14 +101,7 @@ where
 
         (
             Self {
-                swarm: Self::build_swarm(
-                    key,
-                    membership,
-                    addresses,
-                    balancer,
-                    monitor,
-                    redial_cooldown,
-                ),
+                swarm: Self::build_swarm(key, membership, balancer, monitor, redial_cooldown),
                 sampling_events_sender,
                 validation_events_sender,
             },
@@ -123,7 +114,6 @@ where
     fn build_swarm(
         key: Keypair,
         membership: Membership,
-        addresses: AddressBook,
         balancer: ConnectionBalancer<Membership>,
         monitor: ConnectionMonitor<Membership>,
         redial_cooldown: Duration,
@@ -138,14 +128,7 @@ where
             .with_tokio()
             .with_quic()
             .with_behaviour(|key| {
-                ValidatorBehaviour::new(
-                    key,
-                    membership,
-                    addresses,
-                    balancer,
-                    monitor,
-                    redial_cooldown,
-                )
+                ValidatorBehaviour::new(key, membership, balancer, monitor, redial_cooldown)
             })
             .expect("Validator behaviour should build")
             .with_swarm_config(|cfg| {

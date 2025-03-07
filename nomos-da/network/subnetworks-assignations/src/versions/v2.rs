@@ -1,5 +1,6 @@
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
+use libp2p::Multiaddr;
 use libp2p_identity::PeerId;
 use serde::{Deserialize, Serialize};
 
@@ -7,17 +8,19 @@ use crate::MembershipHandler;
 
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
 pub struct FillWithOriginalReplication {
-    pub assignations: Vec<HashSet<PeerId>>,
-    pub subnetwork_size: usize,
-    pub dispersal_factor: usize,
-    pub original_replication: usize,
-    pub pivot: u16,
+    assignations: Vec<HashSet<PeerId>>,
+    addressbook: HashMap<PeerId, Multiaddr>,
+    subnetwork_size: usize,
+    dispersal_factor: usize,
+    original_replication: usize,
+    pivot: u16,
 }
 
 impl FillWithOriginalReplication {
     #[must_use]
     pub fn new(
         peers: &[PeerId],
+        addressbook: HashMap<PeerId, Multiaddr>,
         subnetwork_size: usize,
         dispersal_factor: usize,
         original_replication: usize,
@@ -35,6 +38,7 @@ impl FillWithOriginalReplication {
             dispersal_factor,
             original_replication,
             pivot,
+            addressbook,
         }
     }
     fn fill(
@@ -104,10 +108,16 @@ impl MembershipHandler for FillWithOriginalReplication {
     fn last_subnetwork_id(&self) -> Self::NetworkId {
         self.subnetwork_size.saturating_sub(1) as u16
     }
+
+    fn get_address(&self, peer_id: &PeerId) -> Option<Multiaddr> {
+        self.addressbook.get(peer_id).cloned()
+    }
 }
 
 #[cfg(test)]
 mod test {
+    use std::collections::HashMap;
+
     use libp2p_identity::PeerId;
 
     use crate::versions::v2::FillWithOriginalReplication;
@@ -121,6 +131,7 @@ mod test {
         let pivot = 512;
         let distribution = FillWithOriginalReplication::new(
             &nodes,
+            HashMap::default(),
             subnetwork_size,
             dispersal_factor,
             original_replication,

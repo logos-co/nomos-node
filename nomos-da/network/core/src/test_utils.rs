@@ -1,5 +1,5 @@
 use std::{
-    collections::HashSet,
+    collections::{HashMap, HashSet},
     sync::{Arc, Mutex},
     time::Duration,
 };
@@ -17,6 +17,7 @@ use crate::SubnetworkId;
 #[derive(Clone)]
 pub struct AllNeighbours {
     neighbours: Arc<Mutex<HashSet<PeerId>>>,
+    addresses: Arc<Mutex<HashMap<PeerId, libp2p::Multiaddr>>>,
 }
 
 impl Default for AllNeighbours {
@@ -30,11 +31,16 @@ impl AllNeighbours {
     pub fn new() -> Self {
         Self {
             neighbours: Arc::new(Mutex::new(HashSet::new())),
+            addresses: Arc::new(Mutex::new(HashMap::new())),
         }
     }
 
     pub fn add_neighbour(&self, id: PeerId) {
         self.neighbours.lock().unwrap().insert(id);
+    }
+
+    pub fn update_addresses(&self, addressbook: Vec<(PeerId, libp2p::Multiaddr)>) {
+        self.addresses.lock().unwrap().extend(addressbook);
     }
 }
 
@@ -60,6 +66,10 @@ impl MembershipHandler for AllNeighbours {
 
     fn last_subnetwork_id(&self) -> Self::NetworkId {
         0
+    }
+
+    fn get_address(&self, peer_id: &PeerId) -> Option<libp2p::Multiaddr> {
+        self.addresses.lock().unwrap().get(peer_id).cloned()
     }
 }
 

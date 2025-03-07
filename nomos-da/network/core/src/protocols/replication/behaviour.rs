@@ -320,6 +320,10 @@ mod tests {
         fn last_subnetwork_id(&self) -> Self::NetworkId {
             unimplemented!()
         }
+
+        fn get_address(&self, _peer_id: &PeerId) -> Option<Multiaddr> {
+            unimplemented!()
+        }
     }
 
     struct TestWaker;

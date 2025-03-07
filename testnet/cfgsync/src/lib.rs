@@ -16,6 +16,7 @@ mod tests {
     use nomos_libp2p::{ed25519, libp2p, Multiaddr, PeerId, Protocol};
     use nomos_node::Config as ValidatorConfig;
     use nomos_tracing_service::TracingSettings;
+    use subnetworks_assignations::MembershipHandler;
     use tokio::time::timeout;
 
     use crate::{
@@ -89,10 +90,10 @@ mod tests {
         let my_multiaddr = config
             .da_network
             .backend
-            .addresses
-            .get(&my_peer_id)
+            .membership
+            .get_address(&my_peer_id)
             .unwrap();
-        let my_multiaddr_ip = extract_ip(my_multiaddr).unwrap();
+        let my_multiaddr_ip = extract_ip(&my_multiaddr).unwrap();
         assert_eq!(
             my_ip, my_multiaddr_ip,
             "DA membership ip doesn't match host ip"

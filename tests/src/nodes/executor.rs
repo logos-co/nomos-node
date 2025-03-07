@@ -223,7 +223,6 @@ pub fn create_executor_config(config: GeneralConfig) -> Config {
                 validator_settings: DaNetworkBackendSettings {
                     node_key: config.da_config.node_key,
                     membership: config.da_config.membership,
-                    addresses: config.da_config.addresses,
                     listening_address: config.da_config.listening_address,
                     policy_settings: config.da_config.policy_settings,
                     monitor_settings: config.da_config.monitor_settings,

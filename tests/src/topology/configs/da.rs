@@ -73,7 +73,6 @@ pub struct GeneralDaConfig {
     pub node_key: ed25519::SecretKey,
     pub peer_id: PeerId,
     pub membership: NomosDaMembership,
-    pub addresses: HashMap<PeerId, Multiaddr>,
     pub listening_address: Multiaddr,
     pub blob_storage_directory: PathBuf,
     pub global_params_path: String,
@@ -112,13 +111,14 @@ pub fn create_da_configs(ids: &[[u8; 32]], da_params: &DaParams) -> Vec<GeneralD
         listening_addresses.push(listening_address);
     }
 
+    let addresses = build_da_peer_list(&peer_ids, &listening_addresses);
+
     let membership = NomosDaMembership::new(
         &peer_ids,
+        addresses,
         da_params.subnetwork_size,
         da_params.dispersal_factor,
     );
-
-    let addresses = build_da_peer_list(&peer_ids, &listening_addresses);
 
     ids.iter()
         .zip(node_keys)
@@ -135,7 +135,6 @@ pub fn create_da_configs(ids: &[[u8; 32]], da_params: &DaParams) -> Vec<GeneralD
                 node_key,
                 peer_id,
                 membership: membership.clone(),
-                addresses: addresses.clone(),
                 listening_address: listening_addresses[i].clone(),
                 blob_storage_directory,
                 global_params_path: da_params.global_params_path.clone(),

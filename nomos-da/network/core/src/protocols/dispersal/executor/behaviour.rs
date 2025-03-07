@@ -31,7 +31,7 @@ use tokio::sync::{mpsc, mpsc::UnboundedSender};
 use tokio_stream::wrappers::UnboundedReceiverStream;
 use tracing::error;
 
-use crate::{address_book::AddressBook, protocol::DISPERSAL_PROTOCOL, SubnetworkId};
+use crate::{protocol::DISPERSAL_PROTOCOL, SubnetworkId};
 
 #[derive(Debug, Error)]
 pub enum DispersalError {
@@ -180,8 +180,6 @@ pub struct DispersalExecutorBehaviour<Membership: MembershipHandler> {
     idle_streams: HashMap<PeerId, DispersalStream>,
     /// Subnetworks membership information
     membership: Membership,
-    /// Addresses of known peers in the DA network
-    addresses: AddressBook,
     /// Pending blobs that need to be dispersed by `PeerId`
     to_disperse: HashMap<PeerId, VecDeque<(Membership::NetworkId, DaBlob)>>,
     /// Pending blobs from disconnected networks
@@ -207,7 +205,7 @@ where
     Membership: MembershipHandler + 'static,
     Membership::NetworkId: Send,
 {
-    pub fn new(membership: Membership, addresses: AddressBook) -> Self {
+    pub fn new(membership: Membership) -> Self {
         let stream_behaviour = libp2p_stream::Behaviour::new();
         let tasks = FuturesUnordered::new();
         let to_disperse = HashMap::new();
@@ -229,7 +227,6 @@ where
             stream_behaviour,
             tasks,
             membership,
-            addresses,
             to_disperse,
             disconnected_pending_blobs,
             connected_peers,
@@ -497,7 +494,6 @@ impl<M: MembershipHandler<Id = PeerId, NetworkId = SubnetworkId> + 'static> Netw
             pending_out_streams,
             pending_blobs_stream,
             membership,
-            addresses,
             connected_peers,
             subnetwork_open_streams,
             ..
@@ -577,10 +573,10 @@ impl<M: MembershipHandler<Id = PeerId, NetworkId = SubnetworkId> + 'static> Netw
             // attach known peer address if possible
             if let Some(address) = opts
                 .get_peer_id()
-                .and_then(|peer_id: PeerId| addresses.get_address(&peer_id))
+                .and_then(|peer_id: PeerId| membership.get_address(&peer_id))
             {
                 opts = DialOpts::peer_id(opts.get_peer_id().unwrap())
-                    .addresses(vec![address.clone()])
+                    .addresses(vec![address])
                     .build();
 
                 return Poll::Ready(ToSwarm::Dial { opts });

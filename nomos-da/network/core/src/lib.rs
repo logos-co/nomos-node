@@ -1,4 +1,3 @@
-pub mod address_book;
 pub mod behaviour;
 pub mod maintenance;
 pub mod protocol;

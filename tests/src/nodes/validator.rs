@@ -311,7 +311,6 @@ pub fn create_validator_config(config: GeneralConfig) -> Config {
             backend: DaNetworkBackendSettings {
                 node_key: config.da_config.node_key,
                 membership: config.da_config.membership,
-                addresses: config.da_config.addresses,
                 listening_address: config.da_config.listening_address,
                 policy_settings: DAConnectionPolicySettings {
                     min_dispersal_peers: 0,

@@ -4,7 +4,6 @@ use libp2p::{identity::Keypair, swarm::NetworkBehaviour, PeerId};
 use subnetworks_assignations::MembershipHandler;
 
 use crate::{
-    address_book::AddressBook,
     maintenance::{
         balancer::{ConnectionBalancer, ConnectionBalancerBehaviour},
         monitor::{ConnectionMonitor, ConnectionMonitorBehaviour},
@@ -40,7 +39,7 @@ where
     executor_dispersal: DispersalExecutorBehaviour<Membership>,
     validator_dispersal: DispersalValidatorBehaviour<Membership>,
     replication: ReplicationBehaviour<Membership>,
-    balancer: ConnectionBalancerBehaviour<Balancer>,
+    balancer: ConnectionBalancerBehaviour<Balancer, Membership>,
     monitor: ConnectionMonitorBehaviour<Monitor>,
 }
 
@@ -54,21 +53,17 @@ where
     pub fn new(
         key: &Keypair,
         membership: Membership,
-        addresses: AddressBook,
         balancer: Balancer,
         monitor: Monitor,
         redial_cooldown: Duration,
     ) -> Self {
         let peer_id = PeerId::from_public_key(&key.public());
         Self {
-            sampling: SamplingBehaviour::new(peer_id, membership.clone(), addresses.clone()),
-            executor_dispersal: DispersalExecutorBehaviour::new(
-                membership.clone(),
-                addresses.clone(),
-            ),
+            sampling: SamplingBehaviour::new(peer_id, membership.clone()),
+            executor_dispersal: DispersalExecutorBehaviour::new(membership.clone()),
             validator_dispersal: DispersalValidatorBehaviour::new(membership.clone()),
-            replication: ReplicationBehaviour::new(peer_id, membership),
-            balancer: ConnectionBalancerBehaviour::new(addresses, balancer),
+            replication: ReplicationBehaviour::new(peer_id, membership.clone()),
+            balancer: ConnectionBalancerBehaviour::new(membership, balancer),
             monitor: ConnectionMonitorBehaviour::new(monitor, redial_cooldown),
         }
     }
@@ -121,7 +116,9 @@ where
         &mut self.monitor
     }
 
-    pub fn balancer_behaviour_mut(&mut self) -> &mut ConnectionBalancerBehaviour<Balancer> {
+    pub fn balancer_behaviour_mut(
+        &mut self,
+    ) -> &mut ConnectionBalancerBehaviour<Balancer, Membership> {
         &mut self.balancer
     }
 }

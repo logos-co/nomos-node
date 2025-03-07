@@ -15,7 +15,6 @@ pub mod test {
     use tracing_subscriber::{fmt::TestWriter, EnvFilter};
 
     use crate::{
-        address_book::AddressBook,
         protocols::dispersal::{
             executor::behaviour::DispersalExecutorBehaviour,
             validator::behaviour::{DispersalEvent, DispersalValidatorBehaviour},
@@ -36,7 +35,7 @@ pub mod test {
         let mut executor = Swarm::new_ephemeral_tokio(|k1| {
             let p1 = PeerId::from_public_key(&k1.public());
             neighbours.add_neighbour(p1);
-            DispersalExecutorBehaviour::new(neighbours.clone(), AddressBook::empty())
+            DispersalExecutorBehaviour::new(neighbours.clone())
         });
         let mut validator = Swarm::new_ephemeral_tokio(|k2| {
             let p2 = PeerId::from_public_key(&k2.public());

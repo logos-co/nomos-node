@@ -2,6 +2,9 @@ pub mod versions;
 
 use std::{collections::HashSet, hash::Hash};
 
+use libp2p::Multiaddr;
+use libp2p_identity::PeerId;
+
 pub trait MembershipHandler {
     /// Subnetworks Id type
     type NetworkId: Eq + Hash;
@@ -26,4 +29,40 @@ pub trait MembershipHandler {
     fn members(&self) -> HashSet<Self::Id>;
 
     fn last_subnetwork_id(&self) -> Self::NetworkId;
+
+    fn get_address(&self, peer_id: &PeerId) -> Option<Multiaddr>;
+}
+
+use std::sync::Arc;
+
+impl<T> MembershipHandler for Arc<T>
+where
+    T: MembershipHandler,
+{
+    type NetworkId = T::NetworkId;
+    type Id = T::Id;
+
+    fn membership(&self, id: &Self::Id) -> HashSet<Self::NetworkId> {
+        self.as_ref().membership(id)
+    }
+
+    fn is_allowed(&self, id: &Self::Id) -> bool {
+        self.as_ref().is_allowed(id)
+    }
+
+    fn members_of(&self, network_id: &Self::NetworkId) -> HashSet<Self::Id> {
+        self.as_ref().members_of(network_id)
+    }
+
+    fn members(&self) -> HashSet<Self::Id> {
+        self.as_ref().members()
+    }
+
+    fn last_subnetwork_id(&self) -> Self::NetworkId {
+        self.as_ref().last_subnetwork_id()
+    }
+
+    fn get_address(&self, peer_id: &PeerId) -> Option<Multiaddr> {
+        self.as_ref().get_address(peer_id)
+    }
 }
