@@ -32,7 +32,10 @@ impl Default for SwarmConfig {
 // remotely https://serde.rs/remote-derive.html
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(remote = "gossipsub::Config")]
-#[expect(clippy::struct_excessive_bools)]
+#[expect(
+    clippy::struct_excessive_bools,
+    reason = "Type matching `gossipsub::Config` for remote serde impl."
+)]
 struct GossipsubConfigDef {
     #[serde(getter = "gossipsub::Config::history_length")]
     history_length: usize,
@@ -98,7 +101,10 @@ struct GossipsubConfigDef {
     published_message_ids_cache_time: Duration,
 }
 
-#[expect(clippy::fallible_impl_from)]
+#[expect(
+    clippy::fallible_impl_from,
+    reason = "`TryFrom` impl conflicting with blanket impl."
+)]
 impl From<GossipsubConfigDef> for gossipsub::Config {
     fn from(def: GossipsubConfigDef) -> Self {
         let mut builder = gossipsub::ConfigBuilder::default();

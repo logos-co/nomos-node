@@ -295,7 +295,10 @@ mod serde_level {
         })
     }
 
-    #[expect(clippy::trivially_copy_pass_by_ref)]
+    #[expect(
+        clippy::trivially_copy_pass_by_ref,
+        reason = "Signature must match serde requirement."
+    )]
     pub fn serialize<S>(value: &Level, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,

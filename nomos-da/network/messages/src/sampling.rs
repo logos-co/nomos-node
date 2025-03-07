@@ -49,7 +49,7 @@ impl SampleRequest {
     }
 }
 
-#[expect(clippy::large_enum_variant)]
+#[expect(clippy::large_enum_variant, reason = "repr(C) attribute")]
 #[repr(C)]
 #[derive(Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub enum SampleResponse {
