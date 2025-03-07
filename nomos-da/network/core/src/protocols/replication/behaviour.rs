@@ -321,7 +321,7 @@ mod tests {
             unimplemented!()
         }
 
-        fn get_address(&self, peer_id: &PeerId) -> Option<Multiaddr> {
+        fn get_address(&self, _peer_id: &PeerId) -> Option<Multiaddr> {
             unimplemented!()
         }
     }

@@ -4,7 +4,6 @@ use libp2p::{identity::Keypair, swarm::NetworkBehaviour, PeerId};
 use subnetworks_assignations::MembershipHandler;
 
 use crate::{
-    address_book::AddressBook,
     maintenance::{
         balancer::{ConnectionBalancer, ConnectionBalancerBehaviour},
         monitor::{ConnectionMonitor, ConnectionMonitorBehaviour},

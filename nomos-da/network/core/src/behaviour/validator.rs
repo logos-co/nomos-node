@@ -56,7 +56,7 @@ where
             sampling: SamplingBehaviour::new(peer_id, membership.clone()),
             dispersal: DispersalValidatorBehaviour::new(membership.clone()),
             replication: ReplicationBehaviour::new(peer_id, membership.clone()),
-            balancer: ConnectionBalancerBehaviour::new(membership.clone(), balancer),
+            balancer: ConnectionBalancerBehaviour::new(membership, balancer),
             monitor: ConnectionMonitorBehaviour::new(monitor, redial_cooldown),
         }
     }

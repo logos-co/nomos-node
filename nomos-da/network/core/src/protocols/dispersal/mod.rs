@@ -15,7 +15,6 @@ pub mod test {
     use tracing_subscriber::{fmt::TestWriter, EnvFilter};
 
     use crate::{
-        address_book::AddressBook,
         protocols::dispersal::{
             executor::behaviour::DispersalExecutorBehaviour,
             validator::behaviour::{DispersalEvent, DispersalValidatorBehaviour},

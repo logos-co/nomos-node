@@ -42,7 +42,7 @@ where
     Balancer: ConnectionBalancer,
     Membership: MembershipHandler,
 {
-    pub fn new(membership: Membership, balancer: Balancer) -> Self {
+    pub const fn new(membership: Membership, balancer: Balancer) -> Self {
         Self {
             membership,
             balancer,
@@ -143,7 +143,7 @@ where
 #[cfg(test)]
 mod tests {
     use std::{
-        collections::{HashMap, HashSet, VecDeque},
+        collections::{HashSet, VecDeque},
         time::Duration,
     };
 

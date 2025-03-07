@@ -31,6 +31,7 @@ impl FillFromNodeList {
         }
     }
 
+    #[must_use]
     pub fn clone_with_different_addressbook(
         &self,
         addressbook: HashMap<PeerId, Multiaddr>,
