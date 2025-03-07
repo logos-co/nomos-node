@@ -7,12 +7,12 @@ no-default-features = true
 
 [advisories]
 ignore = [
-    { id = "RUSTSEC-2020-0095", reason = "`difference` is unmaintained; consider using an alternative. Use `cargo tree -p difference -i > tmp.txt` to check the dependency tree." },
-    { id = "RUSTSEC-2023-0071", reason = "Marvin Attack: potential key recovery through timing sidechannels" },
-    { id = "RUSTSEC-2024-0370", reason = "`proc-macro-error` is unmaintained; consider using an alternative. Use `cargo tree -p proc-macro-error -i > tmp.txt` to check the dependency tree." },
-    { id = "RUSTSEC-2024-0384", reason = "`instant` is unmaintained; consider using an alternative. Use `cargo tree -p instant -i > tmp.txt` to check the dependency tree." },
-    { id = "RUSTSEC-2024-0388", reason = "`derivative` is unmaintained; consider using an alternative. Use `cargo tree -p derivative -i > tmp.txt` to check the dependency tree." },
-    { id = "RUSTSEC-2025-0009", reason = "Some AES functions may panic when overflow checking is enabled. `ring::aead::quic::HeaderProtectionKey::new_mask()` may panic when overflowchecking is enabled." }
+  { id = "RUSTSEC-2020-0095", reason = "`difference` is unmaintained; consider using an alternative. Use `cargo tree -p difference -i > tmp.txt` to check the dependency tree." },
+  { id = "RUSTSEC-2023-0071", reason = "Marvin Attack: potential key recovery through timing sidechannels" },
+  { id = "RUSTSEC-2024-0370", reason = "`proc-macro-error` is unmaintained; consider using an alternative. Use `cargo tree -p proc-macro-error -i > tmp.txt` to check the dependency tree." },
+  { id = "RUSTSEC-2024-0384", reason = "`instant` is unmaintained; consider using an alternative. Use `cargo tree -p instant -i > tmp.txt` to check the dependency tree." },
+  { id = "RUSTSEC-2024-0388", reason = "`derivative` is unmaintained; consider using an alternative. Use `cargo tree -p derivative -i > tmp.txt` to check the dependency tree." },
+  { id = "RUSTSEC-2025-0009", reason = "Some AES functions may panic when overflow checking is enabled. `ring::aead::quic::HeaderProtectionKey::new_mask()` may panic when overflowchecking is enabled." }
 ]
 yanked = "deny"
 
@@ -22,20 +22,20 @@ multiple-versions    = "allow"
 
 [licenses]
 allow = [
-    "Apache-2.0 WITH LLVM-exception",
-    "Apache-2.0",
-    "BSD-2-Clause",
-    "BSD-3-Clause",
-    "BSL-1.0",
-    "BlueOak-1.0.0",
-    "CC0-1.0",
-    "ISC",
-    "MIT",
-    "MPL-2.0",
-    "NCSA",
-    "OpenSSL",
-    "Unicode-3.0",
-    "Zlib",
+  "Apache-2.0 WITH LLVM-exception",
+  "Apache-2.0",
+  "BSD-2-Clause",
+  "BSD-3-Clause",
+  "BSL-1.0",
+  "BlueOak-1.0.0",
+  "CC0-1.0",
+  "ISC",
+  "MIT",
+  "MPL-2.0",
+  "NCSA",
+  "OpenSSL",
+  "Unicode-3.0",
+  "Zlib",
 ]
 private = { ignore = false }
 unused-allowed-license = "deny"
