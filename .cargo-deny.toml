@@ -1,8 +1,8 @@
 # Config file reference can be found at https://embarkstudios.github.io/cargo-deny/checks/cfg.html.
 
 [graph]
-all-features = true
-exclude-dev = true
+all-features        = true
+exclude-dev         = true
 no-default-features = true
 
 [advisories]
@@ -19,7 +19,7 @@ yanked = "deny"
 
 [bans]
 allow-wildcard-paths = false
-multiple-versions = "allow"
+multiple-versions    = "allow"
 
 [licenses]
 allow = [
@@ -41,12 +41,12 @@ private = { ignore = false }
 unused-allowed-license = "deny"
 
 [[licenses.clarify]]
-expression = "MIT AND ISC AND OpenSSL"
+expression    = "MIT AND ISC AND OpenSSL"
 license-files = [{ path = "LICENSE", hash = 0xbd0eed23 }]
-name = "ring"
+name          = "ring"
 
 [sources]
-unknown-git = "deny"
+unknown-git      = "deny"
 unknown-registry = "deny"
 
 [sources.allow-org]
