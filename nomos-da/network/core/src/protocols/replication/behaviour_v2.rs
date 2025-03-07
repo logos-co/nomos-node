@@ -159,6 +159,7 @@ impl PendingOutbound {
 }
 
 /// Nomos DA broadcast network behaviour.
+///
 /// This item handles the logic of the nomos da subnetworks broadcasting.
 /// DA subnetworks are a logical distribution of subsets.
 /// A node just connects and accepts connections to other nodes that are in the
@@ -631,15 +632,9 @@ mod tests {
             .into_iter()
             .map(|(id, messages)| (id, messages.into_iter().collect()))
             .collect();
-        let actual_next =
-            super::next_peer(
-                &previous,
-                &pending_outbound_messages,
-                |peer_id| match idle_stream {
-                    Some(idle_stream) => idle_stream == *peer_id,
-                    None => false,
-                },
-            );
+        let actual_next = super::next_peer(&previous, &pending_outbound_messages, |peer_id| {
+            idle_stream == Some(*peer_id)
+        });
         assert_eq!(actual_next, expected_next);
     }
 
