@@ -1,4 +1,4 @@
-use std::{fmt::Debug, marker::PhantomData, pin::Pin};
+use std::{fmt::Debug, marker::PhantomData, pin::Pin, sync::Arc};
 
 use futures::{
     future::{AbortHandle, Abortable, Aborted},
@@ -87,7 +87,7 @@ where
             libp2p::identity::Keypair::from(ed25519::Keypair::from(config.node_key.clone()));
         let (mut validator_swarm, validator_events_stream) = ValidatorSwarm::new(
             keypair,
-            config.membership.clone(),
+            Arc::new(config.membership.clone()),
             config.policy_settings,
             config.monitor_settings,
             config.balancer_interval,

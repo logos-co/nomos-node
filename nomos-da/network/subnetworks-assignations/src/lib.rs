@@ -32,3 +32,37 @@ pub trait MembershipHandler {
 
     fn get_address(&self, peer_id: &PeerId) -> Option<Multiaddr>;
 }
+
+use std::sync::Arc;
+
+impl<T> MembershipHandler for Arc<T>
+where
+    T: MembershipHandler,
+{
+    type NetworkId = T::NetworkId;
+    type Id = T::Id;
+
+    fn membership(&self, id: &Self::Id) -> HashSet<Self::NetworkId> {
+        (**self).membership(id)
+    }
+
+    fn is_allowed(&self, id: &Self::Id) -> bool {
+        (**self).is_allowed(id)
+    }
+
+    fn members_of(&self, network_id: &Self::NetworkId) -> HashSet<Self::Id> {
+        (**self).members_of(network_id)
+    }
+
+    fn members(&self) -> HashSet<Self::Id> {
+        (**self).members()
+    }
+
+    fn last_subnetwork_id(&self) -> Self::NetworkId {
+        (**self).last_subnetwork_id()
+    }
+
+    fn get_address(&self, peer_id: &PeerId) -> Option<Multiaddr> {
+        (**self).get_address(peer_id)
+    }
+}

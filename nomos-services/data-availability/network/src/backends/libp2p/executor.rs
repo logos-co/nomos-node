@@ -1,4 +1,4 @@
-use std::{fmt::Debug, marker::PhantomData, pin::Pin};
+use std::{fmt::Debug, marker::PhantomData, pin::Pin, sync::Arc};
 
 use futures::{
     future::Aborted,
@@ -112,7 +112,7 @@ where
         ));
         let (mut executor_swarm, executor_events_stream) = ExecutorSwarm::new(
             keypair,
-            config.validator_settings.membership.clone(),
+            Arc::new(config.validator_settings.membership.clone()),
             config.validator_settings.policy_settings.clone(),
             config.validator_settings.monitor_settings.clone(),
             config.validator_settings.balancer_interval,
