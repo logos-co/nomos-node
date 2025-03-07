@@ -120,7 +120,7 @@ mod test {
             swarm_1.listen_on(addr1).unwrap();
             wait_for_incoming_connection(&mut swarm_1, peer_id2).await;
 
-            (0..10usize).for_each(|i| swarm_1.behaviour_mut().send_message(get_message(i)));
+            (0..10usize).for_each(|i| swarm_1.behaviour_mut().send_message(&get_message(i)));
 
             wait_for_messages(&mut swarm_1, 10..20).await;
 
@@ -141,7 +141,7 @@ mod test {
             wait_for_incoming_connection(&mut swarm_3, peer_id2).await;
             wait_for_messages(&mut swarm_3, 0..10).await;
 
-            (10..20usize).for_each(|i| swarm_3.behaviour_mut().send_message(get_message(i)));
+            (10..20usize).for_each(|i| swarm_3.behaviour_mut().send_message(&get_message(i)));
 
             done_3_tx.send(()).await.unwrap();
             swarm_3.loop_on_next().await;
@@ -211,7 +211,7 @@ mod test {
                 tokio::select! {
                     // send a message everytime that the channel ticks
                     _  = receiver.recv() => {
-                        swarm_2.behaviour_mut().send_message(get_message(i));
+                        swarm_2.behaviour_mut().send_message(&get_message(i));
                         i += 1;
                     }
                     // print out events

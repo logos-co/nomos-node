@@ -39,10 +39,10 @@ pub enum ReplicationError {
 }
 
 impl ReplicationError {
+    #[must_use]
     pub const fn peer_id(&self) -> Option<&PeerId> {
         match self {
-            Self::Io { peer_id, .. } => Some(peer_id),
-            Self::OpenStream { peer_id, .. } => Some(peer_id),
+            Self::OpenStream { peer_id, .. } | Self::Io { peer_id, .. } => Some(peer_id),
         }
     }
 }
@@ -73,7 +73,7 @@ impl Clone for ReplicationError {
     }
 }
 
-/// Nomos DA BroadcastEvents to be bubbled up to logic layers
+/// Nomos DA `BroadcastEvents` to be bubbled up to logic layers
 #[derive(Debug)]
 pub enum ReplicationEvent {
     IncomingMessage {
@@ -92,10 +92,11 @@ impl From<ReplicationError> for ReplicationEvent {
 }
 
 impl ReplicationEvent {
+    #[must_use]
     pub fn blob_size(&self) -> Option<usize> {
         match self {
             Self::IncomingMessage { message, .. } => Some(message.blob.data.column_len()),
-            _ => None,
+            Self::ReplicationError { .. } => None,
         }
     }
 }
@@ -152,7 +153,11 @@ impl PendingOutbound {
     /// Find the next peer whose pending message can be scheduled for writing to
     /// the peer's stream. Peers are iterated in a round-robin fashion.
     fn next_peer(&mut self, is_stream_idle_fn: impl FnMut(&PeerId) -> bool) -> Option<PeerId> {
-        let next = next_peer(&self.last_scheduled, &self.messages, is_stream_idle_fn);
+        let next = next_peer(
+            self.last_scheduled.as_ref(),
+            &self.messages,
+            is_stream_idle_fn,
+        );
         self.last_scheduled = next;
         next
     }
@@ -211,11 +216,11 @@ impl<Membership> ReplicationBehaviour<Membership> {
             incoming_streams,
             incoming_tasks,
             membership,
-            connected: Default::default(),
-            pending_outbound: Default::default(),
-            outbound_streams: Default::default(),
+            connected: HashSet::default(),
+            pending_outbound: PendingOutbound::default(),
+            outbound_streams: HashMap::default(),
             outbound_tasks,
-            seen_message_cache: Default::default(),
+            seen_message_cache: IndexSet::default(),
             waker: None,
         }
     }
@@ -239,26 +244,26 @@ where
             > 0
     }
 
-    fn no_loopback_member_peers_of(&self, subnetwork: &SubnetworkId) -> HashSet<PeerId> {
-        let mut peers = self.membership.members_of(subnetwork);
+    fn no_loopback_member_peers_of(&self, subnetwork: SubnetworkId) -> HashSet<PeerId> {
+        let mut peers = self.membership.members_of(&subnetwork);
         // no loopback
         peers.remove(&self.local_peer_id);
         peers
     }
 
-    fn replicate_message(&mut self, message: DaMessage) {
+    fn replicate_message(&mut self, message: &DaMessage) {
         let message_id = (message.blob.blob_id.to_vec(), message.subnetwork_id);
         if self.seen_message_cache.contains(&message_id) {
             return;
         }
         self.seen_message_cache.insert(message_id);
-        self.send_message(message)
+        self.send_message(message);
     }
 
-    pub fn send_message(&mut self, message: DaMessage) {
+    pub fn send_message(&mut self, message: &DaMessage) {
         // Push a message in the queue for every single peer connected that is a member
         // of the selected subnetwork_id
-        let peers = self.no_loopback_member_peers_of(&message.subnetwork_id);
+        let peers = self.no_loopback_member_peers_of(message.subnetwork_id);
 
         self.connected
             .iter()
@@ -309,10 +314,7 @@ where
         pack_to_writer(&message, &mut stream)
             .await
             .unwrap_or_else(|_| {
-                panic!(
-                    "Message should always be serializable.\nMessage: '{:?}'",
-                    message
-                )
+                panic!("Message should always be serializable.\nMessage: '{message:?}'",)
             });
         stream
             .flush()
@@ -377,7 +379,7 @@ where
             self.outbound_streams.remove(&peer_id);
             self.pending_outbound.on_disconnected(&peer_id);
         }
-        self.stream_behaviour.on_swarm_event(event)
+        self.stream_behaviour.on_swarm_event(event);
     }
 
     fn on_connection_handler_event(
@@ -388,7 +390,7 @@ where
     ) {
         let Either::Left(event) = event;
         self.stream_behaviour
-            .on_connection_handler_event(peer_id, connection_id, event)
+            .on_connection_handler_event(peer_id, connection_id, event);
     }
 
     fn poll(
@@ -406,7 +408,7 @@ where
             Poll::Ready(Some(Ok((peer_id, message, stream)))) => {
                 // Replicate the message to all connected peers from the same subnet if we
                 // haven't seen it yet
-                self.replicate_message(message.clone());
+                self.replicate_message(&message);
                 // Schedule waiting for any next incoming message on the same stream
                 self.incoming_tasks
                     .push(Self::try_read_message(peer_id, stream).boxed());
@@ -522,7 +524,7 @@ where
 /// previous peer at the end. This ensures we're fair scheduling one message per
 /// peer at a time, iterating the peers in a round-robin fashion.
 fn next_peer<K, M>(
-    previous: &Option<K>,
+    previous: Option<&K>,
     pending_outbound_messages: &IndexMap<K, VecDeque<M>>,
     mut is_stream_idle_fn: impl FnMut(&K) -> bool,
 ) -> Option<K>
@@ -632,9 +634,10 @@ mod tests {
             .into_iter()
             .map(|(id, messages)| (id, messages.into_iter().collect()))
             .collect();
-        let actual_next = super::next_peer(&previous, &pending_outbound_messages, |peer_id| {
-            idle_stream == Some(*peer_id)
-        });
+        let actual_next =
+            super::next_peer(previous.as_ref(), &pending_outbound_messages, |peer_id| {
+                idle_stream == Some(*peer_id)
+            });
         assert_eq!(actual_next, expected_next);
     }
 
