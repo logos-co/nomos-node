@@ -30,7 +30,7 @@ pub struct KzgrsMempoolAdapter<
     DaVerifierBackend,
     DaVerifierNetwork,
     DaVerifierStorage,
-    ApiBackend,
+    ApiAdapter,
 > where
     DaPool: MemPool<BlockId = HeaderId>,
     DaPoolAdapter: MempoolAdapter<Key = DaPool::Key>,
@@ -46,7 +46,7 @@ pub struct KzgrsMempoolAdapter<
         SamplingStorage,
     )>,
     _phantom2: PhantomData<(DaVerifierBackend, DaVerifierNetwork, DaVerifierStorage)>,
-    _phantom3: PhantomData<ApiBackend>,
+    _phantom3: PhantomData<ApiAdapter>,
 }
 
 #[async_trait::async_trait]
@@ -60,7 +60,7 @@ impl<
         DaVerifierBackend,
         DaVerifierNetwork,
         DaVerifierStorage,
-        ApiBackend,
+        ApiAdapter,
     > DaMempoolAdapter
     for KzgrsMempoolAdapter<
         DaPoolAdapter,
@@ -72,7 +72,7 @@ impl<
         DaVerifierBackend,
         DaVerifierNetwork,
         DaVerifierStorage,
-        ApiBackend,
+        ApiAdapter,
     >
 where
     DaPool: MemPool<BlockId = HeaderId, Key = BlobId>,
@@ -93,7 +93,7 @@ where
     DaVerifierBackend::Settings: Clone,
     DaVerifierNetwork: nomos_da_verifier::network::NetworkAdapter + Send + Sync,
     DaVerifierNetwork::Settings: Clone,
-    ApiBackend: nomos_da_sampling::api::ApiBackend + Send + Sync,
+    ApiAdapter: nomos_da_sampling::api::ApiAdapter + Send + Sync,
 {
     type MempoolService = DaMempoolService<
         DaPoolAdapter,
@@ -105,7 +105,7 @@ where
         DaVerifierBackend,
         DaVerifierNetwork,
         DaVerifierStorage,
-        ApiBackend,
+        ApiAdapter,
     >;
     type BlobId = BlobId;
     type Metadata = dispersal::Metadata;

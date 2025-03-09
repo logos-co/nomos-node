@@ -60,7 +60,7 @@ pub async fn add_blob_info<
     DaVerifierBackend,
     DaVerifierNetwork,
     DaVerifierStorage,
-    ApiBackend,
+    ApiAdapter,
 >(
     handle: &overwatch_rs::overwatch::handle::OverwatchHandle,
     item: A::Payload,
@@ -85,7 +85,7 @@ where
     DaVerifierBackend::Settings: Clone,
     DaVerifierStorage: nomos_da_verifier::storage::DaStorageAdapter,
     DaVerifierNetwork::Settings: Clone,
-    ApiBackend: nomos_da_sampling::api::ApiBackend + Send + Sync,
+    ApiAdapter: nomos_da_sampling::api::ApiAdapter + Send + Sync,
 {
     let relay = handle
         .relay::<DaMempoolService<
@@ -98,7 +98,7 @@ where
             DaVerifierBackend,
             DaVerifierNetwork,
             DaVerifierStorage,
-            ApiBackend,
+            ApiAdapter,
         >>()
         .connect()
         .await?;

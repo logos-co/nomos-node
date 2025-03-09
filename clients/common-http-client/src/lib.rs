@@ -40,11 +40,10 @@ pub struct CommonHttpClient {
 
 impl CommonHttpClient {
     #[must_use]
-    pub fn new(base_address: &str, basic_auth: Option<BasicAuthCredentials>) -> Self {
+    pub fn new(base_address: Url, basic_auth: Option<BasicAuthCredentials>) -> Self {
         let client = ClientBuilder::new()
             .build()
             .expect("Client from default settings should be able to build");
-        let base_address = base_address.parse().expect("Invalid base address");
         Self {
             client: Arc::new(client),
             base_address,

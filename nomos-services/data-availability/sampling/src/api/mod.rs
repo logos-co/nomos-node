@@ -1,18 +1,20 @@
 use async_trait::async_trait;
 use overwatch_rs::DynError;
-use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
-
-use crate::api::http::{ApiRequest, ApiResponse};
+use tokio::sync::oneshot;
 
 pub mod http;
 
+/// Trait to support `Nomos` API requests
 #[async_trait]
-pub trait ApiBackend {
-    type Settings: Clone;
-    type Request: Send;
-    type Response: Send;
+pub trait ApiAdapter {
+    type Settings;
+    type Blob;
+    type BlobId;
+    type Commitments;
     fn new(settings: Self::Settings) -> Self;
-    async fn run(
-        self,
-    ) -> Result<(UnboundedSender<ApiRequest>, UnboundedReceiver<ApiResponse>), DynError>;
+    async fn request_commitments(
+        &self,
+        request: Self::BlobId,
+        reply_channel: oneshot::Sender<Option<Self::Commitments>>,
+    ) -> Result<(), DynError>;
 }

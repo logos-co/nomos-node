@@ -25,7 +25,7 @@ use nomos_da_network_service::{
     backends::libp2p::common::DaNetworkBackendSettings, NetworkConfig as DaNetworkConfig,
 };
 use nomos_da_sampling::{
-    api::http::ApiBackendSettings, backend::kzgrs::KzgrsSamplingBackendSettings,
+    api::http::ApiAdapterSettings, backend::kzgrs::KzgrsSamplingBackendSettings,
     storage::adapters::rocksdb::RocksAdapterSettings as SamplingStorageAdapterSettings,
     DaSamplingServiceSettings,
 };
@@ -357,8 +357,11 @@ pub fn create_validator_config(config: GeneralConfig) -> Config {
                 blob_storage_directory: "./".into(),
             },
             network_adapter_settings: (),
-            api_backend_settings: ApiBackendSettings {
-                addresses: vec![config.api_config.address],
+            api_adapter_settings: ApiAdapterSettings {
+                addresses: vec![Url::parse(
+                    format!("http://{}", config.api_config.address).as_str(),
+                )
+                .unwrap()],
             },
         },
         storage: RocksBackendSettings {

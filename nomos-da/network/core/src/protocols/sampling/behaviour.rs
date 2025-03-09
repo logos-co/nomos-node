@@ -1,6 +1,5 @@
 use std::{
     collections::{HashMap, VecDeque},
-    sync::Arc,
     task::{Context, Poll},
 };
 
@@ -219,7 +218,7 @@ pub enum SamplingEvent {
     SamplingSuccess {
         blob_id: BlobId,
         subnetwork_id: SubnetworkId,
-        light_blob: Arc<DaLightBlob>,
+        light_blob: Box<DaLightBlob>,
     },
     IncomingSample {
         request_receiver: Receiver<BehaviourSampleReq>,
@@ -570,7 +569,7 @@ impl<Membership: MembershipHandler<Id = PeerId, NetworkId = SubnetworkId> + 'sta
                 Poll::Ready(ToSwarm::GenerateEvent(SamplingEvent::SamplingSuccess {
                     blob_id,
                     subnetwork_id,
-                    light_blob: Arc::new(blob.data),
+                    light_blob: Box::new(blob.data),
                 }))
             }
         }

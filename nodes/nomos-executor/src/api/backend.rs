@@ -65,7 +65,7 @@ pub struct AxumBackend<
     SamplingRng,
     SamplingStorage,
     TimeBackend,
-    ApiBackend,
+    ApiAdapter,
     const SIZE: usize,
 > {
     settings: AxumBackendSettings,
@@ -91,7 +91,7 @@ pub struct AxumBackend<
         SamplingRng,
         SamplingStorage,
         TimeBackend,
-        ApiBackend,
+        ApiAdapter,
     )>,
 }
 
@@ -129,7 +129,7 @@ impl<
         SamplingRng,
         SamplingStorage,
         TimeBackend,
-        ApiBackend,
+        ApiAdapter,
         const SIZE: usize,
     > Backend
     for AxumBackend<
@@ -152,7 +152,7 @@ impl<
         SamplingRng,
         SamplingStorage,
         TimeBackend,
-        ApiBackend,
+        ApiAdapter,
         SIZE,
     >
 where
@@ -244,7 +244,7 @@ where
     SamplingStorage: nomos_da_sampling::storage::DaStorageAdapter + Send + 'static,
     TimeBackend: nomos_time::backends::TimeBackend + Send + 'static,
     TimeBackend::Settings: Clone + Send + Sync,
-    ApiBackend: nomos_da_sampling::api::ApiBackend + Send + Sync + 'static,
+    ApiAdapter: nomos_da_sampling::api::ApiAdapter + Send + Sync + 'static,
 {
     type Error = hyper::Error;
     type Settings = AxumBackendSettings;
@@ -299,7 +299,7 @@ where
                         DaVerifierNetwork,
                         DaVerifierStorage,
                         TimeBackend,
-                        ApiBackend,
+                        ApiAdapter,
                         SIZE,
                     >,
                 ),
@@ -318,7 +318,7 @@ where
                         DaVerifierNetwork,
                         DaVerifierStorage,
                         TimeBackend,
-                        ApiBackend,
+                        ApiAdapter,
                         SIZE,
                     >,
                 ),
@@ -351,7 +351,7 @@ where
                         DaVerifierNetwork,
                         DaVerifierStorage,
                         TimeBackend,
-                        ApiBackend,
+                        ApiAdapter,
                         SIZE,
                     >,
                 ),
@@ -374,7 +374,7 @@ where
                         DaVerifierBackend,
                         DaVerifierNetwork,
                         DaVerifierStorage,
-                        ApiBackend,
+                        ApiAdapter,
                     >,
                 ),
             )

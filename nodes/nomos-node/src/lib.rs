@@ -27,7 +27,7 @@ pub use nomos_da_network_service::{
     backends::libp2p::validator::DaNetworkValidatorBackend, NetworkService as DaNetworkService,
 };
 use nomos_da_sampling::{
-    api::http::HttApiBackend, backend::kzgrs::KzgrsSamplingBackend,
+    api::http::HttApiAdapter, backend::kzgrs::KzgrsSamplingBackend,
     network::adapters::validator::Libp2pAdapter as SamplingLibp2pAdapter,
     storage::adapters::rocksdb::RocksAdapter as SamplingStorageAdapter, DaSamplingService,
 };
@@ -82,7 +82,7 @@ pub type NomosApiService = ApiService<
         ChaCha20Rng,
         SamplingStorageAdapter<DaBlob, Wire>,
         SystemTimeBackend,
-        HttApiBackend,
+        HttApiAdapter,
         MB16,
     >,
 >;
@@ -114,7 +114,7 @@ pub type Cryptarchia<SamplingAdapter> = cryptarchia_consensus::CryptarchiaConsen
     VerifierNetworkAdapter<NomosDaMembership>,
     VerifierStorageAdapter<DaBlob, Wire>,
     SystemTimeBackend,
-    HttApiBackend,
+    HttApiAdapter,
 >;
 
 pub type NodeCryptarchia =
@@ -135,7 +135,7 @@ pub type DaMempool = DaMempoolService<
     KzgrsDaVerifier,
     VerifierNetworkAdapter<NomosDaMembership>,
     VerifierStorageAdapter<DaBlob, Wire>,
-    HttApiBackend,
+    HttApiAdapter,
 >;
 
 pub type DaIndexer<SamplingAdapter> = DataIndexerService<
@@ -165,7 +165,7 @@ pub type DaIndexer<SamplingAdapter> = DataIndexerService<
     VerifierNetworkAdapter<NomosDaMembership>,
     VerifierStorageAdapter<DaBlob, Wire>,
     SystemTimeBackend,
-    HttApiBackend,
+    HttApiAdapter,
 >;
 
 pub type NodeDaIndexer =
@@ -179,7 +179,7 @@ pub type DaSampling<SamplingAdapter> = DaSamplingService<
     KzgrsDaVerifier,
     VerifierNetworkAdapter<NomosDaMembership>,
     VerifierStorageAdapter<DaBlob, Wire>,
-    HttApiBackend,
+    HttApiAdapter,
 >;
 
 pub type NodeDaSampling = DaSampling<SamplingLibp2pAdapter<NomosDaMembership>>;

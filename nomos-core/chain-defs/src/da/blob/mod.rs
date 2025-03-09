@@ -5,8 +5,8 @@ pub mod select;
 pub trait Blob {
     type BlobId;
     type ColumnIndex;
-    type LightBlob: Send + Sync;
-    type SharedCommitments: Send + Sync;
+    type LightBlob;
+    type SharedCommitments;
 
     fn id(&self) -> Self::BlobId;
     fn column_idx(&self) -> Self::ColumnIndex;

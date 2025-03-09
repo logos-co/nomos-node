@@ -27,10 +27,4 @@ pub trait DaStorageAdapter {
         blob_id: <Self::Blob as Blob>::BlobId,
         column_idx: ColumnIndex,
     ) -> Result<Option<<Self::Blob as Blob>::LightBlob>, DynError>;
-
-    async fn get_blob(
-        &self,
-        blob_id: <Self::Blob as Blob>::BlobId,
-        column_idx: ColumnIndex,
-    ) -> Result<Option<Self::Blob>, DynError>;
 }

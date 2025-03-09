@@ -30,19 +30,19 @@ use tokio_stream::StreamExt;
 use tracing::{error, instrument};
 
 const DA_VERIFIER_TAG: ServiceId = "DA-Verifier";
-pub enum DaVerifierMsg<B: Blob, A> {
+pub enum DaVerifierMsg<Commitments, LightBlob, Blob, Answer> {
     AddBlob {
-        blob: B,
-        reply_channel: Sender<Option<A>>,
+        blob: Blob,
+        reply_channel: Sender<Option<Answer>>,
     },
     VerifyBlob {
-        commitments: Arc<B::SharedCommitments>,
-        light_blob: Arc<B::LightBlob>,
+        commitments: Arc<Commitments>,
+        light_blob: Box<LightBlob>,
         reply_channel: Sender<Result<(), DynError>>,
     },
 }
 
-impl<B: Blob + 'static, A: 'static> Debug for DaVerifierMsg<B, A> {
+impl<C: 'static, L: 'static, B: 'static, A: 'static> Debug for DaVerifierMsg<C, L, B, A> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::AddBlob { .. } => {
@@ -55,7 +55,7 @@ impl<B: Blob + 'static, A: 'static> Debug for DaVerifierMsg<B, A> {
     }
 }
 
-impl<B: Blob + 'static, A: 'static> RelayMessage for DaVerifierMsg<B, A> {}
+impl<C: 'static, L: 'static, B: 'static, A: 'static> RelayMessage for DaVerifierMsg<C, L, B, A> {}
 
 pub struct DaVerifierService<Backend, N, S>
 where
@@ -121,7 +121,12 @@ where
     type Settings = DaVerifierServiceSettings<Backend::Settings, N::Settings, S::Settings>;
     type State = NoState<Self::Settings>;
     type StateOperator = NoOperator<Self::State, Self::Settings>;
-    type Message = DaVerifierMsg<Backend::DaBlob, ()>;
+    type Message = DaVerifierMsg<
+        <Backend::DaBlob as Blob>::SharedCommitments,
+        <Backend::DaBlob as Blob>::LightBlob,
+        Backend::DaBlob,
+        (),
+    >;
 }
 
 #[async_trait::async_trait]
@@ -129,9 +134,11 @@ impl<Backend, N, S> ServiceCore for DaVerifierService<Backend, N, S>
 where
     Backend: VerifierBackend + Send + Sync + 'static,
     Backend::Settings: Clone + Send + Sync + 'static,
-    Backend::DaBlob: Blob + Debug + Send + Sync + 'static,
+    Backend::DaBlob: Debug + Send + Sync + 'static,
     Backend::Error: Error + Send + Sync + 'static,
     <Backend::DaBlob as Blob>::BlobId: AsRef<[u8]> + Debug + Send + Sync + 'static,
+    <Backend::DaBlob as Blob>::LightBlob: Debug + Send + Sync + 'static,
+    <Backend::DaBlob as Blob>::SharedCommitments: Debug + Send + Sync + 'static,
     N: NetworkAdapter<Blob = Backend::DaBlob> + Send + Sync + 'static,
     N::Settings: Clone + Send + Sync + 'static,
     S: DaStorageAdapter<Blob = Backend::DaBlob> + Send + Sync + 'static,

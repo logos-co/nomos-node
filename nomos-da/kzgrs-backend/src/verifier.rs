@@ -157,14 +157,11 @@ mod test {
         global_parameters_from_randomness, Commitment, GlobalParameters,
         PolynomialEvaluationDomain, Proof, BYTES_PER_FIELD_ELEMENT,
     };
-    use nomos_core::da::DaEncoder;
+    use nomos_core::da::{blob::Blob, DaEncoder};
     use once_cell::sync::Lazy;
 
     use crate::{
-        common::{
-            blob::{DaBlob, DaBlobSharedCommitments, DaLightBlob},
-            hash_commitment, Chunk, Column,
-        },
+        common::{blob::DaBlob, hash_commitment, Chunk, Column},
         encoder::{
             test::{rand_data, ENCODER},
             DaEncoderParams,
@@ -379,25 +376,23 @@ mod test {
         for (i, column) in encoded_data.extended_data.columns().enumerate() {
             println!("{i}");
             let verifier = &verifiers[i];
-            let da_blob = DaLightBlob {
+            let da_blob = DaBlob {
                 column,
                 column_idx: i
                     .try_into()
                     .expect("Column index shouldn't overflow the target type"),
                 column_commitment: encoded_data.column_commitments[i],
+                aggregated_column_commitment: encoded_data.aggregated_column_commitment,
                 aggregated_column_proof: encoded_data.aggregated_column_proofs[i],
+                rows_commitments: encoded_data.row_commitments.clone(),
                 rows_proofs: encoded_data
                     .rows_proofs
                     .iter()
                     .map(|proofs| proofs.get(i).copied().unwrap())
                     .collect(),
             };
-
-            let commitments = DaBlobSharedCommitments {
-                aggregated_column_commitment: encoded_data.aggregated_column_commitment,
-                rows_commitments: encoded_data.row_commitments.clone(),
-            };
-            assert!(verifier.verify(&commitments, &da_blob, domain_size));
+            let (light_blob, commitments) = da_blob.into_blob_and_shared_commitments();
+            assert!(verifier.verify(&commitments, &light_blob, domain_size));
         }
     }
 }

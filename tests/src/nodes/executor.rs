@@ -30,7 +30,7 @@ use nomos_da_network_service::{
     NetworkConfig as DaNetworkConfig,
 };
 use nomos_da_sampling::{
-    api::http::ApiBackendSettings, backend::kzgrs::KzgrsSamplingBackendSettings,
+    api::http::ApiAdapterSettings, backend::kzgrs::KzgrsSamplingBackendSettings,
     storage::adapters::rocksdb::RocksAdapterSettings as SamplingStorageAdapterSettings,
     DaSamplingServiceSettings,
 };
@@ -49,6 +49,7 @@ use nomos_node::{
 use nomos_time::{backends::system_time::SystemTimeBackendSettings, TimeServiceSettings};
 use nomos_tracing::logging::local::FileConfig;
 use nomos_tracing_service::LoggerLayer;
+use reqwest::Url;
 use tempfile::NamedTempFile;
 
 use super::{create_tempdir, persist_tempdir, GetRangeReq, CLIENT};
@@ -264,8 +265,11 @@ pub fn create_executor_config(config: GeneralConfig) -> Config {
                 blob_storage_directory: "./".into(),
             },
             network_adapter_settings: (),
-            api_backend_settings: ApiBackendSettings {
-                addresses: vec![config.api_config.address],
+            api_adapter_settings: ApiAdapterSettings {
+                addresses: vec![Url::parse(
+                    format!("http://{}", config.api_config.address).as_str(),
+                )
+                .unwrap()],
             },
         },
         storage: RocksBackendSettings {

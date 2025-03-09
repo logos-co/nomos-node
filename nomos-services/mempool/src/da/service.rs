@@ -38,7 +38,7 @@ pub struct DaMempoolService<
     DaVerifierBackend,
     DaVerifierNetwork,
     DaVerifierStorage,
-    ApiBackend,
+    ApiAdapter,
 > where
     N: NetworkAdapter<Key = P::Key>,
     N::Payload: DispersedBlobInfo + Into<P::Item> + Debug + 'static,
@@ -60,7 +60,7 @@ pub struct DaMempoolService<
     DaVerifierBackend: VerifierBackend + Send + 'static,
     DaVerifierBackend::Settings: Clone,
     DaVerifierStorage: nomos_da_verifier::storage::DaStorageAdapter,
-    ApiBackend: nomos_da_sampling::api::ApiBackend,
+    ApiAdapter: nomos_da_sampling::api::ApiAdapter + Send,
 {
     service_state: OpaqueServiceStateHandle<Self>,
     network_relay: Relay<NetworkService<N::Backend>>,
@@ -73,7 +73,7 @@ pub struct DaMempoolService<
             DaVerifierBackend,
             DaVerifierNetwork,
             DaVerifierStorage,
-            ApiBackend,
+            ApiAdapter,
         >,
     >,
     pool: P,
@@ -89,7 +89,7 @@ impl<
         DaVerifierBackend,
         DaVerifierNetwork,
         DaVerifierStorage,
-        ApiBackend,
+        ApiAdapter,
     > ServiceData
     for DaMempoolService<
         N,
@@ -101,7 +101,7 @@ impl<
         DaVerifierBackend,
         DaVerifierNetwork,
         DaVerifierStorage,
-        ApiBackend,
+        ApiAdapter,
     >
 where
     N: NetworkAdapter<Key = P::Key>,
@@ -123,7 +123,7 @@ where
     DaVerifierBackend::Settings: Clone,
     DaVerifierNetwork: nomos_da_verifier::network::NetworkAdapter,
     DaVerifierNetwork::Settings: Clone,
-    ApiBackend: nomos_da_sampling::api::ApiBackend,
+    ApiAdapter: nomos_da_sampling::api::ApiAdapter + Send,
 {
     const SERVICE_ID: ServiceId = "mempool-da";
     type Settings = DaMempoolSettings<P::Settings, N::Settings>;
@@ -148,7 +148,7 @@ impl<
         DaVerifierBackend,
         DaVerifierNetwork,
         DaVerifierStorage,
-        ApiBackend,
+        ApiAdapter,
     > ServiceCore
     for DaMempoolService<
         N,
@@ -160,7 +160,7 @@ impl<
         DaVerifierBackend,
         DaVerifierNetwork,
         DaVerifierStorage,
-        ApiBackend,
+        ApiAdapter,
     >
 where
     P: MemPool + Send + 'static,
@@ -183,7 +183,7 @@ where
     DaVerifierBackend::Settings: Clone,
     DaVerifierNetwork: nomos_da_verifier::network::NetworkAdapter,
     DaVerifierNetwork::Settings: Clone,
-    ApiBackend: nomos_da_sampling::api::ApiBackend,
+    ApiAdapter: nomos_da_sampling::api::ApiAdapter + Send,
 {
     fn init(
         service_state: OpaqueServiceStateHandle<Self>,
@@ -262,7 +262,7 @@ impl<
         DaVerifierBackend,
         DaVerifierNetwork,
         DaVerifierStorage,
-        ApiBackend,
+        ApiAdapter,
     >
     DaMempoolService<
         N,
@@ -274,7 +274,7 @@ impl<
         DaVerifierBackend,
         DaVerifierNetwork,
         DaVerifierStorage,
-        ApiBackend,
+        ApiAdapter,
     >
 where
     P: MemPool + Send + 'static,
@@ -297,7 +297,7 @@ where
     DaVerifierBackend::Settings: Clone,
     DaVerifierNetwork: nomos_da_verifier::network::NetworkAdapter,
     DaVerifierNetwork::Settings: Clone,
-    ApiBackend: nomos_da_sampling::api::ApiBackend,
+    ApiAdapter: nomos_da_sampling::api::ApiAdapter + Send,
 {
     fn handle_mempool_message(
         message: MempoolMsg<P::BlockId, N::Payload, P::Item, P::Key>,

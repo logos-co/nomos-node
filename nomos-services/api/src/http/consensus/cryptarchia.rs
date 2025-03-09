@@ -38,7 +38,7 @@ pub type Cryptarchia<
     DaVerifierNetwork,
     DaVerifierStorage,
     TimeBackend,
-    ApiBackend,
+    ApiAdapter,
     const SIZE: usize,
 > = CryptarchiaConsensus<
     ConsensusNetworkAdapter<Tx, BlobInfo>,
@@ -58,7 +58,7 @@ pub type Cryptarchia<
     DaVerifierNetwork,
     DaVerifierStorage,
     TimeBackend,
-    ApiBackend,
+    ApiAdapter,
 >;
 
 pub async fn cryptarchia_info<
@@ -73,7 +73,7 @@ pub async fn cryptarchia_info<
     DaVerifierNetwork,
     DaVerifierStorage,
     TimeBackend,
-    ApiBackend,
+    ApiAdapter,
     const SIZE: usize,
 >(
     handle: &'a OverwatchHandle,
@@ -106,7 +106,7 @@ where
     DaVerifierNetwork::Settings: Clone,
     TimeBackend: nomos_time::backends::TimeBackend,
     TimeBackend::Settings: Clone + Send + Sync,
-    ApiBackend: nomos_da_sampling::api::ApiBackend + Send + Sync,
+    ApiAdapter: nomos_da_sampling::api::ApiAdapter + Send + Sync,
 {
     let relay = handle
         .relay::<Cryptarchia<
@@ -120,7 +120,7 @@ where
             DaVerifierNetwork,
             DaVerifierStorage,
             TimeBackend,
-            ApiBackend,
+            ApiAdapter,
             SIZE,
         >>()
         .connect()
@@ -146,7 +146,7 @@ pub async fn cryptarchia_headers<
     DaVerifierNetwork,
     DaVerifierStorage,
     TimeBackend,
-    ApiBackend,
+    ApiAdapter,
     const SIZE: usize,
 >(
     handle: &'a OverwatchHandle,
@@ -181,7 +181,7 @@ where
     DaVerifierNetwork::Settings: Clone,
     TimeBackend: nomos_time::backends::TimeBackend,
     TimeBackend::Settings: Clone + Send + Sync,
-    ApiBackend: nomos_da_sampling::api::ApiBackend + Send + Sync,
+    ApiAdapter: nomos_da_sampling::api::ApiAdapter + Send + Sync,
 {
     let relay = handle
         .relay::<Cryptarchia<
@@ -195,7 +195,7 @@ where
             DaVerifierNetwork,
             DaVerifierStorage,
             TimeBackend,
-            ApiBackend,
+            ApiAdapter,
             SIZE,
         >>()
         .connect()

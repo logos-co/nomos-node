@@ -1,6 +1,7 @@
 use std::time::Duration;
 
 use executor_http_client::ExecutorHttpClient;
+use reqwest::Url;
 
 use crate::{adjust_timeout, nodes::executor::Executor};
 
@@ -13,8 +14,8 @@ pub async fn disseminate_with_metadata(
 ) {
     let executor_config = executor.config();
     let backend_address = executor_config.http.backend_settings.address;
-    let exec_url = format!("http://{backend_address}");
-    let client = ExecutorHttpClient::new(&exec_url, None);
+    let exec_url = Url::parse(&format!("http://{backend_address}")).unwrap();
+    let client = ExecutorHttpClient::new(exec_url, None);
 
     client.publish_blob(data.to_vec(), metadata).await.unwrap();
 }

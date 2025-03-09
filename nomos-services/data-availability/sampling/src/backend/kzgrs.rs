@@ -27,20 +27,6 @@ pub struct SamplingContext {
     commitment: Option<Arc<DaBlobSharedCommitments>>,
 }
 
-impl SamplingContext {
-    fn new(commitment: Option<DaBlobSharedCommitments>) -> Self {
-        Self {
-            subnets: HashSet::new(),
-            started: Instant::now(),
-            commitment: commitment.map(Arc::new),
-        }
-    }
-
-    const fn is_waiting_commitments(&self) -> bool {
-        self.commitment.is_none()
-    }
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct KzgrsSamplingBackendSettings {
     pub num_samples: u16,
@@ -128,65 +114,52 @@ impl<R: Rng + Sync + Send> DaSamplingServiceBackend<R> for KzgrsSamplingBackend<
         self.validated_blobs.remove(&blob_id);
     }
 
-    async fn prepare_sampling(&mut self, blob_id: Self::BlobId) -> SamplingState {
-        if self.validated_blobs.contains(&blob_id) {
-            return SamplingState::Terminated;
-        }
+    async fn init_sampling(&mut self, blob_id: Self::BlobId) -> SamplingState {
         if self.pending_sampling_blobs.contains_key(&blob_id) {
             return SamplingState::Tracking;
         }
-        self.pending_sampling_blobs
-            .insert(blob_id, SamplingContext::new(None));
-        SamplingState::WaitingCommitments
-    }
-    async fn init_sampling(
-        &mut self,
-        blob_id: Self::BlobId,
-        commitments: Self::SharedCommitments,
-    ) -> SamplingState {
         if self.validated_blobs.contains(&blob_id) {
             return SamplingState::Terminated;
         }
 
-        match self.pending_sampling_blobs.get_mut(&blob_id) {
-            Some(ctx) => {
-                if ctx.is_waiting_commitments() {
-                    ctx.commitment = Some(Arc::new(commitments));
-                    let subnets = (0..self.settings.num_subnets as SubnetworkId)
-                        .choose_multiple(&mut self.rng, self.settings.num_samples.into());
+        let subnets: Vec<SubnetworkId> = (0..self.settings.num_subnets as SubnetworkId)
+            .choose_multiple(&mut self.rng, self.settings.num_samples.into());
 
-                    SamplingState::Init(subnets)
-                } else {
-                    SamplingState::Tracking
-                }
-            }
-            None => SamplingState::WaitingCommitments,
-        }
+        let ctx: SamplingContext = SamplingContext {
+            subnets: HashSet::new(),
+            started: Instant::now(),
+            commitment: None,
+        };
+        self.pending_sampling_blobs.insert(blob_id, ctx);
+        SamplingState::Init(subnets)
     }
+
     fn prune(&mut self) {
         self.prune_by_time();
     }
 
-    fn commitments(&self, blob_id: &Self::BlobId) -> Option<Arc<Self::SharedCommitments>> {
+    fn get_commitments(&self, blob_id: &Self::BlobId) -> Option<Arc<Self::SharedCommitments>> {
         self.pending_sampling_blobs
             .get(blob_id)
             .and_then(|ctx| ctx.commitment.clone())
+    }
+
+    fn add_commitments(&mut self, blob_id: &Self::BlobId, commitments: Self::SharedCommitments) {
+        if let Some(ctx) = self.pending_sampling_blobs.get_mut(blob_id) {
+            ctx.commitment = Some(Arc::new(commitments));
+        }
     }
 }
 
 #[cfg(test)]
 mod test {
-
     use std::{
         collections::HashSet,
         time::{Duration, Instant},
     };
 
     use kzgrs::{Commitment, Proof};
-    use kzgrs_backend::common::{
-        blob::{DaBlob, DaBlobSharedCommitments},
-        Column,
-    };
+    use kzgrs_backend::common::{blob::DaBlob, Column};
     use nomos_core::da::BlobId;
     use rand::{prelude::*, rngs::StdRng};
 
@@ -213,9 +186,7 @@ mod test {
         let mut backend = create_sampler(num_samples, number_of_subnets);
 
         let blob_id = BlobId::default();
-        let state = backend
-            .init_sampling(blob_id, DaBlobSharedCommitments::default())
-            .await;
+        let state = backend.init_sampling(blob_id).await;
 
         if let SamplingState::Init(subnets) = state {
             let unique_subnet_ids: HashSet<_> = subnets.iter().copied().collect();
@@ -271,44 +242,20 @@ mod test {
         assert!(sampler.get_validated_blobs().await.is_empty());
 
         // start sampling for b1
-        let SamplingState::WaitingCommitments = sampler.prepare_sampling(b1).await else {
-            panic!("unexpected return value")
-        };
-
-        assert!(sampler.pending_sampling_blobs.len() == 1);
-        let ctx_b1 = sampler.pending_sampling_blobs.get_mut(&b1).unwrap();
-        assert!(ctx_b1.commitment.is_none());
-
-        let SamplingState::Init(subnets_to_sample) = sampler
-            .init_sampling(b1, DaBlobSharedCommitments::default())
-            .await
-        else {
+        let SamplingState::Init(subnets_to_sample) = sampler.init_sampling(b1).await else {
             panic!("unexpected return value")
         };
         assert!(subnets_to_sample.len() == subnet_num);
         assert!(sampler.validated_blobs.is_empty());
-        let ctx_b1 = sampler.pending_sampling_blobs.get_mut(&b1).unwrap();
-        assert!(ctx_b1.commitment.is_some());
+        assert!(sampler.pending_sampling_blobs.len() == 1);
 
         // start sampling for b2
-        let SamplingState::WaitingCommitments = sampler.prepare_sampling(b2).await else {
-            panic!("unexpected return value")
-        };
-
-        assert!(sampler.pending_sampling_blobs.len() == 2);
-        let ctx_b2 = sampler.pending_sampling_blobs.get_mut(&b2).unwrap();
-        assert!(ctx_b2.commitment.is_none());
-
-        let SamplingState::Init(subnets_to_sample2) = sampler
-            .init_sampling(b2, DaBlobSharedCommitments::default())
-            .await
-        else {
+        let SamplingState::Init(subnets_to_sample2) = sampler.init_sampling(b2).await else {
             panic!("unexpected return value")
         };
         assert!(subnets_to_sample2.len() == subnet_num);
         assert!(sampler.validated_blobs.is_empty());
-        let ctx_b2 = sampler.pending_sampling_blobs.get_mut(&b1).unwrap();
-        assert!(ctx_b2.commitment.is_some());
+        assert!(sampler.pending_sampling_blobs.len() == 2);
 
         // mark in block for both
         // collections should be reset
@@ -317,14 +264,8 @@ mod test {
         assert!(sampler.validated_blobs.is_empty());
 
         // because they're reset, we need to restart sampling for the test
-        _ = sampler.prepare_sampling(b1).await;
-        _ = sampler
-            .init_sampling(b1, DaBlobSharedCommitments::default())
-            .await;
-        _ = sampler.prepare_sampling(b2).await;
-        _ = sampler
-            .init_sampling(b2, DaBlobSharedCommitments::default())
-            .await;
+        _ = sampler.init_sampling(b1).await;
+        _ = sampler.init_sampling(b2).await;
 
         // handle ficticious error for b2
         // b2 should be gone, b1 still around

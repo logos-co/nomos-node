@@ -109,10 +109,10 @@ impl AsRef<[u8]> for Index {
 
 #[cfg(test)]
 mod tests {
-    use nomos_core::da::DaEncoder as _;
+    use nomos_core::da::{blob::Blob, DaEncoder as _};
 
     use crate::{
-        common::blob::{DaBlobSharedCommitments, DaLightBlob},
+        common::blob::DaBlob,
         encoder::{
             test::{rand_data, ENCODER},
             EncodedData,
@@ -126,25 +126,23 @@ mod tests {
         let domain_size = encoded_data.extended_data.0[0].len();
         for (i, column) in encoded_data.extended_data.columns().enumerate() {
             let verifier = &verifiers[i];
-            let da_blob = DaLightBlob {
+            let da_blob = DaBlob {
                 column,
                 column_idx: i
                     .try_into()
                     .expect("Column index shouldn't overflow the target type"),
                 column_commitment: encoded_data.column_commitments[i],
-
+                aggregated_column_commitment: encoded_data.aggregated_column_commitment,
                 aggregated_column_proof: encoded_data.aggregated_column_proofs[i],
+                rows_commitments: encoded_data.row_commitments.clone(),
                 rows_proofs: encoded_data
                     .rows_proofs
                     .iter()
                     .map(|proofs| proofs.get(i).copied().unwrap())
                     .collect(),
             };
-            let commitments = DaBlobSharedCommitments {
-                aggregated_column_commitment: encoded_data.aggregated_column_commitment,
-                rows_commitments: encoded_data.row_commitments.clone(),
-            };
-            attestations.push(verifier.verify(&commitments, &da_blob, domain_size));
+            let (light_blob, commitments) = da_blob.into_blob_and_shared_commitments();
+            attestations.push(verifier.verify(&commitments, &light_blob, domain_size));
         }
         attestations
     }

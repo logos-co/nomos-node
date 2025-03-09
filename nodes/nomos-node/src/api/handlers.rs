@@ -114,7 +114,7 @@ pub async fn cryptarchia_info<
     DaVerifierNetwork,
     DaVerifierStorage,
     TimeBackend,
-    ApiBackend,
+    ApiAdapter,
     const SIZE: usize,
 >(
     State(handle): State<OverwatchHandle>,
@@ -147,7 +147,7 @@ where
     DaVerifierNetwork::Settings: Clone,
     TimeBackend: nomos_time::backends::TimeBackend,
     TimeBackend::Settings: Clone + Send + Sync,
-    ApiBackend: nomos_da_sampling::api::ApiBackend + Send + Sync,
+    ApiAdapter: nomos_da_sampling::api::ApiAdapter + Send + Sync,
 {
     make_request_and_return_response!(consensus::cryptarchia_info::<
         Tx,
@@ -160,7 +160,7 @@ where
         DaVerifierNetwork,
         DaVerifierStorage,
         TimeBackend,
-        ApiBackend,
+        ApiAdapter,
         SIZE,
     >(&handle))
 }
@@ -184,7 +184,7 @@ pub async fn cryptarchia_headers<
     DaVerifierNetwork,
     DaVerifierStorage,
     TimeBackend,
-    ApiBackend,
+    ApiAdapter,
     const SIZE: usize,
 >(
     State(store): State<OverwatchHandle>,
@@ -218,7 +218,7 @@ where
     DaVerifierNetwork::Settings: Clone,
     TimeBackend: nomos_time::backends::TimeBackend,
     TimeBackend::Settings: Clone + Send + Sync,
-    ApiBackend: nomos_da_sampling::api::ApiBackend + Send + Sync,
+    ApiAdapter: nomos_da_sampling::api::ApiAdapter + Send + Sync,
 {
     let CryptarchiaInfoQuery { from, to } = query;
     make_request_and_return_response!(consensus::cryptarchia_headers::<
@@ -232,7 +232,7 @@ where
         DaVerifierNetwork,
         DaVerifierStorage,
         TimeBackend,
-        ApiBackend,
+        ApiAdapter,
         SIZE,
     >(&store, from, to))
 }
@@ -291,7 +291,7 @@ pub async fn get_range<
     DaVerifierNetwork,
     DaVerifierStorage,
     TimeBackend,
-    ApiBackend,
+    ApiAdapter,
     const SIZE: usize,
 >(
     State(handle): State<OverwatchHandle>,
@@ -351,7 +351,7 @@ where
     DaVerifierNetwork::Settings: Clone,
     TimeBackend: nomos_time::backends::TimeBackend,
     TimeBackend::Settings: Clone + Send + Sync,
-    ApiBackend: nomos_da_sampling::api::ApiBackend + Send + Sync,
+    ApiAdapter: nomos_da_sampling::api::ApiAdapter + Send + Sync,
 {
     make_request_and_return_response!(da::get_range::<
         Tx,
@@ -366,7 +366,7 @@ where
         DaVerifierNetwork,
         DaVerifierStorage,
         TimeBackend,
-        ApiBackend,
+        ApiAdapter,
         SIZE,
     >(&handle, app_id, range))
 }
@@ -495,7 +495,7 @@ pub async fn add_blob_info<
     DaVerifierBackend,
     DaVerifierNetwork,
     DaVerifierStorage,
-    ApiBackend,
+    ApiAdapter,
 >(
     State(handle): State<OverwatchHandle>,
     Json(blob_info): Json<B>,
@@ -525,7 +525,7 @@ where
     DaVerifierBackend::Settings: Clone,
     DaVerifierNetwork: nomos_da_verifier::network::NetworkAdapter,
     DaVerifierNetwork::Settings: Clone,
-    ApiBackend: nomos_da_sampling::api::ApiBackend + Send + Sync,
+    ApiAdapter: nomos_da_sampling::api::ApiAdapter + Send + Sync,
 {
     make_request_and_return_response!(mempool::add_blob_info::<
         NetworkBackend,
@@ -539,6 +539,6 @@ where
         DaVerifierBackend,
         DaVerifierNetwork,
         DaVerifierStorage,
-        ApiBackend,
+        ApiAdapter,
     >(&handle, blob_info, DispersedBlobInfo::blob_id))
 }

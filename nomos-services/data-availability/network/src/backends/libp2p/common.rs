@@ -1,4 +1,4 @@
-use std::{fmt::Debug, sync::Arc, time::Duration};
+use std::time::Duration;
 
 use futures::StreamExt;
 use kzgrs_backend::common::{
@@ -46,7 +46,7 @@ pub enum SamplingEvent {
     /// A success sampling
     SamplingSuccess {
         blob_id: BlobId,
-        light_blob: Arc<DaLightBlob>,
+        light_blob: Box<DaLightBlob>,
     },
     /// Incoming sampling request
     SamplingRequest {

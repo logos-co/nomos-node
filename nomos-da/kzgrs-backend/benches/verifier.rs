@@ -2,12 +2,12 @@ use std::hint::black_box;
 
 use divan::{counter::BytesCount, Bencher};
 use kzgrs_backend::{
-    common::blob::{DaBlobSharedCommitments, DaLightBlob},
+    common::blob::DaBlob,
     encoder::{DaEncoder, DaEncoderParams},
     global::GLOBAL_PARAMETERS,
     verifier::DaVerifier,
 };
-use nomos_core::da::DaEncoder as _;
+use nomos_core::da::{blob::Blob, DaEncoder as _};
 use rand::{thread_rng, RngCore};
 
 fn main() {
@@ -32,29 +32,28 @@ fn verify<const SIZE: usize>(bencher: Bencher, column_size: usize) {
             let data = rand_data(SIZE * MB / DaEncoderParams::MAX_BLS12_381_ENCODING_CHUNK_SIZE);
             let encoded_data = encoder.encode(&data).unwrap();
             let verifier = DaVerifier::new(GLOBAL_PARAMETERS.clone());
-            let da_blob = DaLightBlob {
+            let da_blob = DaBlob {
                 column: encoded_data.extended_data.columns().next().unwrap(),
                 column_idx: 0,
                 column_commitment: encoded_data.column_commitments.first().copied().unwrap(),
+                aggregated_column_commitment: encoded_data.aggregated_column_commitment,
                 aggregated_column_proof: encoded_data
                     .aggregated_column_proofs
                     .first()
                     .copied()
                     .unwrap(),
+                rows_commitments: encoded_data.row_commitments.clone(),
                 rows_proofs: encoded_data
                     .rows_proofs
                     .iter()
                     .map(|row| row.iter().next().copied().unwrap())
                     .collect(),
             };
-            let commitments = DaBlobSharedCommitments {
-                aggregated_column_commitment: encoded_data.aggregated_column_commitment,
-                rows_commitments: encoded_data.row_commitments,
-            };
-            (verifier, commitments, da_blob)
+            (verifier, da_blob)
         })
         .input_counter(|_| BytesCount::new(SIZE))
-        .bench_refs(|(verifier, commitments, blob)| {
-            black_box(verifier.verify(commitments, blob, column_size))
+        .bench_values(|(verifier, blob)| {
+            let (light_blob, commitments) = blob.into_blob_and_shared_commitments();
+            black_box(verifier.verify(&commitments, &light_blob, column_size))
         });
 }

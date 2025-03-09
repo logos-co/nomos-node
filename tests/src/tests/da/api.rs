@@ -1,6 +1,7 @@
 use common_http_client::CommonHttpClient;
 use kzgrs_backend::common::blob::{DaBlob, DaLightBlob};
 use nomos_core::da::blob::Blob;
+use reqwest::Url;
 use tests::{
     common::da::{disseminate_with_metadata, wait_for_indexed_blob, APP_ID},
     topology::{Topology, TopologyConfig},
@@ -32,9 +33,11 @@ async fn test_get_blob_data() {
         .next()
         .unwrap();
 
-    let exec_url = format!("http://{}", executor.config().http.backend_settings.address);
+    let exec_url =
+        Url::parse(format!("http://{}", executor.config().http.backend_settings.address).as_str())
+            .unwrap();
 
-    let client = CommonHttpClient::new(&exec_url, None);
+    let client = CommonHttpClient::new(exec_url, None);
     let commitments = client
         .get_commitments::<DaBlob>(blob.id().try_into().unwrap())
         .await

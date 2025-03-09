@@ -164,7 +164,7 @@ where
         SamplingStorage,
         DaVerifierNetwork,
         DaVerifierStorage,
-        ApiBackend,
+        ApiAdapter,
     >(
         network_relay: Relay<NetworkService<NetworkAdapter::Backend>>,
         blend_relay: Relay<
@@ -183,7 +183,7 @@ where
                 DaVerifierBackend,
                 DaVerifierNetwork,
                 DaVerifierStorage,
-                ApiBackend,
+                ApiAdapter,
             >,
         >,
         sampling_relay: Relay<
@@ -195,7 +195,7 @@ where
                 DaVerifierBackend,
                 DaVerifierNetwork,
                 DaVerifierStorage,
-                ApiBackend,
+                ApiAdapter,
             >,
         >,
         storage_relay: Relay<StorageService<Storage>>,
@@ -208,7 +208,7 @@ where
         DaVerifierBackend::Settings: Clone,
         DaVerifierNetwork: nomos_da_verifier::network::NetworkAdapter + Send + Sync,
         DaVerifierNetwork::Settings: Clone,
-        ApiBackend: nomos_da_sampling::api::ApiBackend + Send + Sync,
+        ApiAdapter: nomos_da_sampling::api::ApiAdapter + Send + Sync,
     {
         let network_relay = network_relay
             .connect()
