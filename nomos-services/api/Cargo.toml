@@ -5,15 +5,13 @@ name    = "nomos-api"
 version = "0.1.0"
 
 [features]
-axum            = ["dep:axum", "dep:hyper", "dep:tower-http", "utoipa-swagger-ui/axum"]
+axum            = ["dep:axum", "dep:hyper", "utoipa-swagger-ui/axum"]
 default         = ["axum"]
 instrumentation = []
 
 [dependencies]
 async-trait              = "0.1"
-bytes                    = "1.2"
 cryptarchia-consensus    = { workspace = true, features = ["libp2p"] }
-full-replication         = { workspace = true }
 kzgrs-backend            = { workspace = true }
 nomos-blend-service      = { workspace = true, features = ["libp2p"] }
 nomos-core               = { workspace = true }
@@ -34,12 +32,10 @@ rand                     = "0.8"
 serde                    = { version = "1", features = ["derive"] }
 subnetworks-assignations = { workspace = true }
 tokio                    = { version = "1", default-features = false, features = ["sync"] }
-tracing                  = "0.1"
 
 # axum related dependencies
-axum       = { version = "0.6", optional = true }
-hyper      = { version = "0.14", features = ["full"], optional = true }
-tower-http = { version = "0.4", optional = true, features = ["cors", "trace"] }
+axum  = { version = "0.6", optional = true }
+hyper = { version = "0.14", features = ["full"], optional = true }
 
 # openapi related dependencies
 utoipa            = "4.0"
@@ -51,4 +47,14 @@ hyper             = { version = "0.14", features = ["full"] }
 reqwest           = { version = "0.11", features = ["blocking", "json"] }
 serde             = { version = "1", features = ["derive"] }
 serde_json        = "1"
+tracing           = "0.1"
 utoipa-swagger-ui = { version = "4.0", features = ["axum"] }
+
+[package.metadata.cargo-machete]
+# False positives.
+ignored = [
+    # Required by `utoipa`.
+    "serde_json",
+    # Required by Overwatch's `#[derive(Services)]` macro.
+    "tracing",
+]

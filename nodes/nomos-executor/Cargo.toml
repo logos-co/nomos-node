@@ -36,9 +36,15 @@ tower-http               = { version = "0.4", features = ["cors", "trace"] }
 tracing                  = "0.1.40"
 utoipa                   = "4.0"
 utoipa-swagger-ui        = { version = "4.0" }
-uuid                     = { version = "1.10.0", features = ["v4"] }
 
 [features]
 default         = ["tracing"]
 instrumentation = ["nomos-node/instrumentation"]
 tracing         = ["nomos-node/tracing"]
+
+[package.metadata.cargo-machete]
+# False positives.
+ignored = [
+    # Required by Overwatch's `#[derive(Services)]` macro.
+    "tracing",
+]
