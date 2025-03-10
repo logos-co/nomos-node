@@ -36,13 +36,17 @@ pub enum ReplicationError {
         peer_id: PeerId,
         error: OpenStreamError,
     },
+    #[error("Error dequeuing outbound message, peer not found: {peer_id}")]
+    DequeueOutbound { peer_id: PeerId },
 }
 
 impl ReplicationError {
     #[must_use]
     pub const fn peer_id(&self) -> Option<&PeerId> {
         match self {
-            Self::OpenStream { peer_id, .. } | Self::Io { peer_id, .. } => Some(peer_id),
+            Self::OpenStream { peer_id, .. }
+            | Self::Io { peer_id, .. }
+            | Self::DequeueOutbound { peer_id } => Some(peer_id),
         }
     }
 }
@@ -69,6 +73,7 @@ impl Clone for ReplicationError {
                     )),
                 },
             },
+            Self::DequeueOutbound { peer_id } => Self::DequeueOutbound { peer_id: *peer_id },
         }
     }
 }
@@ -127,6 +132,8 @@ struct PendingOutbound {
     last_scheduled: Option<PeerId>,
 }
 
+struct PeerNotFound;
+
 impl PendingOutbound {
     /// Appends a message to the peer's pending queue. Lazily creates the queue
     /// for the peer upon the first call.
@@ -134,15 +141,10 @@ impl PendingOutbound {
         self.messages.entry(peer_id).or_default().push_back(message);
     }
 
-    /// ### Panics
-    ///
-    /// [`Self::enqueue_message`] must be called at least once for the peer
-    /// before calling this method or it will panic.
-    fn dequeue_message(&mut self, peer_id: &PeerId) -> Option<DaMessage> {
-        self.messages
-            .get_mut(peer_id)
-            .expect("Peer is in the map")
-            .pop_front()
+    /// Dequeues the next message from the peer's pending queue.
+    fn dequeue_message(&mut self, peer_id: &PeerId) -> Result<Option<DaMessage>, PeerNotFound> {
+        let messages = self.messages.get_mut(peer_id).ok_or(PeerNotFound)?;
+        Ok(messages.pop_front())
     }
 
     /// Do internal housekeeping when a peer disconnects.
@@ -438,7 +440,15 @@ where
         // we can write the next pending message to this stream if there is one
         match self.outbound_tasks.poll_next_unpin(cx) {
             Poll::Ready(Some(Ok((peer_id, stream)))) => {
-                match self.pending_outbound.dequeue_message(&peer_id) {
+                let Ok(message) = self.pending_outbound.dequeue_message(&peer_id) else {
+                    return Poll::Ready(ToSwarm::GenerateEvent(
+                        ReplicationEvent::ReplicationError {
+                            error: ReplicationError::DequeueOutbound { peer_id },
+                        },
+                    ));
+                };
+
+                match message {
                     Some(message) => {
                         self.outbound_tasks
                             .push(Box::pin(Self::try_write_message(peer_id, message, stream)));
@@ -469,10 +479,13 @@ where
         });
 
         if let Some(peer_id) = next_peer {
-            let message = self
-                .pending_outbound
-                .dequeue_message(&peer_id)
-                .expect("Message is in the queue, ensured by PendingOutbound::next_peer()");
+            let Ok(message) = self.pending_outbound.dequeue_message(&peer_id) else {
+                return Poll::Ready(ToSwarm::GenerateEvent(ReplicationEvent::ReplicationError {
+                    error: ReplicationError::DequeueOutbound { peer_id },
+                }));
+            };
+            let message =
+                message.expect("Message is in the queue, ensured by PendingOutbound::next_peer()");
 
             match self.outbound_streams.entry(peer_id) {
                 Entry::Occupied(mut entry) => match entry.get_mut().take() {
