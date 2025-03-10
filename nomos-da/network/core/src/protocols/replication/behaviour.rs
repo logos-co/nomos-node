@@ -1,29 +1,28 @@
 use std::{
-    collections::{HashMap, HashSet, VecDeque},
-    convert::Infallible,
+    collections::{hash_map::Entry, HashMap, HashSet, VecDeque},
     task::{Context, Poll, Waker},
 };
 
 use either::Either;
-use indexmap::IndexSet;
+use futures::{future::BoxFuture, stream::FuturesUnordered, AsyncWriteExt, FutureExt, StreamExt};
+use indexmap::{IndexMap, IndexSet};
 use libp2p::{
     core::{transport::PortUse, Endpoint},
     swarm::{
-        ConnectionClosed, ConnectionDenied, ConnectionId, FromSwarm, NetworkBehaviour,
-        NotifyHandler, THandler, THandlerInEvent, THandlerOutEvent, ToSwarm,
+        ConnectionClosed, ConnectionDenied, ConnectionId, FromSwarm, NetworkBehaviour, THandler,
+        THandlerInEvent, THandlerOutEvent, ToSwarm,
     },
-    Multiaddr, PeerId,
+    Multiaddr, PeerId, Stream,
 };
+use libp2p_stream::{Control, IncomingStreams, OpenStreamError};
 use log::{error, trace};
+use nomos_da_messages::packing::{pack_to_writer, unpack_from_reader};
 use subnetworks_assignations::MembershipHandler;
 use thiserror::Error;
 
-use super::handler::{
-    BehaviourEventToHandler, DaMessage, HandlerEventToBehaviour, ReplicationHandler,
-};
-use crate::SubnetworkId;
+use crate::{protocol::REPLICATION_PROTOCOL, SubnetworkId};
 
-type SwarmEvent = ToSwarm<ReplicationEvent, Either<BehaviourEventToHandler, Infallible>>;
+pub type DaMessage = nomos_da_messages::replication::ReplicationRequest;
 
 #[derive(Debug, Error)]
 pub enum ReplicationError {
@@ -32,13 +31,22 @@ pub enum ReplicationError {
         peer_id: PeerId,
         error: std::io::Error,
     },
+    #[error("Error opening stream [{peer_id}]: {error}")]
+    OpenStream {
+        peer_id: PeerId,
+        error: OpenStreamError,
+    },
+    #[error("Error dequeuing outbound message, peer not found: {peer_id}")]
+    DequeueOutbound { peer_id: PeerId },
 }
 
 impl ReplicationError {
     #[must_use]
     pub const fn peer_id(&self) -> Option<&PeerId> {
         match self {
-            Self::Io { peer_id, .. } => Some(peer_id),
+            Self::OpenStream { peer_id, .. }
+            | Self::Io { peer_id, .. }
+            | Self::DequeueOutbound { peer_id } => Some(peer_id),
         }
     }
 }
@@ -50,11 +58,27 @@ impl Clone for ReplicationError {
                 peer_id: *peer_id,
                 error: std::io::Error::new(error.kind(), error.to_string()),
             },
+            Self::OpenStream { peer_id, error } => Self::OpenStream {
+                peer_id: *peer_id,
+                error: match error {
+                    OpenStreamError::UnsupportedProtocol(protocol) => {
+                        OpenStreamError::UnsupportedProtocol(protocol.clone())
+                    }
+                    OpenStreamError::Io(error) => {
+                        OpenStreamError::Io(std::io::Error::new(error.kind(), error.to_string()))
+                    }
+                    err => OpenStreamError::Io(std::io::Error::new(
+                        std::io::ErrorKind::Other,
+                        err.to_string(),
+                    )),
+                },
+            },
+            Self::DequeueOutbound { peer_id } => Self::DequeueOutbound { peer_id: *peer_id },
         }
     }
 }
 
-/// Nomos DA `BroadcastEvents` to be bubble up to logic layers
+/// Nomos DA `BroadcastEvents` to be bubbled up to logic layers
 #[derive(Debug)]
 pub enum ReplicationEvent {
     IncomingMessage {
@@ -82,9 +106,68 @@ impl ReplicationEvent {
     }
 }
 
-/// Nomos DA broadcas network behaviour.
+type IncomingTask = BoxFuture<'static, Result<(PeerId, DaMessage, Stream), ReplicationError>>;
+type OutboundTask = BoxFuture<'static, Result<(PeerId, Stream), ReplicationError>>;
+
+enum StreamState {
+    Idle(Stream),
+    Busy,
+}
+
+impl StreamState {
+    pub fn take(&mut self) -> Self {
+        let mut ret = Self::Busy;
+        std::mem::swap(self, &mut ret);
+        ret
+    }
+}
+
+/// Holds pending outbound messages for each peer and manages which message
+/// should be scheduled next for writing to an outbound stream.
+#[derive(Default)]
+struct PendingOutbound {
+    /// Pending outbound message queues for each peer
+    messages: IndexMap<PeerId, VecDeque<DaMessage>>,
+    /// The last peer whose pending message was scheduled for sending
+    last_scheduled: Option<PeerId>,
+}
+
+struct PeerNotFound;
+
+impl PendingOutbound {
+    /// Appends a message to the peer's pending queue. Lazily creates the queue
+    /// for the peer upon the first call.
+    fn enqueue_message(&mut self, peer_id: PeerId, message: DaMessage) {
+        self.messages.entry(peer_id).or_default().push_back(message);
+    }
+
+    /// Dequeues the next message from the peer's pending queue.
+    fn dequeue_message(&mut self, peer_id: &PeerId) -> Result<Option<DaMessage>, PeerNotFound> {
+        let messages = self.messages.get_mut(peer_id).ok_or(PeerNotFound)?;
+        Ok(messages.pop_front())
+    }
+
+    /// Do internal housekeeping when a peer disconnects.
+    fn on_disconnected(&mut self, peer_id: &PeerId) {
+        self.last_scheduled = on_disconnected(&mut self.messages, self.last_scheduled, peer_id);
+    }
+
+    /// Find the next peer whose pending message can be scheduled for writing to
+    /// the peer's stream. Peers are iterated in a round-robin fashion.
+    fn next_peer(&mut self, is_stream_idle_fn: impl FnMut(&PeerId) -> bool) -> Option<PeerId> {
+        let next = next_peer(
+            self.last_scheduled.as_ref(),
+            &self.messages,
+            is_stream_idle_fn,
+        );
+        self.last_scheduled = next;
+        next
+    }
+}
+
+/// Nomos DA broadcast network behaviour.
 ///
-/// This item handles the logic of the nomos da subnetworks broadcasting
+/// This item handles the logic of the nomos da subnetworks broadcasting.
 /// DA subnetworks are a logical distribution of subsets.
 /// A node just connects and accepts connections to other nodes that are in the
 /// same subsets. A node forwards messages to all connected peers which are
@@ -92,27 +175,55 @@ impl ReplicationEvent {
 pub struct ReplicationBehaviour<Membership> {
     /// Local peer Id, related to the libp2p public key
     local_peer_id: PeerId,
+    /// Underlying stream behaviour
+    stream_behaviour: libp2p_stream::Behaviour,
+    /// Used to open new outbound streams from the stream behaviour
+    control: Control,
+    /// Provides inbound streams that are accepted by the stream behaviour
+    incoming_streams: IncomingStreams,
+    /// Holds tasks for reading messages from incoming streams
+    incoming_tasks: FuturesUnordered<IncomingTask>,
     /// Membership handler, membership handles the subsets logics on who is
     /// where in the nomos DA subnetworks
     membership: Membership,
-    /// Relation of connected peers of replication subnetworks
-    connected: HashMap<PeerId, ConnectionId>,
-    /// Outgoing event queue
-    outgoing_events: VecDeque<SwarmEvent>,
-    /// Seen messages cache holds a record of seen messages, messages will be
-    /// removed from this set after some time to keep it
+    /// Currently connected peers
+    connected: HashSet<PeerId>,
+    /// Pending outbound messages are stored here, they are then consumed by
+    /// each respective outbound stream
+    pending_outbound: PendingOutbound,
+    /// Indicates which outbound streams are currently idle or busy
+    outbound_streams: HashMap<PeerId, StreamState>,
+    /// Holds tasks for writing messages to the outbound streams
+    outbound_tasks: FuturesUnordered<OutboundTask>,
+    /// Seen messages cache holds a record of seen messages
     seen_message_cache: IndexSet<(Vec<u8>, SubnetworkId)>,
-    /// Waker that handles polling
+    /// This waker is only used when we are the initiator of
+    /// [`Self::send_message`], ie. the method is called from outside the
+    /// behaviour. In all other cases we wake via reference in [`Self::poll`].
     waker: Option<Waker>,
 }
 
 impl<Membership> ReplicationBehaviour<Membership> {
     pub fn new(peer_id: PeerId, membership: Membership) -> Self {
+        let stream_behaviour = libp2p_stream::Behaviour::new();
+        let mut control = stream_behaviour.new_control();
+        let incoming_streams = control
+            .accept(REPLICATION_PROTOCOL)
+            .expect("A unique protocol can be accepted only once");
+        let incoming_tasks = FuturesUnordered::new();
+        let outbound_tasks = FuturesUnordered::new();
+
         Self {
             local_peer_id: peer_id,
+            stream_behaviour,
+            control,
+            incoming_streams,
+            incoming_tasks,
             membership,
-            connected: HashMap::default(),
-            outgoing_events: VecDeque::default(),
+            connected: HashSet::default(),
+            pending_outbound: PendingOutbound::default(),
+            outbound_streams: HashMap::default(),
+            outbound_tasks,
             seen_message_cache: IndexSet::default(),
             waker: None,
         }
@@ -144,42 +255,81 @@ where
         peers
     }
 
-    fn replicate_message(&mut self, message: &DaMessage) {
+    fn replicate_message(&mut self, waker: &Waker, message: &DaMessage) {
         let message_id = (message.blob.blob_id.to_vec(), message.subnetwork_id);
         if self.seen_message_cache.contains(&message_id) {
             return;
         }
         self.seen_message_cache.insert(message_id);
-        self.send_message(message);
+        self.send_message_impl(Some(waker), message);
     }
 
+    /// Initiate sending a replication message **from outside the behaviour**
     pub fn send_message(&mut self, message: &DaMessage) {
-        // push a message in the queue for every single peer connected that is a member
+        let waker = self.waker.take();
+        self.send_message_impl(waker.as_ref(), message);
+    }
+
+    fn send_message_impl(&mut self, waker: Option<&Waker>, message: &DaMessage) {
+        // Push a message in the queue for every single peer connected that is a member
         // of the selected subnetwork_id
         let peers = self.no_loopback_member_peers_of(message.subnetwork_id);
+        // At least one message was enqueued
+        let mut queued = false;
 
-        let connected_peers: Vec<_> = self
-            .connected
+        self.connected
             .iter()
-            .filter(|(peer_id, _connection_id)| peers.contains(peer_id))
-            .collect();
-
-        for (peer_id, connection_id) in connected_peers {
-            self.outgoing_events.push_back(SwarmEvent::NotifyHandler {
-                peer_id: *peer_id,
-                handler: NotifyHandler::One(*connection_id),
-                event: Either::Left(BehaviourEventToHandler::OutgoingMessage {
-                    message: message.clone(),
-                }),
+            .filter(|peer_id| peers.contains(peer_id))
+            .for_each(|peer_id| {
+                self.pending_outbound
+                    .enqueue_message(*peer_id, message.clone());
+                queued = true;
             });
+
+        if queued {
+            waker.map(Waker::wake_by_ref);
         }
-        self.try_wake();
     }
 
-    pub fn try_wake(&mut self) {
-        if let Some(waker) = self.waker.take() {
-            waker.wake();
-        }
+    /// Attempt to read a single message from the incoming stream
+    async fn try_read_message(
+        peer_id: PeerId,
+        mut stream: Stream,
+    ) -> Result<(PeerId, DaMessage, Stream), ReplicationError> {
+        let message = unpack_from_reader(&mut stream)
+            .await
+            .map_err(|error| ReplicationError::Io { peer_id, error })?;
+        Ok((peer_id, message, stream))
+    }
+
+    /// Attempt to open a new stream from the underlying control to the peer
+    async fn try_open_stream(
+        peer_id: PeerId,
+        mut control: Control,
+    ) -> Result<Stream, ReplicationError> {
+        let stream = control
+            .open_stream(peer_id, REPLICATION_PROTOCOL)
+            .await
+            .map_err(|error| ReplicationError::OpenStream { peer_id, error })?;
+        Ok(stream)
+    }
+
+    /// Attempt to write a message to the given stream
+    async fn try_write_message(
+        peer_id: PeerId,
+        message: DaMessage,
+        mut stream: Stream,
+    ) -> Result<(PeerId, Stream), ReplicationError> {
+        pack_to_writer(&message, &mut stream)
+            .await
+            .unwrap_or_else(|_| {
+                panic!("Message should always be serializable.\nMessage: '{message:?}'",)
+            });
+        stream
+            .flush()
+            .await
+            .map_err(|error| ReplicationError::Io { peer_id, error })?;
+        Ok((peer_id, stream))
     }
 }
 
@@ -187,336 +337,356 @@ impl<M> NetworkBehaviour for ReplicationBehaviour<M>
 where
     M: MembershipHandler<NetworkId = SubnetworkId, Id = PeerId> + 'static,
 {
-    type ConnectionHandler = Either<ReplicationHandler, libp2p::swarm::dummy::ConnectionHandler>;
+    type ConnectionHandler = Either<
+        <libp2p_stream::Behaviour as NetworkBehaviour>::ConnectionHandler,
+        libp2p::swarm::dummy::ConnectionHandler,
+    >;
     type ToSwarm = ReplicationEvent;
 
     fn handle_established_inbound_connection(
         &mut self,
         connection_id: ConnectionId,
         peer_id: PeerId,
-        _local_addr: &Multiaddr,
-        _remote_addr: &Multiaddr,
+        local_addr: &Multiaddr,
+        remote_addr: &Multiaddr,
     ) -> Result<THandler<Self>, ConnectionDenied> {
         if !self.is_neighbour(&peer_id) {
             trace!("refusing connection to {peer_id}");
             return Ok(Either::Right(libp2p::swarm::dummy::ConnectionHandler));
         }
         trace!("{}, Connected to {peer_id}", self.local_peer_id);
-        self.connected.insert(peer_id, connection_id);
-        Ok(Either::Left(ReplicationHandler::new()))
+        self.connected.insert(peer_id);
+        self.stream_behaviour
+            .handle_established_inbound_connection(connection_id, peer_id, local_addr, remote_addr)
+            .map(Either::Left)
     }
 
     fn handle_established_outbound_connection(
         &mut self,
         connection_id: ConnectionId,
         peer_id: PeerId,
-        _addr: &Multiaddr,
-        _role_override: Endpoint,
-        _port_use: PortUse,
+        addr: &Multiaddr,
+        role_override: Endpoint,
+        port_use: PortUse,
     ) -> Result<THandler<Self>, ConnectionDenied> {
         trace!("{}, Connected to {peer_id}", self.local_peer_id);
-        self.connected.insert(peer_id, connection_id);
-        Ok(Either::Left(ReplicationHandler::new()))
+        self.connected.insert(peer_id);
+        self.stream_behaviour
+            .handle_established_outbound_connection(
+                connection_id,
+                peer_id,
+                addr,
+                role_override,
+                port_use,
+            )
+            .map(Either::Left)
     }
 
     fn on_swarm_event(&mut self, event: FromSwarm) {
         if let FromSwarm::ConnectionClosed(ConnectionClosed { peer_id, .. }) = event {
             self.connected.remove(&peer_id);
+            self.outbound_streams.remove(&peer_id);
+            self.pending_outbound.on_disconnected(&peer_id);
         }
+        self.stream_behaviour.on_swarm_event(event);
     }
 
     fn on_connection_handler_event(
         &mut self,
         peer_id: PeerId,
-        _connection_id: ConnectionId,
+        connection_id: ConnectionId,
         event: THandlerOutEvent<Self>,
     ) {
-        let event = match event {
-            Either::Left(e) => e,
-            Either::Right(v) => libp2p::core::util::unreachable(v),
-        };
-        match event {
-            HandlerEventToBehaviour::IncomingMessage { message } => {
-                self.replicate_message(&message);
-                self.outgoing_events.push_back(ToSwarm::GenerateEvent(
-                    ReplicationEvent::IncomingMessage {
-                        peer_id,
-                        message: Box::new(message),
-                    },
-                ));
-            }
-            HandlerEventToBehaviour::OutgoingMessageError { error } => {
-                self.outgoing_events.push_back(ToSwarm::GenerateEvent(
-                    ReplicationError::Io { peer_id, error }.into(),
-                ));
-            }
-        }
-        self.try_wake();
+        let Either::Left(event) = event;
+        self.stream_behaviour
+            .on_connection_handler_event(peer_id, connection_id, event);
     }
 
     fn poll(
         &mut self,
         cx: &mut Context<'_>,
     ) -> Poll<ToSwarm<Self::ToSwarm, THandlerInEvent<Self>>> {
-        if let Some(event) = self.outgoing_events.pop_front() {
-            Poll::Ready(event)
-        } else {
-            self.waker = Some(cx.waker().clone());
-            Poll::Pending
+        // The incoming message to be returned to the swarm **after** all the polling is
+        // done, this way we don't starve the tasks that are polled later in the
+        // sequence
+        let mut incoming_message = None;
+
+        // Check if we've received any new messages
+        match self.incoming_tasks.poll_next_unpin(cx) {
+            Poll::Ready(Some(Ok((peer_id, message, stream)))) => {
+                // Replicate the message to all connected peers from the same subnet if we
+                // haven't seen it yet
+                self.replicate_message(cx.waker(), &message);
+                // Schedule waiting for any next incoming message on the same stream
+                self.incoming_tasks
+                    .push(Self::try_read_message(peer_id, stream).boxed());
+                // Signal to the swarm that we've received the message but poll the other tasks
+                // as well first
+                incoming_message = Some(Poll::Ready(ToSwarm::GenerateEvent(
+                    ReplicationEvent::IncomingMessage {
+                        peer_id,
+                        message: Box::new(message),
+                    },
+                )));
+            }
+            Poll::Ready(Some(Err(error))) => {
+                return Poll::Ready(ToSwarm::GenerateEvent(ReplicationEvent::ReplicationError {
+                    error,
+                }));
+            }
+            _ => {}
         }
+        // If any of the busy outbound streams has finished sending a message,
+        // we can write the next pending message to this stream if there is one
+        match self.outbound_tasks.poll_next_unpin(cx) {
+            Poll::Ready(Some(Ok((peer_id, stream)))) => {
+                let Ok(message) = self.pending_outbound.dequeue_message(&peer_id) else {
+                    return Poll::Ready(ToSwarm::GenerateEvent(
+                        ReplicationEvent::ReplicationError {
+                            error: ReplicationError::DequeueOutbound { peer_id },
+                        },
+                    ));
+                };
+
+                match message {
+                    Some(message) => {
+                        self.outbound_tasks
+                            .push(Box::pin(Self::try_write_message(peer_id, message, stream)));
+
+                        cx.waker().wake_by_ref();
+                    }
+                    None => {
+                        self.outbound_streams
+                            .insert(peer_id, StreamState::Idle(stream));
+                    }
+                }
+            }
+            Poll::Ready(Some(Err(error))) => {
+                return Poll::Ready(ToSwarm::GenerateEvent(ReplicationEvent::ReplicationError {
+                    error,
+                }));
+            }
+            _ => {}
+        }
+
+        // Pick the next peer that has a pending message and an idle or unopened stream
+        // and schedule writing a message to it.
+        let next_peer = self.pending_outbound.next_peer(|id| {
+            matches!(
+                self.outbound_streams.get(id),
+                Some(StreamState::Idle(_)) | None
+            )
+        });
+
+        if let Some(peer_id) = next_peer {
+            let Ok(message) = self.pending_outbound.dequeue_message(&peer_id) else {
+                return Poll::Ready(ToSwarm::GenerateEvent(ReplicationEvent::ReplicationError {
+                    error: ReplicationError::DequeueOutbound { peer_id },
+                }));
+            };
+            let message =
+                message.expect("Message is in the queue, ensured by PendingOutbound::next_peer()");
+
+            match self.outbound_streams.entry(peer_id) {
+                Entry::Occupied(mut entry) => match entry.get_mut().take() {
+                    StreamState::Idle(stream) => {
+                        self.outbound_tasks
+                            .push(Box::pin(Self::try_write_message(peer_id, message, stream)));
+                    }
+                    StreamState::Busy => {
+                        unreachable!("The stream is idle, ensured by PendingOutbound::next_peer()")
+                    }
+                },
+                // If there is no stream for this peer yet, try to open one, and then write the
+                // first message into it
+                Entry::Vacant(entry) => {
+                    entry.insert(StreamState::Busy);
+                    let control = self.control.clone();
+                    self.outbound_tasks.push(Box::pin(async move {
+                        let stream = Self::try_open_stream(peer_id, control).await?;
+                        let (peer_id, stream) =
+                            Self::try_write_message(peer_id, message, stream).await?;
+                        Ok((peer_id, stream))
+                    }));
+                }
+            }
+
+            cx.waker().wake_by_ref();
+        }
+
+        // Schedule reading from any new incoming streams if possible
+        if let Poll::Ready(Some((peer_id, stream))) = self.incoming_streams.poll_next_unpin(cx) {
+            self.incoming_tasks
+                .push(Self::try_read_message(peer_id, stream).boxed());
+            cx.waker().wake_by_ref();
+        }
+
+        if let Some(incoming_message) = incoming_message {
+            return incoming_message;
+        }
+
+        // Keep the most recent waker in case `send_message()` is called from
+        // outside the behaviour
+        self.waker = Some(cx.waker().clone());
+
+        Poll::Pending
     }
+}
+
+/// Find the next peer that has at least one pending message and its associated
+/// stream is idle or hasn't been opened yet. Iterate over all peers, starting
+/// with the one after the previous peer, wrap around and finish with the
+/// previous peer at the end. This ensures we're fair scheduling one message per
+/// peer at a time, iterating the peers in a round-robin fashion.
+fn next_peer<K, M>(
+    previous: Option<&K>,
+    pending_outbound_messages: &IndexMap<K, VecDeque<M>>,
+    mut is_stream_idle_fn: impl FnMut(&K) -> bool,
+) -> Option<K>
+where
+    K: Copy + Eq + std::hash::Hash,
+{
+    match previous {
+        Some(previous) => {
+            let i = pending_outbound_messages
+                .get_index_of(previous)
+                .expect("Peer to be present");
+            pending_outbound_messages[i + 1..]
+                .iter()
+                .chain(pending_outbound_messages[..=i].iter())
+                .find_map(|(id, messages)| {
+                    (!messages.is_empty() && is_stream_idle_fn(id)).then_some(*id)
+                })
+        }
+        None => pending_outbound_messages.iter().find_map(|(id, messages)| {
+            (!messages.is_empty() && is_stream_idle_fn(id)).then_some(*id)
+        }),
+    }
+}
+
+/// If the `last_scheduled` marker points to a peer that has been disconnected,
+/// the marker needs to be moved back one step, so that the search for the next
+/// peer in `poll()` continues where we left off last time. This function
+/// returns the corrected marker value.
+fn on_disconnected<P, Q>(
+    messages: &mut IndexMap<P, Q>,
+    last_scheduled: Option<P>,
+    disconnected: &P,
+) -> Option<P>
+where
+    P: Copy + Eq + std::hash::Hash,
+{
+    // Store marker index
+    let i = last_scheduled.map(|id| messages.get_index_of(&id).expect("Peer to be present"));
+    // Remove disconnected peer and its pending messages
+    messages.shift_remove(disconnected);
+    // If the marker pointed to the disconnected peer, move it backwards one step,
+    // wrapping around if necessary
+    last_scheduled.and_then(|id| {
+        if id == *disconnected {
+            let i = i.expect("Valid index");
+            if i == 0 {
+                messages.last().map(|(id, _)| *id)
+            } else {
+                messages.get_index(i - 1).map(|(id, _)| *id)
+            }
+        } else {
+            None
+        }
+    })
 }
 
 #[cfg(test)]
 mod tests {
-    use std::{
-        collections::HashSet,
-        sync::Arc,
-        task::{Context, Poll},
-    };
+    use std::collections::VecDeque;
 
-    use futures::task::{waker_ref, ArcWake};
-    use kzgrs_backend::testutils::get_da_blob;
-    use libp2p::{identity, PeerId};
-    use nomos_core::da::BlobId;
-    use nomos_da_messages::common::Blob;
+    use indexmap::IndexMap;
+    use rstest::rstest;
 
-    use super::*;
-
-    #[derive(Clone, Debug)]
-    struct MockMembershipHandler {
-        membership: HashMap<PeerId, HashSet<SubnetworkId>>,
-    }
-
-    impl MembershipHandler for MockMembershipHandler {
-        type NetworkId = SubnetworkId;
-        type Id = PeerId;
-
-        fn membership(&self, peer_id: &PeerId) -> HashSet<Self::NetworkId> {
-            self.membership.get(peer_id).cloned().unwrap_or_default()
-        }
-
-        fn is_allowed(&self, _id: &Self::Id) -> bool {
-            unimplemented!()
-        }
-
-        fn members_of(&self, subnetwork: &Self::NetworkId) -> HashSet<Self::Id> {
-            self.membership
-                .iter()
-                .filter_map(|(id, nets)| {
-                    if nets.contains(subnetwork) {
-                        Some(*id)
-                    } else {
-                        None
-                    }
-                })
-                .collect()
-        }
-
-        fn members(&self) -> HashSet<Self::Id> {
-            unimplemented!()
-        }
-
-        fn last_subnetwork_id(&self) -> Self::NetworkId {
-            unimplemented!()
-        }
-
-        fn get_address(&self, _peer_id: &PeerId) -> Option<Multiaddr> {
-            unimplemented!()
-        }
-    }
-
-    struct TestWaker;
-
-    impl ArcWake for TestWaker {
-        fn wake_by_ref(_arc_self: &Arc<Self>) {}
-    }
-
-    fn create_replication_behaviours(
-        num_instances: usize,
-        subnetwork_id: SubnetworkId,
-        membership: &mut HashMap<PeerId, HashSet<SubnetworkId>>,
-    ) -> Vec<ReplicationBehaviour<MockMembershipHandler>> {
-        let mut behaviours = Vec::new();
-
-        let mut peer_ids = Vec::new();
-        for _ in 0..num_instances {
-            let keypair = identity::Keypair::generate_ed25519();
-            let peer_id = PeerId::from(keypair.public());
-            peer_ids.push(peer_id);
-        }
-
-        for peer_id in &peer_ids {
-            membership.insert(*peer_id, HashSet::from([subnetwork_id]));
-        }
-
-        let membership_handler = MockMembershipHandler {
-            membership: HashMap::default(), // This will be updated after all behaviours are added.
-        };
-
-        for peer_id in peer_ids {
-            let behaviour = ReplicationBehaviour::new(peer_id, membership_handler.clone());
-            behaviours.push(behaviour);
-        }
-
-        behaviours
-    }
-
-    fn establish_connection(
-        behaviours: &mut [ReplicationBehaviour<MockMembershipHandler>],
-        i: usize,
-        j: usize,
-        connection_id: ConnectionId,
+    #[rstest]
+    #[case(None, vec![], None, None)]
+    // One peer, previous peer is not set
+    //
+    // Peer does not have pending messages and the stream is busy
+    #[case(None, vec![(0, vec![])], None, None)]
+    // Peer does not have pending messages and the stream is idle
+    #[case(None, vec![(0, vec![])], Some(0), None)]
+    // Peer has pending messages and the stream is busy
+    #[case(None, vec![(0, vec![()])], None, None)]
+    // Peer has pending messages and the stream is idle
+    #[case(None, vec![(0, vec![()])], Some(0), Some(0))]
+    // One peer, previous peer is set
+    //
+    // Peer does not have pending messages and the stream is busy
+    #[case(Some(0), vec![(0, vec![])], None, None)]
+    // Peer does not have pending messages and the stream is idle
+    #[case(Some(0), vec![(0, vec![])], Some(0), None)]
+    // Peer has pending messages and the stream is busy
+    #[case(Some(0), vec![(0, vec![()])], None, None)]
+    // Peer has pending messages and the stream is idle
+    #[case(Some(0), vec![(0, vec![()])], Some(0), Some(0))]
+    // Multiple peers
+    //
+    // Advances from peer 0 to 1
+    #[case(Some(0), vec![(0, vec![()]), (1, vec![()])], Some(1), Some(1))]
+    // Wraps around from peer 0, via peer 1, to peer 0
+    #[case(Some(0), vec![(0, vec![()]), (1, vec![()])], Some(0), Some(0))]
+    // Wraps around from peer 1 to peer 0
+    #[case(Some(1), vec![(0, vec![()]), (1, vec![()])], Some(0), Some(0))]
+    // Wraps around from peer 1, via peer 0, to peer 1
+    #[case(Some(1), vec![(0, vec![()]), (1, vec![()])], Some(1), Some(1))]
+    // All streams busy
+    #[case(Some(0), vec![(0, vec![()]), (1, vec![()])], None, None)]
+    // All queues empty
+    #[case(Some(1), vec![(0, vec![]), (1, vec![])], Some(0), None)]
+    fn test_next_peer(
+        #[case] previous: Option<usize>,
+        #[case] pending_outbound_messages: Vec<(usize, Vec<()>)>,
+        #[case] idle_stream: Option<usize>,
+        #[case] expected_next: Option<usize>,
     ) {
-        let peer_id_i = behaviours[i].local_peer_id;
-        let peer_id_j = behaviours[j].local_peer_id;
-
-        behaviours[i]
-            .handle_established_outbound_connection(
-                connection_id,
-                peer_id_j,
-                &Multiaddr::empty(),
-                Endpoint::Dialer,
-                PortUse::default(),
-            )
-            .unwrap();
-
-        behaviours[j]
-            .handle_established_inbound_connection(
-                connection_id,
-                peer_id_i,
-                &Multiaddr::empty(),
-                &Multiaddr::empty(),
-            )
-            .unwrap();
+        let pending_outbound_messages: IndexMap<usize, VecDeque<()>> = pending_outbound_messages
+            .into_iter()
+            .map(|(id, messages)| (id, messages.into_iter().collect()))
+            .collect();
+        let actual_next =
+            super::next_peer(previous.as_ref(), &pending_outbound_messages, |peer_id| {
+                idle_stream == Some(*peer_id)
+            });
+        assert_eq!(actual_next, expected_next);
     }
 
-    fn deliver_message_to_peer(
-        all_behaviours: &mut [ReplicationBehaviour<MockMembershipHandler>],
-        peer_id: PeerId,
-        connection_id: ConnectionId,
-        message: DaMessage,
+    #[rstest]
+    /// Marker is not set, peer 0 is disconnected
+    #[case(None, vec![(0, ())], 0, None, vec![])]
+    /// Marker is set to peer 0, peer 0 is disconnected, marker is cleared
+    #[case(Some(0), vec![(0, ())], 0, None, vec![])]
+    /// Marker is set to peer 1, peer 1 is disconnected, marker is moved
+    /// backwards to peer 0
+    #[case(Some(0), vec![(0, ()), (1, ())], 0, Some(1), vec![(1, ())])]
+    /// Marker is set to peer 0, peer 0 is disconnected, marker is moved
+    /// backwards to peer 1 (wrapping around)
+    #[case(Some(0), vec![(0, ()), (1, ())], 0, Some(1), vec![(1, ())])]
+    fn test_on_disconnected(
+        #[case] last_scheduled_peer: Option<usize>,
+        #[case] pending_messages: Vec<(usize, ())>,
+        #[case] disconnected_peer: usize,
+        #[case] expected_last_scheduled_peer: Option<usize>,
+        #[case] expected_pending_messages: Vec<(usize, ())>,
     ) {
-        if let Some(behaviour) = all_behaviours
-            .iter_mut()
-            .find(|b| b.local_peer_id == peer_id)
-        {
-            // Simulate the handler receiving the message.
-            behaviour.on_connection_handler_event(
-                peer_id,
-                connection_id,
-                Either::Left(HandlerEventToBehaviour::IncomingMessage { message }),
-            );
-        }
-    }
-
-    #[tokio::test]
-    async fn test_replication_behaviour() {
-        let num_instances = 20;
-        let mut membership = HashMap::default();
-
-        let subnet_0_behaviours =
-            create_replication_behaviours(num_instances / 2, 0, &mut membership);
-        let subnet_1_behaviours =
-            create_replication_behaviours(num_instances / 2, 1, &mut membership);
-
-        let mut all_behaviours = subnet_0_behaviours;
-        all_behaviours.extend(subnet_1_behaviours);
-
-        for behaviour in &mut all_behaviours {
-            let membership_handler = MockMembershipHandler {
-                membership: membership.clone(),
-            };
-            behaviour.update_membership(membership_handler);
-        }
-
-        // Simulate peer connections.
-        for (i, j) in (0..num_instances).flat_map(|i| (i + 1..num_instances).map(move |j| (i, j))) {
-            let connection_id = ConnectionId::new_unchecked(i);
-            establish_connection(&mut all_behaviours, i, j, connection_id);
-        }
-
-        // Simulate sending a message from the first behavior.
-        let message = DaMessage::new(Blob::new(BlobId::from([0; 32]), get_da_blob(None)), 0);
-        all_behaviours[0].replicate_message(&message);
-
-        let waker = Arc::new(TestWaker);
-        let waker_ref = waker_ref(&waker);
-        let mut cx = Context::from_waker(&waker_ref);
-
-        // Poll all behaviors until no more events are generated.
-        let mut pending_behaviours: Vec<_> = (0..num_instances).collect();
-        let mut completed = false;
-
-        while !completed {
-            completed = true;
-            for i in &pending_behaviours {
-                let behaviour = &mut all_behaviours[*i];
-                let mut events = vec![];
-
-                while let Poll::Ready(event) = behaviour.poll(&mut cx) {
-                    events.push(event);
-                }
-
-                // If there are events, set completed to false to continue polling.
-                if !events.is_empty() {
-                    completed = false;
-
-                    for event in events {
-                        // Intercept the events that should be processed by the handler.
-                        if let ToSwarm::NotifyHandler {
-                            peer_id,
-                            handler: NotifyHandler::One(connection_id),
-                            event:
-                                Either::Left(BehaviourEventToHandler::OutgoingMessage { message }),
-                        } = event
-                        {
-                            // Deliver the message to the appropriate peer's handler.
-                            deliver_message_to_peer(
-                                &mut all_behaviours,
-                                peer_id,
-                                connection_id,
-                                message.clone(),
-                            );
-                        }
-                    }
-                }
-            }
-
-            // Filter out behaviors that no longer generate events.
-            pending_behaviours.retain(|i| {
-                let mut events = vec![];
-                let behaviour = &mut all_behaviours[*i];
-                while let Poll::Ready(event) = behaviour.poll(&mut cx) {
-                    events.push(event);
-                }
-                !events.is_empty()
-            });
-        }
-
-        // Verify that all peers in subnet 0 have received the message, and others have
-        // not.
-        let (subnet_0_behaviours, other_behaviours): (Vec<_>, Vec<_>) =
-            all_behaviours.iter().partition(|behaviour| {
-                behaviour
-                    .membership
-                    .membership(&behaviour.local_peer_id)
-                    .contains(&0)
-            });
-
-        // Assert that all members of subnet 0 have received the message.
-        for behaviour in &subnet_0_behaviours {
-            assert!(behaviour
-                .seen_message_cache
-                .contains(&([0; 32].to_vec(), message.subnetwork_id)));
-        }
-
-        // Assert that no members of other subnets have received the message.
-        for behaviour in &other_behaviours {
-            assert!(behaviour.seen_message_cache.is_empty());
-        }
-
-        // Ensure the number of peers with the message matches the expected count
-        assert_eq!(subnet_0_behaviours.len(), num_instances / 2);
+        let mut pending_outbound_messages: IndexMap<usize, ()> =
+            pending_messages.into_iter().collect();
+        let actual = super::on_disconnected(
+            &mut pending_outbound_messages,
+            last_scheduled_peer,
+            &disconnected_peer,
+        );
+        assert_eq!(actual, expected_last_scheduled_peer);
+        assert_eq!(
+            pending_outbound_messages,
+            expected_pending_messages
+                .into_iter()
+                .collect::<IndexMap<usize, ()>>()
+        );
     }
 }

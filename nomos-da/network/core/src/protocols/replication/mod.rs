@@ -1,6 +1,4 @@
 pub mod behaviour;
-pub mod behaviour_v2;
-pub mod handler;
 
 #[cfg(test)]
 mod test {
@@ -14,7 +12,7 @@ mod test {
     use tracing_subscriber::{fmt::TestWriter, EnvFilter};
 
     use crate::{
-        protocols::replication::behaviour_v2::{DaMessage, ReplicationBehaviour, ReplicationEvent},
+        protocols::replication::behaviour::{DaMessage, ReplicationBehaviour, ReplicationEvent},
         test_utils::AllNeighbours,
     };
 
