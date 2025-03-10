@@ -1,10 +1,11 @@
+use core::fmt;
 use std::{
     borrow::Cow,
     collections::{HashMap, HashSet},
     sync::{Arc, Mutex},
 };
 
-use futures::future::BoxFuture;
+use futures::{channel::oneshot, future::BoxFuture};
 use overwatch_rs::services::state::NoState;
 use rand::{
     distributions::{Distribution, WeightedIndex},
@@ -15,7 +16,7 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::broadcast::{self, Receiver, Sender};
 use tracing::debug;
 
-use super::{fmt, oneshot, Debug, NetworkBackend, OverwatchHandle};
+use super::{Debug, NetworkBackend, OverwatchHandle};
 
 const BROADCAST_CHANNEL_BUF: usize = 16;
 

@@ -16,7 +16,7 @@ serde          = { version = "1.0", features = ["derive"] }
 services-utils = { workspace = true }
 sled           = { version = "0.34", optional = true }
 thiserror      = "1.0"
-tokio          = { version = "1", features = ["sync"] }
+tokio          = { version = "1", features = ["macros", "sync"] }
 tracing        = "0.1"
 
 [dev-dependencies]

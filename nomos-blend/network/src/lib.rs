@@ -6,6 +6,7 @@ mod handler;
 use std::time::Duration;
 
 pub use behaviour::{Behaviour, Config, Event, IntervalStreamProvider};
+#[cfg(feature = "tokio")]
 use tokio_stream::StreamExt;
 
 #[cfg(feature = "tokio")]
