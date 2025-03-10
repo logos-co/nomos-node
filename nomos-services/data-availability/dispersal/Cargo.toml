@@ -7,7 +7,6 @@ version = "0.1.0"
 [dependencies]
 async-trait              = "0.1"
 futures                  = "0.3"
-itertools                = "0.13"
 kzgrs-backend            = { workspace = true }
 nomos-core               = { workspace = true }
 nomos-da-network-core    = { workspace = true }
@@ -20,6 +19,5 @@ overwatch-rs             = { workspace = true }
 rand                     = "0.8"
 serde                    = { version = "1.0", features = ["derive"] }
 subnetworks-assignations = { workspace = true }
-thiserror                = "1.0"
 tokio                    = "1"
 tracing                  = "0.1"

@@ -6,7 +6,6 @@ version = "0.1.0"
 
 [dependencies]
 opentelemetry                      = { version = "0.26" }
-opentelemetry-http                 = { version = "0.26", features = ["reqwest"] }
 opentelemetry-otlp                 = { version = "0.26", features = ["grpc-tonic", "http-proto", "opentelemetry-http"] }
 opentelemetry-semantic-conventions = "0.26"
 opentelemetry_sdk                  = { version = "0.26", features = ["rt-tokio"] }

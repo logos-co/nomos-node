@@ -9,7 +9,6 @@ async-trait        = "0.1"
 cryptarchia-engine = { workspace = true, features = ["serde", "tokio"] }
 futures            = "0.3"
 log                = "0.4.22"
-nomos-tracing      = { workspace = true }
 overwatch-rs       = { workspace = true }
 serde              = { version = "1.0", optional = true, features = ["derive"] }
 services-utils     = { workspace = true }
@@ -18,7 +17,6 @@ thiserror          = { version = "2.0", optional = true }
 time               = "0.3"
 tokio              = { version = "1", features = ["macros", "sync"] }
 tokio-stream       = "0.1"
-url                = "2.5"
 
 [features]
 ntp   = ["dep:sntpc", "dep:thiserror"]

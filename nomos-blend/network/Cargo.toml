@@ -7,23 +7,19 @@ version = "0.1.0"
 [dependencies]
 cached              = "0.53.1"
 futures             = "0.3.30"
-futures-timer       = "3.0.3"
 libp2p              = { workspace = true }
 nomos-blend         = { workspace = true }
 nomos-blend-message = { workspace = true }
-opentelemetry       = "0.27.1"
-rand                = "0.8"
 sha2                = "0.10"
 tokio               = { version = "1", features = ["time"], optional = true }
 tokio-stream        = { version = "0.1", optional = true }
 tracing             = "0.1"
 
 [dev-dependencies]
-fixed              = "1"
-libp2p             = { workspace = true, features = ["ed25519", "quic", "tokio"] }
-tokio              = { version = "1", features = ["macros", "rt-multi-thread", "time"] }
-tokio-stream       = "0.1"
-tracing-subscriber = "0.3.18"
+fixed        = "1"
+libp2p       = { workspace = true, features = ["ed25519", "quic", "tokio"] }
+tokio        = { version = "1", features = ["macros", "rt-multi-thread", "time"] }
+tokio-stream = "0.1"
 
 [features]
 default = ["tokio"]
