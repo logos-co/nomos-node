@@ -4,7 +4,12 @@ use std::{
 };
 
 use either::Either;
-use futures::{future::BoxFuture, stream::FuturesUnordered, AsyncWriteExt, FutureExt, StreamExt};
+use futures::{
+    future::BoxFuture,
+    io::{ReadHalf, WriteHalf},
+    stream::{BoxStream, FuturesUnordered},
+    AsyncReadExt, AsyncWriteExt, FutureExt, StreamExt,
+};
 use indexmap::{IndexMap, IndexSet};
 use libp2p::{
     core::{transport::PortUse, Endpoint},
@@ -19,6 +24,8 @@ use log::{error, trace};
 use nomos_da_messages::packing::{pack_to_writer, unpack_from_reader};
 use subnetworks_assignations::MembershipHandler;
 use thiserror::Error;
+use tokio::sync::mpsc;
+use tokio_stream::wrappers::UnboundedReceiverStream;
 
 use crate::{protocol::REPLICATION_PROTOCOL, SubnetworkId};
 
@@ -106,15 +113,16 @@ impl ReplicationEvent {
     }
 }
 
-type IncomingTask = BoxFuture<'static, Result<(PeerId, DaMessage, Stream), ReplicationError>>;
-type OutboundTask = BoxFuture<'static, Result<(PeerId, Stream), ReplicationError>>;
+type IncomingTask =
+    BoxFuture<'static, Result<(PeerId, DaMessage, ReadHalf<Stream>), ReplicationError>>;
+type OutboundTask = BoxFuture<'static, Result<(PeerId, WriteHalf<Stream>), ReplicationError>>;
 
-enum StreamState {
-    Idle(Stream),
+enum WriteHalfState {
+    Idle(WriteHalf<Stream>),
     Busy,
 }
 
-impl StreamState {
+impl WriteHalfState {
     pub fn take(&mut self) -> Self {
         let mut ret = Self::Busy;
         std::mem::swap(self, &mut ret);
@@ -179,9 +187,15 @@ pub struct ReplicationBehaviour<Membership> {
     stream_behaviour: libp2p_stream::Behaviour,
     /// Used to open new outbound streams from the stream behaviour
     control: Control,
-    /// Provides inbound streams that are accepted by the stream behaviour
+    /// Provides streams that are accepted by the stream behaviour from other
+    /// peers
     incoming_streams: IncomingStreams,
-    /// Holds tasks for reading messages from incoming streams
+    /// Sends a new read half when an outbound stream initiated by us is opened
+    outbound_read_half_tx: mpsc::UnboundedSender<(PeerId, ReadHalf<Stream>)>,
+    /// Receives the new read half from the stream opened by us so that we can
+    /// schedule reading messages from it
+    outbound_read_half_rx: BoxStream<'static, (PeerId, ReadHalf<Stream>)>,
+    /// Holds tasks for reading messages from streams' read halves
     incoming_tasks: FuturesUnordered<IncomingTask>,
     /// Membership handler, membership handles the subsets logics on who is
     /// where in the nomos DA subnetworks
@@ -189,11 +203,11 @@ pub struct ReplicationBehaviour<Membership> {
     /// Currently connected peers
     connected: HashSet<PeerId>,
     /// Pending outbound messages are stored here, they are then consumed by
-    /// each respective outbound stream
+    /// each respective stream's write half
     pending_outbound: PendingOutbound,
-    /// Indicates which outbound streams are currently idle or busy
-    outbound_streams: HashMap<PeerId, StreamState>,
-    /// Holds tasks for writing messages to the outbound streams
+    /// Indicates which of the streams' write halves are currently idle or busy
+    outbound_streams: HashMap<PeerId, WriteHalfState>,
+    /// Holds tasks for writing messages to the streams' write halves
     outbound_tasks: FuturesUnordered<OutboundTask>,
     /// Seen messages cache holds a record of seen messages
     seen_message_cache: IndexSet<(Vec<u8>, SubnetworkId)>,
@@ -213,6 +227,9 @@ impl<Membership> ReplicationBehaviour<Membership> {
         let incoming_tasks = FuturesUnordered::new();
         let outbound_tasks = FuturesUnordered::new();
 
+        let (outbound_read_stream_tx, new_read_stream_rx) = mpsc::unbounded_channel();
+        let outbound_read_stream_rx = UnboundedReceiverStream::new(new_read_stream_rx).boxed();
+
         Self {
             local_peer_id: peer_id,
             stream_behaviour,
@@ -226,6 +243,8 @@ impl<Membership> ReplicationBehaviour<Membership> {
             outbound_tasks,
             seen_message_cache: IndexSet::default(),
             waker: None,
+            outbound_read_half_tx: outbound_read_stream_tx,
+            outbound_read_half_rx: outbound_read_stream_rx,
         }
     }
 
@@ -291,45 +310,53 @@ where
         }
     }
 
-    /// Attempt to read a single message from the incoming stream
+    /// Attempt to read a single message from the stream's read half
     async fn try_read_message(
         peer_id: PeerId,
-        mut stream: Stream,
-    ) -> Result<(PeerId, DaMessage, Stream), ReplicationError> {
-        let message = unpack_from_reader(&mut stream)
+        mut read_half: ReadHalf<Stream>,
+    ) -> Result<(PeerId, DaMessage, ReadHalf<Stream>), ReplicationError> {
+        let message = unpack_from_reader(&mut read_half)
             .await
             .map_err(|error| ReplicationError::Io { peer_id, error })?;
-        Ok((peer_id, message, stream))
+        Ok((peer_id, message, read_half))
     }
 
     /// Attempt to open a new stream from the underlying control to the peer
     async fn try_open_stream(
         peer_id: PeerId,
         mut control: Control,
-    ) -> Result<Stream, ReplicationError> {
+        new_read_half_tx: mpsc::UnboundedSender<(PeerId, ReadHalf<Stream>)>,
+    ) -> Result<WriteHalf<Stream>, ReplicationError> {
         let stream = control
             .open_stream(peer_id, REPLICATION_PROTOCOL)
             .await
             .map_err(|error| ReplicationError::OpenStream { peer_id, error })?;
-        Ok(stream)
+        let (read_stream, write_stream) = stream.split();
+        // Send the new read half to the incoming tasks so that it can be scheduled for
+        // reading
+        new_read_half_tx
+            .send((peer_id, read_stream))
+            .expect("Receiver is not dropped");
+        // Write half is ready for writing messages
+        Ok(write_stream)
     }
 
-    /// Attempt to write a message to the given stream
+    /// Attempt to write a message to the given stream's write half
     async fn try_write_message(
         peer_id: PeerId,
         message: DaMessage,
-        mut stream: Stream,
-    ) -> Result<(PeerId, Stream), ReplicationError> {
-        pack_to_writer(&message, &mut stream)
+        mut write_half: WriteHalf<Stream>,
+    ) -> Result<(PeerId, WriteHalf<Stream>), ReplicationError> {
+        pack_to_writer(&message, &mut write_half)
             .await
             .unwrap_or_else(|_| {
                 panic!("Message should always be serializable.\nMessage: '{message:?}'",)
             });
-        stream
+        write_half
             .flush()
             .await
             .map_err(|error| ReplicationError::Io { peer_id, error })?;
-        Ok((peer_id, stream))
+        Ok((peer_id, write_half))
     }
 }
 
@@ -413,13 +440,13 @@ where
 
         // Check if we've received any new messages
         match self.incoming_tasks.poll_next_unpin(cx) {
-            Poll::Ready(Some(Ok((peer_id, message, stream)))) => {
+            Poll::Ready(Some(Ok((peer_id, message, read_half)))) => {
                 // Replicate the message to all connected peers from the same subnet if we
                 // haven't seen it yet
                 self.replicate_message(cx.waker(), &message);
-                // Schedule waiting for any next incoming message on the same stream
+                // Schedule waiting for any next incoming message on the same stream's read half
                 self.incoming_tasks
-                    .push(Self::try_read_message(peer_id, stream).boxed());
+                    .push(Self::try_read_message(peer_id, read_half).boxed());
                 // Signal to the swarm that we've received the message but poll the other tasks
                 // as well first
                 incoming_message = Some(Poll::Ready(ToSwarm::GenerateEvent(
@@ -436,10 +463,10 @@ where
             }
             _ => {}
         }
-        // If any of the busy outbound streams has finished sending a message,
-        // we can write the next pending message to this stream if there is one
+        // If any of the busy streams' write halves has finished sending a message,
+        // we can write the next pending message to this half if there is one
         match self.outbound_tasks.poll_next_unpin(cx) {
-            Poll::Ready(Some(Ok((peer_id, stream)))) => {
+            Poll::Ready(Some(Ok((peer_id, write_half)))) => {
                 let Ok(message) = self.pending_outbound.dequeue_message(&peer_id) else {
                     return Poll::Ready(ToSwarm::GenerateEvent(
                         ReplicationEvent::ReplicationError {
@@ -450,14 +477,15 @@ where
 
                 match message {
                     Some(message) => {
-                        self.outbound_tasks
-                            .push(Box::pin(Self::try_write_message(peer_id, message, stream)));
+                        self.outbound_tasks.push(Box::pin(Self::try_write_message(
+                            peer_id, message, write_half,
+                        )));
 
                         cx.waker().wake_by_ref();
                     }
                     None => {
                         self.outbound_streams
-                            .insert(peer_id, StreamState::Idle(stream));
+                            .insert(peer_id, WriteHalfState::Idle(write_half));
                     }
                 }
             }
@@ -469,12 +497,12 @@ where
             _ => {}
         }
 
-        // Pick the next peer that has a pending message and an idle or unopened stream
-        // and schedule writing a message to it.
+        // Pick the next peer that has a pending message and an idle write half or an
+        // unopened stream and schedule writing a message to it.
         let next_peer = self.pending_outbound.next_peer(|id| {
             matches!(
                 self.outbound_streams.get(id),
-                Some(StreamState::Idle(_)) | None
+                Some(WriteHalfState::Idle(_)) | None
             )
         });
 
@@ -489,21 +517,25 @@ where
 
             match self.outbound_streams.entry(peer_id) {
                 Entry::Occupied(mut entry) => match entry.get_mut().take() {
-                    StreamState::Idle(stream) => {
+                    WriteHalfState::Idle(stream) => {
                         self.outbound_tasks
                             .push(Box::pin(Self::try_write_message(peer_id, message, stream)));
                     }
-                    StreamState::Busy => {
+                    WriteHalfState::Busy => {
                         unreachable!("The stream is idle, ensured by PendingOutbound::next_peer()")
                     }
                 },
                 // If there is no stream for this peer yet, try to open one, and then write the
                 // first message into it
                 Entry::Vacant(entry) => {
-                    entry.insert(StreamState::Busy);
+                    entry.insert(WriteHalfState::Busy);
                     let control = self.control.clone();
+                    // Send the read half once the stream is opened to the incoming tasks so that it
+                    // can be scheduled for reading
+                    let new_read_half_tx = self.outbound_read_half_tx.clone();
                     self.outbound_tasks.push(Box::pin(async move {
-                        let stream = Self::try_open_stream(peer_id, control).await?;
+                        let stream =
+                            Self::try_open_stream(peer_id, control, new_read_half_tx).await?;
                         let (peer_id, stream) =
                             Self::try_write_message(peer_id, message, stream).await?;
                         Ok((peer_id, stream))
@@ -514,10 +546,23 @@ where
             cx.waker().wake_by_ref();
         }
 
-        // Schedule reading from any new incoming streams if possible
+        // Schedule reading from any new streams initiated by other peers, if possible
         if let Poll::Ready(Some((peer_id, stream))) = self.incoming_streams.poll_next_unpin(cx) {
+            let (read_half, write_half) = stream.split();
+            // Put the write half in an idle state so that it's ready to schedule writing
+            // pending messages to it
+            self.outbound_streams
+                .insert(peer_id, WriteHalfState::Idle(write_half));
             self.incoming_tasks
-                .push(Self::try_read_message(peer_id, stream).boxed());
+                .push(Self::try_read_message(peer_id, read_half).boxed());
+            cx.waker().wake_by_ref();
+        }
+        // Schedule reading from any new streams initiated by us
+        if let Poll::Ready(Some((peer_id, read_half))) =
+            self.outbound_read_half_rx.poll_next_unpin(cx)
+        {
+            self.incoming_tasks
+                .push(Self::try_read_message(peer_id, read_half).boxed());
             cx.waker().wake_by_ref();
         }
 
