@@ -262,6 +262,7 @@ where
         self.send_message_impl(Some(waker), message);
     }
 
+    /// Initiate sending a replication message **from outside the behaviour**
     pub fn send_message(&mut self, message: &DaMessage) {
         let waker = self.waker.take();
         self.send_message_impl(waker.as_ref(), message);
@@ -271,6 +272,8 @@ where
         // Push a message in the queue for every single peer connected that is a member
         // of the selected subnetwork_id
         let peers = self.no_loopback_member_peers_of(message.subnetwork_id);
+        // At least one message was enqueued
+        let mut queued = false;
 
         self.connected
             .iter()
@@ -278,10 +281,11 @@ where
             .for_each(|peer_id| {
                 self.pending_outbound
                     .enqueue_message(*peer_id, message.clone());
+                queued = true;
             });
 
-        if let Some(waker) = waker {
-            waker.wake_by_ref();
+        if queued {
+            waker.map(Waker::wake_by_ref);
         }
     }
 
