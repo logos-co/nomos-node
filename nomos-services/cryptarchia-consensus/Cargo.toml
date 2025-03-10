@@ -48,5 +48,9 @@ serde_json = "1.0.96"
 
 [features]
 default = []
-libp2p  = ["nomos-blend-service/libp2p", "nomos-libp2p", "nomos-network/libp2p"]
-openapi = ["dep:utoipa", "serde_json"]
+libp2p = [
+    "dep:nomos-libp2p",
+    "nomos-blend-service/libp2p",
+    "nomos-network/libp2p",
+]
+openapi = ["dep:serde_json", "dep:utoipa"]

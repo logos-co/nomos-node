@@ -26,8 +26,8 @@ tokio    = { version = "1", features = ["macros", "sync", "time"] }
 [features]
 default         = []
 mock            = []
-rocksdb-backend = ["rocksdb"]
-sled-backend    = ["sled"]
+rocksdb-backend = ["dep:rocksdb"]
+sled-backend    = ["dep:sled"]
 
 [[bin]]
 name              = "rocks"

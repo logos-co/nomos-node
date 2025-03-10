@@ -32,6 +32,6 @@ tokio = { version = "1", features = ["full"] }
 
 [features]
 default = []
-libp2p  = ["humantime-serde", "nomos-libp2p", "rand"]
-mock    = ["chrono", "rand"]
-openapi = ["dep:utoipa", "serde_json"]
+libp2p  = ["dep:humantime-serde", "dep:nomos-libp2p", "dep:rand"]
+mock    = ["dep:chrono", "dep:rand"]
+openapi = ["dep:serde_json", "dep:utoipa"]

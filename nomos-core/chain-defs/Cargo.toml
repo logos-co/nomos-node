@@ -35,4 +35,4 @@ risc0-zkvm = { workspace = true, features = ["prove"] }
 [features]
 default = []
 mock    = []
-raptor  = ["raptorq"]
+raptor  = ["dep:raptorq"]

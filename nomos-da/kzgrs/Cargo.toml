@@ -56,6 +56,6 @@ parallel = [
   "ark-poly-commit/rayon",
   "ark-poly/parallel",
   "ark-poly/rayon",
-  "rayon",
+  "dep:rayon",
 ]
 single = []

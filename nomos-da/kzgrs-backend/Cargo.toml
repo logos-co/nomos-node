@@ -29,7 +29,7 @@ rand          = "0.8"
 
 [features]
 default   = []
-parallel  = ["kzgrs/parallel", "rayon"]
+parallel  = ["dep:rayon", "kzgrs/parallel"]
 single    = []
 testutils = []
 

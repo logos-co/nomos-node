@@ -21,4 +21,5 @@ tokio-stream       = "0.1"
 url                = "2.5"
 
 [features]
-ntp = ["dep:sntpc", "dep:thiserror"]
+ntp   = ["dep:sntpc", "dep:thiserror"]
+serde = ["dep:serde"]
