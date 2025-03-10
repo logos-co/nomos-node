@@ -195,7 +195,9 @@ pub struct ReplicationBehaviour<Membership> {
     outbound_tasks: FuturesUnordered<OutboundTask>,
     /// Seen messages cache holds a record of seen messages
     seen_message_cache: IndexSet<(Vec<u8>, SubnetworkId)>,
-    /// Waker that handles polling
+    /// This waker is only used when we are the initiator of
+    /// [`Self::send_message`], ie. the method is called from outside the
+    /// behaviour. In all other cases we wake via reference in [`Self::poll`].
     waker: Option<Waker>,
 }
 
@@ -251,16 +253,21 @@ where
         peers
     }
 
-    fn replicate_message(&mut self, message: &DaMessage) {
+    fn replicate_message(&mut self, waker: &Waker, message: &DaMessage) {
         let message_id = (message.blob.blob_id.to_vec(), message.subnetwork_id);
         if self.seen_message_cache.contains(&message_id) {
             return;
         }
         self.seen_message_cache.insert(message_id);
-        self.send_message(message);
+        self.send_message_impl(Some(waker), message);
     }
 
     pub fn send_message(&mut self, message: &DaMessage) {
+        let waker = self.waker.take();
+        self.send_message_impl(waker.as_ref(), message);
+    }
+
+    fn send_message_impl(&mut self, waker: Option<&Waker>, message: &DaMessage) {
         // Push a message in the queue for every single peer connected that is a member
         // of the selected subnetwork_id
         let peers = self.no_loopback_member_peers_of(message.subnetwork_id);
@@ -273,12 +280,8 @@ where
                     .enqueue_message(*peer_id, message.clone());
             });
 
-        self.try_wake();
-    }
-
-    pub fn try_wake(&mut self) {
-        if let Some(waker) = self.waker.take() {
-            waker.wake();
+        if let Some(waker) = waker {
+            waker.wake_by_ref();
         }
     }
 
@@ -397,7 +400,6 @@ where
         &mut self,
         cx: &mut Context<'_>,
     ) -> Poll<ToSwarm<Self::ToSwarm, THandlerInEvent<Self>>> {
-        let mut should_wake = false;
         // The incoming message to be returned to the swarm **after** all the polling is
         // done, this way we don't starve the tasks that are polled later in the
         // sequence
@@ -408,7 +410,7 @@ where
             Poll::Ready(Some(Ok((peer_id, message, stream)))) => {
                 // Replicate the message to all connected peers from the same subnet if we
                 // haven't seen it yet
-                self.replicate_message(&message);
+                self.replicate_message(cx.waker(), &message);
                 // Schedule waiting for any next incoming message on the same stream
                 self.incoming_tasks
                     .push(Self::try_read_message(peer_id, stream).boxed());
@@ -437,7 +439,7 @@ where
                         self.outbound_tasks
                             .push(Box::pin(Self::try_write_message(peer_id, message, stream)));
 
-                        should_wake = true;
+                        cx.waker().wake_by_ref();
                     }
                     None => {
                         self.outbound_streams
@@ -492,27 +494,23 @@ where
                 }
             }
 
-            should_wake = true;
+            cx.waker().wake_by_ref();
         }
 
         // Schedule reading from any new incoming streams if possible
         if let Poll::Ready(Some((peer_id, stream))) = self.incoming_streams.poll_next_unpin(cx) {
             self.incoming_tasks
                 .push(Self::try_read_message(peer_id, stream).boxed());
-            should_wake = true;
+            cx.waker().wake_by_ref();
         }
 
         if let Some(incoming_message) = incoming_message {
             return incoming_message;
         }
 
-        // Always use the waker from the most recent context
+        // Keep the most recent waker in case `send_message()` is called from
+        // outside the behaviour
         self.waker = Some(cx.waker().clone());
-
-        // Only wake if we have a reason to
-        if should_wake {
-            self.try_wake();
-        }
 
         Poll::Pending
     }
