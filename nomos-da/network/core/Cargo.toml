@@ -30,5 +30,6 @@ kzgrs              = { workspace = true }
 kzgrs-backend      = { workspace = true, features = ["testutils"] }
 libp2p             = { workspace = true, features = ["ed25519", "macros", "noise", "ping", "plaintext", "quic", "tcp", "yamux"] }
 libp2p-swarm-test  = { version = "0.5.0", features = ["tokio"] }
+rstest             = "0.25"
 tokio              = { version = "1", features = ["macros", "rt-multi-thread", "time"] }
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
