@@ -19,6 +19,7 @@ nomos-network         = { workspace = true }
 overwatch-rs          = { workspace = true }
 rand                  = { version = "0.8" }
 serde                 = { version = "1.0", features = ["derive"] }
+serde_json            = { version = "1", optional = true }
 services-utils        = { workspace = true }
 thiserror             = "1.0"
 tokio                 = { version = "1", features = ["macros", "sync"] }
@@ -39,4 +40,11 @@ libp2p          = ["nomos-network/libp2p"]
 mock            = ["dep:linked-hash-map", "nomos-core/mock", "nomos-network/mock"]
 
 # enable to help generate OpenAPI
-openapi = ["dep:utoipa"]
+openapi = ["dep:serde_json", "dep:utoipa"]
+
+[package.metadata.cargo-machete]
+# False positives.
+ignored = [
+    # Required by `utoipa`.
+    "serde_json",
+]
