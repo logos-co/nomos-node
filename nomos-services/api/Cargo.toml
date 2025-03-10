@@ -26,7 +26,7 @@ nomos-da-verifier        = { workspace = true, features = ["libp2p", "rocksdb-ba
 nomos-libp2p             = { workspace = true }
 nomos-mempool            = { workspace = true, features = ["libp2p", "mock", "openapi"] }
 nomos-network            = { workspace = true }
-nomos-storage            = { workspace = true, features = ["rocksdb"] }
+nomos-storage            = { workspace = true, features = ["rocksdb-backend"] }
 nomos-time               = { workspace = true }
 overwatch-derive         = { workspace = true }
 overwatch-rs             = { workspace = true }

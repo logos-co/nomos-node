@@ -14,4 +14,4 @@ utoipa     = { version = "4.0", optional = true }
 
 [features]
 default = []
-openapi = ["dep:utoipa", "serde_json"]
+openapi = ["dep:serde_json", "dep:utoipa"]

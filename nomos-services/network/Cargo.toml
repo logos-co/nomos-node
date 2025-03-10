@@ -22,7 +22,7 @@ services-utils  = { workspace = true }
 sled            = { version = "0.34", optional = true }
 sscanf          = { version = "0.4", optional = true }
 thiserror       = "1.0"
-tokio           = { version = "1", features = ["sync"] }
+tokio           = { version = "1", features = ["macros", "sync"] }
 tokio-stream    = "0.1"
 tracing         = "0.1"
 utoipa          = { version = "4.0", optional = true }
@@ -32,6 +32,6 @@ tokio = { version = "1", features = ["full"] }
 
 [features]
 default = []
-libp2p  = ["humantime-serde", "nomos-libp2p", "rand"]
-mock    = ["chrono", "rand"]
-openapi = ["dep:utoipa", "serde_json"]
+libp2p  = ["dep:humantime-serde", "dep:nomos-libp2p", "dep:rand"]
+mock    = ["dep:chrono", "dep:rand"]
+openapi = ["dep:serde_json", "dep:utoipa"]

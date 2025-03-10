@@ -23,7 +23,7 @@ nomos-libp2p             = { workspace = true }
 nomos-mempool            = { workspace = true, features = ["libp2p", "mock"] }
 nomos-network            = { workspace = true, features = ["libp2p"] }
 nomos-node               = { workspace = true }
-nomos-storage            = { workspace = true, features = ["rocksdb"] }
+nomos-storage            = { workspace = true, features = ["rocksdb-backend"] }
 nomos-time               = { workspace = true }
 overwatch-derive         = { workspace = true }
 overwatch-rs             = { workspace = true }

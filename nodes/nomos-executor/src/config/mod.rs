@@ -43,6 +43,13 @@ pub struct Config {
 impl Config {
     pub fn update_from_args(
         mut self,
+        #[cfg_attr(
+            not(feature = "tracing"),
+            expect(
+                unused_variables,
+                reason = "`log_args` is only used to update tracing configs when the `tracing` feature is enabled."
+            )
+        )]
         log_args: LogArgs,
         network_args: NetworkArgs,
         blend_args: BlendArgs,
