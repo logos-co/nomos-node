@@ -53,7 +53,7 @@ async fn happy_test(topology: &Topology) {
                 tokio::time::sleep(std::time::Duration::from_millis(100)).await;
             }
             } => {}
-        };
+        }
     }
 
     let last_committed_block_height = n_blocks - security_param.get();
