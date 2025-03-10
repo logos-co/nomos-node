@@ -150,6 +150,7 @@ jobs:
     needs:
       - formatting
       - cargo-deny
+      - features
       - lints
       - tests
     env:
