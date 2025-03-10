@@ -68,8 +68,10 @@ impl Metadata {
         Self { app_id, index }
     }
 
-    // `std::mem::size_of_val` is not yet stable as a const fn
-    #[expect(clippy::missing_const_for_fn)]
+    #[expect(
+        clippy::missing_const_for_fn,
+        reason = "TODO: `std::mem::size_of_val` is not yet stable as a const fn"
+    )]
     #[must_use]
     pub fn size(&self) -> usize {
         std::mem::size_of_val(&self.app_id) + std::mem::size_of_val(&self.index)

@@ -16,18 +16,13 @@ use nomos_libp2p::{secret_key_serde, NetworkBehaviour};
 use overwatch_rs::overwatch::handle::OverwatchHandle;
 use rand::RngCore;
 use serde::{Deserialize, Serialize};
-use tokio::{
-    sync::{broadcast, mpsc},
-    task::JoinHandle,
-};
+use tokio::sync::{broadcast, mpsc};
 use tokio_stream::wrappers::BroadcastStream;
 
 use super::BlendBackend;
 
 /// A blend backend that uses the libp2p network stack.
 pub struct Libp2pBlendBackend {
-    #[expect(dead_code)]
-    task: JoinHandle<()>,
     swarm_message_sender: mpsc::Sender<BlendSwarmMessage>,
     incoming_message_sender: broadcast::Sender<Vec<u8>>,
 }
@@ -70,12 +65,11 @@ impl BlendBackend for Libp2pBlendBackend {
             incoming_message_sender.clone(),
         );
 
-        let task = overwatch_handle.runtime().spawn(async move {
+        overwatch_handle.runtime().spawn(async move {
             swarm.run().await;
         });
 
         Self {
-            task,
             swarm_message_sender,
             incoming_message_sender,
         }
@@ -208,7 +202,10 @@ where
         }
     }
 
-    #[expect(clippy::cognitive_complexity)]
+    #[expect(
+        clippy::cognitive_complexity,
+        reason = "TODO: Address this at some point."
+    )]
     fn handle_swarm_message(&mut self, msg: BlendSwarmMessage) {
         match msg {
             BlendSwarmMessage::Publish(msg) => {
@@ -224,7 +221,10 @@ where
         }
     }
 
-    #[expect(clippy::cognitive_complexity)]
+    #[expect(
+        clippy::cognitive_complexity,
+        reason = "TODO: Address this at some point."
+    )]
     fn handle_event(&mut self, event: SwarmEvent<BlendBehaviourEvent>) {
         match event {
             SwarmEvent::Behaviour(BlendBehaviourEvent::Blend(

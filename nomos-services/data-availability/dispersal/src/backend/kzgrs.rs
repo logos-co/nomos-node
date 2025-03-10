@@ -39,9 +39,10 @@ pub struct DispersalFromAdapter<Adapter> {
     timeout: Duration,
 }
 
-// remove if solved, this occurs in the timeout method below (out of our
-// handling)
-#[expect(dependency_on_unit_never_type_fallback)]
+#[expect(
+    dependency_on_unit_never_type_fallback,
+    reason = "TODO: Remove if solved, this occurs in the timeout method below (out of our handling)"
+)]
 #[async_trait::async_trait]
 impl<Adapter> DaDispersal for DispersalFromAdapter<Adapter>
 where

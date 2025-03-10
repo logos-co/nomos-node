@@ -31,7 +31,10 @@ pub struct Disseminate {
 }
 
 impl Disseminate {
-    #[expect(clippy::cognitive_complexity)]
+    #[expect(
+        clippy::cognitive_complexity,
+        reason = "TODO: Address this at some point."
+    )]
     pub fn run(self) -> Result<(), Box<dyn std::error::Error>> {
         let basic_auth = self
             .username
