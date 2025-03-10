@@ -1,9 +1,9 @@
-name: Code checks
-
 on:
   pull_request:
   push:
     branches: [ master ]
+
+name: Code checks
 
 concurrency:
   group: ${{ github.workflow }}@${{ github.ref }}
