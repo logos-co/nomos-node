@@ -76,8 +76,10 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-      - name: Run cargo-machete
+      - name: Install cargo-machete
         uses: bnjbvr/cargo-machete@v0.8.0
+      - name: Run cargo-machete
+        run: cargo machete --with-metadata
   
   lints:
     name: Check Rust lints
