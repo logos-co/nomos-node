@@ -38,7 +38,7 @@ pub enum BehaviourEventToHandler {
 }
 
 /// Broadcast configuration
-pub(crate) struct ReplicationHandlerConfig {}
+pub(crate) struct ReplicationHandlerConfig;
 
 impl ReplicationHandlerConfig {
     pub const fn new() -> Self {
