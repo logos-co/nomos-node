@@ -21,7 +21,7 @@ pub struct DABlobCommitmentsRequest<B: Blob> {
 }
 
 #[derive(Serialize, Deserialize)]
-pub struct DAGetLightBlobReq<B: Blob> {
+pub struct DaSamplingRequest<B: Blob> {
     pub blob_id: B::BlobId,
-    pub column_idx: B::ColumnIndex,
+    pub share_idx: B::ColumnIndex,
 }

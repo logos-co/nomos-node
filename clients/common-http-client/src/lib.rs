@@ -1,14 +1,14 @@
 use std::{fmt::Debug, sync::Arc};
 
 use nomos_core::da::blob::Blob;
-use nomos_da_messages::http::da::{DABlobCommitmentsRequest, DAGetLightBlobReq};
+use nomos_da_messages::http::da::{DABlobCommitmentsRequest, DaSamplingRequest};
 use reqwest::{Client, ClientBuilder, RequestBuilder, StatusCode, Url};
 use serde::{de::DeserializeOwned, Serialize};
 
 // These could be moved into shared location, perhaps to upcoming `nomos-lib`
-const DA_GET_SHARED_COMMITMENTS: &str = "/da/get-commitments";
+const DA_GET_SHARED_COMMITMENTS: &str = "/da/sampling/commitments";
 
-const DA_GET_LIGHT_BLOB: &str = "/da/get-blob";
+const DA_GET_LIGHT_BLOB: &str = "/da/sampling/blob";
 
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
@@ -123,9 +123,9 @@ impl CommonHttpClient {
         <B as Blob>::BlobId: serde::Serialize + Send + Sync,
         <B as Blob>::ColumnIndex: serde::Serialize + Send + Sync,
     {
-        let request: DAGetLightBlobReq<B> = DAGetLightBlobReq {
+        let request: DaSamplingRequest<B> = DaSamplingRequest {
             blob_id,
-            column_idx,
+            share_idx: column_idx,
         };
         let path = DA_GET_LIGHT_BLOB.trim_start_matches('/');
         let request_url = base_url.join(path).map_err(Error::Url)?;
