@@ -16,7 +16,7 @@ use nomos_blend::{
     persistent_transmission::PersistentTransmissionSettings,
 };
 use nomos_da_dispersal::{
-    backend::kzgrs::{DispersalKZGRSBackendSettings, EncoderSettings},
+    backend::kzgrs::{DispersalKZGRSBackendSettings, EncoderSettings, MempoolPublishStrategy},
     DispersalServiceSettings,
 };
 use nomos_da_indexer::{
@@ -282,6 +282,11 @@ pub fn create_executor_config(config: GeneralConfig) -> Config {
                     global_params_path: config.da_config.global_params_path,
                 },
                 dispersal_timeout: Duration::from_secs(20),
+                mempool_strategy: MempoolPublishStrategy::SampleSubnetworks {
+                    num_to_sample: config.da_config.num_subnets as usize,
+                    timeout: Duration::from_secs(10),
+                    cooldown: Duration::from_millis(100),
+                },
             },
         },
         time: TimeServiceSettings {

@@ -98,14 +98,14 @@ pub(crate) async fn handle_validator_events_stream(
                                         subnetwork_id: blob.column_idx,
                                         blob: Box::new(blob),
                                     },
-                                    None => BehaviourSampleRes::SampleNotFound { blob_id },
+                                    None => BehaviourSampleRes::SampleNotFound { blob_id, subnetwork_id: column_idx },
                                 };
 
                                 if response_sender.send(result).is_err() {
                                     error!("Error sending sampling success response");
                                 }
                             } else if response_sender
-                                .send(BehaviourSampleRes::SampleNotFound { blob_id })
+                                .send(BehaviourSampleRes::SampleNotFound { blob_id, subnetwork_id: column_idx })
                                 .is_err()
                             {
                                 error!("Error sending sampling success response");
