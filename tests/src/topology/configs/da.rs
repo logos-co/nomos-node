@@ -6,6 +6,7 @@ use std::{
     time::Duration,
 };
 
+use nomos_da_dispersal::backend::kzgrs::MempoolPublishStrategy;
 use nomos_da_network_core::swarm::{DAConnectionMonitorSettings, DAConnectionPolicySettings};
 use nomos_libp2p::{ed25519, Multiaddr, PeerId};
 use nomos_node::NomosDaMembership;
@@ -34,6 +35,7 @@ pub struct DaParams {
     pub old_blobs_check_interval: Duration,
     pub blobs_validity_duration: Duration,
     pub global_params_path: String,
+    pub mempool_strategy: MempoolPublishStrategy,
     pub policy_settings: DAConnectionPolicySettings,
     pub monitor_settings: DAConnectionMonitorSettings,
     pub balancer_interval: Duration,
@@ -50,6 +52,11 @@ impl Default for DaParams {
             old_blobs_check_interval: Duration::from_secs(5),
             blobs_validity_duration: Duration::from_secs(60),
             global_params_path: GLOBAL_PARAMS_PATH.to_string(),
+            mempool_strategy: MempoolPublishStrategy::SampleSubnetworks {
+                num_to_sample: 2,
+                timeout: Duration::from_secs(10),
+                cooldown: Duration::from_millis(100),
+            },
             policy_settings: DAConnectionPolicySettings {
                 min_dispersal_peers: 1,
                 min_replication_peers: 1,
@@ -80,6 +87,7 @@ pub struct GeneralDaConfig {
     pub verifier_index: HashSet<u16>,
     pub num_samples: u16,
     pub num_subnets: u16,
+    pub mempool_strategy: MempoolPublishStrategy,
     pub old_blobs_check_interval: Duration,
     pub blobs_validity_duration: Duration,
     pub policy_settings: DAConnectionPolicySettings,
@@ -144,6 +152,7 @@ pub fn create_da_configs(ids: &[[u8; 32]], da_params: &DaParams) -> Vec<GeneralD
                 num_subnets: da_params.num_subnets,
                 old_blobs_check_interval: da_params.old_blobs_check_interval,
                 blobs_validity_duration: da_params.blobs_validity_duration,
+                mempool_strategy: da_params.mempool_strategy.clone(),
                 policy_settings: da_params.policy_settings.clone(),
                 monitor_settings: da_params.monitor_settings.clone(),
                 balancer_interval: da_params.balancer_interval,
