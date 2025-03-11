@@ -116,6 +116,10 @@ where
         &mut self.monitor
     }
 
+    pub const fn monitor_behavior(&self) -> &ConnectionMonitorBehaviour<Monitor> {
+        &self.monitor
+    }
+
     pub fn balancer_behaviour_mut(
         &mut self,
     ) -> &mut ConnectionBalancerBehaviour<Balancer, Membership> {

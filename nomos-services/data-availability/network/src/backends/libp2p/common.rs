@@ -2,12 +2,14 @@ use std::{fmt::Debug, time::Duration};
 
 use futures::StreamExt;
 use kzgrs_backend::common::{blob::DaBlob, ColumnIndex};
+use libp2p::PeerId;
 use log::error;
 use nomos_core::da::BlobId;
 use nomos_da_network_core::{
-    protocols::{
-        sampling,
-        sampling::behaviour::{BehaviourSampleReq, BehaviourSampleRes, SamplingError},
+    maintenance::monitor::PeerCommand,
+    protocols::sampling::{
+        self,
+        behaviour::{BehaviourSampleReq, BehaviourSampleRes, SamplingError},
     },
     swarm::{
         validator::ValidatorEventsStream, DAConnectionMonitorSettings, DAConnectionPolicySettings,
@@ -19,6 +21,7 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::{
     broadcast, mpsc,
     mpsc::{error::SendError, UnboundedSender},
+    oneshot,
 };
 
 pub(crate) const BROADCAST_CHANNEL_SIZE: usize = 128;
@@ -130,5 +133,32 @@ pub(crate) async fn handle_sample_request(
         sampling_request_channel.send((subnetwork_id, blob_id))
     {
         error!("Error requesting sample for subnetwork id : {subnetwork_id}, blob_id: {blob_id:?}");
+    }
+}
+
+pub(crate) async fn handle_block_peer_request(
+    monitor_request_channel: &UnboundedSender<PeerCommand>,
+    peer_id: PeerId,
+) {
+    // todo: handle response when http chain is implemented
+    let response = oneshot::channel();
+    if let Err(SendError(cmd)) =
+        monitor_request_channel.send(PeerCommand::Block(peer_id, response.0))
+    {
+        error!("Error peer request: {cmd:?}");
+    }
+}
+
+pub(crate) async fn handle_unblock_peer_request(
+    monitor_request_channel: &UnboundedSender<PeerCommand>,
+    peer_id: PeerId,
+) {
+    // todo: handle response when http chain is implemented
+    let response = oneshot::channel();
+
+    if let Err(SendError(cmd)) =
+        monitor_request_channel.send(PeerCommand::Unblock(peer_id, response.0))
+    {
+        error!("Error peer request: {cmd:?}");
     }
 }
