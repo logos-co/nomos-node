@@ -23,7 +23,7 @@ nomos-libp2p             = { workspace = true }
 nomos-mempool            = { workspace = true, features = ["libp2p", "mock"] }
 nomos-network            = { workspace = true, features = ["libp2p"] }
 nomos-node               = { workspace = true }
-nomos-storage            = { workspace = true, features = ["rocksdb"] }
+nomos-storage            = { workspace = true, features = ["rocksdb-backend"] }
 nomos-time               = { workspace = true }
 overwatch-derive         = { workspace = true }
 overwatch-rs             = { workspace = true }
@@ -36,9 +36,15 @@ tower-http               = { version = "0.4", features = ["cors", "trace"] }
 tracing                  = "0.1.40"
 utoipa                   = "4.0"
 utoipa-swagger-ui        = { version = "4.0" }
-uuid                     = { version = "1.10.0", features = ["v4"] }
 
 [features]
 default         = ["tracing"]
 instrumentation = ["nomos-node/instrumentation"]
 tracing         = ["nomos-node/tracing"]
+
+[package.metadata.cargo-machete]
+# False positives.
+ignored = [
+    # Required by Overwatch's `#[derive(Services)]` macro.
+    "tracing",
+]

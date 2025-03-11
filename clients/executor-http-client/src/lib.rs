@@ -45,13 +45,16 @@ impl ExecutorHttpClient {
     }
 
     /// Get the commitments for a specific `BlobId`
-    pub async fn get_commitments<B, C>(&self, blob_id: B::BlobId) -> Result<Option<C>, Error>
+    pub async fn get_commitments<B>(
+        &self,
+        blob_id: B::BlobId,
+    ) -> Result<Option<B::SharedCommitments>, Error>
     where
-        C: DeserializeOwned + Send + Sync,
-        B: Blob + DeserializeOwned + Send + Sync,
-        <B as Blob>::BlobId: serde::Serialize + Send + Sync,
+        B: Blob + Send,
+        <B as Blob>::BlobId: Serialize + Send + Sync,
+        <B as Blob>::SharedCommitments: DeserializeOwned + Send + Sync,
     {
-        self.client.get_commitments::<B, C>(blob_id).await
+        self.client.get_commitments::<B>(blob_id).await
     }
 
     /// Get blob by blob id and column index

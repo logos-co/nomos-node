@@ -65,9 +65,11 @@ pub struct AxumBackend<
     SamplingRng,
     SamplingStorage,
     TimeBackend,
+    ApiAdapter,
     const SIZE: usize,
 > {
     settings: AxumBackendSettings,
+    #[expect(clippy::allow_attributes_without_reason)]
     #[expect(clippy::type_complexity)]
     _phantom: core::marker::PhantomData<(
         DaAttestation,
@@ -89,6 +91,7 @@ pub struct AxumBackend<
         SamplingRng,
         SamplingStorage,
         TimeBackend,
+        ApiAdapter,
     )>,
 }
 
@@ -126,6 +129,7 @@ impl<
         SamplingRng,
         SamplingStorage,
         TimeBackend,
+        ApiAdapter,
         const SIZE: usize,
     > Backend
     for AxumBackend<
@@ -148,6 +152,7 @@ impl<
         SamplingRng,
         SamplingStorage,
         TimeBackend,
+        ApiAdapter,
         SIZE,
     >
 where
@@ -239,6 +244,7 @@ where
     SamplingStorage: nomos_da_sampling::storage::DaStorageAdapter + Send + 'static,
     TimeBackend: nomos_time::backends::TimeBackend + Send + 'static,
     TimeBackend::Settings: Clone + Send + Sync,
+    ApiAdapter: nomos_da_sampling::api::ApiAdapter + Send + Sync + 'static,
 {
     type Error = hyper::Error;
     type Settings = AxumBackendSettings;
@@ -253,7 +259,7 @@ where
         })
     }
 
-    #[expect(clippy::too_many_lines)]
+    #[expect(clippy::too_many_lines, reason = "TODO: Address this at some point.")]
     async fn serve(self, handle: OverwatchHandle) -> Result<(), Self::Error> {
         let mut builder = CorsLayer::new();
         if self.settings.cors_origins.is_empty() {
@@ -293,6 +299,7 @@ where
                         DaVerifierNetwork,
                         DaVerifierStorage,
                         TimeBackend,
+                        ApiAdapter,
                         SIZE,
                     >,
                 ),
@@ -311,6 +318,7 @@ where
                         DaVerifierNetwork,
                         DaVerifierStorage,
                         TimeBackend,
+                        ApiAdapter,
                         SIZE,
                     >,
                 ),
@@ -343,6 +351,7 @@ where
                         DaVerifierNetwork,
                         DaVerifierStorage,
                         TimeBackend,
+                        ApiAdapter,
                         SIZE,
                     >,
                 ),
@@ -365,6 +374,7 @@ where
                         DaVerifierBackend,
                         DaVerifierNetwork,
                         DaVerifierStorage,
+                        ApiAdapter,
                     >,
                 ),
             )

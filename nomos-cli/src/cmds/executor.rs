@@ -31,13 +31,16 @@ pub struct Disseminate {
 }
 
 impl Disseminate {
-    #[expect(clippy::cognitive_complexity)]
+    #[expect(
+        clippy::cognitive_complexity,
+        reason = "TODO: Address this at some point."
+    )]
     pub fn run(self) -> Result<(), Box<dyn std::error::Error>> {
         let basic_auth = self
             .username
             .map(|u| BasicAuthCredentials::new(u, self.password.clone()));
 
-        let client = ExecutorHttpClient::new(self.addr.clone(), basic_auth);
+        let client = ExecutorHttpClient::new(self.addr, basic_auth);
 
         let mut bytes: Vec<u8> = if let Some(data) = &self.data {
             data.clone().into_bytes()

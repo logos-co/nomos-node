@@ -5,10 +5,8 @@ use kzgrs_backend::{
     common::blob::DaBlob, dispersal::Index, reconstruction::reconstruct_without_missing_data,
 };
 use nomos_core::da::blob::metadata;
-use nomos_node::{
-    api::{handlers::GetRangeReq, paths},
-    wire,
-};
+use nomos_da_messages::http::da::GetRangeReq;
+use nomos_node::{api::paths, wire};
 use reqwest::{Client, Url};
 use serde::{de::DeserializeOwned, Serialize};
 
@@ -53,7 +51,10 @@ pub struct Reconstruct {
 }
 
 impl Retrieve {
-    #[expect(clippy::cognitive_complexity)]
+    #[expect(
+        clippy::cognitive_complexity,
+        reason = "TODO: Address this at some point."
+    )]
     pub fn run(self) -> Result<(), Box<dyn std::error::Error>> {
         let app_id: [u8; 32] = hex::decode(&self.app_id)?
             .try_into()

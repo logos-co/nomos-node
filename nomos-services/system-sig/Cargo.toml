@@ -10,7 +10,6 @@ version = "0.1.0"
 async-ctrlc    = "1.2"
 async-trait    = "0.1"
 futures        = "0.3.28"
-log            = "0.4.20"
 overwatch-rs   = { workspace = true }
 services-utils = { workspace = true }
 tokio          = { version = "1", features = ["macros"] }

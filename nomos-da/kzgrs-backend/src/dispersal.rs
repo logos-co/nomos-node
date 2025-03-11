@@ -68,8 +68,10 @@ impl Metadata {
         Self { app_id, index }
     }
 
-    // `std::mem::size_of_val` is not yet stable as a const fn
-    #[expect(clippy::missing_const_for_fn)]
+    #[expect(
+        clippy::missing_const_for_fn,
+        reason = "TODO: `std::mem::size_of_val` is not yet stable as a const fn"
+    )]
     #[must_use]
     pub fn size(&self) -> usize {
         std::mem::size_of_val(&self.app_id) + std::mem::size_of_val(&self.index)
@@ -107,7 +109,7 @@ impl AsRef<[u8]> for Index {
 
 #[cfg(test)]
 mod tests {
-    use nomos_core::da::DaEncoder as _;
+    use nomos_core::da::{blob::Blob, DaEncoder as _};
 
     use crate::{
         common::blob::DaBlob,
@@ -139,7 +141,8 @@ mod tests {
                     .map(|proofs| proofs.get(i).copied().unwrap())
                     .collect(),
             };
-            attestations.push(verifier.verify(&da_blob, domain_size));
+            let (light_blob, commitments) = da_blob.into_blob_and_shared_commitments();
+            attestations.push(verifier.verify(&commitments, &light_blob, domain_size));
         }
         attestations
     }

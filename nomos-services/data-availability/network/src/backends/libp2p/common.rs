@@ -1,7 +1,10 @@
-use std::{fmt::Debug, time::Duration};
+use std::time::Duration;
 
 use futures::StreamExt;
-use kzgrs_backend::common::{blob::DaBlob, ColumnIndex};
+use kzgrs_backend::common::{
+    blob::{DaBlob, DaLightBlob},
+    ColumnIndex,
+};
 use libp2p::PeerId;
 use log::error;
 use nomos_core::da::BlobId;
@@ -44,15 +47,35 @@ pub struct DaNetworkBackendSettings<Membership> {
 #[derive(Debug, Clone)]
 pub enum SamplingEvent {
     /// A success sampling
-    SamplingSuccess { blob_id: BlobId, blob: Box<DaBlob> },
+    SamplingSuccess {
+        blob_id: BlobId,
+        light_blob: Box<DaLightBlob>,
+    },
     /// Incoming sampling request
     SamplingRequest {
         blob_id: BlobId,
         column_idx: ColumnIndex,
-        response_sender: mpsc::Sender<Option<DaBlob>>,
+        response_sender: mpsc::Sender<Option<DaLightBlob>>,
     },
     /// A failed sampling error
     SamplingError { error: SamplingError },
+}
+
+impl SamplingEvent {
+    #[must_use]
+    pub fn blob_id(&self) -> Option<&BlobId> {
+        match self {
+            Self::SamplingRequest { blob_id, .. } | Self::SamplingSuccess { blob_id, .. } => {
+                Some(blob_id)
+            }
+            Self::SamplingError { error } => error.blob_id(),
+        }
+    }
+
+    #[must_use]
+    pub fn has_blob_id(&self, target: &BlobId) -> bool {
+        self.blob_id() == Some(target)
+    }
 }
 
 /// Task that handles forwarding of events to the subscriptions channels/stream
@@ -72,8 +95,8 @@ pub(crate) async fn handle_validator_events_stream(
         tokio::select! {
             Some(sampling_event) = StreamExt::next(&mut sampling_events_receiver) => {
                 match sampling_event {
-                    sampling::behaviour::SamplingEvent::SamplingSuccess{ blob_id, blob , .. } => {
-                        if let Err(e) = sampling_broadcast_sender.send(SamplingEvent::SamplingSuccess {blob_id, blob}){
+                    sampling::behaviour::SamplingEvent::SamplingSuccess{ blob_id, light_blob , .. } => {
+                        if let Err(e) = sampling_broadcast_sender.send(SamplingEvent::SamplingSuccess {blob_id, light_blob}){
                             error!("Error in internal broadcast of sampling success: {e:?}");
                         }
                     }
@@ -95,14 +118,14 @@ pub(crate) async fn handle_validator_events_stream(
                                         subnetwork_id: blob.column_idx,
                                         blob: Box::new(blob),
                                     },
-                                    None => BehaviourSampleRes::SampleNotFound { blob_id },
+                                    None => BehaviourSampleRes::SampleNotFound { blob_id, subnetwork_id: column_idx },
                                 };
 
                                 if response_sender.send(result).is_err() {
                                     error!("Error sending sampling success response");
                                 }
                             } else if response_sender
-                                .send(BehaviourSampleRes::SampleNotFound { blob_id })
+                                .send(BehaviourSampleRes::SampleNotFound { blob_id, subnetwork_id: column_idx })
                                 .is_err()
                             {
                                 error!("Error sending sampling success response");

@@ -7,13 +7,28 @@ use kzgrs_backend::{
     encoder::{DaEncoderParams, EncodedData},
 };
 use nomos_core::da::{BlobId, DaDispersal, DaEncoder};
+use nomos_tracing::info_with_id;
 use overwatch_rs::DynError;
+use rand::{seq::IteratorRandom, thread_rng};
 use serde::{Deserialize, Serialize};
+use tokio::time::error::Elapsed;
+use tracing::instrument;
 
 use crate::{
     adapters::{mempool::DaMempoolAdapter, network::DispersalNetworkAdapter},
     backend::DispersalBackend,
 };
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub enum MempoolPublishStrategy {
+    Immediately,
+    Timeout(Duration),
+    SampleSubnetworks {
+        sample_threshold: usize,
+        timeout: Duration,
+        cooldown: Duration,
+    },
+}
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct EncoderSettings {
@@ -26,7 +41,9 @@ pub struct EncoderSettings {
 pub struct DispersalKZGRSBackendSettings {
     pub encoder_settings: EncoderSettings,
     pub dispersal_timeout: Duration,
+    pub mempool_strategy: MempoolPublishStrategy,
 }
+
 pub struct DispersalKZGRSBackend<NetworkAdapter, MempoolAdapter> {
     settings: DispersalKZGRSBackendSettings,
     network_adapter: Arc<NetworkAdapter>,
@@ -39,9 +56,10 @@ pub struct DispersalFromAdapter<Adapter> {
     timeout: Duration,
 }
 
-// remove if solved, this occurs in the timeout method below (out of our
-// handling)
-#[expect(dependency_on_unit_never_type_fallback)]
+#[expect(
+    dependency_on_unit_never_type_fallback,
+    reason = "TODO: Remove if solved, this occurs in the timeout method below (out of our handling)"
+)]
 #[async_trait::async_trait]
 impl<Adapter> DaDispersal for DispersalFromAdapter<Adapter>
 where
@@ -53,7 +71,7 @@ where
 
     async fn disperse(&self, encoded_data: Self::EncodedData) -> Result<(), Self::Error> {
         let adapter = self.adapter.as_ref();
-        let encoded_size = encoded_data.extended_data.len();
+        let num_columns = encoded_data.column_commitments.len();
         let blob_id = build_blob_id(
             &encoded_data.aggregated_column_commitment,
             &encoded_data.row_commitments,
@@ -73,7 +91,7 @@ where
                     _ => None,
                 }
             })
-            .take(encoded_size)
+            .take(num_columns)
             .collect();
         // timeout when collecting positive responses
         tokio::time::timeout(self.timeout, valid_responses)
@@ -155,5 +173,57 @@ where
         metadata: Self::Metadata,
     ) -> Result<(), DynError> {
         self.mempool_adapter.post_blob_id(blob_id, metadata).await
+    }
+
+    #[instrument(skip_all)]
+    async fn process_dispersal(
+        &self,
+        data: Vec<u8>,
+        metadata: Self::Metadata,
+    ) -> Result<(), DynError> {
+        let (blob_id, encoded_data) = self.encode(data).await?;
+        info_with_id!(blob_id.as_ref(), "ProcessDispersal");
+        self.disperse(encoded_data).await?;
+        match self.settings.mempool_strategy {
+            MempoolPublishStrategy::Immediately => {
+                self.publish_to_mempool(blob_id, metadata).await?;
+            }
+            MempoolPublishStrategy::Timeout(wait_duration) => {
+                tokio::time::sleep(wait_duration).await;
+                self.publish_to_mempool(blob_id, metadata).await?;
+            }
+            MempoolPublishStrategy::SampleSubnetworks {
+                sample_threshold,
+                timeout,
+                cooldown,
+            } => {
+                let subnets = {
+                    // ThreadRng is not Send, need to drop before await bound.
+                    let mut rng = thread_rng();
+                    (0..self.settings.encoder_settings.num_columns as u16)
+                        .choose_multiple(&mut rng, sample_threshold)
+                };
+
+                match tokio::time::timeout(
+                    timeout,
+                    self.network_adapter
+                        .get_blob_samples(blob_id, &subnets, cooldown),
+                )
+                .await
+                {
+                    Ok(Ok(())) => {
+                        self.publish_to_mempool(blob_id, metadata).await?;
+                    }
+                    Ok(Err(e)) => return Err(e),
+                    Err(Elapsed { .. }) => {
+                        return Err(Box::new(std::io::Error::new(
+                            std::io::ErrorKind::TimedOut,
+                            format!("Dispersed blob sampling timed out for blob_id {blob_id:?}"),
+                        )));
+                    }
+                }
+            }
+        }
+        Ok(())
     }
 }

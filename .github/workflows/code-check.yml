@@ -43,6 +43,46 @@ jobs:
           # All is set in the config file
           arguments:
           command-arguments: "--hide-inclusion-graph -c .cargo-deny.toml --show-stats -D warnings"
+
+  features:
+    name: Check packages feature combinations
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Install cargo-hack
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-hack
+      - name: Set up Cargo cache
+        uses: ./.github/actions/setup-cargo-cache
+        with:
+          key: ${{ github.ref }}->${{ github.workflow }}->${{ github.job }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Run cargo-hack
+        env:
+          RISC0_SKIP_BUILD: true
+          RUSTFLAGS: -D warnings
+        run: cargo hack --feature-powerset --no-dev-deps check
+      - name: Update Cargo cache
+        if: success() || failure()
+        uses: ./.github/actions/update-cargo-cache
+        with:
+          key: ${{ github.ref }}->${{ github.workflow }}->${{ github.job }}
+
+  unused-deps:
+    name: Check for unused dependencies
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Install cargo-machete
+        uses: bnjbvr/cargo-machete@v0.8.0
+        # This step also runs `cargo-machete` without the `--with-metadata` flag, which can trigger more false positives.
+        # We ignore errors and run `cargo-machete` with the `--with-metadata` flag for the actual result.
+        continue-on-error: true
+      - name: Run cargo-machete
+        run: cargo machete --with-metadata
   
   lints:
     name: Check Rust lints
@@ -124,6 +164,8 @@ jobs:
     needs:
       - formatting
       - cargo-deny
+      - features
+      - unused-deps
       - lints
       - tests
     env:

@@ -11,20 +11,17 @@ blake2 = "0.10"
 # TODO: we only need types definition from this crate
 cl                     = { workspace = true }
 cryptarchia-engine     = { workspace = true }
-nomos-utils            = { workspace = true, optional = true }
+nomos-utils            = { workspace = true, optional = true, features = ["serde"] }
 nomos_proof_statements = { workspace = true }
 rand                   = "0.8.5"
-rand_core              = "0.6.0"
-risc0-zkvm             = { workspace = true, optional = true }
 rpds                   = "1"
 serde                  = { version = "1.0", features = ["derive"], optional = true }
-sha2                   = "0.10"
 thiserror              = "1"
 
 [features]
 serde = [
-  "cryptarchia-engine/serde",
-  "dep:serde",
-  "nomos-utils/serde",
-  "rpds/serde",
+    "cryptarchia-engine/serde",
+    "dep:nomos-utils",
+    "dep:serde",
+    "rpds/serde",
 ]

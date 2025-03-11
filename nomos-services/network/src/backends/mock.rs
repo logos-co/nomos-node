@@ -1,10 +1,11 @@
+use core::fmt;
 use std::{
     borrow::Cow,
     collections::{HashMap, HashSet},
     sync::{Arc, Mutex},
 };
 
-use futures::future::BoxFuture;
+use futures::{channel::oneshot, future::BoxFuture};
 use overwatch_rs::services::state::NoState;
 use rand::{
     distributions::{Distribution, WeightedIndex},
@@ -15,7 +16,7 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::broadcast::{self, Receiver, Sender};
 use tracing::debug;
 
-use super::{fmt, oneshot, Debug, NetworkBackend, OverwatchHandle};
+use super::{Debug, NetworkBackend, OverwatchHandle};
 
 const BROADCAST_CHANNEL_BUF: usize = 16;
 
@@ -116,7 +117,7 @@ pub struct MockConfig {
 
 pub enum MockBackendMessage {
     BootProducer {
-        #[expect(clippy::type_complexity)]
+        #[expect(clippy::type_complexity, reason = "TODO: Address this at some point.")]
         spawner: Box<
             dyn Fn(
                     BoxFuture<'static, Result<(), overwatch_rs::DynError>>,
@@ -318,7 +319,7 @@ mod tests {
     static BAR_BROADCAST_MESSAGES: &[&str] = &["bar1"];
 
     #[tokio::test]
-    #[expect(clippy::too_many_lines)]
+    #[expect(clippy::too_many_lines, reason = "Test function")]
     async fn test_mock_network() {
         let config = MockConfig {
             predefined_messages: vec![

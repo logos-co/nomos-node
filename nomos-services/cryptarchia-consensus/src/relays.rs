@@ -157,12 +157,14 @@ where
         }
     }
 
-    #[allow(clippy::type_complexity)]
+    #[expect(clippy::allow_attributes_without_reason)]
+    #[expect(clippy::type_complexity)]
     pub async fn from_relays<
         SamplingNetworkAdapter,
         SamplingStorage,
         DaVerifierNetwork,
         DaVerifierStorage,
+        ApiAdapter,
     >(
         network_relay: Relay<NetworkService<NetworkAdapter::Backend>>,
         blend_relay: Relay<
@@ -181,9 +183,10 @@ where
                 DaVerifierBackend,
                 DaVerifierNetwork,
                 DaVerifierStorage,
+                ApiAdapter,
             >,
         >,
-        #[allow(clippy::type_complexity)] sampling_relay: Relay<
+        sampling_relay: Relay<
             DaSamplingService<
                 SamplingBackend,
                 SamplingNetworkAdapter,
@@ -192,6 +195,7 @@ where
                 DaVerifierBackend,
                 DaVerifierNetwork,
                 DaVerifierStorage,
+                ApiAdapter,
             >,
         >,
         storage_relay: Relay<StorageService<Storage>>,
@@ -204,6 +208,7 @@ where
         DaVerifierBackend::Settings: Clone,
         DaVerifierNetwork: nomos_da_verifier::network::NetworkAdapter + Send + Sync,
         DaVerifierNetwork::Settings: Clone,
+        ApiAdapter: nomos_da_sampling::api::ApiAdapter + Send + Sync,
     {
         let network_relay = network_relay
             .connect()

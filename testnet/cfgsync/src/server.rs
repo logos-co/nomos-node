@@ -1,6 +1,7 @@
 use std::{fs, net::Ipv4Addr, num::NonZero, path::PathBuf, sync::Arc, time::Duration};
 
 use axum::{extract::State, http::StatusCode, response::IntoResponse, routing::post, Json, Router};
+use nomos_da_dispersal::backend::kzgrs::MempoolPublishStrategy;
 use nomos_da_network_core::swarm::{DAConnectionMonitorSettings, DAConnectionPolicySettings};
 use nomos_tracing_service::TracingSettings;
 use serde::{Deserialize, Serialize};
@@ -37,6 +38,7 @@ pub struct CfgSyncConfig {
     pub min_replication_peers: usize,
     pub monitor_failure_time_window_secs: u64,
     pub balancer_interval_secs: u64,
+    pub mempool_publish_strategy: MempoolPublishStrategy,
 
     // Tracing params
     pub tracing_settings: TracingSettings,
@@ -69,6 +71,7 @@ impl CfgSyncConfig {
             old_blobs_check_interval: Duration::from_secs(self.old_blobs_check_interval_secs),
             blobs_validity_duration: Duration::from_secs(self.blobs_validity_duration_secs),
             global_params_path: self.global_params_path.clone(),
+            mempool_strategy: self.mempool_publish_strategy.clone(),
             policy_settings: DAConnectionPolicySettings {
                 min_dispersal_peers: self.min_dispersal_peers,
                 min_replication_peers: self.min_replication_peers,

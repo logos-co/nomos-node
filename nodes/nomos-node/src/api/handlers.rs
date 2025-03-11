@@ -1,4 +1,4 @@
-use std::{error::Error, fmt::Debug, hash::Hash, ops::Range};
+use std::{error::Error, fmt::Debug, hash::Hash};
 
 use axum::{
     extract::{Query, State},
@@ -14,6 +14,7 @@ use nomos_core::{
     header::HeaderId,
     tx::Transaction,
 };
+use nomos_da_messages::http::da::{DABlobCommitmentsRequest, DAGetLightBlobReq, GetRangeReq};
 use nomos_da_network_core::SubnetworkId;
 use nomos_da_sampling::backend::DaSamplingServiceBackend;
 use nomos_da_verifier::backend::VerifierBackend;
@@ -113,6 +114,7 @@ pub async fn cryptarchia_info<
     DaVerifierNetwork,
     DaVerifierStorage,
     TimeBackend,
+    ApiAdapter,
     const SIZE: usize,
 >(
     State(handle): State<OverwatchHandle>,
@@ -145,6 +147,7 @@ where
     DaVerifierNetwork::Settings: Clone,
     TimeBackend: nomos_time::backends::TimeBackend,
     TimeBackend::Settings: Clone + Send + Sync,
+    ApiAdapter: nomos_da_sampling::api::ApiAdapter + Send + Sync,
 {
     make_request_and_return_response!(consensus::cryptarchia_info::<
         Tx,
@@ -157,6 +160,7 @@ where
         DaVerifierNetwork,
         DaVerifierStorage,
         TimeBackend,
+        ApiAdapter,
         SIZE,
     >(&handle))
 }
@@ -180,6 +184,7 @@ pub async fn cryptarchia_headers<
     DaVerifierNetwork,
     DaVerifierStorage,
     TimeBackend,
+    ApiAdapter,
     const SIZE: usize,
 >(
     State(store): State<OverwatchHandle>,
@@ -213,6 +218,7 @@ where
     DaVerifierNetwork::Settings: Clone,
     TimeBackend: nomos_time::backends::TimeBackend,
     TimeBackend::Settings: Clone + Send + Sync,
+    ApiAdapter: nomos_da_sampling::api::ApiAdapter + Send + Sync,
 {
     let CryptarchiaInfoQuery { from, to } = query;
     make_request_and_return_response!(consensus::cryptarchia_headers::<
@@ -226,6 +232,7 @@ where
         DaVerifierNetwork,
         DaVerifierStorage,
         TimeBackend,
+        ApiAdapter,
         SIZE,
     >(&store, from, to))
 }
@@ -263,16 +270,6 @@ where
     make_request_and_return_response!(da::add_blob::<A, B, M, VB, SS>(&handle, blob))
 }
 
-#[derive(Serialize, Deserialize)]
-pub struct GetRangeReq<V: Metadata>
-where
-    <V as Metadata>::AppId: Serialize + DeserializeOwned,
-    <V as Metadata>::Index: Serialize + DeserializeOwned,
-{
-    pub app_id: <V as Metadata>::AppId,
-    pub range: Range<<V as Metadata>::Index>,
-}
-
 #[utoipa::path(
     post,
     path = paths::DA_GET_RANGE,
@@ -294,6 +291,7 @@ pub async fn get_range<
     DaVerifierNetwork,
     DaVerifierStorage,
     TimeBackend,
+    ApiAdapter,
     const SIZE: usize,
 >(
     State(handle): State<OverwatchHandle>,
@@ -353,6 +351,7 @@ where
     DaVerifierNetwork::Settings: Clone,
     TimeBackend: nomos_time::backends::TimeBackend,
     TimeBackend::Settings: Clone + Send + Sync,
+    ApiAdapter: nomos_da_sampling::api::ApiAdapter + Send + Sync,
 {
     make_request_and_return_response!(da::get_range::<
         Tx,
@@ -367,6 +366,7 @@ where
         DaVerifierNetwork,
         DaVerifierStorage,
         TimeBackend,
+        ApiAdapter,
         SIZE,
     >(&handle, app_id, range))
 }
@@ -402,11 +402,6 @@ where
     make_request_and_return_response!(storage::block_req::<S, Tx>(&handle, id))
 }
 
-#[derive(Serialize, Deserialize)]
-pub struct DABlobCommitmentsRequest<B: Blob> {
-    pub blob_id: B::BlobId,
-}
-
 #[utoipa::path(
     get,
     path = paths::DA_GET_SHARED_COMMITMENTS,
@@ -432,12 +427,6 @@ where
         &handle,
         req.blob_id
     ))
-}
-
-#[derive(Serialize, Deserialize)]
-pub struct DAGetLightBlobReq<B: Blob> {
-    pub blob_id: B::BlobId,
-    pub column_idx: B::ColumnIndex,
 }
 
 #[utoipa::path(
@@ -506,6 +495,7 @@ pub async fn add_blob_info<
     DaVerifierBackend,
     DaVerifierNetwork,
     DaVerifierStorage,
+    ApiAdapter,
 >(
     State(handle): State<OverwatchHandle>,
     Json(blob_info): Json<B>,
@@ -535,6 +525,7 @@ where
     DaVerifierBackend::Settings: Clone,
     DaVerifierNetwork: nomos_da_verifier::network::NetworkAdapter,
     DaVerifierNetwork::Settings: Clone,
+    ApiAdapter: nomos_da_sampling::api::ApiAdapter + Send + Sync,
 {
     make_request_and_return_response!(mempool::add_blob_info::<
         NetworkBackend,
@@ -548,5 +539,6 @@ where
         DaVerifierBackend,
         DaVerifierNetwork,
         DaVerifierStorage,
+        ApiAdapter,
     >(&handle, blob_info, DispersedBlobInfo::blob_id))
 }
