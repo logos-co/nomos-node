@@ -21,7 +21,7 @@ nomos-network          = { workspace = true }
 nomos-storage          = { workspace = true }
 nomos-time             = { workspace = true }
 nomos_proof_statements = { workspace = true }
-overwatch-rs           = { workspace = true }
+overwatch              = { workspace = true }
 rand                   = "0.8"
 risc0-zkvm             = { workspace = true }
 serde                  = { version = "1", features = ["derive"] }
