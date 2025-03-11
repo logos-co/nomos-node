@@ -7,6 +7,7 @@ use kzgrs_backend::{
     encoder::{DaEncoderParams, EncodedData},
 };
 use nomos_core::da::{BlobId, DaDispersal, DaEncoder};
+use nomos_mempool::backend::MempoolError;
 use nomos_tracing::info_with_id;
 use overwatch::DynError;
 use rand::{seq::IteratorRandom, thread_rng};
@@ -15,7 +16,10 @@ use tokio::time::error::Elapsed;
 use tracing::instrument;
 
 use crate::{
-    adapters::{mempool::DaMempoolAdapter, network::DispersalNetworkAdapter},
+    adapters::{
+        mempool::{DaMempoolAdapter, DaMempoolAdapterError},
+        network::DispersalNetworkAdapter,
+    },
     backend::DispersalBackend,
 };
 
@@ -172,7 +176,14 @@ where
         blob_id: Self::BlobId,
         metadata: Self::Metadata,
     ) -> Result<(), DynError> {
-        self.mempool_adapter.post_blob_id(blob_id, metadata).await
+        self.mempool_adapter
+            .post_blob_id(blob_id, metadata)
+            .await
+            .or_else(|err| match err {
+                DaMempoolAdapterError::Mempool(MempoolError::ExistingItem) => Ok(()),
+                DaMempoolAdapterError::Mempool(MempoolError::DynamicPoolError(err))
+                | DaMempoolAdapterError::Other(err) => Err(err),
+            })
     }
 
     #[instrument(skip_all)]

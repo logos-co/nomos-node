@@ -1,9 +1,27 @@
 pub mod kzgrs;
 
+use std::error::Error;
+
+use nomos_mempool::backend::MempoolError;
 use overwatch::{
     services::{relay::OutboundRelay, ServiceData},
     DynError,
 };
+
+#[derive(Debug)]
+pub enum DaMempoolAdapterError {
+    Mempool(MempoolError),
+    Other(DynError),
+}
+
+impl<E> From<E> for DaMempoolAdapterError
+where
+    E: Error + Send + Sync + 'static,
+{
+    fn from(e: E) -> Self {
+        Self::Other(Box::new(e) as DynError)
+    }
+}
 
 #[async_trait::async_trait]
 pub trait DaMempoolAdapter {
@@ -17,5 +35,5 @@ pub trait DaMempoolAdapter {
         &self,
         blob_id: Self::BlobId,
         metadata: Self::Metadata,
-    ) -> Result<(), DynError>;
+    ) -> Result<(), DaMempoolAdapterError>;
 }

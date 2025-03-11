@@ -24,8 +24,13 @@ use overwatch::{
 };
 use rand::{RngCore, SeedableRng};
 use services_utils::overwatch::lifecycle;
+use tokio::sync::oneshot;
 
-use crate::{backend::MemPool, network::NetworkAdapter, MempoolMetrics, MempoolMsg};
+use crate::{
+    backend::{MemPool, MempoolError},
+    network::NetworkAdapter,
+    MempoolMetrics, MempoolMsg,
+};
 
 #[expect(clippy::type_complexity, reason = "This is a complex type")]
 pub struct DaMempoolService<
@@ -311,25 +316,14 @@ where
                 key,
                 reply_channel,
             } => {
-                match pool.add_item(key, item.clone()) {
-                    Ok(_id) => {
-                        // Broadcast the item to the network
-                        let net = network_relay.clone();
-                        let settings = service_state.settings_reader.get_updated_settings().network;
-                        // move sending to a new task so local operations can complete in the
-                        // meantime
-                        tokio::spawn(async move {
-                            let adapter = N::new(settings, net).await;
-                            adapter.send(item).await;
-                        });
-                        if let Err(e) = reply_channel.send(Ok(())) {
-                            tracing::debug!("Failed to send reply to AddTx: {:?}", e);
-                        }
-                    }
-                    Err(e) => {
-                        tracing::debug!("could not add tx to the pool due to: {}", e);
-                    }
-                }
+                Self::handle_add_to_pool(
+                    item,
+                    key,
+                    pool,
+                    network_relay,
+                    service_state,
+                    reply_channel,
+                );
             }
             MempoolMsg::View {
                 ancestor_hint,
@@ -370,6 +364,37 @@ where
                 reply_channel
                     .send(pool.status(&items))
                     .unwrap_or_else(|_| tracing::debug!("could not send back mempool status"));
+            }
+        }
+    }
+
+    fn handle_add_to_pool(
+        item: N::Payload,
+        key: P::Key,
+        pool: &mut P,
+        network_relay: &OutboundRelay<NetworkMsg<N::Backend>>,
+        service_state: &OpaqueServiceStateHandle<Self>,
+        reply_channel: oneshot::Sender<Result<(), MempoolError>>,
+    ) {
+        match pool.add_item(key, item.clone()) {
+            Ok(_id) => {
+                // Broadcast the item to the network
+                let net = network_relay.clone();
+                let settings = service_state.settings_reader.get_updated_settings().network;
+                tokio::spawn(async move {
+                    let adapter = N::new(settings, net).await;
+                    adapter.send(item).await;
+                });
+
+                if let Err(e) = reply_channel.send(Ok(())) {
+                    tracing::debug!("Failed to send reply to AddTx: {e:?}");
+                }
+            }
+            Err(e) => {
+                tracing::debug!("could not add tx to the pool due to: {e}");
+                if let Err(e) = reply_channel.send(Err(e)) {
+                    tracing::debug!("Failed to send reply to AddTx: {e:?}");
+                }
             }
         }
     }

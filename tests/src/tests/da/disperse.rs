@@ -87,6 +87,41 @@ async fn disseminate_retrieve_reconstruct() {
     }
 }
 
+#[tokio::test]
+async fn disseminate_same_data() {
+    const ITERATIONS: usize = 10;
+
+    let topology = Topology::spawn(TopologyConfig::validator_and_executor()).await;
+    let executor = &topology.executors()[0];
+    let num_subnets = executor.config().da_network.backend.num_subnets as usize;
+
+    let data = [1u8; 31];
+
+    let app_id = hex::decode(APP_ID).unwrap();
+    let app_id: [u8; 32] = app_id.clone().try_into().unwrap();
+    let metadata = kzgrs_backend::dispersal::Metadata::new(app_id, Index::from(0));
+
+    let from = 0u64.to_be_bytes();
+    let to = 1u64.to_be_bytes();
+
+    for i in 0..ITERATIONS {
+        println!("iteration {i}");
+        disseminate_with_metadata(executor, &data, metadata).await;
+
+        wait_for_indexed_blob(executor, app_id, from, to, num_subnets).await;
+
+        let executor_blobs = executor.get_indexer_range(app_id, from..to).await;
+        let executor_idx_0_blobs = executor_blobs
+            .iter()
+            .filter(|(i, _)| i == &from)
+            .flat_map(|(_, blobs)| blobs);
+
+        // Index zero shouldn't be empty, validator replicated both blobs to executor
+        // because they both are in the same subnetwork.
+        assert!(executor_idx_0_blobs.count() == 2);
+    }
+}
+
 #[ignore = "for local debugging"]
 #[tokio::test]
 async fn local_testnet() {
