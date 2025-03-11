@@ -41,7 +41,7 @@ private = { ignore = false }
 unused-allowed-license = "deny"
 
 [[licenses.clarify]]
-expression    = "MIT AND ISC AND OpenSSL"
+expression    = "MIT AND ISC"
 license-files = [{ path = "LICENSE", hash = 0xbd0eed23 }]
 name          = "ring"
 

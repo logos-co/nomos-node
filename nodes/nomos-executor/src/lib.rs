@@ -18,7 +18,7 @@ use nomos_da_dispersal::{
 };
 use nomos_da_network_service::backends::libp2p::executor::DaNetworkExecutorBackend;
 use nomos_da_sampling::{
-    backend::kzgrs::KzgrsSamplingBackend,
+    api::http::HttApiAdapter, backend::kzgrs::KzgrsSamplingBackend,
     storage::adapters::rocksdb::RocksAdapter as SamplingStorageAdapter,
 };
 use nomos_da_verifier::{
@@ -58,6 +58,7 @@ pub type ExecutorApiService = ApiService<
         ChaCha20Rng,
         SamplingStorageAdapter<DaBlob, Wire>,
         nomos_time::backends::system_time::SystemTimeBackend,
+        HttApiAdapter<NomosDaMembership>,
         MB16,
     >,
 >;
@@ -72,6 +73,7 @@ pub type DispersalMempoolAdapter = KzgrsMempoolAdapter<
     KzgrsDaVerifier,
     VerifierNetworkAdapter<NomosDaMembership>,
     VerifierStorageAdapter<DaBlob, Wire>,
+    HttApiAdapter<NomosDaMembership>,
 >;
 
 pub type DaDispersal = DispersalService<

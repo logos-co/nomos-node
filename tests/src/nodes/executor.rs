@@ -30,7 +30,7 @@ use nomos_da_network_service::{
     NetworkConfig as DaNetworkConfig,
 };
 use nomos_da_sampling::{
-    backend::kzgrs::KzgrsSamplingBackendSettings,
+    api::http::ApiAdapterSettings, backend::kzgrs::KzgrsSamplingBackendSettings,
     storage::adapters::rocksdb::RocksAdapterSettings as SamplingStorageAdapterSettings,
     DaSamplingServiceSettings,
 };
@@ -222,7 +222,7 @@ pub fn create_executor_config(config: GeneralConfig) -> Config {
             backend: DaNetworkExecutorBackendSettings {
                 validator_settings: DaNetworkBackendSettings {
                     node_key: config.da_config.node_key,
-                    membership: config.da_config.membership,
+                    membership: config.da_config.membership.clone(),
                     listening_address: config.da_config.listening_address,
                     policy_settings: config.da_config.policy_settings,
                     monitor_settings: config.da_config.monitor_settings,
@@ -264,6 +264,10 @@ pub fn create_executor_config(config: GeneralConfig) -> Config {
                 blob_storage_directory: "./".into(),
             },
             network_adapter_settings: (),
+            api_adapter_settings: ApiAdapterSettings {
+                membership: config.da_config.membership,
+                api_port: config.api_config.address.port(),
+            },
         },
         storage: RocksBackendSettings {
             db_path: "./db".into(),

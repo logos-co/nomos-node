@@ -59,6 +59,7 @@ pub struct AxumBackend<
     SamplingRng,
     SamplingStorage,
     TimeBackend,
+    ApiAdapter,
     const SIZE: usize,
 > {
     settings: AxumBackendSettings,
@@ -77,6 +78,7 @@ pub struct AxumBackend<
     _sampling_rng: core::marker::PhantomData<SamplingRng>,
     _sampling_storage: core::marker::PhantomData<SamplingStorage>,
     _time_backend: core::marker::PhantomData<TimeBackend>,
+    _api_adapter: core::marker::PhantomData<ApiAdapter>,
 }
 
 #[derive(OpenApi)]
@@ -109,6 +111,7 @@ impl<
         SamplingRng,
         SamplingStorage,
         TimeBackend,
+        ApiAdapter,
         const SIZE: usize,
     > Backend
     for AxumBackend<
@@ -127,6 +130,7 @@ impl<
         SamplingRng,
         SamplingStorage,
         TimeBackend,
+        ApiAdapter,
         SIZE,
     >
 where
@@ -202,6 +206,7 @@ where
     DaVerifierNetwork::Settings: Clone,
     TimeBackend: nomos_time::backends::TimeBackend + Send + 'static,
     TimeBackend::Settings: Clone + Send + Sync,
+    ApiAdapter: nomos_da_sampling::api::ApiAdapter + Send + Sync + 'static,
 {
     type Error = hyper::Error;
     type Settings = AxumBackendSettings;
@@ -227,6 +232,7 @@ where
             _sampling_rng: core::marker::PhantomData,
             _sampling_storage: core::marker::PhantomData,
             _time_backend: core::marker::PhantomData,
+            _api_adapter: core::marker::PhantomData,
         })
     }
 
@@ -270,6 +276,7 @@ where
                         DaVerifierNetwork,
                         DaVerifierStorage,
                         TimeBackend,
+                        ApiAdapter,
                         SIZE,
                     >,
                 ),
@@ -288,6 +295,7 @@ where
                         DaVerifierNetwork,
                         DaVerifierStorage,
                         TimeBackend,
+                        ApiAdapter,
                         SIZE,
                     >,
                 ),
@@ -320,6 +328,7 @@ where
                         DaVerifierNetwork,
                         DaVerifierStorage,
                         TimeBackend,
+                        ApiAdapter,
                         SIZE,
                     >,
                 ),
@@ -342,6 +351,7 @@ where
                         DaVerifierBackend,
                         DaVerifierNetwork,
                         DaVerifierStorage,
+                        ApiAdapter,
                     >,
                 ),
             )

@@ -7,7 +7,7 @@ use kzgrs_backend::{
     global::GLOBAL_PARAMETERS,
     verifier::DaVerifier,
 };
-use nomos_core::da::DaEncoder as _;
+use nomos_core::da::{blob::Blob, DaEncoder as _};
 use rand::{thread_rng, RngCore};
 
 fn main() {
@@ -54,5 +54,8 @@ fn verify<const SIZE: usize>(bencher: Bencher, column_size: usize) {
         .input_counter(|(_, blob)| {
             BytesCount::new(blob.column.iter().map(Chunk::len).sum::<usize>())
         })
-        .bench_refs(|(verifier, blob)| black_box(verifier.verify(blob, column_size)));
+        .bench_values(|(verifier, blob)| {
+            let (light_blob, commitments) = blob.into_blob_and_shared_commitments();
+            black_box(verifier.verify(&commitments, &light_blob, column_size))
+        });
 }

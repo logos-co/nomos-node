@@ -13,7 +13,7 @@ use futures::{
     stream::{BoxStream, FuturesUnordered},
     AsyncWriteExt, FutureExt, StreamExt,
 };
-use kzgrs_backend::common::{blob::DaBlob, ColumnIndex};
+use kzgrs_backend::common::{blob::DaLightBlob, ColumnIndex};
 use libp2p::{
     core::{transport::PortUse, Endpoint},
     swarm::{
@@ -188,7 +188,7 @@ pub enum BehaviourSampleRes {
     SamplingSuccess {
         blob_id: BlobId,
         subnetwork_id: SubnetworkId,
-        blob: Box<DaBlob>,
+        blob: Box<DaLightBlob>,
     },
     SampleNotFound {
         blob_id: BlobId,
@@ -199,7 +199,7 @@ impl From<BehaviourSampleRes> for sampling::SampleResponse {
     fn from(res: BehaviourSampleRes) -> Self {
         match res {
             BehaviourSampleRes::SamplingSuccess { blob, blob_id, .. } => {
-                Self::Blob(common::Blob::new(blob_id, *blob))
+                Self::Blob(common::LightBlob::new(blob_id, *blob))
             }
             BehaviourSampleRes::SampleNotFound { blob_id } => {
                 Self::Error(sampling::SampleError::new(
@@ -218,7 +218,7 @@ pub enum SamplingEvent {
     SamplingSuccess {
         blob_id: BlobId,
         subnetwork_id: SubnetworkId,
-        blob: Box<DaBlob>,
+        light_blob: Box<DaLightBlob>,
     },
     IncomingSample {
         request_receiver: Receiver<BehaviourSampleReq>,
@@ -569,7 +569,7 @@ impl<Membership: MembershipHandler<Id = PeerId, NetworkId = SubnetworkId> + 'sta
                 Poll::Ready(ToSwarm::GenerateEvent(SamplingEvent::SamplingSuccess {
                     blob_id,
                     subnetwork_id,
-                    blob: Box::new(blob.data),
+                    light_blob: Box::new(blob.data),
                 }))
             }
         }

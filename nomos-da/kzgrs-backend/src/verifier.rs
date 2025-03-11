@@ -5,10 +5,12 @@ use kzgrs::{
     verify_element_proof, Commitment, GlobalParameters, PolynomialEvaluationDomain, Proof,
     BYTES_PER_FIELD_ELEMENT,
 };
-use nomos_core::da::blob::Blob;
 
 use crate::{
-    common::{blob::DaBlob, hash_commitment, Chunk, Column},
+    common::{
+        blob::{DaBlobSharedCommitments, DaLightBlob},
+        hash_commitment, Chunk, Column,
+    },
     encoder::DaEncoderParams,
 };
 
@@ -107,18 +109,23 @@ impl DaVerifier {
     }
 
     #[must_use]
-    pub fn verify(&self, blob: &DaBlob, rows_domain_size: usize) -> bool {
+    pub fn verify(
+        &self,
+        commitments: &DaBlobSharedCommitments,
+        light_blob: &DaLightBlob,
+        rows_domain_size: usize,
+    ) -> bool {
         let rows_domain = PolynomialEvaluationDomain::new(rows_domain_size)
             .expect("Domain should be able to build");
-        let blob_col_idx = &u16::from_be_bytes(blob.column_idx());
+        let blob_col_idx = &light_blob.column_idx;
         let index = blob_col_idx;
 
         let is_column_verified = Self::verify_column(
             &self.global_parameters,
-            &blob.column,
-            &blob.column_commitment,
-            &blob.aggregated_column_commitment,
-            &blob.aggregated_column_proof,
+            &light_blob.column,
+            &light_blob.column_commitment,
+            &commitments.aggregated_column_commitment,
+            &light_blob.aggregated_column_proof,
             *index as usize,
             rows_domain,
         );
@@ -128,9 +135,9 @@ impl DaVerifier {
 
         let are_chunks_verified = Self::verify_chunks(
             &self.global_parameters,
-            blob.column.as_ref(),
-            &blob.rows_commitments,
-            &blob.rows_proofs,
+            light_blob.column.as_ref(),
+            &commitments.rows_commitments,
+            &light_blob.rows_proofs,
             *index as usize,
             rows_domain,
         );
@@ -150,7 +157,7 @@ mod test {
         global_parameters_from_randomness, Commitment, GlobalParameters,
         PolynomialEvaluationDomain, Proof, BYTES_PER_FIELD_ELEMENT,
     };
-    use nomos_core::da::DaEncoder;
+    use nomos_core::da::{blob::Blob, DaEncoder};
     use once_cell::sync::Lazy;
 
     use crate::{
@@ -384,7 +391,8 @@ mod test {
                     .map(|proofs| proofs.get(i).copied().unwrap())
                     .collect(),
             };
-            assert!(verifier.verify(&da_blob, domain_size));
+            let (light_blob, commitments) = da_blob.into_blob_and_shared_commitments();
+            assert!(verifier.verify(&commitments, &light_blob, domain_size));
         }
     }
 }

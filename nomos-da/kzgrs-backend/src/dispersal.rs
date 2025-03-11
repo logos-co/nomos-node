@@ -109,7 +109,7 @@ impl AsRef<[u8]> for Index {
 
 #[cfg(test)]
 mod tests {
-    use nomos_core::da::DaEncoder as _;
+    use nomos_core::da::{blob::Blob, DaEncoder as _};
 
     use crate::{
         common::blob::DaBlob,
@@ -141,7 +141,8 @@ mod tests {
                     .map(|proofs| proofs.get(i).copied().unwrap())
                     .collect(),
             };
-            attestations.push(verifier.verify(&da_blob, domain_size));
+            let (light_blob, commitments) = da_blob.into_blob_and_shared_commitments();
+            attestations.push(verifier.verify(&commitments, &light_blob, domain_size));
         }
         attestations
     }

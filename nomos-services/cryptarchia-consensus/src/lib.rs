@@ -164,6 +164,7 @@ pub struct CryptarchiaConsensus<
     DaVerifierNetwork,
     DaVerifierStorage,
     TimeBackend,
+    ApiAdapter,
 > where
     NetAdapter: NetworkAdapter,
     NetAdapter::Backend: 'static,
@@ -201,6 +202,7 @@ pub struct CryptarchiaConsensus<
     DaVerifierNetwork::Settings: Clone,
     TimeBackend: nomos_time::backends::TimeBackend,
     TimeBackend::Settings: Clone + Send + Sync,
+    ApiAdapter: nomos_da_sampling::api::ApiAdapter + Send + Sync,
 {
     service_state: OpaqueServiceStateHandle<Self>,
     // underlying networking backend. We need this so we can relay and check the types properly
@@ -220,6 +222,7 @@ pub struct CryptarchiaConsensus<
             DaVerifierBackend,
             DaVerifierNetwork,
             DaVerifierStorage,
+            ApiAdapter,
         >,
     >,
     sampling_relay: Relay<
@@ -231,6 +234,7 @@ pub struct CryptarchiaConsensus<
             DaVerifierBackend,
             DaVerifierNetwork,
             DaVerifierStorage,
+            ApiAdapter,
         >,
     >,
     block_subscription_sender: broadcast::Sender<Block<ClPool::Item, DaPool::Item>>,
@@ -256,6 +260,7 @@ impl<
         DaVerifierNetwork,
         DaVerifierStorage,
         TimeBackend,
+        ApiAdapter,
     > ServiceData
     for CryptarchiaConsensus<
         NetAdapter,
@@ -275,6 +280,7 @@ impl<
         DaVerifierNetwork,
         DaVerifierStorage,
         TimeBackend,
+        ApiAdapter,
     >
 where
     NetAdapter: NetworkAdapter,
@@ -312,6 +318,7 @@ where
     DaVerifierNetwork::Settings: Clone,
     TimeBackend: nomos_time::backends::TimeBackend,
     TimeBackend::Settings: Clone + Send + Sync,
+    ApiAdapter: nomos_da_sampling::api::ApiAdapter + Send + Sync,
 {
     const SERVICE_ID: ServiceId = CRYPTARCHIA_ID;
     type Settings = CryptarchiaSettings<
@@ -350,6 +357,7 @@ impl<
         DaVerifierNetwork,
         DaVerifierStorage,
         TimeBackend,
+        ApiAdapter,
     > ServiceCore
     for CryptarchiaConsensus<
         A,
@@ -369,6 +377,7 @@ impl<
         DaVerifierNetwork,
         DaVerifierStorage,
         TimeBackend,
+        ApiAdapter,
     >
 where
     A: NetworkAdapter<Tx = ClPool::Item, BlobCertificate = DaPool::Item>
@@ -435,6 +444,7 @@ where
     DaVerifierNetwork::Settings: Clone,
     TimeBackend: nomos_time::backends::TimeBackend,
     TimeBackend::Settings: Clone + Send + Sync,
+    ApiAdapter: nomos_da_sampling::api::ApiAdapter + Send + Sync,
 {
     fn init(
         service_state: OpaqueServiceStateHandle<Self>,
@@ -680,6 +690,7 @@ impl<
         DaVerifierNetwork,
         DaVerifierStorage,
         TimeBackend,
+        ApiAdapter,
     >
     CryptarchiaConsensus<
         A,
@@ -699,6 +710,7 @@ impl<
         DaVerifierNetwork,
         DaVerifierStorage,
         TimeBackend,
+        ApiAdapter,
     >
 where
     A: NetworkAdapter + Clone + Send + Sync + 'static,
@@ -755,6 +767,7 @@ where
     DaVerifierNetwork::Settings: Clone,
     TimeBackend: nomos_time::backends::TimeBackend,
     TimeBackend::Settings: Clone + Send + Sync,
+    ApiAdapter: nomos_da_sampling::api::ApiAdapter + Send + Sync,
 {
     fn process_message(
         cryptarchia: &Cryptarchia,

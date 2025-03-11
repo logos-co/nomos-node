@@ -65,6 +65,7 @@ pub struct AxumBackend<
     SamplingRng,
     SamplingStorage,
     TimeBackend,
+    ApiAdapter,
     const SIZE: usize,
 > {
     settings: AxumBackendSettings,
@@ -90,6 +91,7 @@ pub struct AxumBackend<
         SamplingRng,
         SamplingStorage,
         TimeBackend,
+        ApiAdapter,
     )>,
 }
 
@@ -127,6 +129,7 @@ impl<
         SamplingRng,
         SamplingStorage,
         TimeBackend,
+        ApiAdapter,
         const SIZE: usize,
     > Backend
     for AxumBackend<
@@ -149,6 +152,7 @@ impl<
         SamplingRng,
         SamplingStorage,
         TimeBackend,
+        ApiAdapter,
         SIZE,
     >
 where
@@ -240,6 +244,7 @@ where
     SamplingStorage: nomos_da_sampling::storage::DaStorageAdapter + Send + 'static,
     TimeBackend: nomos_time::backends::TimeBackend + Send + 'static,
     TimeBackend::Settings: Clone + Send + Sync,
+    ApiAdapter: nomos_da_sampling::api::ApiAdapter + Send + Sync + 'static,
 {
     type Error = hyper::Error;
     type Settings = AxumBackendSettings;
@@ -294,6 +299,7 @@ where
                         DaVerifierNetwork,
                         DaVerifierStorage,
                         TimeBackend,
+                        ApiAdapter,
                         SIZE,
                     >,
                 ),
@@ -312,6 +318,7 @@ where
                         DaVerifierNetwork,
                         DaVerifierStorage,
                         TimeBackend,
+                        ApiAdapter,
                         SIZE,
                     >,
                 ),
@@ -344,6 +351,7 @@ where
                         DaVerifierNetwork,
                         DaVerifierStorage,
                         TimeBackend,
+                        ApiAdapter,
                         SIZE,
                     >,
                 ),
@@ -366,6 +374,7 @@ where
                         DaVerifierBackend,
                         DaVerifierNetwork,
                         DaVerifierStorage,
+                        ApiAdapter,
                     >,
                 ),
             )
