@@ -13,6 +13,7 @@ mod tests {
     };
 
     use futures::future::join_all;
+    use nomos_da_dispersal::backend::kzgrs::MempoolPublishStrategy;
     use nomos_libp2p::{ed25519, libp2p, Multiaddr, PeerId, Protocol};
     use nomos_node::Config as ValidatorConfig;
     use nomos_tracing_service::TracingSettings;
@@ -40,6 +41,7 @@ mod tests {
             old_blobs_check_interval_secs: 0,
             blobs_validity_duration_secs: 0,
             global_params_path: String::new(),
+            mempool_publish_strategy: MempoolPublishStrategy::Immediately,
             min_dispersal_peers: 0,
             min_replication_peers: 0,
             monitor_failure_time_window_secs: 0,
@@ -102,9 +104,8 @@ mod tests {
 
     pub fn extract_ip(multiaddr: &Multiaddr) -> Option<Ipv4Addr> {
         for protocol in multiaddr {
-            match protocol {
-                Protocol::Ip4(ip) => return Some(ip),
-                _ => continue,
+            if let Protocol::Ip4(ip) = protocol {
+                return Some(ip);
             }
         }
         None

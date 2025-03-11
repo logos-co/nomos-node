@@ -14,6 +14,7 @@ pub enum SampleErrorType {
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct SampleError {
     pub blob_id: BlobId,
+    pub column_idx: ColumnIndex,
     pub error_type: SampleErrorType,
     pub error_description: String,
 }
@@ -21,11 +22,13 @@ pub struct SampleError {
 impl SampleError {
     pub fn new(
         blob_id: BlobId,
+        column_idx: ColumnIndex,
         error_type: SampleErrorType,
         error_description: impl Into<String>,
     ) -> Self {
         Self {
             blob_id,
+            column_idx,
             error_type,
             error_description: error_description.into(),
         }

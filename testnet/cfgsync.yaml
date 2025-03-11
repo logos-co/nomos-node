@@ -18,6 +18,15 @@ min_dispersal_peers: 1
 min_replication_peers: 1
 monitor_failure_time_window_secs: 5
 balancer_interval_secs: 5
+# Dispersal mempool publish strategy
+mempool_publish_strategy: !SampleSubnetworks
+  sample_threshold: 2
+  dispersal_timeout:
+    secs: 2
+    nanos: 0
+  cooldown:
+    secs: 0
+    nanos: 100_000_000
 
 # Tracing
 tracing_settings:

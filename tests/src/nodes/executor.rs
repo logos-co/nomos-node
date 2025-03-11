@@ -281,7 +281,8 @@ pub fn create_executor_config(config: GeneralConfig) -> Config {
                     with_cache: false,
                     global_params_path: config.da_config.global_params_path,
                 },
-                dispersal_timeout: Duration::from_secs(u64::MAX),
+                dispersal_timeout: Duration::from_secs(20),
+                mempool_strategy: config.da_config.mempool_strategy,
             },
         },
         time: TimeServiceSettings {

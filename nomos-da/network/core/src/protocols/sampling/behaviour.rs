@@ -70,7 +70,11 @@ pub enum SamplingError {
     #[error("Malformed blob id: {blob_id:?}")]
     InvalidBlobId { peer_id: PeerId, blob_id: Vec<u8> },
     #[error("Blob not found: {blob_id:?}")]
-    BlobNotFound { peer_id: PeerId, blob_id: Vec<u8> },
+    BlobNotFound {
+        peer_id: PeerId,
+        blob_id: Vec<u8>,
+        subnetwork_id: SubnetworkId,
+    },
     #[error("Canceled response: {error}")]
     ResponseChannel { error: Canceled, peer_id: PeerId },
 }
@@ -91,9 +95,11 @@ impl SamplingError {
     }
 
     #[must_use]
-    pub const fn blob_id(&self) -> Option<&BlobId> {
+    pub fn blob_id(&self) -> Option<&BlobId> {
         match self {
+            Self::BlobNotFound { blob_id, .. } => blob_id.as_slice().try_into().ok(),
             Self::Deserialize { blob_id, .. } => Some(blob_id),
+            Self::Protocol { error, .. } => Some(&error.blob_id),
             _ => None,
         }
     }
@@ -124,10 +130,7 @@ impl Clone for SamplingError {
                     OpenStreamError::Io(error) => {
                         OpenStreamError::Io(std::io::Error::new(error.kind(), error.to_string()))
                     }
-                    err => OpenStreamError::Io(std::io::Error::new(
-                        std::io::ErrorKind::Other,
-                        err.to_string(),
-                    )),
+                    err => OpenStreamError::Io(std::io::Error::other(err.to_string())),
                 },
             },
             Self::Deserialize {
@@ -153,9 +156,14 @@ impl Clone for SamplingError {
                 peer_id: *peer_id,
                 blob_id: blob_id.clone(),
             },
-            Self::BlobNotFound { blob_id, peer_id } => Self::BlobNotFound {
+            Self::BlobNotFound {
+                blob_id,
+                peer_id,
+                subnetwork_id,
+            } => Self::BlobNotFound {
                 peer_id: *peer_id,
                 blob_id: blob_id.clone(),
+                subnetwork_id: *subnetwork_id,
             },
         }
     }
@@ -192,6 +200,7 @@ pub enum BehaviourSampleRes {
     },
     SampleNotFound {
         blob_id: BlobId,
+        subnetwork_id: SubnetworkId,
     },
 }
 
@@ -201,13 +210,15 @@ impl From<BehaviourSampleRes> for sampling::SampleResponse {
             BehaviourSampleRes::SamplingSuccess { blob, blob_id, .. } => {
                 Self::Blob(common::LightBlob::new(blob_id, *blob))
             }
-            BehaviourSampleRes::SampleNotFound { blob_id } => {
-                Self::Error(sampling::SampleError::new(
-                    blob_id,
-                    sampling::SampleErrorType::NotFound,
-                    "Sample not found",
-                ))
-            }
+            BehaviourSampleRes::SampleNotFound {
+                blob_id,
+                subnetwork_id,
+            } => Self::Error(sampling::SampleError::new(
+                blob_id,
+                subnetwork_id,
+                sampling::SampleErrorType::NotFound,
+                "Sample not found",
+            )),
         }
     }
 }

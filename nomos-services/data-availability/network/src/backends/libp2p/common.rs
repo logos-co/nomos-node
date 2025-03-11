@@ -58,6 +58,23 @@ pub enum SamplingEvent {
     SamplingError { error: SamplingError },
 }
 
+impl SamplingEvent {
+    #[must_use]
+    pub fn blob_id(&self) -> Option<&BlobId> {
+        match self {
+            Self::SamplingRequest { blob_id, .. } | Self::SamplingSuccess { blob_id, .. } => {
+                Some(blob_id)
+            }
+            Self::SamplingError { error } => error.blob_id(),
+        }
+    }
+
+    #[must_use]
+    pub fn has_blob_id(&self, target: &BlobId) -> bool {
+        self.blob_id() == Some(target)
+    }
+}
+
 /// Task that handles forwarding of events to the subscriptions channels/stream
 pub(crate) async fn handle_validator_events_stream(
     events_streams: ValidatorEventsStream,
@@ -98,14 +115,14 @@ pub(crate) async fn handle_validator_events_stream(
                                         subnetwork_id: blob.column_idx,
                                         blob: Box::new(blob),
                                     },
-                                    None => BehaviourSampleRes::SampleNotFound { blob_id },
+                                    None => BehaviourSampleRes::SampleNotFound { blob_id, subnetwork_id: column_idx },
                                 };
 
                                 if response_sender.send(result).is_err() {
                                     error!("Error sending sampling success response");
                                 }
                             } else if response_sender
-                                .send(BehaviourSampleRes::SampleNotFound { blob_id })
+                                .send(BehaviourSampleRes::SampleNotFound { blob_id, subnetwork_id: column_idx })
                                 .is_err()
                             {
                                 error!("Error sending sampling success response");
