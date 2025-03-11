@@ -6,11 +6,11 @@ use std::{
 
 use axum::{routing, Router, Server};
 use nomos_api::{ApiService, ApiServiceSettings, Backend};
-use overwatch_derive::Services;
 use overwatch::{
     overwatch::{handle::OverwatchHandle, OverwatchRunner},
     OpaqueServiceHandle,
 };
+use overwatch_derive::Services;
 use utoipa::{
     openapi::security::{ApiKey, ApiKeyValue, SecurityScheme},
     Modify, OpenApi,

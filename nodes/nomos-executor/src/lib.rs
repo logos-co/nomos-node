@@ -33,8 +33,8 @@ use nomos_node::{
     NomosDaMembership, NomosTimeService, RocksBackend, StorageService, SystemSig, Tx, TxMempool,
     Wire, MB16,
 };
-use overwatch_derive::Services;
 use overwatch::OpaqueServiceHandle;
+use overwatch_derive::Services;
 use rand_chacha::ChaCha20Rng;
 
 pub type ExecutorApiService = ApiService<
