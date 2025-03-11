@@ -22,7 +22,7 @@ use nomos_node::api::handlers::{
     cryptarchia_info, da_get_commitments, da_get_light_blob, get_range, libp2p_info,
 };
 use nomos_storage::backends::StorageSerde;
-use overwatch_rs::overwatch::handle::OverwatchHandle;
+use overwatch::overwatch::handle::OverwatchHandle;
 use rand::{RngCore, SeedableRng};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use subnetworks_assignations::MembershipHandler;

@@ -1,7 +1,7 @@
 use cryptarchia_consensus::ConsensusMsg;
 use futures::Stream;
 use nomos_core::block::Block;
-use overwatch_rs::services::relay::OutboundRelay;
+use overwatch::services::relay::OutboundRelay;
 use tokio::sync::oneshot;
 use tokio_stream::{wrappers::BroadcastStream, StreamExt};
 use tracing::debug;

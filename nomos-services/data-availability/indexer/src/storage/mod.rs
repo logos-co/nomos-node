@@ -5,7 +5,7 @@ use std::ops::Range;
 use futures::Stream;
 use nomos_core::da::blob::{info::DispersedBlobInfo, metadata::Metadata};
 use nomos_storage::{backends::StorageBackend, StorageService};
-use overwatch_rs::{
+use overwatch::{
     services::{relay::OutboundRelay, ServiceData},
     DynError,
 };

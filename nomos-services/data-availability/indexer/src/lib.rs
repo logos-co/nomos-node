@@ -23,7 +23,7 @@ use nomos_mempool::{
 };
 use nomos_storage::{backends::StorageBackend, StorageService};
 use nomos_tracing::info_with_id;
-use overwatch_rs::{
+use overwatch::{
     services::{
         relay::{Relay, RelayMessage},
         state::{NoOperator, NoState},

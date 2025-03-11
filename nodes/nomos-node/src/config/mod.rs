@@ -21,7 +21,7 @@ use nomos_storage::backends::rocksdb::RocksBackend;
 use nomos_time::TimeService;
 use nomos_tracing::logging::{gelf::GelfConfig, local::FileConfig};
 use nomos_tracing_service::{LoggerLayer, Tracing};
-use overwatch_rs::services::ServiceData;
+use overwatch::services::ServiceData;
 use serde::{Deserialize, Serialize};
 use subnetworks_assignations::versions::v1::FillFromNodeList;
 use tracing::Level;

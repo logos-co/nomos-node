@@ -18,8 +18,8 @@ use nomos_network::{
     NetworkConfig, NetworkMsg, NetworkService,
 };
 use nomos_tracing_service::{Tracing, TracingSettings};
+use overwatch::{overwatch::OverwatchRunner, OpaqueServiceHandle};
 use overwatch_derive::*;
-use overwatch_rs::{overwatch::OverwatchRunner, OpaqueServiceHandle};
 use rand::distributions::{Alphanumeric, DistString};
 use services_utils::{
     overwatch::{recovery::operators::RecoveryBackend, JsonFileBackend},

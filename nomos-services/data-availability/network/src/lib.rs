@@ -8,7 +8,7 @@ use std::{
 use async_trait::async_trait;
 use backends::NetworkBackend;
 use futures::{Stream, StreamExt};
-use overwatch_rs::{
+use overwatch::{
     services::{
         relay::RelayMessage,
         state::{NoOperator, ServiceState},
@@ -80,7 +80,7 @@ where
     fn init(
         service_state: OpaqueServiceStateHandle<Self>,
         _init_state: Self::State,
-    ) -> Result<Self, overwatch_rs::DynError> {
+    ) -> Result<Self, overwatch::DynError> {
         Ok(Self {
             backend: <B as NetworkBackend>::new(
                 service_state.settings_reader.get_updated_settings().backend,
@@ -90,7 +90,7 @@ where
         })
     }
 
-    async fn run(mut self) -> Result<(), overwatch_rs::DynError> {
+    async fn run(mut self) -> Result<(), overwatch::DynError> {
         let Self {
             service_state:
                 OpaqueServiceStateHandle::<Self> {

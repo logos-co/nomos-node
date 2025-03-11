@@ -1,4 +1,4 @@
-use overwatch_rs::services::{life_cycle::LifecycleMessage, ServiceData};
+use overwatch::services::{life_cycle::LifecycleMessage, ServiceData};
 use tracing::{debug, error};
 
 /// Handles the shutdown signal from `Overwatch`

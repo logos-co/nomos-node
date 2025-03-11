@@ -31,7 +31,7 @@ use nomos_mempool::{
 use nomos_network::NetworkService;
 use nomos_storage::{backends::StorageBackend, StorageMsg, StorageService};
 use nomos_time::{SlotTick, TimeService, TimeServiceMessage};
-use overwatch_rs::{
+use overwatch::{
     services::{
         relay::{OutboundRelay, Relay, RelayMessage},
         state::ServiceState,
@@ -449,7 +449,7 @@ where
     fn init(
         service_state: OpaqueServiceStateHandle<Self>,
         _initial_state: Self::State,
-    ) -> Result<Self, overwatch_rs::DynError> {
+    ) -> Result<Self, overwatch::DynError> {
         let network_relay = service_state.overwatch_handle.relay();
         let blend_relay = service_state.overwatch_handle.relay();
         let cl_mempool_relay = service_state.overwatch_handle.relay();
@@ -473,7 +473,7 @@ where
     }
 
     #[expect(clippy::too_many_lines, reason = "TODO: Address this at some point.")]
-    async fn run(mut self) -> Result<(), overwatch_rs::DynError> {
+    async fn run(mut self) -> Result<(), overwatch::DynError> {
         let relays: CryptarchiaConsensusRelays<
             BlendAdapter,
             BS,

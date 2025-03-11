@@ -13,7 +13,7 @@ use nomos_blend::{conn_maintenance::ConnectionMonitorSettings, membership::Membe
 use nomos_blend_message::sphinx::SphinxMessage;
 use nomos_blend_network::TokioIntervalStreamProvider;
 use nomos_libp2p::{secret_key_serde, NetworkBehaviour};
-use overwatch_rs::overwatch::handle::OverwatchHandle;
+use overwatch::overwatch::handle::OverwatchHandle;
 use rand::RngCore;
 use serde::{Deserialize, Serialize};
 use tokio::sync::{broadcast, mpsc};

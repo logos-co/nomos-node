@@ -1,4 +1,4 @@
-use overwatch_rs::{
+use overwatch::{
     overwatch::handle::OverwatchHandle,
     services::{
         relay::NoMessage,
@@ -35,7 +35,7 @@ pub struct ApiService<B: Backend> {
 }
 
 impl<B: Backend> ServiceData for ApiService<B> {
-    const SERVICE_ID: overwatch_rs::services::ServiceId = "nomos-api";
+    const SERVICE_ID: overwatch::services::ServiceId = "nomos-api";
 
     type Settings = ApiServiceSettings<B::Settings>;
 

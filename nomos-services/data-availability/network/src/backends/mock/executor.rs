@@ -2,7 +2,7 @@ use std::pin::Pin;
 
 use futures::{Stream, StreamExt};
 use kzgrs_backend::common::{blob::DaBlob, build_blob_id};
-use overwatch_rs::{overwatch::handle::OverwatchHandle, services::state::NoState};
+use overwatch::{overwatch::handle::OverwatchHandle, services::state::NoState};
 use serde::{Deserialize, Serialize};
 use tokio::sync::{
     broadcast::{self},

@@ -7,7 +7,7 @@ use libp2p_identity::PeerId;
 use multiaddr::Multiaddr;
 use nomos_core::da::BlobId;
 use nomos_da_network_core::SubnetworkId;
-use overwatch_rs::DynError;
+use overwatch::DynError;
 use rand::prelude::IteratorRandom;
 use serde::{Deserialize, Serialize};
 use subnetworks_assignations::MembershipHandler;

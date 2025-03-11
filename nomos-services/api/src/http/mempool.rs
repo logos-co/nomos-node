@@ -15,7 +15,7 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::oneshot;
 
 pub async fn add_tx<N, A, Item, Key>(
-    handle: &overwatch_rs::overwatch::handle::OverwatchHandle,
+    handle: &overwatch::overwatch::handle::OverwatchHandle,
     item: Item,
     converter: impl Fn(&Item) -> Key,
 ) -> Result<(), super::DynError>
@@ -62,7 +62,7 @@ pub async fn add_blob_info<
     DaVerifierStorage,
     ApiAdapter,
 >(
-    handle: &overwatch_rs::overwatch::handle::OverwatchHandle,
+    handle: &overwatch::overwatch::handle::OverwatchHandle,
     item: A::Payload,
     converter: impl Fn(&A::Payload) -> Key,
 ) -> Result<(), super::DynError>

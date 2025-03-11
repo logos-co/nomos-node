@@ -14,7 +14,7 @@ use nomos_da_sampling::{
 };
 use nomos_da_verifier::backend::VerifierBackend;
 use nomos_network::{NetworkMsg, NetworkService};
-use overwatch_rs::{
+use overwatch::{
     services::{
         relay::{OutboundRelay, Relay},
         state::{NoOperator, NoState},
@@ -188,7 +188,7 @@ where
     fn init(
         service_state: OpaqueServiceStateHandle<Self>,
         _init_state: Self::State,
-    ) -> Result<Self, overwatch_rs::DynError> {
+    ) -> Result<Self, overwatch::DynError> {
         let network_relay = service_state.overwatch_handle.relay();
         let sampling_relay = service_state.overwatch_handle.relay();
         let settings = service_state.settings_reader.get_updated_settings();
@@ -201,7 +201,7 @@ where
         })
     }
 
-    async fn run(mut self) -> Result<(), overwatch_rs::DynError> {
+    async fn run(mut self) -> Result<(), overwatch::DynError> {
         let Self {
             mut service_state,
             network_relay,

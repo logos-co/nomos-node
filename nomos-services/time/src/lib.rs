@@ -6,7 +6,7 @@ use std::{
 use cryptarchia_engine::{Epoch, Slot};
 use futures::{Stream, StreamExt};
 use log::error;
-use overwatch_rs::{
+use overwatch::{
     services::{
         relay::RelayMessage,
         state::{NoOperator, NoState},

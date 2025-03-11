@@ -15,7 +15,7 @@ use nomos_node::{
     CryptarchiaArgs, HttpArgs, LogArgs, NetworkArgs, NetworkService, NomosTimeService, Wire,
 };
 use nomos_storage::backends::rocksdb::RocksBackend;
-use overwatch_rs::services::ServiceData;
+use overwatch::services::ServiceData;
 use serde::{Deserialize, Serialize};
 use subnetworks_assignations::versions::v1::FillFromNodeList;
 

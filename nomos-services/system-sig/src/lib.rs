@@ -1,5 +1,5 @@
 use futures::stream::StreamExt;
-use overwatch_rs::{
+use overwatch::{
     overwatch::handle::OverwatchHandle,
     services::{
         relay::NoMessage,
