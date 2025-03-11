@@ -15,7 +15,9 @@ pub enum Error {
     #[error("Internal server error: {0}")]
     Server(String),
     #[error(transparent)]
-    Request(reqwest::Error),
+    Request(#[from] reqwest::Error),
+    #[error(transparent)]
+    Url(#[from] url::ParseError),
 }
 
 #[derive(Clone)]
@@ -34,41 +36,37 @@ impl BasicAuthCredentials {
 #[derive(Clone)]
 pub struct CommonHttpClient {
     client: Arc<Client>,
-    base_address: Url,
     basic_auth: Option<BasicAuthCredentials>,
 }
 
 impl CommonHttpClient {
     #[must_use]
-    pub fn new(base_address: Url, basic_auth: Option<BasicAuthCredentials>) -> Self {
+    pub fn new(basic_auth: Option<BasicAuthCredentials>) -> Self {
         let client = ClientBuilder::new()
             .build()
             .expect("Client from default settings should be able to build");
         Self {
             client: Arc::new(client),
-            base_address,
             basic_auth,
         }
     }
 }
 
 impl CommonHttpClient {
-    pub async fn post<Req, Res>(&self, request_path: &str, request_body: &Req) -> Result<Res, Error>
+    pub async fn post<Req, Res>(&self, request_url: Url, request_body: &Req) -> Result<Res, Error>
     where
         Req: Serialize + ?Sized + Send + Sync,
         Res: DeserializeOwned + Send + Sync,
     {
-        let request_url = self.base_address.join(request_path).unwrap();
         let request = self.client.post(request_url).json(request_body);
         self.execute_request::<Res>(request).await
     }
 
-    pub async fn get<Req, Res>(&self, request_path: &str, request_body: &Req) -> Result<Res, Error>
+    pub async fn get<Req, Res>(&self, request_url: Url, request_body: &Req) -> Result<Res, Error>
     where
         Req: Serialize + ?Sized + Send + Sync,
         Res: DeserializeOwned + Send + Sync,
     {
-        let request_url = self.base_address.join(request_path).unwrap();
         let request = self.client.get(request_url).json(request_body);
         self.execute_request::<Res>(request).await
     }
@@ -98,6 +96,7 @@ impl CommonHttpClient {
     /// Get the commitments for a Blob
     pub async fn get_commitments<B>(
         &self,
+        base_url: Url,
         blob_id: B::BlobId,
     ) -> Result<Option<B::SharedCommitments>, Error>
     where
@@ -107,12 +106,14 @@ impl CommonHttpClient {
     {
         let request: DABlobCommitmentsRequest<B> = DABlobCommitmentsRequest { blob_id };
         let path = DA_GET_SHARED_COMMITMENTS.trim_start_matches('/');
-        self.get(path, &request).await
+        let request_url = base_url.join(path).map_err(Error::Url)?;
+        self.get(request_url, &request).await
     }
 
     /// Get blob by blob id and column index
     pub async fn get_blob<B, C>(
         &self,
+        base_url: Url,
         blob_id: B::BlobId,
         column_idx: B::ColumnIndex,
     ) -> Result<Option<C>, Error>
@@ -127,6 +128,7 @@ impl CommonHttpClient {
             column_idx,
         };
         let path = DA_GET_LIGHT_BLOB.trim_start_matches('/');
-        self.get(path, &request).await
+        let request_url = base_url.join(path).map_err(Error::Url)?;
+        self.get(request_url, &request).await
     }
 }
