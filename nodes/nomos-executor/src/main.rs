@@ -8,7 +8,7 @@ use nomos_node::{
     config::BlendArgs, BlobInfo, CryptarchiaArgs, DaMempoolSettings, DispersedBlobInfo, HttpArgs,
     LogArgs, MempoolAdapterSettings, NetworkArgs, Transaction, Tx, CL_TOPIC, DA_TOPIC,
 };
-use overwatch_rs::overwatch::OverwatchRunner;
+use overwatch::overwatch::OverwatchRunner;
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]

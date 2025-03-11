@@ -14,7 +14,7 @@ type ClMempoolService<T> = TxMempoolService<
 >;
 
 pub async fn cl_mempool_metrics<T>(
-    handle: &overwatch_rs::overwatch::handle::OverwatchHandle,
+    handle: &overwatch::overwatch::handle::OverwatchHandle,
 ) -> Result<MempoolMetrics, super::DynError>
 where
     T: Transaction
@@ -42,7 +42,7 @@ where
 }
 
 pub async fn cl_mempool_status<T>(
-    handle: &overwatch_rs::overwatch::handle::OverwatchHandle,
+    handle: &overwatch::overwatch::handle::OverwatchHandle,
     items: Vec<<T as Transaction>::Hash>,
 ) -> Result<Vec<Status<HeaderId>>, super::DynError>
 where

@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use bytes::Bytes;
-use overwatch_rs::DynError;
+use overwatch::DynError;
 use serde::{Deserialize, Serialize};
 use zeroize::ZeroizeOnDrop;
 

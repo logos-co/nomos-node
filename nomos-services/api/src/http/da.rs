@@ -32,7 +32,7 @@ use nomos_mempool::{
     backend::mockpool::MockPool, network::adapters::libp2p::Libp2pAdapter as MempoolNetworkAdapter,
 };
 use nomos_storage::backends::{rocksdb::RocksBackend, StorageSerde};
-use overwatch_rs::{overwatch::handle::OverwatchHandle, DynError};
+use overwatch::{overwatch::handle::OverwatchHandle, DynError};
 use rand::{RngCore, SeedableRng};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use subnetworks_assignations::MembershipHandler;

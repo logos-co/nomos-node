@@ -4,7 +4,7 @@ use nomos_network::{
     backends::libp2p::{Command, Event, EventKind, Libp2p, Message, TopicHash},
     NetworkMsg, NetworkService,
 };
-use overwatch_rs::services::{relay::OutboundRelay, ServiceData};
+use overwatch::services::{relay::OutboundRelay, ServiceData};
 use serde::{de::DeserializeOwned, Serialize};
 use tokio_stream::{wrappers::BroadcastStream, StreamExt};
 

@@ -6,7 +6,7 @@ use std::{
 };
 
 use futures::{channel::oneshot, future::BoxFuture};
-use overwatch_rs::services::state::NoState;
+use overwatch::services::state::NoState;
 use rand::{
     distributions::{Distribution, WeightedIndex},
     rngs::StdRng,
@@ -120,8 +120,8 @@ pub enum MockBackendMessage {
         #[expect(clippy::type_complexity, reason = "TODO: Address this at some point.")]
         spawner: Box<
             dyn Fn(
-                    BoxFuture<'static, Result<(), overwatch_rs::DynError>>,
-                ) -> Result<(), overwatch_rs::DynError>
+                    BoxFuture<'static, Result<(), overwatch::DynError>>,
+                ) -> Result<(), overwatch::DynError>
                 + Send
                 + Sync
                 + 'static,
@@ -171,7 +171,7 @@ pub enum NetworkEvent {
 
 impl Mock {
     /// Run producer message handler
-    pub async fn run_producer_handler(&self) -> Result<(), overwatch_rs::DynError> {
+    pub async fn run_producer_handler(&self) -> Result<(), overwatch::DynError> {
         match &self.config.weights {
             // if user provides weights, then we send the predefined messages according to the
             // weights endlessly
@@ -182,7 +182,7 @@ impl Mock {
         }
     }
 
-    async fn run_endless_producer(&self, weights: &[usize]) -> Result<(), overwatch_rs::DynError> {
+    async fn run_endless_producer(&self, weights: &[usize]) -> Result<(), overwatch::DynError> {
         let dist = WeightedIndex::new(weights.iter())?;
         let mut rng = StdRng::seed_from_u64(self.config.seed);
         loop {
@@ -207,7 +207,7 @@ impl Mock {
         }
     }
 
-    async fn run_in_order_producer(&self) -> Result<(), overwatch_rs::DynError> {
+    async fn run_in_order_producer(&self) -> Result<(), overwatch::DynError> {
         for msg in &self.config.predefined_messages {
             tokio::time::sleep(self.config.duration).await;
             match self

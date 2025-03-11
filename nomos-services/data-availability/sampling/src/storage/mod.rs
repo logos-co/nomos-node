@@ -3,7 +3,7 @@ pub mod adapters;
 use kzgrs_backend::common::ColumnIndex;
 use nomos_core::da::blob::Blob;
 use nomos_storage::{backends::StorageBackend, StorageService};
-use overwatch_rs::{
+use overwatch::{
     services::{relay::OutboundRelay, ServiceData},
     DynError,
 };

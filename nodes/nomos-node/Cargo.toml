@@ -33,8 +33,8 @@ nomos-system-sig         = { workspace = true }
 nomos-time               = { workspace = true, features = ["serde"] }
 nomos-tracing            = { workspace = true }
 nomos-tracing-service    = { workspace = true }
+overwatch                = { workspace = true }
 overwatch-derive         = { workspace = true }
-overwatch-rs             = { workspace = true }
 rand_chacha              = "0.3"
 serde                    = "1"
 serde_yaml               = "0.9"

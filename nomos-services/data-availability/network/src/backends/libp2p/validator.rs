@@ -10,7 +10,7 @@ use nomos_core::da::BlobId;
 use nomos_da_network_core::{swarm::validator::ValidatorSwarm, SubnetworkId};
 use nomos_libp2p::ed25519;
 use nomos_tracing::info_with_id;
-use overwatch_rs::{overwatch::handle::OverwatchHandle, services::state::NoState};
+use overwatch::{overwatch::handle::OverwatchHandle, services::state::NoState};
 use subnetworks_assignations::MembershipHandler;
 use tokio::{
     sync::{broadcast, mpsc::UnboundedSender},

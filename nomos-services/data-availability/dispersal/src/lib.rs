@@ -2,7 +2,7 @@ use std::{fmt::Debug, marker::PhantomData};
 
 use nomos_core::da::blob::metadata;
 use nomos_da_network_core::{PeerId, SubnetworkId};
-use overwatch_rs::{
+use overwatch::{
     services::{
         relay::{Relay, RelayMessage},
         state::{NoOperator, NoState},

@@ -15,12 +15,12 @@ mod tests {
     use std::{env::temp_dir, path::PathBuf};
 
     use async_trait::async_trait;
-    use overwatch_derive::Services;
-    use overwatch_rs::{
+    use overwatch::{
         overwatch::OverwatchRunner,
         services::{relay::RelayMessage, state::ServiceState, ServiceCore, ServiceData, ServiceId},
         DynError, OpaqueServiceHandle, OpaqueServiceStateHandle,
     };
+    use overwatch_derive::Services;
     use serde::{Deserialize, Serialize};
     use tracing;
 

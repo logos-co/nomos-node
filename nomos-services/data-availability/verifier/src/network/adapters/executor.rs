@@ -8,7 +8,7 @@ use nomos_da_network_service::{
     backends::libp2p::executor::{DaNetworkEvent, DaNetworkEventKind, DaNetworkExecutorBackend},
     NetworkService,
 };
-use overwatch_rs::services::{relay::OutboundRelay, ServiceData};
+use overwatch::services::{relay::OutboundRelay, ServiceData};
 use subnetworks_assignations::MembershipHandler;
 use tokio_stream::StreamExt;
 

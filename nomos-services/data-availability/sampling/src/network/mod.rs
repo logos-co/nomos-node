@@ -9,7 +9,7 @@ use nomos_da_network_service::{
     backends::{libp2p::common::SamplingEvent, NetworkBackend},
     NetworkService,
 };
-use overwatch_rs::{
+use overwatch::{
     services::{relay::OutboundRelay, ServiceData},
     DynError,
 };

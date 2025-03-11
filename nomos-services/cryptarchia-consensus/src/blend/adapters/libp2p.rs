@@ -4,7 +4,7 @@ use nomos_blend_service::{
     backends::libp2p::Libp2pBlendBackend, network::NetworkAdapter, BlendService, ServiceMessage,
 };
 use nomos_core::{block::Block, wire};
-use overwatch_rs::services::{relay::OutboundRelay, ServiceData};
+use overwatch::services::{relay::OutboundRelay, ServiceData};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use crate::{blend::BlendAdapter, messages::NetworkMessage};

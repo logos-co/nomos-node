@@ -18,7 +18,7 @@ use nomos_da_network_service::{
     },
     DaNetworkMsg, NetworkService,
 };
-use overwatch_rs::{
+use overwatch::{
     services::{relay::OutboundRelay, ServiceData},
     DynError,
 };

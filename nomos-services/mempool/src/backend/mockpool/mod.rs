@@ -8,7 +8,7 @@ use std::{
 
 use ::serde::{Deserialize, Serialize};
 use linked_hash_map::LinkedHashMap;
-use overwatch_rs::services::state::ServiceState;
+use overwatch::services::state::ServiceState;
 
 use super::Status;
 use crate::{

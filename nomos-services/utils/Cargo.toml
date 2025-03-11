@@ -7,8 +7,8 @@ version = "0.1.0"
 [dependencies]
 async-trait      = "0.1.83"
 log              = "0.4.22"
+overwatch        = { workspace = true }
 overwatch-derive = { workspace = true }
-overwatch-rs     = { workspace = true }
 serde            = { version = "1.0", features = ["derive"] }
 serde_json       = "1.0.133"
 thiserror        = "1"
