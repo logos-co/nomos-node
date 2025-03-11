@@ -14,10 +14,13 @@ pub async fn disseminate_with_metadata(
 ) {
     let executor_config = executor.config();
     let backend_address = executor_config.http.backend_settings.address;
+    let client = ExecutorHttpClient::new(None);
     let exec_url = Url::parse(&format!("http://{backend_address}")).unwrap();
-    let client = ExecutorHttpClient::new(exec_url, None);
 
-    client.publish_blob(data.to_vec(), metadata).await.unwrap();
+    client
+        .publish_blob(exec_url, data.to_vec(), metadata)
+        .await
+        .unwrap();
 }
 
 pub async fn wait_for_indexed_blob(
