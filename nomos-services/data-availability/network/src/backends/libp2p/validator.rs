@@ -21,7 +21,7 @@ use tokio::{
 use tokio_stream::wrappers::BroadcastStream;
 use tracing::instrument;
 
-use super::common::PeerRequest;
+use super::common::MonitorCommand;
 use crate::backends::{
     libp2p::common::{
         handle_blacklisted_peer_request, handle_block_peer_request, handle_sample_request,
@@ -39,7 +39,7 @@ pub enum DaNetworkMessage {
         subnetwork_id: SubnetworkId,
         blob_id: BlobId,
     },
-    PeerRequest(PeerRequest),
+    PeerRequest(MonitorCommand),
 }
 
 /// Events types to subscribe to
@@ -166,17 +166,20 @@ where
                 info_with_id!(&blob_id, "RequestSample");
                 handle_sample_request(&self.sampling_request_channel, subnetwork_id, blob_id).await;
             }
-            DaNetworkMessage::PeerRequest(PeerRequest::Block(peer_id, response_sender)) => {
+            DaNetworkMessage::PeerRequest(MonitorCommand::BlockPeer(peer_id, response_sender)) => {
                 info_with_id!(&peer_id.to_bytes(), "BlockPeer");
                 handle_block_peer_request(&self.peer_request_channel, peer_id, response_sender)
                     .await;
             }
-            DaNetworkMessage::PeerRequest(PeerRequest::Unblock(peer_id, response_sender)) => {
+            DaNetworkMessage::PeerRequest(MonitorCommand::UnblockPeer(
+                peer_id,
+                response_sender,
+            )) => {
                 info_with_id!(&peer_id.to_bytes(), "UnblockPeer");
                 handle_unblock_peer_request(&self.peer_request_channel, peer_id, response_sender)
                     .await;
             }
-            DaNetworkMessage::PeerRequest(PeerRequest::BlacklistedPeers(response_sender)) => {
+            DaNetworkMessage::PeerRequest(MonitorCommand::BlacklistedPeers(response_sender)) => {
                 tracing::info!("BlacklistedPeers");
                 handle_blacklisted_peer_request(&self.peer_request_channel, response_sender).await;
             }

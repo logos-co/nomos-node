@@ -79,9 +79,9 @@ impl SamplingEvent {
 }
 
 #[derive(Debug)]
-pub enum PeerRequest {
-    Block(PeerId, oneshot::Sender<bool>),
-    Unblock(PeerId, oneshot::Sender<bool>),
+pub enum MonitorCommand {
+    BlockPeer(PeerId, oneshot::Sender<bool>),
+    UnblockPeer(PeerId, oneshot::Sender<bool>),
     BlacklistedPeers(oneshot::Sender<Vec<PeerId>>),
 }
 

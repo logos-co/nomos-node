@@ -26,7 +26,7 @@ use tokio::{
 use tokio_stream::wrappers::{BroadcastStream, UnboundedReceiverStream};
 use tracing::instrument;
 
-use super::common::PeerRequest;
+use super::common::MonitorCommand;
 use crate::backends::{
     libp2p::common::{
         handle_blacklisted_peer_request, handle_block_peer_request, handle_sample_request,
@@ -48,7 +48,7 @@ pub enum ExecutorDaNetworkMessage {
         subnetwork_id: SubnetworkId,
         da_blob: Box<DaBlob>,
     },
-    PeerRequest(PeerRequest),
+    PeerRequest(MonitorCommand),
 }
 
 /// Events types to subscribe to
@@ -222,12 +222,15 @@ where
                     error!("Could not send internal blob to underlying dispersal behaviour: {e}");
                 }
             }
-            ExecutorDaNetworkMessage::PeerRequest(PeerRequest::Block(peer_id, response_sender)) => {
+            ExecutorDaNetworkMessage::PeerRequest(MonitorCommand::BlockPeer(
+                peer_id,
+                response_sender,
+            )) => {
                 info_with_id!(&peer_id.to_bytes(), "BlockPeer");
                 handle_block_peer_request(&self.peer_request_channel, peer_id, response_sender)
                     .await;
             }
-            ExecutorDaNetworkMessage::PeerRequest(PeerRequest::Unblock(
+            ExecutorDaNetworkMessage::PeerRequest(MonitorCommand::UnblockPeer(
                 peer_id,
                 response_sender,
             )) => {
@@ -235,7 +238,7 @@ where
                 handle_unblock_peer_request(&self.peer_request_channel, peer_id, response_sender)
                     .await;
             }
-            ExecutorDaNetworkMessage::PeerRequest(PeerRequest::BlacklistedPeers(
+            ExecutorDaNetworkMessage::PeerRequest(MonitorCommand::BlacklistedPeers(
                 response_sender,
             )) => {
                 tracing::info!("BlacklistedPeers");
