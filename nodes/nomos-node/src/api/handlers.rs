@@ -14,7 +14,7 @@ use nomos_core::{
     header::HeaderId,
     tx::Transaction,
 };
-use nomos_da_messages::http::da::{DABlobCommitmentsRequest, DAGetLightBlobReq, GetRangeReq};
+use nomos_da_messages::http::da::{DABlobCommitmentsRequest, DaSamplingRequest, GetRangeReq};
 use nomos_da_network_core::SubnetworkId;
 use nomos_da_sampling::backend::DaSamplingServiceBackend;
 use nomos_da_verifier::backend::VerifierBackend;
@@ -439,7 +439,7 @@ where
 )]
 pub async fn da_get_light_blob<StorageOp, DaBlob>(
     State(handle): State<OverwatchHandle>,
-    Json(request): Json<DAGetLightBlobReq<DaBlob>>,
+    Json(request): Json<DaSamplingRequest<DaBlob>>,
 ) -> Response
 where
     DaBlob: Blob,
@@ -452,7 +452,7 @@ where
     make_request_and_return_response!(storage::get_light_blob::<StorageOp, DaBlob>(
         &handle,
         request.blob_id,
-        request.column_idx
+        request.share_idx
     ))
 }
 
