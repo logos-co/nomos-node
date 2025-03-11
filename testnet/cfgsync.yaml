@@ -21,12 +21,12 @@ balancer_interval_secs: 5
 # Dispersal mempool publish strategy
 mempool_publish_strategy: !SampleSubnetworks
   sample_threshold: 2
-  dispersal_timeout:
+  timeout:
     secs: 2
     nanos: 0
   cooldown:
     secs: 0
-    nanos: 100_000_000
+    nanos: 100000000
 
 # Tracing
 tracing_settings:
