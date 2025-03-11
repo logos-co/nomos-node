@@ -139,11 +139,10 @@ pub(crate) async fn handle_sample_request(
 pub(crate) async fn handle_block_peer_request(
     monitor_request_channel: &UnboundedSender<PeerCommand>,
     peer_id: PeerId,
+    response_sender: oneshot::Sender<bool>,
 ) {
-    // todo: handle response when http chain is implemented
-    let response = oneshot::channel();
     if let Err(SendError(cmd)) =
-        monitor_request_channel.send(PeerCommand::Block(peer_id, response.0))
+        monitor_request_channel.send(PeerCommand::Block(peer_id, response_sender))
     {
         error!("Error peer request: {cmd:?}");
     }
@@ -152,12 +151,10 @@ pub(crate) async fn handle_block_peer_request(
 pub(crate) async fn handle_unblock_peer_request(
     monitor_request_channel: &UnboundedSender<PeerCommand>,
     peer_id: PeerId,
+    response_sender: oneshot::Sender<bool>,
 ) {
-    // todo: handle response when http chain is implemented
-    let response = oneshot::channel();
-
     if let Err(SendError(cmd)) =
-        monitor_request_channel.send(PeerCommand::Unblock(peer_id, response.0))
+        monitor_request_channel.send(PeerCommand::Unblock(peer_id, response_sender))
     {
         error!("Error peer request: {cmd:?}");
     }

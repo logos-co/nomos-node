@@ -20,7 +20,7 @@ use overwatch_rs::{overwatch::handle::OverwatchHandle, services::state::NoState}
 use serde::{Deserialize, Serialize};
 use subnetworks_assignations::MembershipHandler;
 use tokio::{
-    sync::{broadcast, mpsc::UnboundedSender},
+    sync::{broadcast, mpsc::UnboundedSender, oneshot},
     task::JoinHandle,
 };
 use tokio_stream::wrappers::{BroadcastStream, UnboundedReceiverStream};
@@ -49,9 +49,11 @@ pub enum ExecutorDaNetworkMessage {
     },
     BlockPeer {
         peer_id: PeerId,
+        response_sender: oneshot::Sender<bool>,
     },
     UnblockPeer {
         peer_id: PeerId,
+        response_sender: oneshot::Sender<bool>,
     },
 }
 
@@ -226,13 +228,21 @@ where
                     error!("Could not send internal blob to underlying dispersal behaviour: {e}");
                 }
             }
-            ExecutorDaNetworkMessage::BlockPeer { peer_id } => {
+            ExecutorDaNetworkMessage::BlockPeer {
+                peer_id,
+                response_sender,
+            } => {
                 info_with_id!(&peer_id.to_bytes(), "BlockPeer");
-                handle_block_peer_request(&self.peer_request_channel, peer_id).await;
+                handle_block_peer_request(&self.peer_request_channel, peer_id, response_sender)
+                    .await;
             }
-            ExecutorDaNetworkMessage::UnblockPeer { peer_id } => {
+            ExecutorDaNetworkMessage::UnblockPeer {
+                peer_id,
+                response_sender,
+            } => {
                 info_with_id!(&peer_id.to_bytes(), "UnblockPeer");
-                handle_unblock_peer_request(&self.peer_request_channel, peer_id).await;
+                handle_unblock_peer_request(&self.peer_request_channel, peer_id, response_sender)
+                    .await;
             }
         }
     }

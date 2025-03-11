@@ -15,7 +15,7 @@ use nomos_tracing::info_with_id;
 use overwatch_rs::{overwatch::handle::OverwatchHandle, services::state::NoState};
 use subnetworks_assignations::MembershipHandler;
 use tokio::{
-    sync::{broadcast, mpsc::UnboundedSender},
+    sync::{broadcast, mpsc::UnboundedSender, oneshot},
     task::JoinHandle,
 };
 use tokio_stream::wrappers::BroadcastStream;
@@ -38,13 +38,13 @@ pub enum DaNetworkMessage {
         subnetwork_id: SubnetworkId,
         blob_id: BlobId,
     },
-
     BlockPeer {
         peer_id: PeerId,
+        response_sender: oneshot::Sender<bool>,
     },
-
     UnblockPeer {
         peer_id: PeerId,
+        response_sender: oneshot::Sender<bool>,
     },
 }
 
@@ -172,13 +172,21 @@ where
                 info_with_id!(&blob_id, "RequestSample");
                 handle_sample_request(&self.sampling_request_channel, subnetwork_id, blob_id).await;
             }
-            DaNetworkMessage::BlockPeer { peer_id } => {
+            DaNetworkMessage::BlockPeer {
+                peer_id,
+                response_sender,
+            } => {
                 info_with_id!(&peer_id.to_bytes(), "BlockPeer");
-                handle_block_peer_request(&self.peer_request_channel, peer_id).await;
+                handle_block_peer_request(&self.peer_request_channel, peer_id, response_sender)
+                    .await;
             }
-            DaNetworkMessage::UnblockPeer { peer_id } => {
+            DaNetworkMessage::UnblockPeer {
+                peer_id,
+                response_sender,
+            } => {
                 info_with_id!(&peer_id.to_bytes(), "UnblockPeer");
-                handle_unblock_peer_request(&self.peer_request_channel, peer_id).await;
+                handle_unblock_peer_request(&self.peer_request_channel, peer_id, response_sender)
+                    .await;
             }
         }
     }
