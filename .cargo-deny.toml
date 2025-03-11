@@ -13,7 +13,7 @@ ignore = [
   { id = "RUSTSEC-2024-0384", reason = "`instant` is unmaintained; consider using an alternative. Use `cargo tree -p instant -i > tmp.txt` to check the dependency tree." },
   { id = "RUSTSEC-2024-0388", reason = "`derivative` is unmaintained; consider using an alternative. Use `cargo tree -p derivative -i > tmp.txt` to check the dependency tree." },
   { id = "RUSTSEC-2024-0436", reason = "`paste` has a security vulnerability; consider using an alternative. Use `cargo tree -p paste -i > tmp.txt` to check the dependency tree." },
-  { id = "RUSTSEC-2025-0014", reason = "Latest humantime crates.io release is four years old and GitHub repository has not seen commits in four years"}
+  { id = "RUSTSEC-2025-0014", reason = "humantime is unmaintained" },
 ]
 yanked = "deny"
 
