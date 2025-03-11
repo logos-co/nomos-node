@@ -160,10 +160,7 @@ where
 
         self.start_sampling(blob_id, subnets).await?;
 
-        let stream = match stream_receiver.await {
-            Ok(stream) => stream,
-            Err(error) => return Err(Box::new(error) as DynError),
-        };
+        let stream = stream_receiver.await.map_err(Box::new)?;
 
         enum SampleOutcome {
             Success(u16),

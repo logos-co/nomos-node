@@ -53,7 +53,7 @@ impl Default for DaParams {
             blobs_validity_duration: Duration::from_secs(60),
             global_params_path: GLOBAL_PARAMS_PATH.to_string(),
             mempool_strategy: MempoolPublishStrategy::SampleSubnetworks {
-                num_to_sample: 2,
+                sample_threshold: 2,
                 timeout: Duration::from_secs(10),
                 cooldown: Duration::from_millis(100),
             },

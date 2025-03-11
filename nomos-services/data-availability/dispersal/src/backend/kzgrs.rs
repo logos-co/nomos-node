@@ -24,7 +24,7 @@ pub enum MempoolPublishStrategy {
     Immediately,
     Timeout(Duration),
     SampleSubnetworks {
-        num_to_sample: usize,
+        sample_threshold: usize,
         timeout: Duration,
         cooldown: Duration,
     },
@@ -193,7 +193,7 @@ where
                 self.publish_to_mempool(blob_id, metadata).await?;
             }
             MempoolPublishStrategy::SampleSubnetworks {
-                num_to_sample,
+                sample_threshold,
                 timeout,
                 cooldown,
             } => {
@@ -201,7 +201,7 @@ where
                     // ThreadRng is not Send, need to drop before await bound.
                     let mut rng = thread_rng();
                     (0..self.settings.encoder_settings.num_columns as u16)
-                        .choose_multiple(&mut rng, num_to_sample)
+                        .choose_multiple(&mut rng, sample_threshold)
                 };
 
                 match tokio::time::timeout(
