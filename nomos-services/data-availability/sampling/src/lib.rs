@@ -9,6 +9,7 @@ use backend::{DaSamplingServiceBackend, SamplingState};
 use kzgrs_backend::common::blob::{DaBlob, DaBlobSharedCommitments, DaLightBlob};
 use network::NetworkAdapter;
 use nomos_core::da::{blob::Blob, BlobId, DaVerifier};
+use nomos_da_network_core::protocols::sampling::behaviour::SamplingError;
 use nomos_da_network_service::{backends::libp2p::common::SamplingEvent, NetworkService};
 use nomos_da_verifier::{DaVerifierMsg, DaVerifierService};
 use nomos_storage::StorageService;
@@ -229,8 +230,10 @@ where
             SamplingEvent::SamplingError { error } => {
                 if let Some(blob_id) = error.blob_id() {
                     error_with_id!(blob_id, "SamplingError");
-                    sampler.handle_sampling_error(*blob_id).await;
-                    return;
+                    if let SamplingError::BlobNotFound { .. } = error {
+                        sampler.handle_sampling_error(*blob_id).await;
+                        return;
+                    }
                 }
                 error!("Error while sampling: {error}");
             }

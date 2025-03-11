@@ -95,9 +95,11 @@ impl SamplingError {
     }
 
     #[must_use]
-    pub const fn blob_id(&self) -> Option<&BlobId> {
+    pub fn blob_id(&self) -> Option<&BlobId> {
         match self {
+            Self::BlobNotFound { blob_id, .. } => blob_id.as_slice().try_into().ok(),
             Self::Deserialize { blob_id, .. } => Some(blob_id),
+            Self::Protocol { error, .. } => Some(&error.blob_id),
             _ => None,
         }
     }
@@ -128,10 +130,7 @@ impl Clone for SamplingError {
                     OpenStreamError::Io(error) => {
                         OpenStreamError::Io(std::io::Error::new(error.kind(), error.to_string()))
                     }
-                    err => OpenStreamError::Io(std::io::Error::new(
-                        std::io::ErrorKind::Other,
-                        err.to_string(),
-                    )),
+                    err => OpenStreamError::Io(std::io::Error::other(err.to_string())),
                 },
             },
             Self::Deserialize {

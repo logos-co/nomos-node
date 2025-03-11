@@ -168,27 +168,19 @@ where
         }
 
         let mut stream = tokio_stream::StreamExt::filter_map(stream, move |event| match event {
-            DaNetworkEvent::Sampling(SamplingEvent::SamplingSuccess {
-                blob_id: event_blob_id,
-                ref blob,
-            }) if event_blob_id == blob_id => Some(SampleOutcome::Success(blob.column_idx)),
-            DaNetworkEvent::Sampling(SamplingEvent::SamplingError { ref error }) => match error {
-                SamplingError::Protocol {
-                    error,
-                    subnetwork_id,
-                    ..
-                } if error.blob_id == blob_id => Some(SampleOutcome::Retry(*subnetwork_id)),
-                SamplingError::Deserialize {
-                    blob_id: event_blob_id,
-                    subnetwork_id,
-                    ..
-                } if *event_blob_id == blob_id => Some(SampleOutcome::Retry(*subnetwork_id)),
-                SamplingError::BlobNotFound {
-                    blob_id: event_blob_id,
-                    subnetwork_id,
-                    ..
-                } if *event_blob_id == blob_id => Some(SampleOutcome::Retry(*subnetwork_id)),
-                _ => None,
+            DaNetworkEvent::Sampling(event) if event.has_blob_id(&blob_id) => match event {
+                SamplingEvent::SamplingSuccess { light_blob, .. } => {
+                    Some(SampleOutcome::Success(light_blob.column_idx))
+                }
+                SamplingEvent::SamplingError { error } => match error {
+                    SamplingError::Protocol { subnetwork_id, .. }
+                    | SamplingError::Deserialize { subnetwork_id, .. }
+                    | SamplingError::BlobNotFound { subnetwork_id, .. } => {
+                        Some(SampleOutcome::Retry(subnetwork_id))
+                    }
+                    _ => None,
+                },
+                SamplingEvent::SamplingRequest { .. } => None,
             },
             _ => None,
         });
