@@ -6,7 +6,7 @@ use std::{fmt::Debug, pin::Pin};
 use futures::Stream;
 use nomos_blend::membership::Membership;
 use nomos_blend_message::sphinx::SphinxMessage;
-use overwatch_rs::overwatch::handle::OverwatchHandle;
+use overwatch::overwatch::handle::OverwatchHandle;
 use rand::RngCore;
 
 /// A trait for blend backends that send messages to the blend network.

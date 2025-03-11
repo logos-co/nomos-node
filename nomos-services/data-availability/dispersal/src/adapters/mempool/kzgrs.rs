@@ -9,7 +9,7 @@ use nomos_da_sampling::backend::DaSamplingServiceBackend;
 use nomos_mempool::{
     backend::MemPool, network::NetworkAdapter as MempoolAdapter, DaMempoolService, MempoolMsg,
 };
-use overwatch_rs::{
+use overwatch::{
     services::{relay::OutboundRelay, ServiceData},
     DynError,
 };

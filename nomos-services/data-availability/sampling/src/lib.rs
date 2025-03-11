@@ -14,7 +14,7 @@ use nomos_da_network_service::{backends::libp2p::common::SamplingEvent, NetworkS
 use nomos_da_verifier::{DaVerifierMsg, DaVerifierService};
 use nomos_storage::StorageService;
 use nomos_tracing::{error_with_id, info_with_id};
-use overwatch_rs::{
+use overwatch::{
     services::{
         relay::{OutboundRelay, Relay, RelayMessage},
         state::{NoOperator, NoState},

@@ -1,7 +1,7 @@
 use std::fmt::Debug;
 
 use log::error;
-use overwatch_rs::services::state::{ServiceState, StateOperator};
+use overwatch::services::state::{ServiceState, StateOperator};
 use serde::{de::DeserializeOwned, Serialize};
 
 use crate::{

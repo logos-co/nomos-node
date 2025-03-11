@@ -6,7 +6,7 @@ use nomos_network::{
     },
     NetworkMsg, NetworkService,
 };
-use overwatch_rs::services::{relay::OutboundRelay, ServiceData};
+use overwatch::services::{relay::OutboundRelay, ServiceData};
 use tokio_stream::wrappers::BroadcastStream;
 
 use crate::network::NetworkAdapter;

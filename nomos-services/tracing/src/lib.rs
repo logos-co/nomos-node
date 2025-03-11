@@ -16,7 +16,7 @@ use nomos_tracing::{
     metrics::otlp::{create_otlp_metrics_layer, OtlpMetricsConfig},
     tracing::otlp::{create_otlp_tracing_layer, OtlpTracingConfig},
 };
-use overwatch_rs::{
+use overwatch::{
     services::{
         life_cycle::LifecycleMessage,
         relay::NoMessage,
@@ -161,7 +161,7 @@ impl ServiceCore for Tracing {
     fn init(
         service_state: OpaqueServiceStateHandle<Self>,
         _init_state: Self::State,
-    ) -> Result<Self, overwatch_rs::DynError> {
+    ) -> Result<Self, overwatch::DynError> {
         #[cfg(test)]
         use std::sync::Once;
         #[cfg(test)]
@@ -249,7 +249,7 @@ impl ServiceCore for Tracing {
         })
     }
 
-    async fn run(self) -> Result<(), overwatch_rs::DynError> {
+    async fn run(self) -> Result<(), overwatch::DynError> {
         let Self {
             service_state,
             logger_guard,

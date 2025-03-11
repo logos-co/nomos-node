@@ -7,7 +7,7 @@ use std::{
 use axum::{routing, Router, Server};
 use nomos_api::{ApiService, ApiServiceSettings, Backend};
 use overwatch_derive::Services;
-use overwatch_rs::{
+use overwatch::{
     overwatch::{handle::OverwatchHandle, OverwatchRunner},
     OpaqueServiceHandle,
 };

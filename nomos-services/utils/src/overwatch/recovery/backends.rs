@@ -1,6 +1,6 @@
 use std::{marker::PhantomData, path::PathBuf};
 
-use overwatch_rs::services::state::ServiceState;
+use overwatch::services::state::ServiceState;
 
 use crate::{
     overwatch::recovery::{

@@ -9,7 +9,7 @@ use nomos_node::{
     config::BlendArgs, Config, CryptarchiaArgs, HttpArgs, LogArgs, NetworkArgs, Nomos,
     NomosServiceSettings, Tx,
 };
-use overwatch_rs::overwatch::OverwatchRunner;
+use overwatch::overwatch::OverwatchRunner;
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]

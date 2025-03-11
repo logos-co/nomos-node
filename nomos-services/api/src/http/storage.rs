@@ -9,7 +9,7 @@ use nomos_storage::{
 use serde::{de::DeserializeOwned, Serialize};
 
 pub async fn block_req<S, Tx>(
-    handle: &overwatch_rs::overwatch::handle::OverwatchHandle,
+    handle: &overwatch::overwatch::handle::OverwatchHandle,
     id: HeaderId,
 ) -> Result<Option<Block<Tx, kzgrs_backend::dispersal::BlobInfo>>, super::DynError>
 where
@@ -27,7 +27,7 @@ where
 }
 
 pub async fn get_shared_commitments<StorageOp, DaBlob>(
-    handle: &overwatch_rs::overwatch::handle::OverwatchHandle,
+    handle: &overwatch::overwatch::handle::OverwatchHandle,
     blob_id: <DaBlob as Blob>::BlobId,
 ) -> Result<Option<<DaBlob as Blob>::SharedCommitments>, super::DynError>
 where
@@ -62,7 +62,7 @@ where
 }
 
 pub async fn get_light_blob<StorageOp, DaBlob>(
-    handle: &overwatch_rs::overwatch::handle::OverwatchHandle,
+    handle: &overwatch::overwatch::handle::OverwatchHandle,
     blob_id: <DaBlob as Blob>::BlobId,
     column_idx: <DaBlob as Blob>::ColumnIndex,
 ) -> Result<Option<<DaBlob as Blob>::LightBlob>, super::DynError>

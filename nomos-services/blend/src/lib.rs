@@ -22,7 +22,7 @@ use nomos_blend::{
 use nomos_blend_message::{sphinx::SphinxMessage, BlendMessage};
 use nomos_core::wire;
 use nomos_network::NetworkService;
-use overwatch_rs::{
+use overwatch::{
     services::{
         relay::{Relay, RelayMessage},
         state::{NoOperator, NoState},
@@ -84,7 +84,7 @@ where
     fn init(
         service_state: OpaqueServiceStateHandle<Self>,
         _init_state: Self::State,
-    ) -> Result<Self, overwatch_rs::DynError> {
+    ) -> Result<Self, overwatch::DynError> {
         let network_relay = service_state.overwatch_handle.relay();
         let blend_config = service_state.settings_reader.get_updated_settings();
         Ok(Self {
@@ -100,7 +100,7 @@ where
         })
     }
 
-    async fn run(mut self) -> Result<(), overwatch_rs::DynError> {
+    async fn run(mut self) -> Result<(), overwatch::DynError> {
         let Self {
             service_state,
             mut backend,

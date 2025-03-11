@@ -2,7 +2,7 @@
 pub mod preload;
 
 use bytes::Bytes;
-use overwatch_rs::DynError;
+use overwatch::DynError;
 
 use crate::KMSOperator;
 

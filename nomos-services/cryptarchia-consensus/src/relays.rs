@@ -14,7 +14,7 @@ use nomos_mempool::{
 };
 use nomos_network::{NetworkMsg, NetworkService};
 use nomos_storage::{backends::StorageBackend, StorageMsg, StorageService};
-use overwatch_rs::services::relay::{OutboundRelay, Relay};
+use overwatch::services::relay::{OutboundRelay, Relay};
 use rand::{RngCore, SeedableRng};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 

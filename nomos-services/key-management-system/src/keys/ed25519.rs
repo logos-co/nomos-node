@@ -1,6 +1,6 @@
 use bytes::Bytes;
 use ed25519_dalek::ed25519::signature::Signer;
-use overwatch_rs::DynError;
+use overwatch::DynError;
 use serde::{Deserialize, Serialize};
 use zeroize::ZeroizeOnDrop;
 

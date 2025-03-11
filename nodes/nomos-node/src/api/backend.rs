@@ -17,7 +17,7 @@ use nomos_da_verifier::backend::VerifierBackend;
 use nomos_libp2p::PeerId;
 use nomos_mempool::{tx::service::openapi::Status, MempoolMetrics};
 use nomos_storage::backends::StorageSerde;
-use overwatch_rs::overwatch::handle::OverwatchHandle;
+use overwatch::overwatch::handle::OverwatchHandle;
 use rand::{RngCore, SeedableRng};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use subnetworks_assignations::MembershipHandler;

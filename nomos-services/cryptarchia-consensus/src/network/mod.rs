@@ -5,7 +5,7 @@ use std::hash::Hash;
 use futures::Stream;
 use nomos_core::block::Block;
 use nomos_network::{backends::NetworkBackend, NetworkService};
-use overwatch_rs::{
+use overwatch::{
     services::{relay::OutboundRelay, ServiceData},
     DynError,
 };

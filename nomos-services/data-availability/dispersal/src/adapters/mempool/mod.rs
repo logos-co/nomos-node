@@ -1,6 +1,6 @@
 pub mod kzgrs;
 
-use overwatch_rs::{
+use overwatch::{
     services::{relay::OutboundRelay, ServiceData},
     DynError,
 };

@@ -34,7 +34,7 @@ use nomos_node::{
     Wire, MB16,
 };
 use overwatch_derive::Services;
-use overwatch_rs::OpaqueServiceHandle;
+use overwatch::OpaqueServiceHandle;
 use rand_chacha::ChaCha20Rng;
 
 pub type ExecutorApiService = ApiService<

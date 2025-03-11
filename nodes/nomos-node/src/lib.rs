@@ -56,7 +56,7 @@ use nomos_time::{backends::system_time::SystemTimeBackend, TimeService};
 #[cfg(feature = "tracing")]
 pub use nomos_tracing_service::Tracing;
 use overwatch_derive::Services;
-use overwatch_rs::OpaqueServiceHandle;
+use overwatch::OpaqueServiceHandle;
 use rand_chacha::ChaCha20Rng;
 use serde::{de::DeserializeOwned, Serialize};
 use subnetworks_assignations::versions::v1::FillFromNodeList;

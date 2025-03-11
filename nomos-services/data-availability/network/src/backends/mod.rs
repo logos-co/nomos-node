@@ -4,7 +4,7 @@ pub mod mock;
 use std::pin::Pin;
 
 use futures::Stream;
-use overwatch_rs::{overwatch::handle::OverwatchHandle, services::state::ServiceState};
+use overwatch::{overwatch::handle::OverwatchHandle, services::state::ServiceState};
 
 use super::Debug;
 
