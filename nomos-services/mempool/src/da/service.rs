@@ -27,7 +27,7 @@ use services_utils::overwatch::lifecycle;
 
 use crate::{backend::MemPool, network::NetworkAdapter, MempoolMetrics, MempoolMsg};
 
-#[allow(clippy::type_complexity)]
+#[expect(clippy::type_complexity, reason = "This is a complex type")]
 pub struct DaMempoolService<
     N,
     P,
