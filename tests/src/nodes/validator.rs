@@ -310,7 +310,7 @@ pub fn create_validator_config(config: GeneralConfig) -> Config {
         da_network: DaNetworkConfig {
             backend: DaNetworkBackendSettings {
                 node_key: config.da_config.node_key,
-                membership: config.da_config.membership,
+                membership: config.da_config.membership.clone(),
                 listening_address: config.da_config.listening_address,
                 policy_settings: DAConnectionPolicySettings {
                     min_dispersal_peers: 0,
@@ -358,10 +358,8 @@ pub fn create_validator_config(config: GeneralConfig) -> Config {
             },
             network_adapter_settings: (),
             api_adapter_settings: ApiAdapterSettings {
-                addresses: vec![Url::parse(
-                    format!("http://{}", config.api_config.address).as_str(),
-                )
-                .unwrap()],
+                membership: config.da_config.membership,
+                api_port: config.api_config.address.port(),
             },
         },
         storage: RocksBackendSettings {

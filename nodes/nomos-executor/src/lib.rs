@@ -58,7 +58,7 @@ pub type ExecutorApiService = ApiService<
         ChaCha20Rng,
         SamplingStorageAdapter<DaBlob, Wire>,
         nomos_time::backends::system_time::SystemTimeBackend,
-        HttApiAdapter,
+        HttApiAdapter<NomosDaMembership>,
         MB16,
     >,
 >;
@@ -73,7 +73,7 @@ pub type DispersalMempoolAdapter = KzgrsMempoolAdapter<
     KzgrsDaVerifier,
     VerifierNetworkAdapter<NomosDaMembership>,
     VerifierStorageAdapter<DaBlob, Wire>,
-    HttApiAdapter,
+    HttApiAdapter<NomosDaMembership>,
 >;
 
 pub type DaDispersal = DispersalService<

@@ -49,7 +49,6 @@ use nomos_node::{
 use nomos_time::{backends::system_time::SystemTimeBackendSettings, TimeServiceSettings};
 use nomos_tracing::logging::local::FileConfig;
 use nomos_tracing_service::LoggerLayer;
-use reqwest::Url;
 use tempfile::NamedTempFile;
 
 use super::{create_tempdir, persist_tempdir, GetRangeReq, CLIENT};
@@ -223,7 +222,7 @@ pub fn create_executor_config(config: GeneralConfig) -> Config {
             backend: DaNetworkExecutorBackendSettings {
                 validator_settings: DaNetworkBackendSettings {
                     node_key: config.da_config.node_key,
-                    membership: config.da_config.membership,
+                    membership: config.da_config.membership.clone(),
                     listening_address: config.da_config.listening_address,
                     policy_settings: config.da_config.policy_settings,
                     monitor_settings: config.da_config.monitor_settings,
@@ -266,10 +265,8 @@ pub fn create_executor_config(config: GeneralConfig) -> Config {
             },
             network_adapter_settings: (),
             api_adapter_settings: ApiAdapterSettings {
-                addresses: vec![Url::parse(
-                    format!("http://{}", config.api_config.address).as_str(),
-                )
-                .unwrap()],
+                membership: config.da_config.membership,
+                api_port: config.api_config.address.port(),
             },
         },
         storage: RocksBackendSettings {

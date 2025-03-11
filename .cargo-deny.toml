@@ -15,6 +15,7 @@ ignore = [
   { id = "RUSTSEC-2024-0436", reason = "`paste` has a security vulnerability; consider using an alternative. Use `cargo tree -p paste -i > tmp.txt` to check the dependency tree." },
   { id = "RUSTSEC-2025-0009", reason = "Some AES functions may panic when overflow checking is enabled. `ring::aead::quic::HeaderProtectionKey::new_mask()` may panic when overflowchecking is enabled." }
   { id = "RUSTSEC-2025-0010", reason = "Versions of ring prior to 0.17 are unmaintained. Additionally, the project's general policy is to only patch the latest release, which is 0.17.12 now. " },
+  { id = "RUSTSEC-2025-0014", reason = "Latest humantime crates.io release is four years old and GitHub repository has not seen commits in four years"}
 ]
 yanked = "deny"
 
