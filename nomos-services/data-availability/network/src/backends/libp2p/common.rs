@@ -78,6 +78,13 @@ impl SamplingEvent {
     }
 }
 
+#[derive(Debug)]
+pub enum PeerRequest {
+    Block(PeerId, oneshot::Sender<bool>),
+    Unblock(PeerId, oneshot::Sender<bool>),
+    BlacklistedPeers(oneshot::Sender<Vec<PeerId>>),
+}
+
 /// Task that handles forwarding of events to the subscriptions channels/stream
 pub(crate) async fn handle_validator_events_stream(
     events_streams: ValidatorEventsStream,
@@ -178,6 +185,17 @@ pub(crate) async fn handle_unblock_peer_request(
 ) {
     if let Err(SendError(cmd)) =
         monitor_request_channel.send(PeerCommand::Unblock(peer_id, response_sender))
+    {
+        error!("Error peer request: {cmd:?}");
+    }
+}
+
+pub(crate) async fn handle_blacklisted_peer_request(
+    monitor_request_channel: &UnboundedSender<PeerCommand>,
+    response_sender: oneshot::Sender<Vec<PeerId>>,
+) {
+    if let Err(SendError(cmd)) =
+        monitor_request_channel.send(PeerCommand::BlacklistedPeers(response_sender))
     {
         error!("Error peer request: {cmd:?}");
     }

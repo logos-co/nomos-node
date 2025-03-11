@@ -15,17 +15,18 @@ use nomos_tracing::info_with_id;
 use overwatch_rs::{overwatch::handle::OverwatchHandle, services::state::NoState};
 use subnetworks_assignations::MembershipHandler;
 use tokio::{
-    sync::{broadcast, mpsc::UnboundedSender, oneshot},
+    sync::{broadcast, mpsc::UnboundedSender},
     task::JoinHandle,
 };
 use tokio_stream::wrappers::BroadcastStream;
 use tracing::instrument;
 
+use super::common::PeerRequest;
 use crate::backends::{
     libp2p::common::{
-        handle_block_peer_request, handle_sample_request, handle_unblock_peer_request,
-        handle_validator_events_stream, DaNetworkBackendSettings, SamplingEvent,
-        BROADCAST_CHANNEL_SIZE,
+        handle_blacklisted_peer_request, handle_block_peer_request, handle_sample_request,
+        handle_unblock_peer_request, handle_validator_events_stream, DaNetworkBackendSettings,
+        SamplingEvent, BROADCAST_CHANNEL_SIZE,
     },
     NetworkBackend,
 };
@@ -38,14 +39,7 @@ pub enum DaNetworkMessage {
         subnetwork_id: SubnetworkId,
         blob_id: BlobId,
     },
-    BlockPeer {
-        peer_id: PeerId,
-        response_sender: oneshot::Sender<bool>,
-    },
-    UnblockPeer {
-        peer_id: PeerId,
-        response_sender: oneshot::Sender<bool>,
-    },
+    PeerRequest(PeerRequest),
 }
 
 /// Events types to subscribe to
@@ -172,21 +166,19 @@ where
                 info_with_id!(&blob_id, "RequestSample");
                 handle_sample_request(&self.sampling_request_channel, subnetwork_id, blob_id).await;
             }
-            DaNetworkMessage::BlockPeer {
-                peer_id,
-                response_sender,
-            } => {
+            DaNetworkMessage::PeerRequest(PeerRequest::Block(peer_id, response_sender)) => {
                 info_with_id!(&peer_id.to_bytes(), "BlockPeer");
                 handle_block_peer_request(&self.peer_request_channel, peer_id, response_sender)
                     .await;
             }
-            DaNetworkMessage::UnblockPeer {
-                peer_id,
-                response_sender,
-            } => {
+            DaNetworkMessage::PeerRequest(PeerRequest::Unblock(peer_id, response_sender)) => {
                 info_with_id!(&peer_id.to_bytes(), "UnblockPeer");
                 handle_unblock_peer_request(&self.peer_request_channel, peer_id, response_sender)
                     .await;
+            }
+            DaNetworkMessage::PeerRequest(PeerRequest::BlacklistedPeers(response_sender)) => {
+                tracing::info!("BlacklistedPeers");
+                handle_blacklisted_peer_request(&self.peer_request_channel, response_sender).await;
             }
         }
     }

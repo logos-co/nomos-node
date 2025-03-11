@@ -39,6 +39,7 @@ pub trait ConnectionMonitor {
 pub enum PeerCommand {
     Block(PeerId, oneshot::Sender<bool>),
     Unblock(PeerId, oneshot::Sender<bool>),
+    BlacklistedPeers(oneshot::Sender<Vec<PeerId>>),
 }
 
 /// A `NetworkBehaviour` that block connections to malicious peers or
@@ -246,6 +247,10 @@ where
                 PeerCommand::Unblock(peer, response) => {
                     let result = self.unblock_peer(peer);
                     let _ = response.send(result);
+                }
+                PeerCommand::BlacklistedPeers(response) => {
+                    let blacklisted_peers = self.malicous_peers.iter().copied().collect();
+                    let _ = response.send(blacklisted_peers);
                 }
             }
         }
