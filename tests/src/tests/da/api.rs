@@ -73,10 +73,11 @@ async fn test_block_peer() {
         .membership
         .members();
 
+    // take second peer ID from the membership set
     let existing_peer_id = membership
         .iter()
-        .next()
-        .expect("Expected at least one member in the set");
+        .nth(1)
+        .expect("Expected at least 2 members in the set");
 
     // try block/unblock peer id combinations
     let blocked = executor.block_peer(existing_peer_id.to_string()).await;
