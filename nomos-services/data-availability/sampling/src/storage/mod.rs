@@ -1,7 +1,7 @@
 pub mod adapters;
 
-use kzgrs_backend::common::ColumnIndex;
-use nomos_core::da::blob::Blob;
+use kzgrs_backend::common::ShareIndex;
+use nomos_core::da::blob::Share;
 use nomos_storage::{backends::StorageBackend, StorageService};
 use overwatch::{
     services::{relay::OutboundRelay, ServiceData},
@@ -12,19 +12,19 @@ use overwatch::{
 pub trait DaStorageAdapter {
     type Backend: StorageBackend + Send + Sync + 'static;
     type Settings: Clone + Send + Sync + 'static;
-    type Blob: Blob + Clone;
+    type Share: Share + Clone;
     async fn new(
         storage_relay: OutboundRelay<<StorageService<Self::Backend> as ServiceData>::Message>,
     ) -> Self;
 
     async fn get_commitments(
         &self,
-        blob_id: <Self::Blob as Blob>::BlobId,
-    ) -> Result<Option<<Self::Blob as Blob>::SharedCommitments>, DynError>;
+        blob_id: <Self::Share as Share>::BlobId,
+    ) -> Result<Option<<Self::Share as Share>::SharesCommitments>, DynError>;
 
-    async fn get_light_blob(
+    async fn get_light_share(
         &self,
-        blob_id: <Self::Blob as Blob>::BlobId,
-        column_idx: ColumnIndex,
-    ) -> Result<Option<<Self::Blob as Blob>::LightBlob>, DynError>;
+        blob_id: <Self::Share as Share>::BlobId,
+        share_idx: ShareIndex,
+    ) -> Result<Option<<Self::Share as Share>::LightShare>, DynError>;
 }

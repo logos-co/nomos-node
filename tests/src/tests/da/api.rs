@@ -1,6 +1,6 @@
 use common_http_client::CommonHttpClient;
-use kzgrs_backend::common::blob::{DaBlob, DaLightBlob};
-use nomos_core::da::blob::Blob;
+use kzgrs_backend::common::share::{DaLightShare, DaShare};
+use nomos_core::da::blob::Share;
 use reqwest::Url;
 use tests::{
     common::da::{disseminate_with_metadata, wait_for_indexed_blob, APP_ID},
@@ -8,7 +8,7 @@ use tests::{
 };
 
 #[tokio::test]
-async fn test_get_blob_data() {
+async fn test_get_share_data() {
     let topology = Topology::spawn(TopologyConfig::validator_and_executor()).await;
     let executor = &topology.executors()[0];
     let num_subnets = executor.config().da_network.backend.num_subnets as usize;
@@ -27,9 +27,9 @@ async fn test_get_blob_data() {
 
     let executor_blobs = executor.get_indexer_range(app_id, from..to).await;
 
-    let blob = executor_blobs
+    let share = executor_blobs
         .iter()
-        .flat_map(|(_, blobs)| blobs)
+        .flat_map(|(_, shares)| shares)
         .next()
         .unwrap();
 
@@ -39,16 +39,20 @@ async fn test_get_blob_data() {
 
     let client = CommonHttpClient::new(None);
     let commitments = client
-        .get_commitments::<DaBlob>(exec_url.clone(), blob.id().try_into().unwrap())
+        .get_commitments::<DaShare>(exec_url.clone(), share.blob_id().try_into().unwrap())
         .await
         .unwrap();
 
     assert!(commitments.is_some());
 
-    let blob_data = client
-        .get_blob::<DaBlob, DaLightBlob>(exec_url, blob.id().try_into().unwrap(), blob.column_idx())
+    let share_data = client
+        .get_share::<DaShare, DaLightShare>(
+            exec_url,
+            share.blob_id().try_into().unwrap(),
+            share.share_idx(),
+        )
         .await
         .unwrap();
 
-    assert!(blob_data.is_some());
+    assert!(share_data.is_some());
 }

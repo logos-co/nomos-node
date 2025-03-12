@@ -2,12 +2,13 @@ pub mod api;
 pub mod config;
 
 use api::backend::AxumBackend;
-use kzgrs_backend::common::blob::DaBlob;
+use kzgrs_backend::common::share::DaShare;
 use nomos_api::ApiService;
 use nomos_blend_service::{
     backends::libp2p::Libp2pBlendBackend as BlendBackend,
     network::libp2p::Libp2pAdapter as BlendNetworkAdapter, BlendService,
 };
+use nomos_core::da::blob::info::DispersedBlobInfo;
 use nomos_da_dispersal::{
     adapters::{
         mempool::kzgrs::KzgrsMempoolAdapter,
@@ -29,9 +30,8 @@ use nomos_da_verifier::{
 use nomos_mempool::backend::mockpool::MockPool;
 use nomos_node::{
     BlobInfo, Cryptarchia, DaIndexer, DaMempool, DaNetworkService, DaSampling, DaVerifier,
-    DispersedBlobInfo, HeaderId, MempoolNetworkAdapter, NetworkBackend, NetworkService,
-    NomosDaMembership, NomosTimeService, RocksBackend, StorageService, SystemSig, Tx, TxMempool,
-    Wire, MB16,
+    HeaderId, MempoolNetworkAdapter, NetworkBackend, NetworkService, NomosDaMembership,
+    NomosTimeService, RocksBackend, StorageService, SystemSig, Tx, TxMempool, Wire, MB16,
 };
 use overwatch::OpaqueServiceHandle;
 use overwatch_derive::Services;
@@ -40,13 +40,13 @@ use rand_chacha::ChaCha20Rng;
 pub type ExecutorApiService = ApiService<
     AxumBackend<
         (),
-        DaBlob,
+        DaShare,
         BlobInfo,
         NomosDaMembership,
         BlobInfo,
         KzgrsDaVerifier,
         VerifierNetworkAdapter<NomosDaMembership>,
-        VerifierStorageAdapter<DaBlob, Wire>,
+        VerifierStorageAdapter<DaShare, Wire>,
         Tx,
         Wire,
         DispersalKZGRSBackend<DispersalNetworkAdapter<NomosDaMembership>, DispersalMempoolAdapter>,
@@ -56,7 +56,7 @@ pub type ExecutorApiService = ApiService<
         KzgrsSamplingBackend<ChaCha20Rng>,
         nomos_da_sampling::network::adapters::executor::Libp2pAdapter<NomosDaMembership>,
         ChaCha20Rng,
-        SamplingStorageAdapter<DaBlob, Wire>,
+        SamplingStorageAdapter<DaShare, Wire>,
         nomos_time::backends::system_time::SystemTimeBackend,
         HttApiAdapter<NomosDaMembership>,
         MB16,
@@ -69,10 +69,10 @@ pub type DispersalMempoolAdapter = KzgrsMempoolAdapter<
     KzgrsSamplingBackend<ChaCha20Rng>,
     nomos_da_sampling::network::adapters::executor::Libp2pAdapter<NomosDaMembership>,
     ChaCha20Rng,
-    SamplingStorageAdapter<DaBlob, Wire>,
+    SamplingStorageAdapter<DaShare, Wire>,
     KzgrsDaVerifier,
     VerifierNetworkAdapter<NomosDaMembership>,
-    VerifierStorageAdapter<DaBlob, Wire>,
+    VerifierStorageAdapter<DaShare, Wire>,
     HttApiAdapter<NomosDaMembership>,
 >;
 

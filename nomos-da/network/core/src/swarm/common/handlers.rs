@@ -1,4 +1,4 @@
-use kzgrs_backend::common::blob::DaBlob;
+use kzgrs_backend::common::share::DaShare;
 use libp2p::PeerId;
 use log::{debug, error};
 use nomos_da_messages::replication;
@@ -16,7 +16,7 @@ use crate::{
 };
 
 pub async fn handle_validator_dispersal_event<Membership>(
-    validation_events_sender: &UnboundedSender<DaBlob>,
+    validation_events_sender: &UnboundedSender<DaShare>,
     replication_behaviour: &mut ReplicationBehaviour<Membership>,
     event: DispersalEvent,
 ) where
@@ -24,12 +24,12 @@ pub async fn handle_validator_dispersal_event<Membership>(
 {
     // Send message for replication
     if let DispersalEvent::IncomingMessage { message } = event {
-        let blob_message = message.blob;
-        if let Err(e) = validation_events_sender.send(blob_message.data.clone()) {
+        let share_message = message.share;
+        if let Err(e) = validation_events_sender.send(share_message.data.clone()) {
             error!("Error sending blob to validation: {e:?}");
         }
         replication_behaviour.send_message(&replication::ReplicationRequest::new(
-            blob_message,
+            share_message,
             message.subnetwork_id,
         ));
     }
@@ -45,11 +45,11 @@ pub async fn handle_sampling_event(
 }
 
 pub async fn handle_replication_event(
-    validation_events_sender: &UnboundedSender<DaBlob>,
+    validation_events_sender: &UnboundedSender<DaShare>,
     event: ReplicationEvent,
 ) {
     if let ReplicationEvent::IncomingMessage { message, .. } = event {
-        if let Err(e) = validation_events_sender.send(message.blob.data) {
+        if let Err(e) = validation_events_sender.send(message.share.data) {
             error!("Error sending blob to validation: {e:?}");
         }
     }

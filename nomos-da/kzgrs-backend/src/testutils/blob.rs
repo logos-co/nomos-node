@@ -1,6 +1,6 @@
 use nomos_core::da::DaEncoder;
 
-use crate::{common::blob::DaBlob, testutils::encoder::get_encoder};
+use crate::{common::share::DaShare, testutils::encoder::get_encoder};
 
 #[must_use]
 pub fn get_default_da_blob_data() -> Vec<u8> {
@@ -10,7 +10,7 @@ pub fn get_default_da_blob_data() -> Vec<u8> {
     ]
 }
 
-pub fn get_da_blob(data: Option<Vec<u8>>) -> DaBlob {
+pub fn get_da_share(data: Option<Vec<u8>>) -> DaShare {
     let encoder = get_encoder();
 
     let data = data.unwrap_or_else(get_default_da_blob_data);
@@ -18,9 +18,9 @@ pub fn get_da_blob(data: Option<Vec<u8>>) -> DaBlob {
     let columns: Vec<_> = encoded_data.extended_data.columns().collect();
 
     let index = 0;
-    let da_blob = DaBlob {
+    let da_share = DaShare {
         column: columns[index].clone(),
-        column_idx: index
+        share_idx: index
             .try_into()
             .expect("Column index shouldn't overflow the target type"),
         column_commitment: encoded_data.column_commitments[index],
@@ -34,5 +34,5 @@ pub fn get_da_blob(data: Option<Vec<u8>>) -> DaBlob {
             .collect(),
     };
 
-    da_blob
+    da_share
 }

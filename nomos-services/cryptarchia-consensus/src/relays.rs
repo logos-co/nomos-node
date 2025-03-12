@@ -129,7 +129,7 @@ where
     SamplingRng: SeedableRng + RngCore,
     SamplingBackend: DaSamplingServiceBackend<SamplingRng, BlobId = DaPool::Key> + Send,
     SamplingBackend::Settings: Clone,
-    SamplingBackend::Blob: Debug,
+    SamplingBackend::Share: Debug,
     SamplingBackend::BlobId: Debug,
     TxS: TxSelect<Tx = ClPool::Item> + Clone + Send + Sync,
     DaVerifierBackend: nomos_da_verifier::backend::VerifierBackend + Send + Sync + 'static,

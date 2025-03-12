@@ -1,7 +1,7 @@
 use std::pin::Pin;
 
 use futures::{Stream, StreamExt};
-use kzgrs_backend::common::{blob::DaBlob, build_blob_id};
+use kzgrs_backend::common::{build_blob_id, share::DaShare};
 use overwatch::{overwatch::handle::OverwatchHandle, services::state::NoState};
 use serde::{Deserialize, Serialize};
 use tokio::sync::{
@@ -37,7 +37,7 @@ pub enum DisperseMessage {
 #[derive(Debug, Clone)]
 pub enum SampleMessage {
     SampleSuccess {
-        blob: Box<DaBlob>,
+        share: Box<DaShare>,
         subnetwork_id: u32,
     },
 }
@@ -53,7 +53,7 @@ pub struct MockConfig;
 
 #[derive(Debug)]
 pub enum Command {
-    Disperse { blob: DaBlob, subnetwork_id: u32 },
+    Disperse { share: DaShare, subnetwork_id: u32 },
 }
 
 #[derive(Clone)]
@@ -86,11 +86,11 @@ impl NetworkBackend for MockExecutorBackend {
     async fn process(&self, msg: Self::Message) {
         match msg {
             Command::Disperse {
-                blob,
+                share,
                 subnetwork_id,
             } => {
                 let blob_id =
-                    build_blob_id(&blob.aggregated_column_commitment, &blob.rows_commitments);
+                    build_blob_id(&share.aggregated_column_commitment, &share.rows_commitments);
 
                 let success_message = DisperseMessage::DispersalSuccess {
                     blob_id,

@@ -85,22 +85,22 @@ where
 #[cfg(test)]
 mod tests {
     use futures::io::BufReader;
-    use kzgrs_backend::testutils::get_da_blob;
+    use kzgrs_backend::testutils::get_da_share;
     use nomos_core::da::BlobId;
 
     use super::*;
     use crate::{
-        common::Blob,
+        common::Share,
         dispersal::{DispersalError, DispersalErrorType, DispersalRequest},
     };
 
     #[tokio::test]
     async fn pack_and_unpack() -> Result<()> {
         let blob_id = BlobId::from([0; 32]);
-        let data = get_da_blob(None);
-        let blob = Blob::new(blob_id, data);
+        let share = get_da_share(None);
+        let share = Share::new(blob_id, share);
         let subnetwork_id = 0;
-        let message = DispersalRequest::new(blob, subnetwork_id);
+        let message = DispersalRequest::new(share, subnetwork_id);
 
         let packed_message = pack(&message)?;
         let unpacked_message: DispersalRequest = unpack(&packed_message)?;
@@ -112,10 +112,10 @@ mod tests {
     #[tokio::test]
     async fn pack_to_writer_and_unpack_from_reader() -> Result<()> {
         let blob_id = BlobId::from([0; 32]);
-        let data = get_da_blob(None);
-        let blob = Blob::new(blob_id, data);
+        let data = get_da_share(None);
+        let share = Share::new(blob_id, data);
         let subnetwork_id = 0;
-        let message = DispersalRequest::new(blob, subnetwork_id);
+        let message = DispersalRequest::new(share, subnetwork_id);
 
         let mut writer = Vec::new();
         pack_to_writer(&message, &mut writer).await?;

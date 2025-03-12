@@ -1,10 +1,10 @@
 use core::fmt;
 
 use kzgrs_backend::{
-    common::blob::DaBlob, global::global_parameters_from_file,
+    common::share::DaShare, global::global_parameters_from_file,
     verifier::DaVerifier as NomosKzgrsVerifier,
 };
-use nomos_core::da::{blob::Blob, DaVerifier};
+use nomos_core::da::{blob::Share, DaVerifier};
 use serde::{Deserialize, Serialize};
 
 use super::VerifierBackend;
@@ -41,19 +41,19 @@ impl VerifierBackend for KzgrsDaVerifier {
 }
 
 impl DaVerifier for KzgrsDaVerifier {
-    type DaBlob = DaBlob;
+    type DaShare = DaShare;
     type Error = KzgrsDaVerifierError;
 
     fn verify(
         &self,
-        commitments: &<Self::DaBlob as Blob>::SharedCommitments,
-        light_blob: &<Self::DaBlob as Blob>::LightBlob,
+        commitments: &<Self::DaShare as Share>::SharesCommitments,
+        light_share: &<Self::DaShare as Share>::LightShare,
     ) -> Result<(), Self::Error> {
         // TODO: Prepare the domain depending the size, if fixed, so fixed domain, if
         // not it needs to come with some metadata.
         let domain_size = 2usize;
         self.verifier
-            .verify(commitments, light_blob, domain_size)
+            .verify(commitments, light_share, domain_size)
             .then_some(())
             .ok_or(KzgrsDaVerifierError::VerificationError)
     }

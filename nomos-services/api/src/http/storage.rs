@@ -1,6 +1,6 @@
-use nomos_core::{block::Block, da::blob::Blob, header::HeaderId};
+use nomos_core::{block::Block, da::blob::Share, header::HeaderId};
 use nomos_da_storage::rocksdb::{
-    create_blob_idx, key_bytes, DA_BLOB_PREFIX, DA_SHARED_COMMITMENTS_PREFIX,
+    create_share_idx, key_bytes, DA_SHARED_COMMITMENTS_PREFIX, DA_SHARE_PREFIX,
 };
 use nomos_storage::{
     backends::{rocksdb::RocksBackend, StorageSerde},
@@ -26,16 +26,16 @@ where
     Ok(receiver.recv().await?)
 }
 
-pub async fn get_shared_commitments<StorageOp, DaBlob>(
+pub async fn get_shared_commitments<StorageOp, DaShare>(
     handle: &overwatch::overwatch::handle::OverwatchHandle,
-    blob_id: <DaBlob as Blob>::BlobId,
-) -> Result<Option<<DaBlob as Blob>::SharedCommitments>, super::DynError>
+    blob_id: <DaShare as Share>::BlobId,
+) -> Result<Option<<DaShare as Share>::SharesCommitments>, super::DynError>
 where
     StorageOp: StorageSerde + Send + Sync + 'static,
-    DaBlob: Blob,
-    <DaBlob as Blob>::BlobId:
+    DaShare: Share,
+    <DaShare as Share>::BlobId:
         AsRef<[u8]> + serde::Serialize + DeserializeOwned + Send + Sync + 'static,
-    <DaBlob as Blob>::SharedCommitments:
+    <DaShare as Share>::SharesCommitments:
         serde::Serialize + DeserializeOwned + Send + Sync + 'static,
     <StorageOp as StorageSerde>::Error: Send + Sync,
 {
@@ -61,17 +61,17 @@ where
         .map_err(super::DynError::from)
 }
 
-pub async fn get_light_blob<StorageOp, DaBlob>(
+pub async fn get_light_share<StorageOp, DaShare>(
     handle: &overwatch::overwatch::handle::OverwatchHandle,
-    blob_id: <DaBlob as Blob>::BlobId,
-    column_idx: <DaBlob as Blob>::ColumnIndex,
-) -> Result<Option<<DaBlob as Blob>::LightBlob>, super::DynError>
+    blob_id: <DaShare as Share>::BlobId,
+    share_idx: <DaShare as Share>::ShareIndex,
+) -> Result<Option<<DaShare as Share>::LightShare>, super::DynError>
 where
     StorageOp: StorageSerde + Send + Sync + 'static,
-    DaBlob: Blob,
-    <DaBlob as Blob>::BlobId: AsRef<[u8]> + DeserializeOwned + Send + Sync + 'static,
-    <DaBlob as Blob>::ColumnIndex: AsRef<[u8]> + DeserializeOwned + Send + Sync + 'static,
-    <DaBlob as Blob>::LightBlob: Serialize + DeserializeOwned,
+    DaShare: Share,
+    <DaShare as Share>::BlobId: AsRef<[u8]> + DeserializeOwned + Send + Sync + 'static,
+    <DaShare as Share>::ShareIndex: AsRef<[u8]> + DeserializeOwned + Send + Sync + 'static,
+    <DaShare as Share>::LightShare: Serialize + DeserializeOwned,
     <StorageOp as StorageSerde>::Error: Send + Sync,
 {
     let relay = handle
@@ -79,12 +79,12 @@ where
         .connect()
         .await?;
 
-    let blob_idx = create_blob_idx(blob_id.as_ref(), column_idx.as_ref());
-    let blob_key = key_bytes(DA_BLOB_PREFIX, blob_idx);
+    let share_idx = create_share_idx(blob_id.as_ref(), share_idx.as_ref());
+    let share_key = key_bytes(DA_SHARE_PREFIX, share_idx);
     let (reply_tx, reply_rcv) = tokio::sync::oneshot::channel();
     relay
         .send(StorageMsg::Load {
-            key: blob_key,
+            key: share_key,
             reply_channel: reply_tx,
         })
         .await

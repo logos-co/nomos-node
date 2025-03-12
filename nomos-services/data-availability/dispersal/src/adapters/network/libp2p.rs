@@ -1,7 +1,7 @@
 use std::{collections::HashSet, fmt::Debug, pin::Pin, time::Duration};
 
 use futures::{stream::BoxStream, Stream, StreamExt};
-use kzgrs_backend::common::blob::DaBlob;
+use kzgrs_backend::common::share::DaShare;
 use nomos_core::da::BlobId;
 use nomos_da_network_core::{
     protocols::{
@@ -90,13 +90,13 @@ where
     async fn disperse(
         &self,
         subnetwork_id: Self::SubnetworkId,
-        da_blob: DaBlob,
+        da_share: DaShare,
     ) -> Result<(), DynError> {
         self.outbound_relay
             .send(DaNetworkMsg::Process(
                 ExecutorDaNetworkMessage::RequestDispersal {
                     subnetwork_id,
-                    da_blob: Box::new(da_blob),
+                    da_share: Box::new(da_share),
                 },
             ))
             .await
@@ -169,8 +169,8 @@ where
 
         let mut stream = tokio_stream::StreamExt::filter_map(stream, move |event| match event {
             DaNetworkEvent::Sampling(event) if event.has_blob_id(&blob_id) => match event {
-                SamplingEvent::SamplingSuccess { light_blob, .. } => {
-                    Some(SampleOutcome::Success(light_blob.column_idx))
+                SamplingEvent::SamplingSuccess { light_share, .. } => {
+                    Some(SampleOutcome::Success(light_share.share_idx))
                 }
                 SamplingEvent::SamplingError { error } => match error {
                     SamplingError::Protocol { subnetwork_id, .. }
