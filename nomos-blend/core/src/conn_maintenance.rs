@@ -23,19 +23,25 @@ pub struct ConnectionMonitorSettings {
     /// peer.
     pub interval: Duration,
     /// The number of effective (data or cover) messages that a peer is expected
-    /// to send in a given time window. If the measured count is greater
-    /// than (expected * (1 + tolerance)), the peer is considered malicious.
-    /// If the measured count is less than (expected * (1 - tolerance)), the
+    /// to send in a given time window.
+    ///
+    /// If the count is greater than (expected * (1 + `malicious_tolerance`)),
+    /// the peer is considered malicious.
+    /// If the count is less than (expected * (1 - `unhealthy_tolerance`)), the
     /// peer is considered unhealthy.
     pub expected_effective_messages: U57F7,
-    pub effective_message_tolerance: U57F7,
-    /// The number of drop messages that a peer is expected to send in a given
-    /// time window. If the measured count is greater than (expected * (1 +
-    /// tolerance)), the peer is considered malicious. If the measured count
-    /// is less than (expected * (1 - tolerance)), the peer is considered
-    /// unhealthy.
+    pub effective_message_malicious_tolerance: U57F7,
+    pub effective_message_unhealthy_tolerance: U57F7,
+    /// The number of drop messages that a peer is expected to send
+    /// in a given time window.
+    ///
+    /// If the count is greater than (expected * (1 + `malicious_tolerance`)),
+    /// the peer is considered malicious.
+    /// If the count is less than (expected * (1 - `unhealthy_tolerance`)),
+    /// the peer is considered unhealthy.
     pub expected_drop_messages: U57F7,
-    pub drop_message_tolerance: U57F7,
+    pub drop_message_malicious_tolerance: U57F7,
+    pub drop_message_unhealthy_tolerance: U57F7,
 }
 
 /// A result of connection monitoring during an interval.
@@ -105,9 +111,9 @@ impl ConnectionMonitor {
     /// messages sent
     fn is_malicious(&self) -> bool {
         let effective_threshold = self.settings.expected_effective_messages
-            * (U57F7::ONE + self.settings.effective_message_tolerance);
+            * (U57F7::ONE + self.settings.effective_message_malicious_tolerance);
         let drop_threshold = self.settings.expected_drop_messages
-            * (U57F7::ONE + self.settings.drop_message_tolerance);
+            * (U57F7::ONE + self.settings.drop_message_malicious_tolerance);
         self.effective_messages > effective_threshold || self.drop_messages > drop_threshold
     }
 
@@ -115,9 +121,9 @@ impl ConnectionMonitor {
     /// messages sent
     fn is_unhealthy(&self) -> bool {
         let effective_threshold = self.settings.expected_effective_messages
-            * (U57F7::ONE - self.settings.effective_message_tolerance);
+            * (U57F7::ONE - self.settings.effective_message_unhealthy_tolerance);
         let drop_threshold = self.settings.expected_drop_messages
-            * (U57F7::ONE - self.settings.drop_message_tolerance);
+            * (U57F7::ONE - self.settings.drop_message_unhealthy_tolerance);
         effective_threshold > self.effective_messages || drop_threshold > self.drop_messages
     }
 }
@@ -135,9 +141,11 @@ mod tests {
             ConnectionMonitorSettings {
                 interval: Duration::from_secs(1),
                 expected_effective_messages: U57F7::from_num(2.0),
-                effective_message_tolerance: U57F7::from_num(0.1),
+                effective_message_malicious_tolerance: U57F7::from_num(0.5),
+                effective_message_unhealthy_tolerance: U57F7::from_num(0.1),
                 expected_drop_messages: U57F7::from_num(1.0),
-                drop_message_tolerance: U57F7::from_num(0.0),
+                drop_message_malicious_tolerance: U57F7::from_num(0.0),
+                drop_message_unhealthy_tolerance: U57F7::from_num(0.0),
             },
             futures::stream::iter(std::iter::repeat(())),
         );
@@ -154,6 +162,7 @@ mod tests {
 
         // Recording more than the expected number of effective messages,
         // expecting the peer to be malicious
+        monitor.record_effective_message();
         monitor.record_effective_message();
         monitor.record_effective_message();
         monitor.record_effective_message();
@@ -200,9 +209,11 @@ mod tests {
             ConnectionMonitorSettings {
                 interval: Duration::from_secs(1),
                 expected_effective_messages: U57F7::from_num(2.0),
-                effective_message_tolerance: U57F7::from_num(0.1),
+                effective_message_malicious_tolerance: U57F7::from_num(0.1),
+                effective_message_unhealthy_tolerance: U57F7::from_num(0.1),
                 expected_drop_messages: U57F7::from_num(1.0),
-                drop_message_tolerance: U57F7::from_num(0.0),
+                drop_message_malicious_tolerance: U57F7::from_num(0.0),
+                drop_message_unhealthy_tolerance: U57F7::from_num(0.0),
             },
             tokio_stream::wrappers::IntervalStream::new(tokio::time::interval_at(
                 tokio::time::Instant::now() + interval,
