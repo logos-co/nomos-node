@@ -38,7 +38,7 @@ use nomos_da_verifier::{
 };
 use nomos_mempool::{backend::mockpool::MockPool, TxMempoolService};
 pub use nomos_mempool::{
-    da::service::{DaMempoolService, DaMempoolSettings},
+    da::{service::DaMempoolService, settings::DaMempoolSettings},
     network::adapters::libp2p::{
         Libp2pAdapter as MempoolNetworkAdapter, Settings as MempoolAdapterSettings,
     },
