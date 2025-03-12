@@ -6,7 +6,7 @@ pub mod verify;
 
 use std::fmt::{Debug, Error, Formatter};
 
-use backend::Status;
+use backend::{MempoolError, Status};
 pub use da::service::{DaMempoolService, DaMempoolSettings};
 use overwatch::services::relay::RelayMessage;
 use tokio::sync::oneshot::Sender;
@@ -16,7 +16,7 @@ pub enum MempoolMsg<BlockId, Payload, Item, Key> {
     Add {
         payload: Payload,
         key: Key,
-        reply_channel: Sender<Result<(), ()>>,
+        reply_channel: Sender<Result<(), MempoolError>>,
     },
     View {
         ancestor_hint: BlockId,
