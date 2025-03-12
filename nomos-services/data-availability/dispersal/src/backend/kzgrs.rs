@@ -8,7 +8,7 @@ use kzgrs_backend::{
 };
 use nomos_core::da::{BlobId, DaDispersal, DaEncoder};
 use nomos_tracing::info_with_id;
-use overwatch_rs::DynError;
+use overwatch::DynError;
 use rand::{seq::IteratorRandom, thread_rng};
 use serde::{Deserialize, Serialize};
 use tokio::time::error::Elapsed;

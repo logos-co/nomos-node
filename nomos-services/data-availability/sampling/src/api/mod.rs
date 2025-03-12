@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use overwatch_rs::DynError;
+use overwatch::DynError;
 use tokio::sync::oneshot;
 
 pub mod http;

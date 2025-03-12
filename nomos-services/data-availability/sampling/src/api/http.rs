@@ -7,7 +7,7 @@ use libp2p_identity::PeerId;
 use multiaddr::Multiaddr;
 use nomos_core::da::BlobId;
 use nomos_da_network_core::SubnetworkId;
-use overwatch_rs::DynError;
+use overwatch::DynError;
 use rand::prelude::IteratorRandom;
 use serde::{Deserialize, Serialize};
 use subnetworks_assignations::MembershipHandler;
@@ -21,11 +21,42 @@ use crate::api::ApiAdapter;
 pub struct ApiAdapterSettings<Membership> {
     pub membership: Membership,
     pub api_port: u16,
+    pub is_secure: bool,
 }
 
 pub struct HttApiAdapter<Membership> {
-    pub clients: Vec<CommonHttpClient>,
+    pub client: CommonHttpClient,
     pub membership: Membership,
+    pub api_port: u16,
+    pub protocol: String,
+}
+
+impl<Membership> HttApiAdapter<Membership>
+where
+    Membership: MembershipHandler<NetworkId = SubnetworkId, Id = PeerId>
+        + Clone
+        + Debug
+        + Send
+        + Sync
+        + 'static,
+{
+    fn random_peer_address(&self) -> Option<Url> {
+        let peer_address = self
+            .membership
+            .members()
+            .iter()
+            .filter_map(|peer| self.membership.get_address(peer))
+            .choose(&mut rand::thread_rng())?;
+
+        let host = get_ip_from_multiaddr(&peer_address)?;
+        match Url::parse(&format!("{}://{host}:{}", self.protocol, self.api_port)) {
+            Ok(url) => Some(url),
+            Err(e) => {
+                error!("Failed to parse URL: {}", e);
+                None
+            }
+        }
+    }
 }
 
 #[async_trait]
@@ -43,27 +74,14 @@ where
     type BlobId = BlobId;
     type Commitments = DaBlobSharedCommitments;
     fn new(settings: Self::Settings) -> Self {
-        // This part will be removed on a later PR when `base_url` is not part of
-        // `client` anymore
-        let clients = settings
-            .membership
-            .members()
-            .iter()
-            .filter_map(|peer_id| {
-                if let Some(address) = settings.membership.get_address(peer_id) {
-                    let ip = get_ip_from_multiaddr(&address).unwrap();
-                    Some(CommonHttpClient::new(
-                        Url::parse(&format!("http://{}:{}", ip, settings.api_port)).unwrap(),
-                        None,
-                    ))
-                } else {
-                    None
-                }
-            })
-            .collect();
         Self {
-            clients,
+            client: CommonHttpClient::new(None),
             membership: settings.membership,
+            api_port: settings.api_port,
+            protocol: settings
+                .is_secure
+                .then(|| "https".to_string())
+                .unwrap_or_else(|| "http".to_string()),
         }
     }
 
@@ -72,14 +90,18 @@ where
         blob_id: Self::BlobId,
         reply_channel: oneshot::Sender<Option<Self::Commitments>>,
     ) -> Result<(), DynError> {
-        let Some(client) = self.clients.iter().choose(&mut rand::thread_rng()) else {
+        let Some(address) = self.random_peer_address() else {
             error!("No clients available");
             if reply_channel.send(None).is_err() {
                 error!("Failed to send commitments reply");
             }
             return Ok(());
         };
-        match client.get_commitments::<Self::Blob>(blob_id).await {
+        match self
+            .client
+            .get_commitments::<Self::Blob>(address, blob_id)
+            .await
+        {
             Ok(commitments) => {
                 if reply_channel.send(commitments).is_err() {
                     error!("Failed to send commitments reply");
@@ -87,6 +109,9 @@ where
             }
             Err(e) => {
                 error!("Failed to get commitments: {}", e);
+                if reply_channel.send(None).is_err() {
+                    error!("Failed to send commitments reply");
+                }
             }
         }
 

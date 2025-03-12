@@ -7,7 +7,7 @@ use std::{
 use bytes::Bytes;
 use futures::StreamExt;
 use log::error;
-use overwatch_rs::{
+use overwatch::{
     services::{
         relay::RelayMessage,
         state::{NoOperator, NoState},

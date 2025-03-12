@@ -2,7 +2,7 @@ pub mod adapters;
 
 use futures::Stream;
 use nomos_da_network_service::{backends::NetworkBackend, NetworkService};
-use overwatch_rs::services::{relay::OutboundRelay, ServiceData};
+use overwatch::services::{relay::OutboundRelay, ServiceData};
 
 #[async_trait::async_trait]
 pub trait NetworkAdapter {

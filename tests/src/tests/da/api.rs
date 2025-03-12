@@ -37,16 +37,16 @@ async fn test_get_blob_data() {
         Url::parse(format!("http://{}", executor.config().http.backend_settings.address).as_str())
             .unwrap();
 
-    let client = CommonHttpClient::new(exec_url, None);
+    let client = CommonHttpClient::new(None);
     let commitments = client
-        .get_commitments::<DaBlob>(blob.id().try_into().unwrap())
+        .get_commitments::<DaBlob>(exec_url.clone(), blob.id().try_into().unwrap())
         .await
         .unwrap();
 
     assert!(commitments.is_some());
 
     let blob_data = client
-        .get_blob::<DaBlob, DaLightBlob>(blob.id().try_into().unwrap(), blob.column_idx())
+        .get_blob::<DaBlob, DaLightBlob>(exec_url, blob.id().try_into().unwrap(), blob.column_idx())
         .await
         .unwrap();
 

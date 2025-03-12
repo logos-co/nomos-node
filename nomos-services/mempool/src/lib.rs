@@ -8,7 +8,7 @@ use std::fmt::{Debug, Error, Formatter};
 
 use backend::Status;
 pub use da::service::{DaMempoolService, DaMempoolSettings};
-use overwatch_rs::services::relay::RelayMessage;
+use overwatch::services::relay::RelayMessage;
 use tokio::sync::oneshot::Sender;
 pub use tx::{service::TxMempoolService, settings::TxMempoolSettings};
 

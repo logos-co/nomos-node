@@ -10,7 +10,7 @@ use nomos_da_dispersal::{
 use nomos_da_network_core::SubnetworkId;
 use nomos_libp2p::PeerId;
 use nomos_node::make_request_and_return_response;
-use overwatch_rs::overwatch::handle::OverwatchHandle;
+use overwatch::overwatch::handle::OverwatchHandle;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use subnetworks_assignations::MembershipHandler;
 

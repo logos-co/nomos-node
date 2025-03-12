@@ -8,7 +8,7 @@ pub enum MempoolError {
     #[error("Item already in mempool")]
     ExistingItem,
     #[error(transparent)]
-    DynamicPoolError(#[from] overwatch_rs::DynError),
+    DynamicPoolError(#[from] overwatch::DynError),
 }
 
 pub trait MemPool {

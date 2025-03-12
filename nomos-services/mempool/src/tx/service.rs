@@ -8,7 +8,7 @@ use std::{fmt::Debug, marker::PhantomData};
 
 use futures::StreamExt;
 use nomos_network::{NetworkMsg, NetworkService};
-use overwatch_rs::{
+use overwatch::{
     services::{
         handle::ServiceStateHandle, relay::OutboundRelay, ServiceCore, ServiceData, ServiceId,
     },
@@ -110,7 +110,7 @@ where
     fn init(
         service_state: ServiceStateHandle<Self::Message, Self::Settings, Self::State>,
         init_state: Self::State,
-    ) -> Result<Self, overwatch_rs::DynError> {
+    ) -> Result<Self, overwatch::DynError> {
         tracing::trace!(
             "Initializing TxMempoolService with initial state {:#?}",
             init_state.pool
@@ -124,7 +124,7 @@ where
         Ok(Self::new(recovered_pool, service_state))
     }
 
-    async fn run(mut self) -> Result<(), overwatch_rs::DynError> {
+    async fn run(mut self) -> Result<(), overwatch::DynError> {
         let network_service_relay = self
             .service_state_handle
             .overwatch_handle

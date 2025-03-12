@@ -4,7 +4,7 @@ use std::hash::Hash;
 
 use nomos_blend_service::{backends::BlendBackend, network::NetworkAdapter, BlendService};
 use nomos_core::block::Block;
-use overwatch_rs::services::{relay::OutboundRelay, ServiceData};
+use overwatch::services::{relay::OutboundRelay, ServiceData};
 use serde::{de::DeserializeOwned, Serialize};
 
 #[async_trait::async_trait]

@@ -267,6 +267,7 @@ pub fn create_executor_config(config: GeneralConfig) -> Config {
             api_adapter_settings: ApiAdapterSettings {
                 membership: config.da_config.membership,
                 api_port: config.api_config.address.port(),
+                is_secure: false,
             },
         },
         storage: RocksBackendSettings {

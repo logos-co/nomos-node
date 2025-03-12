@@ -5,7 +5,7 @@ use futures::Stream;
 use kzgrs_backend::common::blob::DaBlob;
 use nomos_core::da::BlobId;
 use nomos_da_network_core::SubnetworkId;
-use overwatch_rs::{
+use overwatch::{
     services::{relay::OutboundRelay, ServiceData},
     DynError,
 };

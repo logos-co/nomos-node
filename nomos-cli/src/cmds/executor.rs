@@ -40,7 +40,7 @@ impl Disseminate {
             .username
             .map(|u| BasicAuthCredentials::new(u, self.password.clone()));
 
-        let client = ExecutorHttpClient::new(self.addr, basic_auth);
+        let client = ExecutorHttpClient::new(basic_auth);
 
         let mut bytes: Vec<u8> = if let Some(data) = &self.data {
             data.clone().into_bytes()
@@ -63,7 +63,9 @@ impl Disseminate {
         let metadata = Metadata::new(app_id, self.index.into());
 
         let (res_sender, res_receiver) = std::sync::mpsc::channel();
-        std::thread::spawn(move || disperse_data(&res_sender, &client, bytes, metadata));
+        std::thread::spawn(move || {
+            disperse_data(&res_sender, &client, self.addr.clone(), bytes, metadata);
+        });
 
         match res_receiver.recv() {
             Ok(update) => match update {
@@ -88,11 +90,12 @@ impl Disseminate {
 async fn disperse_data(
     res_sender: &Sender<Result<(), String>>,
     client: &ExecutorHttpClient,
+    base_url: Url,
     bytes: Vec<u8>,
     metadata: Metadata,
 ) {
     let res = client
-        .publish_blob(bytes, metadata)
+        .publish_blob(base_url, bytes, metadata)
         .await
         .map_err(|err| format!("Failed to publish blob: {err:?}"));
     res_sender.send(res).unwrap();

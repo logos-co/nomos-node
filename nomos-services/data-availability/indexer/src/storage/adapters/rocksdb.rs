@@ -18,7 +18,7 @@ use nomos_storage::{
     backends::{rocksdb::RocksBackend, StorageSerde},
     StorageMsg, StorageService,
 };
-use overwatch_rs::{
+use overwatch::{
     services::{relay::OutboundRelay, ServiceData},
     DynError,
 };

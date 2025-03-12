@@ -14,7 +14,7 @@ use nomos_core::da::blob::Blob;
 use nomos_da_network_service::NetworkService;
 use nomos_storage::StorageService;
 use nomos_tracing::info_with_id;
-use overwatch_rs::{
+use overwatch::{
     services::{
         relay::{Relay, RelayMessage},
         state::{NoOperator, NoState},

@@ -16,7 +16,7 @@ use nomos_da_network_core::{
 };
 use nomos_libp2p::ed25519;
 use nomos_tracing::info_with_id;
-use overwatch_rs::{overwatch::handle::OverwatchHandle, services::state::NoState};
+use overwatch::{overwatch::handle::OverwatchHandle, services::state::NoState};
 use serde::{Deserialize, Serialize};
 use subnetworks_assignations::MembershipHandler;
 use tokio::{
