@@ -75,9 +75,9 @@ where
         }
     }
 
-    fn try_wake(&mut self) {
-        if let Some(waker) = self.waker.take() {
-            waker.wake();
+    fn try_wake(&self) {
+        if let Some(waker) = &self.waker {
+            waker.wake_by_ref();
         }
     }
 
@@ -236,9 +236,9 @@ where
                 peer_id: peer,
                 connection: CloseConnection::All,
             });
-        }
+        }SS
 
-        if let Ok(cmd) = self.peer_receiver.try_recv() {
+        if let Poll::Ready(Some(cmd)) = self.peer_receiver.poll_recv(cx) {
             match cmd {
                 PeerCommand::Block(peer, response) => {
                     let result = self.block_peer(peer);
@@ -262,17 +262,18 @@ where
 
 #[cfg(test)]
 mod tests {
-    use std::{collections::HashMap, time::Duration};
+    use std::{collections::HashMap, task::Context, time::Duration};
 
     use libp2p::{
-        swarm::{dial_opts::DialOpts, DialError, ListenError, SwarmEvent},
+        swarm::{dial_opts::DialOpts, DialError, ListenError, NetworkBehaviour, SwarmEvent},
         PeerId, Swarm,
     };
     use libp2p_swarm_test::SwarmExt;
+    use tokio::sync::oneshot;
 
     use crate::maintenance::monitor::{
         Blocked, ConnectionMonitor, ConnectionMonitorBehaviour, ConnectionMonitorOutput,
-        PeerStatus, TemporarilyBlocked,
+        PeerCommand, PeerStatus, TemporarilyBlocked,
     };
 
     #[derive(Default)]
@@ -375,6 +376,44 @@ mod tests {
             })
             .await;
         assert!(cause.downcast::<Blocked>().is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_block_unblock_peer() {
+        let mut dialer = Swarm::new_ephemeral_tokio(|_| {
+            ConnectionMonitorBehaviour::new(MockMonitor::default(), Duration::from_millis(100))
+        });
+        let mut listener = Swarm::new_ephemeral_tokio(|_| {
+            ConnectionMonitorBehaviour::new(MockMonitor::default(), Duration::from_millis(100))
+        });
+        listener.listen().with_memory_addr_external().await;
+
+        let listener_peer = *listener.local_peer_id();
+
+        let connection_behavior_dialer = dialer.behaviour_mut();
+        let sender_channel = connection_behavior_dialer.peer_request_channel();
+
+        let response_channel = oneshot::channel();
+
+        sender_channel
+            .send(PeerCommand::Block(listener_peer, response_channel.0))
+            .unwrap();
+
+        let mut cx = Context::from_waker(futures::task::noop_waker_ref());
+
+        // Poll the behavior directly
+        for _ in 0..5 {
+            let _ = dialer.behaviour_mut().poll(&mut cx);
+            // Optional sleep between polls
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+
+        // Check response
+        match tokio::time::timeout(Duration::from_millis(100), response_channel.1).await {
+            Ok(Ok(result)) => assert!(result),
+            Ok(Err(_)) => panic!("Response channel closed"),
+            Err(_) => panic!("Test timed out"),
+        }
     }
 
     fn dial(
