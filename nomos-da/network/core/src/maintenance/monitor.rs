@@ -409,11 +409,11 @@ mod tests {
         }
 
         // Check response
-        match tokio::time::timeout(Duration::from_millis(100), response_channel.1).await {
-            Ok(Ok(result)) => assert!(result),
-            Ok(Err(_)) => panic!("Response channel closed"),
-            Err(_) => panic!("Test timed out"),
-        }
+        let result = tokio::time::timeout(Duration::from_millis(100), response_channel.1)
+            .await
+            .expect("Test timed out")
+            .expect("Response channel closed");
+        assert!(result);
     }
 
     fn dial(

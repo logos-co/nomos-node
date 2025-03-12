@@ -1,5 +1,3 @@
-use std::time::Duration;
-
 use common_http_client::CommonHttpClient;
 use kzgrs_backend::common::blob::{DaBlob, DaLightBlob};
 use nomos_core::da::blob::Blob;
