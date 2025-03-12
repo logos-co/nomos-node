@@ -39,6 +39,7 @@ pub async fn wait_for_indexed_blob(
                 .filter(|(i, _)| i == &from)
                 .flat_map(|(_, blobs)| blobs)
                 .count();
+            tokio::time::sleep(Duration::from_millis(100)).await;
         }
     };
 

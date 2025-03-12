@@ -14,11 +14,13 @@ use rand::{RngCore, SeedableRng};
 use serde::{Deserialize, Serialize};
 use tokio::sync::oneshot;
 
+use super::DynError;
+
 pub async fn add_tx<N, A, Item, Key>(
     handle: &overwatch::overwatch::handle::OverwatchHandle,
     item: Item,
     converter: impl Fn(&Item) -> Key,
-) -> Result<(), super::DynError>
+) -> Result<(), DynError>
 where
     N: NetworkBackend,
     A: NetworkAdapter<Backend = N, Payload = Item, Key = Key> + Send + Sync + 'static,
@@ -41,11 +43,7 @@ where
         .await
         .map_err(|(e, _)| e)?;
 
-    match receiver.await {
-        Ok(Ok(())) => Ok(()),
-        Ok(Err(())) => Err("mempool error".into()),
-        Err(e) => Err(e.into()),
-    }
+    receiver.await?.map_err(DynError::from)
 }
 
 pub async fn add_blob_info<
@@ -65,7 +63,7 @@ pub async fn add_blob_info<
     handle: &overwatch::overwatch::handle::OverwatchHandle,
     item: A::Payload,
     converter: impl Fn(&A::Payload) -> Key,
-) -> Result<(), super::DynError>
+) -> Result<(), DynError>
 where
     N: NetworkBackend,
     A: NetworkAdapter<Backend = N, Key = Key> + Send + Sync + 'static,
@@ -113,9 +111,5 @@ where
         .await
         .map_err(|(e, _)| e)?;
 
-    match receiver.await {
-        Ok(Ok(())) => Ok(()),
-        Ok(Err(())) => Err("mempool error".into()),
-        Err(e) => Err(e.into()),
-    }
+    receiver.await?.map_err(DynError::from)
 }

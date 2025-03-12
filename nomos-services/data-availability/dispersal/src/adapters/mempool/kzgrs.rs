@@ -9,14 +9,11 @@ use nomos_da_sampling::backend::DaSamplingServiceBackend;
 use nomos_mempool::{
     backend::MemPool, network::NetworkAdapter as MempoolAdapter, DaMempoolService, MempoolMsg,
 };
-use overwatch::{
-    services::{relay::OutboundRelay, ServiceData},
-    DynError,
-};
+use overwatch::services::{relay::OutboundRelay, ServiceData};
 use rand::{RngCore, SeedableRng};
 use tokio::sync::oneshot;
 
-use super::DaMempoolAdapter;
+use super::{DaMempoolAdapter, DaMempoolAdapterError};
 
 type MempoolRelay<Payload, Item, Key> = OutboundRelay<MempoolMsg<HeaderId, Payload, Item, Key>>;
 
@@ -123,7 +120,7 @@ where
         &self,
         blob_id: Self::BlobId,
         metadata: Self::Metadata,
-    ) -> Result<(), DynError> {
+    ) -> Result<(), DaMempoolAdapterError> {
         let (reply_channel, receiver) = oneshot::channel();
         self.mempool_relay
             .send(MempoolMsg::Add {
@@ -132,11 +129,8 @@ where
                 reply_channel,
             })
             .await
-            .map_err(|(e, _)| Box::new(e) as DynError)?;
+            .map_err(|(e, _)| DaMempoolAdapterError::from(e))?;
 
-        receiver
-            .await
-            .map_err(|e| Box::new(e) as DynError)?
-            .map_err(|()| "Failed to receive response from the mempool".into())
+        receiver.await?.map_err(DaMempoolAdapterError::Mempool)
     }
 }
