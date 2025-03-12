@@ -13,13 +13,15 @@ use nomos_core::{
 };
 use nomos_da_dispersal::adapters::mempool::DaMempoolAdapter;
 use nomos_da_network_core::SubnetworkId;
+use nomos_da_network_service::backends::libp2p::executor::DaNetworkExecutorBackend;
 use nomos_da_sampling::backend::DaSamplingServiceBackend;
 use nomos_da_verifier::backend::VerifierBackend;
 use nomos_libp2p::PeerId;
 use nomos_mempool::{tx::service::openapi::Status, MempoolMetrics};
 use nomos_node::api::handlers::{
-    add_blob, add_blob_info, add_tx, block, cl_metrics, cl_status, cryptarchia_headers,
-    cryptarchia_info, da_get_commitments, da_get_light_blob, get_range, libp2p_info,
+    add_blob, add_blob_info, add_tx, blacklisted_peers, block, block_peer, cl_metrics, cl_status,
+    cryptarchia_headers, cryptarchia_info, da_get_commitments, da_get_light_blob, get_range,
+    libp2p_info, unblock_peer,
 };
 use nomos_storage::backends::StorageSerde;
 use overwatch::overwatch::handle::OverwatchHandle;
@@ -355,6 +357,18 @@ where
                         SIZE,
                     >,
                 ),
+            )
+            .route(
+                paths::DA_BLOCK_PEER,
+                routing::post(block_peer::<DaNetworkExecutorBackend<Membership>>),
+            )
+            .route(
+                paths::DA_UNBLOCK_PEER,
+                routing::post(unblock_peer::<DaNetworkExecutorBackend<Membership>>),
+            )
+            .route(
+                paths::DA_BLACKLISTED_PEERS,
+                routing::get(blacklisted_peers::<DaNetworkExecutorBackend<Membership>>),
             )
             .route(paths::NETWORK_INFO, routing::get(libp2p_info))
             .route(

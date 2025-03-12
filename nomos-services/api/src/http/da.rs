@@ -21,6 +21,15 @@ use nomos_da_indexer::{
     storage::adapters::rocksdb::RocksAdapter as IndexerStorageAdapter, DaMsg, DataIndexerService,
 };
 use nomos_da_network_core::SubnetworkId;
+use nomos_da_network_service::{
+    backends::{
+        libp2p::{
+            common::MonitorCommand, executor::ExecutorDaNetworkMessage, validator::DaNetworkMessage,
+        },
+        NetworkBackend,
+    },
+    DaNetworkMsg, NetworkService,
+};
 use nomos_da_sampling::backend::DaSamplingServiceBackend;
 use nomos_da_verifier::{
     backend::VerifierBackend, network::adapters::validator::Libp2pAdapter,
@@ -87,6 +96,8 @@ pub type DaVerifier<Blob, Membership, VerifierBackend, StorageSerializer> = DaVe
 
 pub type DaDispersal<Backend, NetworkAdapter, MempoolAdapter, Membership, Metadata> =
     DispersalService<Backend, NetworkAdapter, MempoolAdapter, Membership, Metadata>;
+
+pub type DaNetwork<Backend> = NetworkService<Backend>;
 
 pub async fn add_blob<A, B, M, VB, SS>(
     handle: &OverwatchHandle,
@@ -268,4 +279,90 @@ where
         .map_err(|(e, _)| e)?;
 
     receiver.await?
+}
+
+pub async fn block_peer<B>(handle: &OverwatchHandle, peer_id: PeerId) -> Result<bool, DynError>
+where
+    B: NetworkBackend + 'static + Send,
+    B::Message: PeerMessagesBuilder,
+{
+    let relay = handle.relay::<NetworkService<B>>().connect().await?;
+    let (sender, receiver) = oneshot::channel();
+    let message = B::Message::create_block_message(peer_id, sender);
+    relay
+        .send(DaNetworkMsg::Process(message))
+        .await
+        .map_err(|(e, _)| e)?;
+    Ok(receiver.await?)
+}
+
+pub async fn unblock_peer<B>(handle: &OverwatchHandle, peer_id: PeerId) -> Result<bool, DynError>
+where
+    B: NetworkBackend + 'static + Send,
+    B::Message: PeerMessagesBuilder,
+{
+    let relay = handle.relay::<NetworkService<B>>().connect().await?;
+    let (sender, receiver) = oneshot::channel();
+    let message = B::Message::create_unblock_message(peer_id, sender);
+    relay
+        .send(DaNetworkMsg::Process(message))
+        .await
+        .map_err(|(e, _)| e)?;
+    Ok(receiver.await?)
+}
+
+pub async fn blacklisted_peers<B>(handle: &OverwatchHandle) -> Result<Vec<PeerId>, DynError>
+where
+    B: NetworkBackend + 'static + Send,
+    B::Message: PeerMessagesBuilder,
+{
+    let relay = handle.relay::<NetworkService<B>>().connect().await?;
+    let (sender, receiver) = oneshot::channel();
+    let message = B::Message::create_blacklisted_message(sender);
+    relay
+        .send(DaNetworkMsg::Process(message))
+        .await
+        .map_err(|(e, _)| e)?;
+    Ok(receiver.await?)
+}
+
+// Builder for generating messages for peers (validator and executor).
+pub trait PeerMessagesBuilder {
+    type MessageType;
+
+    fn create_block_message(peer_id: PeerId, sender: oneshot::Sender<bool>) -> Self;
+    fn create_unblock_message(peer_id: PeerId, sender: oneshot::Sender<bool>) -> Self;
+    fn create_blacklisted_message(sender: oneshot::Sender<Vec<PeerId>>) -> Self;
+}
+
+impl PeerMessagesBuilder for DaNetworkMessage {
+    type MessageType = Self;
+
+    fn create_block_message(peer_id: PeerId, sender: oneshot::Sender<bool>) -> Self {
+        Self::PeerRequest(MonitorCommand::BlockPeer(peer_id, sender))
+    }
+
+    fn create_unblock_message(peer_id: PeerId, sender: oneshot::Sender<bool>) -> Self {
+        Self::PeerRequest(MonitorCommand::UnblockPeer(peer_id, sender))
+    }
+
+    fn create_blacklisted_message(sender: oneshot::Sender<Vec<PeerId>>) -> Self {
+        Self::PeerRequest(MonitorCommand::BlacklistedPeers(sender))
+    }
+}
+
+impl PeerMessagesBuilder for ExecutorDaNetworkMessage {
+    type MessageType = Self;
+
+    fn create_block_message(peer_id: PeerId, sender: oneshot::Sender<bool>) -> Self {
+        Self::PeerRequest(MonitorCommand::BlockPeer(peer_id, sender))
+    }
+
+    fn create_unblock_message(peer_id: PeerId, sender: oneshot::Sender<bool>) -> Self {
+        Self::PeerRequest(MonitorCommand::UnblockPeer(peer_id, sender))
+    }
+
+    fn create_blacklisted_message(sender: oneshot::Sender<Vec<PeerId>>) -> Self {
+        Self::PeerRequest(MonitorCommand::BlacklistedPeers(sender))
+    }
 }
