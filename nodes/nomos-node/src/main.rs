@@ -63,14 +63,15 @@ fn main() -> Result<()> {
                     topic: String::from(nomos_node::CL_TOPIC),
                     id: <Tx as Transaction>::hash,
                 },
-                recovery_path: config.mempool.recovery_path,
+                recovery_path: config.mempool.cl_pool_recovery_path,
             },
             da_mempool: nomos_mempool::DaMempoolSettings {
-                backend: (),
-                network: AdapterSettings {
+                pool: (),
+                network_adapter: AdapterSettings {
                     topic: String::from(nomos_node::DA_TOPIC),
                     id: <BlobInfo as DispersedBlobInfo>::blob_id,
                 },
+                recovery_path: config.mempool.da_pool_recovery_path,
             },
             da_network: config.da_network,
             da_indexer: config.da_indexer,

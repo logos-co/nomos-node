@@ -286,7 +286,8 @@ pub fn create_executor_config(config: GeneralConfig) -> Config {
             },
         },
         mempool: MempoolConfig {
-            recovery_path: "./recovery/mempool.json".into(),
+            cl_pool_recovery_path: "./recovery/cl_mempool.json".into(),
+            da_pool_recovery_path: "./recovery/da_mempool.json".into(),
         },
     }
 }

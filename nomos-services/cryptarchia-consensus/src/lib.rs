@@ -24,9 +24,8 @@ use nomos_da_sampling::{
 };
 use nomos_ledger::{leader_proof::LeaderProof, LedgerState};
 use nomos_mempool::{
-    backend::{MemPool, RecoverableMempool},
-    network::NetworkAdapter as MempoolAdapter,
-    GenericDaMempoolService, MempoolMsg, TxMempoolService,
+    backend::RecoverableMempool, network::NetworkAdapter as MempoolAdapter, DaMempoolService,
+    MempoolMsg, TxMempoolService,
 };
 use nomos_network::NetworkService;
 use nomos_storage::{backends::StorageBackend, StorageMsg, StorageService};
@@ -177,7 +176,8 @@ pub struct CryptarchiaConsensus<
     ClPool::Item: Clone + Eq + Hash + Debug + 'static,
     ClPool::Key: Debug + 'static,
     ClPoolAdapter: MempoolAdapter<Payload = ClPool::Item, Key = ClPool::Key>,
-    DaPool: MemPool<BlockId = HeaderId>,
+    DaPool: RecoverableMempool<BlockId = HeaderId>,
+    DaPool::RecoveryState: Serialize + for<'de> Deserialize<'de>,
     DaPool::Item: Clone + Eq + Hash + Debug + 'static,
     DaPool::Key: Debug + 'static,
     DaPool::Settings: Clone,
@@ -212,7 +212,7 @@ pub struct CryptarchiaConsensus<
         Relay<nomos_blend_service::BlendService<BlendAdapter::Backend, BlendAdapter::Network>>,
     cl_mempool_relay: Relay<TxMempoolService<ClPoolAdapter, ClPool>>,
     da_mempool_relay: Relay<
-        GenericDaMempoolService<
+        DaMempoolService<
             DaPoolAdapter,
             DaPool,
             SamplingBackend,
@@ -293,7 +293,8 @@ where
     ClPool::Item: Clone + Eq + Hash + Debug,
     ClPool::Key: Debug,
     ClPoolAdapter: MempoolAdapter<Payload = ClPool::Item, Key = ClPool::Key>,
-    DaPool: MemPool<BlockId = HeaderId>,
+    DaPool: RecoverableMempool<BlockId = HeaderId>,
+    DaPool::RecoveryState: Serialize + for<'de> Deserialize<'de>,
     DaPool::Item: Clone + Eq + Hash + Debug,
     DaPool::Key: Debug,
     DaPool::Settings: Clone,
@@ -395,7 +396,11 @@ where
     ClPool: RecoverableMempool<BlockId = HeaderId> + Send + Sync + 'static,
     ClPool::RecoveryState: Serialize + for<'de> Deserialize<'de>,
     ClPool::Settings: Clone + Send + Sync + 'static,
-    DaPool: MemPool<BlockId = HeaderId, Key = SamplingBackend::BlobId> + Send + Sync + 'static,
+    DaPool: RecoverableMempool<BlockId = HeaderId, Key = SamplingBackend::BlobId>
+        + Send
+        + Sync
+        + 'static,
+    DaPool::RecoveryState: Serialize + for<'de> Deserialize<'de>,
     DaPool::Settings: Clone + Send + Sync + 'static,
     ClPool::Item: Transaction<Hash = ClPool::Key>
         + Debug
@@ -741,7 +746,11 @@ where
         + Send
         + Sync
         + 'static,
-    DaPool: MemPool<BlockId = HeaderId, Key = SamplingBackend::BlobId> + Send + Sync + 'static,
+    DaPool: RecoverableMempool<BlockId = HeaderId, Key = SamplingBackend::BlobId>
+        + Send
+        + Sync
+        + 'static,
+    DaPool::RecoveryState: Serialize + for<'de> Deserialize<'de>,
     DaPool::Settings: Clone + Send + Sync + 'static,
     TxS: TxSelect<Tx = ClPool::Item> + Clone + Send + Sync + 'static,
     TxS::Settings: Send,

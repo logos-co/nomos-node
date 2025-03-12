@@ -6,7 +6,7 @@ use nomos_da_sampling::{
 };
 use nomos_da_verifier::backend::VerifierBackend;
 use nomos_mempool::{
-    backend::mockpool::MockPool, network::NetworkAdapter, GenericDaMempoolService, MempoolMsg,
+    backend::mockpool::MockPool, network::NetworkAdapter, DaMempoolService, MempoolMsg,
     TxMempoolService,
 };
 use nomos_network::backends::NetworkBackend;
@@ -69,8 +69,8 @@ where
     A: NetworkAdapter<Backend = N, Key = Key> + Send + Sync + 'static,
     A::Payload: DispersedBlobInfo + Into<Item> + Debug,
     A::Settings: Send + Sync,
-    Item: Clone + Debug + Send + Sync + 'static + Hash,
-    Key: Clone + Debug + Ord + Hash + Send + 'static,
+    Item: Clone + Debug + Send + Sync + 'static + Hash + Serialize + for<'de> Deserialize<'de>,
+    Key: Clone + Debug + Ord + Hash + Send + Serialize + for<'de> Deserialize<'de> + 'static,
     SamplingBackend: DaSamplingServiceBackend<SamplingRng, BlobId = Key> + Send,
     SamplingBackend::BlobId: Debug,
     SamplingBackend::Blob: Debug + 'static,
@@ -86,7 +86,7 @@ where
     ApiAdapter: nomos_da_sampling::api::ApiAdapter + Send + Sync,
 {
     let relay = handle
-        .relay::<GenericDaMempoolService<
+        .relay::<DaMempoolService<
             A,
             MockPool<HeaderId, Item, Key>,
             SamplingBackend,

@@ -62,14 +62,15 @@ fn main() -> Result<()> {
                     topic: String::from(CL_TOPIC),
                     id: <Tx as Transaction>::hash,
                 },
-                recovery_path: config.mempool.recovery_path,
+                recovery_path: config.mempool.cl_pool_recovery_path,
             },
             da_mempool: DaMempoolSettings {
-                backend: (),
-                network: MempoolAdapterSettings {
+                pool: (),
+                network_adapter: MempoolAdapterSettings {
                     topic: String::from(DA_TOPIC),
                     id: <BlobInfo as DispersedBlobInfo>::blob_id,
                 },
+                recovery_path: config.mempool.da_pool_recovery_path,
             },
             da_dispersal: config.da_dispersal,
             da_network: config.da_network,

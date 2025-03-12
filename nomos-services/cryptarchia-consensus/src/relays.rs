@@ -10,7 +10,7 @@ use nomos_da_sampling::{backend::DaSamplingServiceBackend, DaSamplingService};
 use nomos_mempool::{
     backend::{MemPool, RecoverableMempool},
     network::NetworkAdapter as MempoolAdapter,
-    GenericDaMempoolService, TxMempoolService,
+    DaMempoolService, TxMempoolService,
 };
 use nomos_network::{NetworkMsg, NetworkService};
 use nomos_storage::{backends::StorageBackend, StorageMsg, StorageService};
@@ -116,10 +116,11 @@ where
     ClPool::Key: Debug + 'static,
     ClPool::Settings: Clone,
     ClPoolAdapter: MempoolAdapter<Payload = ClPool::Item, Key = ClPool::Key>,
-    DaPool: MemPool<BlockId = HeaderId>,
+    DaPool: RecoverableMempool<BlockId = HeaderId>,
+    DaPool::RecoveryState: Serialize + for<'de> Deserialize<'de>,
     DaPool::BlockId: Debug,
-    DaPool::Item: Debug + DeserializeOwned + Eq + Hash + Clone + Send + Sync,
-    DaPool::Key: Debug,
+    DaPool::Item: Debug + DeserializeOwned + Eq + Hash + Clone + Send + Sync + 'static,
+    DaPool::Key: Debug + 'static,
     DaPool::Settings: Clone,
     DaPoolAdapter: MempoolAdapter<Key = DaPool::Key>,
     DaPoolAdapter::Payload: DispersedBlobInfo + Into<DaPool::Item> + Debug,
@@ -173,7 +174,7 @@ where
         cl_mempool_relay: Relay<TxMempoolService<ClPoolAdapter, ClPool>>,
 
         da_mempool_relay: Relay<
-            GenericDaMempoolService<
+            DaMempoolService<
                 DaPoolAdapter,
                 DaPool,
                 SamplingBackend,
