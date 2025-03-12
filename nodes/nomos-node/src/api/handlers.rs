@@ -570,7 +570,15 @@ where
         + Send
         + Sync
         + 'static,
-    <B as DispersedBlobInfo>::BlobId: std::cmp::Ord + Clone + Debug + Hash + Send + Sync + 'static,
+    <B as DispersedBlobInfo>::BlobId: std::cmp::Ord
+        + Clone
+        + Debug
+        + Hash
+        + Send
+        + Sync
+        + Serialize
+        + for<'de> Deserialize<'de>
+        + 'static,
     SamplingBackend: DaSamplingServiceBackend<SamplingRng, BlobId = <B as DispersedBlobInfo>::BlobId>
         + Send
         + 'static,

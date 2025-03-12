@@ -7,10 +7,13 @@ use nomos_core::{
 };
 use nomos_da_sampling::backend::DaSamplingServiceBackend;
 use nomos_mempool::{
-    backend::MemPool, network::NetworkAdapter as MempoolAdapter, DaMempoolService, MempoolMsg,
+    backend::{MemPool, RecoverableMempool},
+    network::NetworkAdapter as MempoolAdapter,
+    DaMempoolService, MempoolMsg,
 };
 use overwatch::services::{relay::OutboundRelay, ServiceData};
 use rand::{RngCore, SeedableRng};
+use serde::{Deserialize, Serialize};
 use tokio::sync::oneshot;
 
 use super::{DaMempoolAdapter, DaMempoolAdapterError};
@@ -72,7 +75,8 @@ impl<
         ApiAdapter,
     >
 where
-    DaPool: MemPool<BlockId = HeaderId, Key = BlobId>,
+    DaPool: RecoverableMempool<BlockId = HeaderId, Key = BlobId>,
+    DaPool::RecoveryState: Serialize + for<'de> Deserialize<'de>,
     DaPoolAdapter: MempoolAdapter<Key = DaPool::Key, Payload = BlobInfo>,
     DaPoolAdapter::Payload: DispersedBlobInfo + Into<DaPool::Item> + Debug + Send,
     DaPool::Item: Clone + Eq + Hash + Debug + Send + 'static,
