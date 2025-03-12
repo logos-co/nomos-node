@@ -80,26 +80,24 @@ async fn test_block_peer() {
         .next()
         .expect("Expected at least one member in the set");
 
-    try block/unblock peer id combinations
+    // try block/unblock peer id combinations
     let blocked = executor.block_peer(existing_peer_id.to_string()).await;
     assert!(blocked);
 
-    // let blacklisted_peers = executor.blacklisted_peers().await;
-    // assert_eq!(blacklisted_peers.len(), 1);
-    // assert_eq!(blacklisted_peers[0], existing_peer_id.to_string());
+    let blacklisted_peers = executor.blacklisted_peers().await;
+    assert_eq!(blacklisted_peers.len(), 1);
+    assert_eq!(blacklisted_peers[0], existing_peer_id.to_string());
 
     let blocked = executor.block_peer(existing_peer_id.to_string()).await;
     assert!(!blocked);
 
-    let unblocked =
-    executor.unblock_peer(existing_peer_id.to_string()).await;
+    let unblocked = executor.unblock_peer(existing_peer_id.to_string()).await;
     assert!(unblocked);
 
     let blacklisted_peers = executor.blacklisted_peers().await;
     assert!(blacklisted_peers.is_empty());
 
-    let unblocked =
-    executor.unblock_peer(existing_peer_id.to_string()).await;
+    let unblocked = executor.unblock_peer(existing_peer_id.to_string()).await;
     assert!(!unblocked);
 
     // try blocking/unblocking non existing peer id
@@ -110,8 +108,7 @@ async fn test_block_peer() {
         .expect("Failed to generate secret key from bytes");
 
     let non_existing_peer_id = secret_key_to_peer_id(node_key);
-    let blocked =
-    executor.block_peer(non_existing_peer_id.to_string()).await;
+    let blocked = executor.block_peer(non_existing_peer_id.to_string()).await;
     assert!(!blocked);
 
     let unblocked = executor

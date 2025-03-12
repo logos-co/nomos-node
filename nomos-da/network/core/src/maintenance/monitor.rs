@@ -236,7 +236,7 @@ where
                 peer_id: peer,
                 connection: CloseConnection::All,
             });
-        }SS
+        }
 
         if let Poll::Ready(Some(cmd)) = self.peer_receiver.poll_recv(cx) {
             match cmd {
