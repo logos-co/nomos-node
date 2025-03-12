@@ -1,7 +1,7 @@
 use std::{io, time::Duration};
 
 use futures::{stream, StreamExt};
-use kzgrs_backend::common::blob::DaBlob;
+use kzgrs_backend::common::share::DaShare;
 use libp2p::{
     core::transport::ListenerId,
     identity::Keypair,
@@ -65,7 +65,7 @@ pub struct ExecutorSwarm<
         >,
     >,
     sampling_events_sender: UnboundedSender<SamplingEvent>,
-    validation_events_sender: UnboundedSender<DaBlob>,
+    validation_events_sender: UnboundedSender<DaShare>,
     dispersal_events_sender: UnboundedSender<DispersalExecutorEvent>,
 }
 
@@ -167,11 +167,13 @@ where
             .sample_request_channel()
     }
 
-    pub fn dispersal_blobs_channel(&mut self) -> UnboundedSender<(Membership::NetworkId, DaBlob)> {
+    pub fn dispersal_shares_channel(
+        &mut self,
+    ) -> UnboundedSender<(Membership::NetworkId, DaShare)> {
         self.swarm
             .behaviour()
             .dispersal_executor_behaviour()
-            .blobs_sender()
+            .shares_sender()
     }
 
     pub fn dispersal_open_stream_sender(&mut self) -> UnboundedSender<PeerId> {
@@ -282,7 +284,7 @@ where
                 tracing::info!(
                     counter.behaviour_events_received = 1,
                     event = EVENT_VALIDATOR_DISPERSAL,
-                    blob_size = event.blob_size()
+                    share_size = event.share_size()
                 );
                 self.handle_validator_dispersal_event(event).await;
             }
@@ -290,7 +292,7 @@ where
                 tracing::info!(
                     counter.behaviour_events_received = 1,
                     event = EVENT_REPLICATION,
-                    blob_size = event.blob_size()
+                    share_size = event.share_size()
                 );
                 self.handle_replication_event(event).await;
             }

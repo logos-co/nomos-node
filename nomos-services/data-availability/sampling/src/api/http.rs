@@ -2,7 +2,7 @@ use std::{fmt::Debug, net::IpAddr};
 
 use async_trait::async_trait;
 use common_http_client::CommonHttpClient;
-use kzgrs_backend::common::blob::{DaBlob, DaBlobSharedCommitments};
+use kzgrs_backend::common::share::{DaShare, DaSharesCommitments};
 use libp2p_identity::PeerId;
 use multiaddr::Multiaddr;
 use nomos_core::da::BlobId;
@@ -70,9 +70,9 @@ where
         + 'static,
 {
     type Settings = ApiAdapterSettings<Membership>;
-    type Blob = DaBlob;
+    type Share = DaShare;
     type BlobId = BlobId;
-    type Commitments = DaBlobSharedCommitments;
+    type Commitments = DaSharesCommitments;
     fn new(settings: Self::Settings) -> Self {
         Self {
             client: CommonHttpClient::new(None),
@@ -99,7 +99,7 @@ where
         };
         match self
             .client
-            .get_commitments::<Self::Blob>(address, blob_id)
+            .get_commitments::<Self::Share>(address, blob_id)
             .await
         {
             Ok(commitments) => {

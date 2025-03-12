@@ -6,9 +6,9 @@ pub mod storage;
 use std::{collections::BTreeSet, fmt::Debug, marker::PhantomData, sync::Arc};
 
 use backend::{DaSamplingServiceBackend, SamplingState};
-use kzgrs_backend::common::blob::{DaBlob, DaBlobSharedCommitments, DaLightBlob};
+use kzgrs_backend::common::share::{DaLightShare, DaShare, DaSharesCommitments};
 use network::NetworkAdapter;
-use nomos_core::da::{blob::Blob, BlobId, DaVerifier};
+use nomos_core::da::{blob::Share, BlobId, DaVerifier};
 use nomos_da_network_core::protocols::sampling::behaviour::SamplingError;
 use nomos_da_network_service::{backends::libp2p::common::SamplingEvent, NetworkService};
 use nomos_da_verifier::{
@@ -38,14 +38,14 @@ const DA_SAMPLING_TAG: ServiceId = "DA-Sampling";
 
 type VerifierRelay<DaVerifierBackend> = OutboundRelay<
     DaVerifierMsg<
-        <<DaVerifierBackend as DaVerifier>::DaBlob as Blob>::SharedCommitments,
-        <<DaVerifierBackend as DaVerifier>::DaBlob as Blob>::LightBlob,
-        <DaVerifierBackend as DaVerifier>::DaBlob,
+        <<DaVerifierBackend as DaVerifier>::DaShare as Share>::SharesCommitments,
+        <<DaVerifierBackend as DaVerifier>::DaShare as Share>::LightShare,
+        <DaVerifierBackend as DaVerifier>::DaShare,
         (),
     >,
 >;
 
-type VerifierMessage = DaVerifierMsg<DaBlobSharedCommitments, DaLightBlob, DaBlob, ()>;
+type VerifierMessage = DaVerifierMsg<DaSharesCommitments, DaLightShare, DaShare, ()>;
 
 #[derive(Debug)]
 pub enum DaSamplingServiceMsg<BlobId> {
@@ -158,18 +158,18 @@ where
     SamplingBackend: DaSamplingServiceBackend<
             SamplingRng,
             BlobId = BlobId,
-            Blob = DaBlob,
-            SharedCommitments = DaBlobSharedCommitments,
+            Share = DaShare,
+            SharesCommitments = DaSharesCommitments,
         > + Send,
     SamplingBackend::Settings: Clone,
     SamplingNetwork: NetworkAdapter + Send,
     SamplingRng: Rng + SeedableRng,
-    SamplingStorage: DaStorageAdapter<Blob = DaBlob> + Send + Sync,
-    VerifierBackend: VerifierBackendTrait<DaBlob = DaBlob>,
+    SamplingStorage: DaStorageAdapter<Share = DaShare> + Send + Sync,
+    VerifierBackend: VerifierBackendTrait<DaShare = DaShare>,
     ApiAdapter: ApiAdapterTrait<
-            Blob = SamplingBackend::Blob,
+            Share = SamplingBackend::Share,
             BlobId = SamplingBackend::BlobId,
-            Commitments = SamplingBackend::SharedCommitments,
+            Commitments = SamplingBackend::SharesCommitments,
         > + Sync,
     ApiAdapter::Settings: Clone + Send,
 {
@@ -228,7 +228,7 @@ where
         match event {
             SamplingEvent::SamplingSuccess {
                 blob_id,
-                light_blob,
+                light_share,
             } => {
                 info_with_id!(blob_id, "SamplingSuccess");
                 let Some(commitments) = sampler.get_commitments(&blob_id) else {
@@ -236,12 +236,12 @@ where
                     sampler.handle_sampling_error(blob_id).await;
                     return;
                 };
-                if Self::verify_blob(verifier_relay, commitments, light_blob.clone())
+                if Self::verify_blob(verifier_relay, commitments, light_share.clone())
                     .await
                     .is_ok()
                 {
                     sampler
-                        .handle_sampling_success(blob_id, light_blob.column_idx)
+                        .handle_sampling_success(blob_id, light_share.share_idx)
                         .await;
                 } else {
                     error_with_id!(blob_id, "SamplingError");
@@ -261,21 +261,21 @@ where
             }
             SamplingEvent::SamplingRequest {
                 blob_id,
-                column_idx,
+                share_idx,
                 response_sender,
             } => {
                 info_with_id!(blob_id, "SamplingRequest");
-                let maybe_blob = storage_adapter
-                    .get_light_blob(blob_id, column_idx)
+                let maybe_share = storage_adapter
+                    .get_light_share(blob_id, share_idx)
                     .await
                     .map_err(|error| {
-                        error!("Failed to get blob from storage adapter: {error}");
-                        None::<SamplingBackend::Blob>
+                        error!("Failed to get share from storage adapter: {error}");
+                        None::<SamplingBackend::Share>
                     })
                     .ok()
                     .flatten();
 
-                if response_sender.send(maybe_blob).await.is_err() {
+                if response_sender.send(maybe_share).await.is_err() {
                     error!("Error sending sampling response");
                 }
             }
@@ -286,7 +286,7 @@ where
         storage_adapter: &SamplingStorage,
         api_request: &ApiAdapter,
         blob_id: SamplingBackend::BlobId,
-    ) -> Option<DaBlobSharedCommitments> {
+    ) -> Option<DaSharesCommitments> {
         // First try to get from storage which most of the time should be the case
         if let Ok(Some(commitments)) = storage_adapter.get_commitments(blob_id).await {
             return Some(commitments);
@@ -303,14 +303,14 @@ where
 
     async fn verify_blob(
         verifier_relay: &OutboundRelay<VerifierMessage>,
-        commitments: Arc<DaBlobSharedCommitments>,
-        light_blob: Box<DaLightBlob>,
+        commitments: Arc<DaSharesCommitments>,
+        light_share: Box<DaLightShare>,
     ) -> Result<(), DynError> {
         let (reply_sender, reply_channel) = oneshot::channel();
         verifier_relay
-            .send(DaVerifierMsg::VerifyBlob {
+            .send(DaVerifierMsg::VerifyShare {
                 commitments,
-                light_blob,
+                light_share,
                 reply_channel: reply_sender,
             })
             .await
@@ -381,24 +381,24 @@ where
     SamplingBackend: DaSamplingServiceBackend<
             SamplingRng,
             BlobId = BlobId,
-            Blob = DaBlob,
-            SharedCommitments = DaBlobSharedCommitments,
+            Share = DaShare,
+            SharesCommitments = DaSharesCommitments,
         > + Send,
     SamplingBackend::Settings: Clone + Send + Sync,
     SamplingNetwork: NetworkAdapter + Send,
     SamplingNetwork::Settings: Send + Sync,
     SamplingRng: Rng + SeedableRng + Send,
-    SamplingStorage: DaStorageAdapter<Blob = DaBlob> + Send + Sync,
+    SamplingStorage: DaStorageAdapter<Share = DaShare> + Send + Sync,
     VerifierBackend:
-        nomos_da_verifier::backend::VerifierBackend<DaBlob = SamplingBackend::Blob> + Send,
+        nomos_da_verifier::backend::VerifierBackend<DaShare = SamplingBackend::Share> + Send,
     VerifierBackend::Settings: Clone,
     VerifierNetwork: nomos_da_verifier::network::NetworkAdapter + Send,
     VerifierNetwork::Settings: Clone,
     VerifierStorage: nomos_da_verifier::storage::DaStorageAdapter + Send,
     ApiAdapter: ApiAdapterTrait<
-            Blob = SamplingBackend::Blob,
+            Share = SamplingBackend::Share,
             BlobId = SamplingBackend::BlobId,
-            Commitments = SamplingBackend::SharedCommitments,
+            Commitments = SamplingBackend::SharesCommitments,
         > + Send
         + Sync,
     ApiAdapter::Settings: Clone + Send + Sync,

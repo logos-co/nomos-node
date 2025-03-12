@@ -1,14 +1,14 @@
 use std::{fmt::Debug, sync::Arc};
 
-use nomos_core::da::blob::Blob;
-use nomos_da_messages::http::da::{DABlobCommitmentsRequest, DaSamplingRequest};
+use nomos_core::da::blob::Share;
+use nomos_da_messages::http::da::{DASharesCommitmentsRequest, DaSamplingRequest};
 use reqwest::{Client, ClientBuilder, RequestBuilder, StatusCode, Url};
 use serde::{de::DeserializeOwned, Serialize};
 
 // These could be moved into shared location, perhaps to upcoming `nomos-lib`
-const DA_GET_SHARED_COMMITMENTS: &str = "/da/sampling/commitments";
+const DA_GET_SHARES_COMMITMENTS: &str = "/da/get-commitments";
 
-const DA_GET_LIGHT_BLOB: &str = "/da/sampling/blob";
+const DA_GET_LIGHT_SHARE: &str = "/da/get-share";
 
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
@@ -94,40 +94,37 @@ impl CommonHttpClient {
     }
 
     /// Get the commitments for a Blob
-    pub async fn get_commitments<B>(
+    pub async fn get_commitments<S>(
         &self,
         base_url: Url,
-        blob_id: B::BlobId,
-    ) -> Result<Option<B::SharedCommitments>, Error>
+        blob_id: S::BlobId,
+    ) -> Result<Option<S::SharesCommitments>, Error>
     where
-        B: Blob,
-        B::SharedCommitments: DeserializeOwned + Send + Sync,
-        <B as Blob>::BlobId: serde::Serialize + Send + Sync,
+        S: Share,
+        S::SharesCommitments: DeserializeOwned + Send + Sync,
+        <S as Share>::BlobId: serde::Serialize + Send + Sync,
     {
-        let request: DABlobCommitmentsRequest<B> = DABlobCommitmentsRequest { blob_id };
-        let path = DA_GET_SHARED_COMMITMENTS.trim_start_matches('/');
+        let request: DASharesCommitmentsRequest<S> = DASharesCommitmentsRequest { blob_id };
+        let path = DA_GET_SHARES_COMMITMENTS.trim_start_matches('/');
         let request_url = base_url.join(path).map_err(Error::Url)?;
         self.get(request_url, &request).await
     }
 
     /// Get blob by blob id and column index
-    pub async fn get_blob<B, C>(
+    pub async fn get_share<S, C>(
         &self,
         base_url: Url,
-        blob_id: B::BlobId,
-        column_idx: B::ColumnIndex,
+        blob_id: S::BlobId,
+        share_idx: S::ShareIndex,
     ) -> Result<Option<C>, Error>
     where
         C: DeserializeOwned + Send + Sync,
-        B: Blob + DeserializeOwned + Send + Sync,
-        <B as Blob>::BlobId: serde::Serialize + Send + Sync,
-        <B as Blob>::ColumnIndex: serde::Serialize + Send + Sync,
+        S: Share + DeserializeOwned + Send + Sync,
+        <S as Share>::BlobId: serde::Serialize + Send + Sync,
+        <S as Share>::ShareIndex: serde::Serialize + Send + Sync,
     {
-        let request: DaSamplingRequest<B> = DaSamplingRequest {
-            blob_id,
-            share_idx: column_idx,
-        };
-        let path = DA_GET_LIGHT_BLOB.trim_start_matches('/');
+        let request: DaSamplingRequest<S> = DaSamplingRequest { blob_id, share_idx };
+        let path = DA_GET_LIGHT_SHARE.trim_start_matches('/');
         let request_url = base_url.join(path).map_err(Error::Url)?;
         self.get(request_url, &request).await
     }

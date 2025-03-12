@@ -8,8 +8,9 @@ use kzgrs::{
 
 use crate::{
     common::{
-        blob::{DaBlobSharedCommitments, DaLightBlob},
-        hash_commitment, Chunk, Column,
+        hash_commitment,
+        share::{DaLightShare, DaSharesCommitments},
+        Chunk, Column,
     },
     encoder::DaEncoderParams,
 };
@@ -111,21 +112,21 @@ impl DaVerifier {
     #[must_use]
     pub fn verify(
         &self,
-        commitments: &DaBlobSharedCommitments,
-        light_blob: &DaLightBlob,
+        commitments: &DaSharesCommitments,
+        light_share: &DaLightShare,
         rows_domain_size: usize,
     ) -> bool {
         let rows_domain = PolynomialEvaluationDomain::new(rows_domain_size)
             .expect("Domain should be able to build");
-        let blob_col_idx = &light_blob.column_idx;
-        let index = blob_col_idx;
+        let share_col_idx = &light_share.share_idx;
+        let index = share_col_idx;
 
         let is_column_verified = Self::verify_column(
             &self.global_parameters,
-            &light_blob.column,
-            &light_blob.column_commitment,
+            &light_share.column,
+            &light_share.column_commitment,
             &commitments.aggregated_column_commitment,
-            &light_blob.aggregated_column_proof,
+            &light_share.aggregated_column_proof,
             *index as usize,
             rows_domain,
         );
@@ -135,9 +136,9 @@ impl DaVerifier {
 
         let are_chunks_verified = Self::verify_chunks(
             &self.global_parameters,
-            light_blob.column.as_ref(),
+            light_share.column.as_ref(),
             &commitments.rows_commitments,
-            &light_blob.rows_proofs,
+            &light_share.rows_proofs,
             *index as usize,
             rows_domain,
         );
@@ -157,11 +158,11 @@ mod test {
         global_parameters_from_randomness, Commitment, GlobalParameters,
         PolynomialEvaluationDomain, Proof, BYTES_PER_FIELD_ELEMENT,
     };
-    use nomos_core::da::{blob::Blob, DaEncoder};
+    use nomos_core::da::{blob::Share, DaEncoder};
     use once_cell::sync::Lazy;
 
     use crate::{
-        common::{blob::DaBlob, hash_commitment, Chunk, Column},
+        common::{hash_commitment, share::DaShare, Chunk, Column},
         encoder::{
             test::{rand_data, ENCODER},
             DaEncoderParams,
@@ -297,9 +298,9 @@ mod test {
         let column = encoded_data.extended_data.columns().next().unwrap();
         let index = 0usize;
 
-        let da_blob = DaBlob {
+        let da_share = DaShare {
             column,
-            column_idx: index.try_into().unwrap(),
+            share_idx: index.try_into().unwrap(),
             column_commitment: encoded_data.column_commitments[index],
             aggregated_column_commitment: encoded_data.aggregated_column_commitment,
             aggregated_column_proof: encoded_data.aggregated_column_proofs[index],
@@ -313,36 +314,36 @@ mod test {
         // Happy case
         let chunks_verified = DaVerifier::verify_chunks(
             &GLOBAL_PARAMETERS,
-            da_blob.column.as_ref(),
-            &da_blob.rows_commitments,
-            &da_blob.rows_proofs,
+            da_share.column.as_ref(),
+            &da_share.rows_commitments,
+            &da_share.rows_proofs,
             index,
             rows_domain,
         );
         assert!(chunks_verified);
 
         // Chunks altered
-        let mut column_w_missing_chunk = da_blob.column.as_ref().to_vec();
+        let mut column_w_missing_chunk = da_share.column.as_ref().to_vec();
         column_w_missing_chunk.pop();
 
         let chunks_not_verified = !DaVerifier::verify_chunks(
             &GLOBAL_PARAMETERS,
             column_w_missing_chunk.as_ref(),
-            &da_blob.rows_commitments,
-            &da_blob.rows_proofs,
+            &da_share.rows_commitments,
+            &da_share.rows_proofs,
             index,
             rows_domain,
         );
         assert!(chunks_not_verified);
 
         // Proofs altered
-        let mut modified_proofs = da_blob.rows_proofs.clone();
+        let mut modified_proofs = da_share.rows_proofs.clone();
         modified_proofs.swap(0, 1);
 
         let chunks_not_verified = !DaVerifier::verify_chunks(
             &GLOBAL_PARAMETERS,
-            da_blob.column.as_ref(),
-            &da_blob.rows_commitments,
+            da_share.column.as_ref(),
+            &da_share.rows_commitments,
             &modified_proofs,
             index,
             rows_domain,
@@ -350,14 +351,14 @@ mod test {
         assert!(chunks_not_verified);
 
         // Commitments altered
-        let mut modified_commitments = da_blob.rows_commitments.clone();
+        let mut modified_commitments = da_share.rows_commitments.clone();
         modified_commitments.swap(0, 1);
 
         let chunks_not_verified = !DaVerifier::verify_chunks(
             &GLOBAL_PARAMETERS,
-            da_blob.column.as_ref(),
+            da_share.column.as_ref(),
             &modified_commitments,
-            &da_blob.rows_proofs,
+            &da_share.rows_proofs,
             index,
             rows_domain,
         );
@@ -376,9 +377,9 @@ mod test {
         for (i, column) in encoded_data.extended_data.columns().enumerate() {
             println!("{i}");
             let verifier = &verifiers[i];
-            let da_blob = DaBlob {
+            let da_share = DaShare {
                 column,
-                column_idx: i
+                share_idx: i
                     .try_into()
                     .expect("Column index shouldn't overflow the target type"),
                 column_commitment: encoded_data.column_commitments[i],
@@ -391,8 +392,8 @@ mod test {
                     .map(|proofs| proofs.get(i).copied().unwrap())
                     .collect(),
             };
-            let (light_blob, commitments) = da_blob.into_blob_and_shared_commitments();
-            assert!(verifier.verify(&commitments, &light_blob, domain_size));
+            let (light_share, commitments) = da_share.into_share_and_commitments();
+            assert!(verifier.verify(&commitments, &light_share, domain_size));
         }
     }
 }

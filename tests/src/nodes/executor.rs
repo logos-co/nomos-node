@@ -8,7 +8,7 @@ use std::{
 
 use cryptarchia_consensus::CryptarchiaSettings;
 use cryptarchia_engine::time::SlotConfig;
-use kzgrs_backend::common::blob::DaBlob;
+use kzgrs_backend::common::share::DaShare;
 use nomos_blend::{
     message_blend::{
         CryptographicProcessorSettings, MessageBlendSettings, TemporalSchedulerSettings,
@@ -128,7 +128,7 @@ impl Executor {
         &self,
         app_id: [u8; 32],
         range: Range<[u8; 8]>,
-    ) -> Vec<([u8; 8], Vec<DaBlob>)> {
+    ) -> Vec<([u8; 8], Vec<DaShare>)> {
         CLIENT
             .post(format!("http://{}{}", self.addr, DA_GET_RANGE))
             .header("Content-Type", "application/json")
@@ -136,7 +136,7 @@ impl Executor {
             .send()
             .await
             .unwrap()
-            .json::<Vec<([u8; 8], Vec<DaBlob>)>>()
+            .json::<Vec<([u8; 8], Vec<DaShare>)>>()
             .await
             .unwrap()
     }

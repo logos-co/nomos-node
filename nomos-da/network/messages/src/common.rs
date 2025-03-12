@@ -1,31 +1,31 @@
-use kzgrs_backend::common::blob::{DaBlob, DaLightBlob};
+use kzgrs_backend::common::share::{DaLightShare, DaShare};
 use nomos_core::da::BlobId;
 use serde::{Deserialize, Serialize};
 
 #[repr(C)]
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
-pub struct Blob {
+pub struct Share {
     pub blob_id: BlobId,
-    pub data: DaBlob,
+    pub data: DaShare,
 }
 
-impl Blob {
+impl Share {
     #[must_use]
-    pub const fn new(blob_id: BlobId, data: DaBlob) -> Self {
+    pub const fn new(blob_id: BlobId, data: DaShare) -> Self {
         Self { blob_id, data }
     }
 }
 
 #[repr(C)]
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
-pub struct LightBlob {
+pub struct LightShare {
     pub blob_id: BlobId,
-    pub data: DaLightBlob,
+    pub data: DaLightShare,
 }
 
-impl LightBlob {
+impl LightShare {
     #[must_use]
-    pub const fn new(blob_id: BlobId, data: DaLightBlob) -> Self {
+    pub const fn new(blob_id: BlobId, data: DaLightShare) -> Self {
         Self { blob_id, data }
     }
 }

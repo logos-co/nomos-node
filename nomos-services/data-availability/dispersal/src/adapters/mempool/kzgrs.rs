@@ -85,7 +85,7 @@ where
     SamplingRng: SeedableRng + RngCore + Sync,
     SamplingBackend: DaSamplingServiceBackend<SamplingRng, BlobId = DaPool::Key> + Send + Sync,
     SamplingBackend::Settings: Clone,
-    SamplingBackend::Blob: Debug + 'static,
+    SamplingBackend::Share: Debug + 'static,
     SamplingBackend::BlobId: Debug + 'static,
     SamplingNetworkAdapter: nomos_da_sampling::network::NetworkAdapter + Send + Sync,
     SamplingStorage: nomos_da_sampling::storage::DaStorageAdapter + Send + Sync,

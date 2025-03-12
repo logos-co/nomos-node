@@ -1,7 +1,7 @@
 use std::{fmt::Debug, marker::PhantomData};
 
 use futures::Stream;
-use kzgrs_backend::common::blob::DaBlob;
+use kzgrs_backend::common::share::DaShare;
 use libp2p::PeerId;
 use nomos_da_network_core::SubnetworkId;
 use nomos_da_network_service::{

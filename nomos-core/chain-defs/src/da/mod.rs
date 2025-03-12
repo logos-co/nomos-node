@@ -1,6 +1,6 @@
 pub mod blob;
 
-use blob::Blob;
+use blob::Share;
 
 pub type BlobId = [u8; 32];
 
@@ -12,13 +12,13 @@ pub trait DaEncoder {
 }
 
 pub trait DaVerifier {
-    type DaBlob: Blob;
+    type DaShare: Share;
     type Error;
 
     fn verify(
         &self,
-        commitments: &<Self::DaBlob as Blob>::SharedCommitments,
-        light_blob: &<Self::DaBlob as Blob>::LightBlob,
+        commitments: &<Self::DaShare as Share>::SharesCommitments,
+        light_share: &<Self::DaShare as Share>::LightShare,
     ) -> Result<(), Self::Error>;
 }
 

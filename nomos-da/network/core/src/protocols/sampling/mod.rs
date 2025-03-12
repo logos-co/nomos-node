@@ -6,7 +6,7 @@ mod test {
 
     use futures::StreamExt;
     use kzgrs::{Commitment, Proof};
-    use kzgrs_backend::common::{blob::DaLightBlob, Column};
+    use kzgrs_backend::common::{share::DaLightShare, Column};
     use libp2p::{identity::Keypair, swarm::SwarmEvent, Multiaddr, PeerId, Swarm};
     use log::debug;
     use rand::Rng;
@@ -44,9 +44,9 @@ mod test {
                             .send(BehaviourSampleRes::SamplingSuccess {
                                 blob_id: Default::default(),
                                 subnetwork_id: Default::default(),
-                                blob: Box::new(DaLightBlob {
+                                share: Box::new(DaLightShare {
                                     column: Column(vec![]),
-                                    column_idx: 0,
+                                    share_idx: 0,
                                     column_commitment: Commitment::default(),
                                     aggregated_column_proof: Proof::default(),
                                     rows_proofs: vec![],

@@ -1,21 +1,22 @@
 use kzgrs::BYTES_PER_FIELD_ELEMENT;
 
-use crate::common::{blob::DaBlob, Chunk};
+use crate::common::{share::DaShare, Chunk};
 
-/// Reconstruct original data from a set of `DaBlob`
+/// Reconstruct original data from a set of `DaShare`
 /// Warning! This does not interpolate so it should not be used on blobs which
 /// doesn't represent the original set of data.
 #[must_use]
-pub fn reconstruct_without_missing_data(blobs: &[DaBlob]) -> Vec<u8> {
+pub fn reconstruct_without_missing_data(shares: &[DaShare]) -> Vec<u8> {
     // pick positions from columns
-    let mut data: Vec<((usize, usize), Vec<u8>)> = blobs
+    let mut data: Vec<((usize, usize), Vec<u8>)> = shares
         .iter()
-        .flat_map(|blob| {
-            blob.column
+        .flat_map(|share| {
+            share
+                .column
                 .iter()
                 .map(Chunk::as_bytes)
                 .enumerate()
-                .map(|(row, data)| ((row, blob.column_idx as usize), data))
+                .map(|(row, data)| ((row, share.share_idx as usize), data))
         })
         .collect();
     data.sort_unstable_by_key(|(k, _)| *k);
@@ -35,7 +36,7 @@ mod test {
     use nomos_core::da::DaEncoder as _;
 
     use crate::{
-        common::{blob::DaBlob, ColumnIndex},
+        common::{share::DaShare, ShareIndex},
         encoder::{test::rand_data, DaEncoder, DaEncoderParams, EncodedData},
         reconstruction::reconstruct_without_missing_data,
     };
@@ -46,13 +47,13 @@ mod test {
         let params = DaEncoderParams::default_with(4);
         let encoder = DaEncoder::new(params);
         let encoded_data: EncodedData = encoder.encode(&data).unwrap();
-        let blobs: Vec<DaBlob> = encoded_data
+        let shares: Vec<DaShare> = encoded_data
             .chunked_data
             .columns()
             .enumerate()
-            .map(|(idx, column)| DaBlob {
+            .map(|(idx, column)| DaShare {
                 column,
-                column_idx: idx as ColumnIndex,
+                share_idx: idx as ShareIndex,
                 column_commitment: Commitment::default(),
                 aggregated_column_commitment: Commitment::default(),
                 aggregated_column_proof: Proof::default(),
@@ -60,6 +61,6 @@ mod test {
                 rows_proofs: vec![],
             })
             .collect();
-        assert_eq!(data, reconstruct_without_missing_data(&blobs));
+        assert_eq!(data, reconstruct_without_missing_data(&shares));
     }
 }

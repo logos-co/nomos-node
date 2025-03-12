@@ -2,7 +2,7 @@ use std::{error::Error, ops::Range, path::PathBuf, sync::mpsc::Sender};
 
 use clap::Args;
 use kzgrs_backend::{
-    common::blob::DaBlob, dispersal::Index, reconstruction::reconstruct_without_missing_data,
+    common::share::DaShare, dispersal::Index, reconstruction::reconstruct_without_missing_data,
 };
 use nomos_core::da::blob::metadata;
 use nomos_da_messages::http::da::GetRangeReq;
@@ -28,7 +28,7 @@ pub struct Retrieve {
     pub addr: Url,
 }
 
-fn parse_app_blobs(val: &str) -> Result<Vec<(Index, Vec<DaBlob>)>, String> {
+fn parse_app_shares(val: &str) -> Result<Vec<(Index, Vec<DaShare>)>, String> {
     let val: String = val.chars().filter(|&c| c != ' ' && c != '\n').collect();
     serde_json::from_str(&val).map_err(|e| e.to_string())
 }
@@ -42,9 +42,9 @@ pub struct Reconstruct {
         long,
         help = "JSON array of blobs [[[index0], [{DaBlob0}, {DaBlob1}...]]...]",
         value_name = "APP_BLOBS",
-        value_parser(parse_app_blobs)
+        value_parser(parse_app_shares)
     )]
-    pub app_blobs: Option<std::vec::Vec<(Index, Vec<DaBlob>)>>,
+    pub app_shares: Option<std::vec::Vec<(Index, Vec<DaShare>)>>,
     /// File with blobs.
     #[clap(short, long)]
     pub file: Option<PathBuf>,
@@ -68,12 +68,12 @@ impl Retrieve {
 
         match res_receiver.recv() {
             Ok(update) => match update {
-                Ok(app_blobs) => {
-                    for (index, blobs) in &app_blobs {
-                        tracing::info!("Index {:?} has {:} blobs", (index), blobs.len());
-                        for blob in blobs {
-                            let blob = wire::deserialize::<DaBlob>(blob).unwrap();
-                            tracing::info!("Index {:?}; Blob: {blob:?}", index.to_u64());
+                Ok(app_shares) => {
+                    for (index, shares) in &app_shares {
+                        tracing::info!("Index {:?} has {:} shares", (index), shares.len());
+                        for share in shares {
+                            let share = wire::deserialize::<DaShare>(share).unwrap();
+                            tracing::info!("Index {:?}; Share: {share:?}", index.to_u64());
                         }
                     }
                 }
@@ -140,25 +140,25 @@ where
 
 impl Reconstruct {
     pub fn run(self) -> Result<(), Box<dyn std::error::Error>> {
-        let app_blobs: Vec<(Index, Vec<DaBlob>)> = if let Some(blobs) = self.app_blobs {
-            blobs
+        let app_shares: Vec<(Index, Vec<DaShare>)> = if let Some(shares) = self.app_shares {
+            shares
         } else {
             let file_path = self.file.as_ref().unwrap();
             let json_string = String::from_utf8(std::fs::read(file_path)?)?;
-            parse_app_blobs(&json_string)?
+            parse_app_shares(&json_string)?
         };
 
-        let mut da_blobs = vec![];
+        let mut da_shares = vec![];
 
-        for (index, blobs) in &app_blobs {
-            tracing::info!("Index {:?} has {:} blobs", (index), blobs.len());
-            for blob in blobs {
-                da_blobs.push(blob.clone());
-                tracing::info!("Index {:?}; DaBlob: {blob:?}", index.to_u64());
+        for (index, shares) in &app_shares {
+            tracing::info!("Index {:?} has {:} shares", (index), shares.len());
+            for share in shares {
+                da_shares.push(share.clone());
+                tracing::info!("Index {:?}; DaShare: {share:?}", index.to_u64());
             }
         }
 
-        let reconstructed_data = reconstruct_without_missing_data(&da_blobs);
+        let reconstructed_data = reconstruct_without_missing_data(&da_shares);
         tracing::info!("Reconstructed data {:?}", reconstructed_data);
 
         Ok(())
