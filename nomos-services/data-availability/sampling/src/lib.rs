@@ -70,17 +70,17 @@ impl<B: 'static> RelayMessage for DaSamplingServiceMsg<B> {}
 
 pub struct DaSamplingService<
     SamplingBackend,
-    SamplingRng,
     SamplingNetwork,
+    SamplingRng,
     SamplingStorage,
-    ApiAdapter,
     VerifierBackend,
     VerifierNetwork,
     VerifierStorage,
+    ApiAdapter,
 > where
     SamplingBackend: DaSamplingServiceBackend<SamplingRng>,
-    SamplingRng: Rng,
     SamplingNetwork: NetworkAdapter,
+    SamplingRng: Rng,
     SamplingStorage: DaStorageAdapter,
     ApiAdapter: ApiAdapterTrait,
 {
@@ -88,40 +88,40 @@ pub struct DaSamplingService<
     #[expect(clippy::type_complexity, reason = "No other way around this for now.")]
     _phantom: PhantomData<(
         SamplingBackend,
-        SamplingRng,
         SamplingNetwork,
+        SamplingRng,
         SamplingStorage,
-        ApiAdapter,
         VerifierBackend,
         VerifierNetwork,
         VerifierStorage,
+        ApiAdapter,
     )>,
 }
 
 impl<
         SamplingBackend,
-        SamplingRng,
         SamplingNetwork,
+        SamplingRng,
         SamplingStorage,
-        ApiAdapter,
         VerifierBackend,
         VerifierNetwork,
         VerifierStorage,
+        ApiAdapter,
     >
     DaSamplingService<
         SamplingBackend,
-        SamplingRng,
         SamplingNetwork,
+        SamplingRng,
         SamplingStorage,
-        ApiAdapter,
         VerifierBackend,
         VerifierNetwork,
         VerifierStorage,
+        ApiAdapter,
     >
 where
     SamplingBackend: DaSamplingServiceBackend<SamplingRng>,
-    SamplingRng: Rng,
     SamplingNetwork: NetworkAdapter,
+    SamplingRng: Rng,
     SamplingStorage: DaStorageAdapter,
     ApiAdapter: ApiAdapterTrait,
 {
@@ -136,42 +136,42 @@ where
 
 impl<
         SamplingBackend,
-        SamplingRng,
         SamplingNetwork,
+        SamplingRng,
         SamplingStorage,
-        ApiAdapter,
         VerifierBackend,
         VerifierNetwork,
         VerifierStorage,
+        ApiAdapter,
     >
     DaSamplingService<
         SamplingBackend,
-        SamplingRng,
         SamplingNetwork,
+        SamplingRng,
         SamplingStorage,
-        ApiAdapter,
         VerifierBackend,
         VerifierNetwork,
         VerifierStorage,
+        ApiAdapter,
     >
 where
     SamplingBackend: DaSamplingServiceBackend<
-        SamplingRng,
-        BlobId = BlobId,
-        Blob = DaBlob,
-        SharedCommitments = DaBlobSharedCommitments,
-    >,
+            SamplingRng,
+            BlobId = BlobId,
+            Blob = DaBlob,
+            SharedCommitments = DaBlobSharedCommitments,
+        > + Send,
     SamplingBackend::Settings: Clone,
+    SamplingNetwork: NetworkAdapter + Send,
     SamplingRng: Rng + SeedableRng,
-    SamplingNetwork: NetworkAdapter,
-    SamplingStorage: DaStorageAdapter<Blob = DaBlob>,
-    ApiAdapter: ApiAdapterTrait<
-        Blob = SamplingBackend::Blob,
-        BlobId = SamplingBackend::BlobId,
-        Commitments = SamplingBackend::SharedCommitments,
-    >,
-    ApiAdapter::Settings: Clone,
+    SamplingStorage: DaStorageAdapter<Blob = DaBlob> + Send + Sync,
     VerifierBackend: VerifierBackendTrait<DaBlob = DaBlob>,
+    ApiAdapter: ApiAdapterTrait<
+            Blob = SamplingBackend::Blob,
+            BlobId = SamplingBackend::BlobId,
+            Commitments = SamplingBackend::SharedCommitments,
+        > + Sync,
+    ApiAdapter::Settings: Clone + Send,
 {
     #[instrument(skip_all)]
     async fn handle_service_message(
@@ -315,36 +315,37 @@ where
             })
             .await
             .expect("Failed to send verify blob message to verifier relay");
+
         reply_channel
             .await
-            .expect("Failed to receive reply blob message from verifierrelay")
+            .expect("Failed to receive reply blob message from verifier relay")
     }
 }
 
 impl<
         SamplingBackend,
-        SamplingRng,
         SamplingNetwork,
+        SamplingRng,
         SamplingStorage,
-        ApiAdapter,
         VerifierBackend,
         VerifierNetwork,
         VerifierStorage,
+        ApiAdapter,
     > ServiceData
     for DaSamplingService<
         SamplingBackend,
-        SamplingRng,
         SamplingNetwork,
+        SamplingRng,
         SamplingStorage,
-        ApiAdapter,
         VerifierBackend,
         VerifierNetwork,
         VerifierStorage,
+        ApiAdapter,
     >
 where
     SamplingBackend: DaSamplingServiceBackend<SamplingRng>,
-    SamplingRng: Rng,
     SamplingNetwork: NetworkAdapter,
+    SamplingRng: Rng,
     SamplingStorage: DaStorageAdapter,
     ApiAdapter: ApiAdapterTrait,
 {
@@ -358,23 +359,23 @@ where
 #[async_trait::async_trait]
 impl<
         SamplingBackend,
-        SamplingRng,
         SamplingNetwork,
+        SamplingRng,
         SamplingStorage,
-        ApiAdapter,
         VerifierBackend,
         VerifierNetwork,
         VerifierStorage,
+        ApiAdapter,
     > ServiceCore
     for DaSamplingService<
         SamplingBackend,
-        SamplingRng,
         SamplingNetwork,
+        SamplingRng,
         SamplingStorage,
-        ApiAdapter,
         VerifierBackend,
         VerifierNetwork,
         VerifierStorage,
+        ApiAdapter,
     >
 where
     SamplingBackend: DaSamplingServiceBackend<
@@ -384,10 +385,16 @@ where
             SharedCommitments = DaBlobSharedCommitments,
         > + Send,
     SamplingBackend::Settings: Clone + Send + Sync,
-    SamplingRng: Rng + SeedableRng + Send,
     SamplingNetwork: NetworkAdapter + Send,
     SamplingNetwork::Settings: Send + Sync,
+    SamplingRng: Rng + SeedableRng + Send,
     SamplingStorage: DaStorageAdapter<Blob = DaBlob> + Send + Sync,
+    VerifierBackend:
+        nomos_da_verifier::backend::VerifierBackend<DaBlob = SamplingBackend::Blob> + Send,
+    VerifierBackend::Settings: Clone,
+    VerifierNetwork: nomos_da_verifier::network::NetworkAdapter + Send,
+    VerifierNetwork::Settings: Clone,
+    VerifierStorage: nomos_da_verifier::storage::DaStorageAdapter + Send,
     ApiAdapter: ApiAdapterTrait<
             Blob = SamplingBackend::Blob,
             BlobId = SamplingBackend::BlobId,
@@ -395,12 +402,6 @@ where
         > + Send
         + Sync,
     ApiAdapter::Settings: Clone + Send + Sync,
-    VerifierBackend:
-        nomos_da_verifier::backend::VerifierBackend<DaBlob = SamplingBackend::Blob> + Send,
-    VerifierBackend::Settings: Clone,
-    VerifierNetwork: nomos_da_verifier::network::NetworkAdapter + Send,
-    VerifierNetwork::Settings: Clone,
-    VerifierStorage: nomos_da_verifier::storage::DaStorageAdapter + Send,
 {
     fn init(
         service_state: OpaqueServiceStateHandle<Self>,
@@ -418,7 +419,6 @@ where
         let DaSamplingServiceSettings {
             sampling_settings,
             api_adapter_settings,
-            ..
         } = self.service_state.settings_reader.get_updated_settings();
 
         let network_relay = self
@@ -428,6 +428,7 @@ where
             .connect()
             .await?;
         let mut network_adapter = SamplingNetwork::new(network_relay).await;
+        let mut sampling_message_stream = network_adapter.listen_to_sampling_messages().await?;
 
         let storage_relay = self
             .service_state
@@ -449,8 +450,6 @@ where
         let rng = SamplingRng::from_entropy();
         let mut sampler = SamplingBackend::new(sampling_settings, rng);
         let mut next_prune_tick = sampler.prune_interval();
-
-        let mut sampling_message_stream = network_adapter.listen_to_sampling_messages().await?;
 
         let mut lifecycle_stream = self.service_state.lifecycle_handle.message_stream();
         #[expect(
