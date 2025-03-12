@@ -411,11 +411,6 @@ where
     }
 
     async fn run(mut self) -> Result<(), DynError> {
-        // This service will likely have to be modified later on.
-        // Most probably the verifier itself need to be constructed/update for every
-        // message with an updated list of the available nodes list, as it needs
-        // his own index coming from the position of his bls public key landing
-        // in the above-mentioned list.
         let DaSamplingServiceSettings {
             sampling_settings,
             api_adapter_settings,
