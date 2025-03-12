@@ -90,7 +90,7 @@ where
     sampling_broadcast_receiver: broadcast::Receiver<SamplingEvent>,
     verifying_broadcast_receiver: broadcast::Receiver<DaShare>,
     dispersal_broadcast_receiver: broadcast::Receiver<DispersalExecutorEvent>,
-    dispersal_shares_sender: UnboundedSender<(Membership::NetworkId, DaBlob)>,
+    dispersal_shares_sender: UnboundedSender<(Membership::NetworkId, DaShare)>,
     peer_request_channel: UnboundedSender<PeerCommand>,
     _membership: PhantomData<Membership>,
 }
@@ -133,7 +133,7 @@ where
             });
 
         let sampling_request_channel = executor_swarm.sample_request_channel();
-        let dispersal_shares_sender = executor_swarm.dispersal_blobs_channel();
+        let dispersal_shares_sender = executor_swarm.dispersal_shares_channel();
         let peer_request_channel = executor_swarm.peer_request_channel();
 
         let (task_abort_handle, abort_registration) = AbortHandle::new_pair();
