@@ -31,7 +31,6 @@ use nomos_da_network_service::{
 };
 use nomos_da_sampling::{
     api::http::ApiAdapterSettings, backend::kzgrs::KzgrsSamplingBackendSettings,
-    storage::adapters::rocksdb::RocksAdapterSettings as SamplingStorageAdapterSettings,
     DaSamplingServiceSettings,
 };
 use nomos_da_verifier::{
@@ -94,12 +93,6 @@ impl Executor {
         }
 
         config.storage.db_path = dir.path().join("db");
-        dir.path().clone_into(
-            &mut config
-                .da_sampling
-                .storage_adapter_settings
-                .blob_storage_directory,
-        );
         dir.path().clone_into(
             &mut config
                 .da_verifier
@@ -260,10 +253,6 @@ pub fn create_executor_config(config: GeneralConfig) -> Config {
                 old_blobs_check_interval: config.da_config.old_blobs_check_interval,
                 blobs_validity_duration: config.da_config.blobs_validity_duration,
             },
-            storage_adapter_settings: SamplingStorageAdapterSettings {
-                blob_storage_directory: "./".into(),
-            },
-            network_adapter_settings: (),
             api_adapter_settings: ApiAdapterSettings {
                 membership: config.da_config.membership,
                 api_port: config.api_config.address.port(),
@@ -297,7 +286,8 @@ pub fn create_executor_config(config: GeneralConfig) -> Config {
             },
         },
         mempool: MempoolConfig {
-            recovery_path: "./recovery/mempool.json".into(),
+            cl_pool_recovery_path: "./recovery/cl_mempool.json".into(),
+            da_pool_recovery_path: "./recovery/da_mempool.json".into(),
         },
     }
 }

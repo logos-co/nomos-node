@@ -721,4 +721,5 @@ storage:
   read_only: false
   column_family: blocks
 mempool:
-  recovery_path: ./recovery/mempool.json
+  cl_pool_recovery_path: ./recovery/cl_mempool.json
+  da_pool_recovery_path: ./recovery/da_mempool.json

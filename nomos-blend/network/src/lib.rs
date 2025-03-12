@@ -131,9 +131,11 @@ mod test {
         let conn_monitor_settings = ConnectionMonitorSettings {
             interval: Duration::from_secs(1),
             expected_effective_messages: U57F7::from_num(0.0),
-            effective_message_tolerance: U57F7::from_num(0.0),
+            effective_message_malicious_tolerance: U57F7::from_num(0.0),
+            effective_message_unhealthy_tolerance: U57F7::from_num(0.0),
             expected_drop_messages: U57F7::from_num(0.0),
-            drop_message_tolerance: U57F7::from_num(0.0),
+            drop_message_malicious_tolerance: U57F7::from_num(0.0),
+            drop_message_unhealthy_tolerance: U57F7::from_num(0.0),
         };
         let (mut nodes, mut keypairs) = nodes(2, 8290);
         let node1_addr = nodes.next().unwrap().address;
@@ -203,9 +205,11 @@ mod test {
         let conn_monitor_settings = ConnectionMonitorSettings {
             interval: Duration::from_secs(1),
             expected_effective_messages: U57F7::from_num(1.0),
-            effective_message_tolerance: U57F7::from_num(0.0),
+            effective_message_malicious_tolerance: U57F7::from_num(0.0),
+            effective_message_unhealthy_tolerance: U57F7::from_num(0.0),
             expected_drop_messages: U57F7::from_num(0.0),
-            drop_message_tolerance: U57F7::from_num(0.0),
+            drop_message_malicious_tolerance: U57F7::from_num(0.0),
+            drop_message_unhealthy_tolerance: U57F7::from_num(0.0),
         };
         let (mut nodes, mut keypairs) = nodes(2, 8390);
         let node1_addr = nodes.next().unwrap().address;
