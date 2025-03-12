@@ -10,7 +10,7 @@ use nomos_da_sampling::{backend::DaSamplingServiceBackend, DaSamplingService};
 use nomos_mempool::{
     backend::{MemPool, RecoverableMempool},
     network::NetworkAdapter as MempoolAdapter,
-    DaMempoolService, TxMempoolService,
+    GenericDaMempoolService, TxMempoolService,
 };
 use nomos_network::{NetworkMsg, NetworkService};
 use nomos_storage::{backends::StorageBackend, StorageMsg, StorageService};
@@ -173,7 +173,7 @@ where
         cl_mempool_relay: Relay<TxMempoolService<ClPoolAdapter, ClPool>>,
 
         da_mempool_relay: Relay<
-            DaMempoolService<
+            GenericDaMempoolService<
                 DaPoolAdapter,
                 DaPool,
                 SamplingBackend,

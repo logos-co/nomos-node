@@ -4,250 +4,168 @@ pub mod openapi {
     pub use crate::backend::Status;
 }
 
-use std::fmt::Debug;
+use std::{fmt::Debug, marker::PhantomData};
 
 use futures::StreamExt;
-use nomos_core::da::blob::info::DispersedBlobInfo;
-use nomos_da_sampling::{
-    backend::DaSamplingServiceBackend, network::NetworkAdapter as DaSamplingNetworkAdapter,
-    storage::DaStorageAdapter, DaSamplingService, DaSamplingServiceMsg,
-};
+use nomos_da_sampling::DaSamplingService;
 use nomos_da_verifier::backend::VerifierBackend;
 use nomos_network::{NetworkMsg, NetworkService};
 use overwatch::{
-    services::{
-        relay::{OutboundRelay, Relay},
-        state::{NoOperator, NoState},
-        ServiceCore, ServiceData, ServiceId,
-    },
+    services::{relay::OutboundRelay, ServiceCore, ServiceData, ServiceId},
     OpaqueServiceStateHandle,
 };
-use rand::{RngCore, SeedableRng};
-use services_utils::overwatch::lifecycle;
-use tokio::sync::oneshot;
+use services_utils::overwatch::{
+    lifecycle, recovery::operators::RecoveryBackend as RecoveryBackendTrait, JsonFileBackend,
+    RecoveryOperator,
+};
 
 use crate::{
-    backend::{MemPool, MempoolError},
-    network::NetworkAdapter,
+    backend::{MemPool, RecoverableMempool},
+    da::{settings::DaMempoolSettings, state::DaMempoolState},
+    network::NetworkAdapter as NetworkAdapterTrait,
     MempoolMetrics, MempoolMsg,
 };
 
-#[expect(clippy::type_complexity, reason = "This is a complex type")]
-pub struct DaMempoolService<
-    N,
-    P,
-    DB,
-    DN,
-    R,
-    SamplingStorage,
-    DaVerifierBackend,
-    DaVerifierNetwork,
-    DaVerifierStorage,
-    ApiAdapter,
-> where
-    N: NetworkAdapter<Key = P::Key>,
-    N::Payload: DispersedBlobInfo + Into<P::Item> + Debug + 'static,
-    P: MemPool,
-    P::Settings: Clone,
-    P::Item: Debug + 'static,
-    P::Key: Debug + 'static,
-    P::BlockId: Debug + 'static,
-    DB: DaSamplingServiceBackend<R, BlobId = P::Key> + Send,
-    DB::Blob: Debug + 'static,
-    DB::BlobId: Debug + 'static,
-    DB::Settings: Clone,
-    DN: DaSamplingNetworkAdapter,
-    SamplingStorage: DaStorageAdapter,
-
-    R: SeedableRng + RngCore,
-    DaVerifierNetwork: nomos_da_verifier::network::NetworkAdapter,
-    DaVerifierNetwork::Settings: Clone,
-    DaVerifierBackend: VerifierBackend + Send + 'static,
-    DaVerifierBackend::Settings: Clone,
-    DaVerifierStorage: nomos_da_verifier::storage::DaStorageAdapter,
-    ApiAdapter: nomos_da_sampling::api::ApiAdapter + Send,
-{
-    service_state: OpaqueServiceStateHandle<Self>,
-    network_relay: Relay<NetworkService<N::Backend>>,
-    sampling_relay: Relay<
-        DaSamplingService<
-            DB,
-            DN,
-            R,
-            SamplingStorage,
-            DaVerifierBackend,
-            DaVerifierNetwork,
-            DaVerifierStorage,
-            ApiAdapter,
+/// A DA mempool service that uses a [`JsonFileBackend`] as a recovery
+/// mechanism.
+pub type DaMempoolService<NetworkAdapter, Pool> = GenericDaMempoolService<
+    Pool,
+    NetworkAdapter,
+    JsonFileBackend<
+        DaMempoolState<
+            <Pool as RecoverableMempool>::RecoveryState,
+            <Pool as MemPool>::Settings,
+            <NetworkAdapter as NetworkAdapterTrait>::Settings,
+        >,
+        DaMempoolSettings<
+            <Pool as MemPool>::Settings,
+            <NetworkAdapter as NetworkAdapterTrait>::Settings,
         >,
     >,
-    pool: P,
+>;
+
+/// A generic DA mempool service which wraps around a mempool, a network
+/// adapter, and a recovery backend.
+pub struct GenericDaMempoolService<Pool, NetworkAdapter, RecoveryBackend>
+where
+    Pool: RecoverableMempool,
+    NetworkAdapter: NetworkAdapterTrait,
+    RecoveryBackend: RecoveryBackendTrait,
+{
+    pool: Pool,
+    service_state_handle: OpaqueServiceStateHandle<Self>,
+    _phantom: PhantomData<(NetworkAdapter, RecoveryBackend)>,
 }
 
-impl<
-        N,
-        P,
-        DB,
-        DN,
-        R,
-        DaStorage,
-        DaVerifierBackend,
-        DaVerifierNetwork,
-        DaVerifierStorage,
-        ApiAdapter,
-    > ServiceData
-    for DaMempoolService<
-        N,
-        P,
-        DB,
-        DN,
-        R,
-        DaStorage,
-        DaVerifierBackend,
-        DaVerifierNetwork,
-        DaVerifierStorage,
-        ApiAdapter,
-    >
+impl<Pool, NetworkAdapter, RecoveryBackend> ServiceData
+    for GenericDaMempoolService<Pool, NetworkAdapter, RecoveryBackend>
 where
-    N: NetworkAdapter<Key = P::Key>,
-    N::Payload: DispersedBlobInfo + Debug + Into<P::Item> + 'static,
-    P: MemPool,
-    P::Settings: Clone,
-    P::Item: Debug + 'static,
-    P::Key: Debug + 'static,
-    P::BlockId: Debug + 'static,
-    DB: DaSamplingServiceBackend<R, BlobId = P::Key> + Send,
-    DB::Blob: Debug + 'static,
-    DB::BlobId: Debug + 'static,
-    DB::Settings: Clone,
-    DN: DaSamplingNetworkAdapter,
-    DaStorage: DaStorageAdapter,
-    R: SeedableRng + RngCore,
-    DaVerifierStorage: nomos_da_verifier::storage::DaStorageAdapter,
-    DaVerifierBackend: VerifierBackend + Send + 'static,
-    DaVerifierBackend::Settings: Clone,
-    DaVerifierNetwork: nomos_da_verifier::network::NetworkAdapter,
-    DaVerifierNetwork::Settings: Clone,
-    ApiAdapter: nomos_da_sampling::api::ApiAdapter + Send,
+    Pool: RecoverableMempool,
+    NetworkAdapter: NetworkAdapterTrait,
+    RecoveryBackend: RecoveryBackendTrait,
 {
     const SERVICE_ID: ServiceId = "mempool-da";
-    type Settings = DaMempoolSettings<P::Settings, N::Settings>;
-    type State = NoState<Self::Settings>;
-    type StateOperator = NoOperator<Self::State, Self::Settings>;
-    type Message = MempoolMsg<
-        <P as MemPool>::BlockId,
-        <N as NetworkAdapter>::Payload,
-        <P as MemPool>::Item,
-        <P as MemPool>::Key,
-    >;
+    type Settings = DaMempoolSettings<Pool::Settings, NetworkAdapter::Settings>;
+    type State = DaMempoolState<Pool::RecoveryState, Pool::Settings, NetworkAdapter::Settings>;
+    type StateOperator = RecoveryOperator<RecoveryBackend>;
+    type Message = MempoolMsg<Pool::BlockId, NetworkAdapter::Payload, Pool::Item, Pool::Key>;
+}
+
+impl<Pool, NetworkAdapter, RecoveryBackend>
+    GenericDaMempoolService<Pool, NetworkAdapter, RecoveryBackend>
+where
+    Pool: RecoverableMempool,
+    Pool::Settings: Clone,
+    NetworkAdapter: NetworkAdapterTrait,
+    NetworkAdapter::Settings: Clone,
+    RecoveryBackend: RecoveryBackendTrait,
+{
+    pub const fn new(pool: Pool, service_state_handle: OpaqueServiceStateHandle<Self>) -> Self {
+        Self {
+            pool,
+            service_state_handle,
+            _phantom: PhantomData,
+        }
+    }
 }
 
 #[async_trait::async_trait]
-impl<
-        N,
-        P,
-        DB,
-        DN,
-        R,
-        DaStorage,
-        DaVerifierBackend,
-        DaVerifierNetwork,
-        DaVerifierStorage,
-        ApiAdapter,
-    > ServiceCore
-    for DaMempoolService<
-        N,
-        P,
-        DB,
-        DN,
-        R,
-        DaStorage,
-        DaVerifierBackend,
-        DaVerifierNetwork,
-        DaVerifierStorage,
-        ApiAdapter,
-    >
+impl<Pool, NetworkAdapter, RecoveryBackend> ServiceCore
+    for GenericDaMempoolService<Pool, NetworkAdapter, RecoveryBackend>
 where
-    P: MemPool + Send + 'static,
-    P::Settings: Clone + Send + Sync + 'static,
-    N::Settings: Clone + Send + Sync + 'static,
-    P::Item: Clone + Debug + Send + Sync + 'static,
-    P::Key: Clone + Debug + Send + Sync + 'static,
-    P::BlockId: Send + Debug + 'static,
-    N::Payload: DispersedBlobInfo + Into<P::Item> + Clone + Debug + Send + 'static,
-    N: NetworkAdapter<Key = P::Key> + Send + Sync + 'static,
-    DB: DaSamplingServiceBackend<R, BlobId = P::Key> + Send,
-    DB::Blob: Debug + 'static,
-    DB::BlobId: Debug + 'static,
-    DB::Settings: Clone,
-    DN: DaSamplingNetworkAdapter,
-    DaStorage: DaStorageAdapter,
-    R: SeedableRng + RngCore,
-    DaVerifierStorage: nomos_da_verifier::storage::DaStorageAdapter + Send + Sync,
-    DaVerifierBackend: nomos_da_verifier::backend::VerifierBackend + Send + 'static,
-    DaVerifierBackend::Settings: Clone,
-    DaVerifierNetwork: nomos_da_verifier::network::NetworkAdapter,
-    DaVerifierNetwork::Settings: Clone,
-    ApiAdapter: nomos_da_sampling::api::ApiAdapter + Send,
+    Pool: RecoverableMempool + Send,
+    Pool::RecoveryState: Debug + Send + Sync,
+    Pool::Key: Send,
+    Pool::Item: Clone + Send + 'static,
+    Pool::BlockId: Send,
+    Pool::Settings: Clone + Sync + Send,
+    NetworkAdapter: NetworkAdapterTrait<Payload = Pool::Item, Key = Pool::Key> + Send,
+    NetworkAdapter::Settings: Clone + Send + Sync + 'static,
+    RecoveryBackend: RecoveryBackendTrait + Send,
 {
     fn init(
         service_state: OpaqueServiceStateHandle<Self>,
-        _init_state: Self::State,
+        init_state: Self::State,
     ) -> Result<Self, overwatch::DynError> {
-        let network_relay = service_state.overwatch_handle.relay();
-        let sampling_relay = service_state.overwatch_handle.relay();
+        tracing::trace!(
+            "Initializing DaMempoolService with initial state {:#?}",
+            init_state.pool
+        );
         let settings = service_state.settings_reader.get_updated_settings();
+        let recovered_pool = init_state.pool.map_or_else(
+            || Pool::new(settings.pool.clone()),
+            |recovered_pool| Pool::recover(settings.pool.clone(), recovered_pool),
+        );
 
-        Ok(Self {
-            service_state,
-            network_relay,
-            sampling_relay,
-            pool: P::new(settings.backend),
-        })
+        Ok(Self::new(recovered_pool, service_state))
     }
 
     async fn run(mut self) -> Result<(), overwatch::DynError> {
-        let Self {
-            mut service_state,
-            network_relay,
-            sampling_relay,
-            mut pool,
-            ..
-        } = self;
-
-        let network_relay: OutboundRelay<_> = network_relay
+        let network_service_relay = self
+            .service_state_handle
+            .overwatch_handle
+            .relay::<NetworkService<_>>()
             .connect()
             .await
             .expect("Relay connection with NetworkService should succeed");
 
-        let sampling_relay: OutboundRelay<_> = sampling_relay
+        let sampling_relay = self
+            .service_state_handle
+            .overwatch_handle
+            .relay::<DaSamplingService<_, _, _, _, _, _, _, _>>()
             .connect()
             .await
             .expect("Relay connection with SamplingService should succeed");
 
-        let adapter = N::new(
-            service_state.settings_reader.get_updated_settings().network,
-            network_relay.clone(),
-        );
-        let adapter = adapter.await;
-
-        let mut network_items = adapter.payload_stream().await;
-        let mut lifecycle_stream = service_state.lifecycle_handle.message_stream();
+        // Queue for network messages
+        let mut network_items = NetworkAdapter::new(
+            self.service_state_handle
+                .settings_reader
+                .get_updated_settings()
+                .network_adapter,
+            network_service_relay.clone(),
+        )
+        .await
+        .payload_stream()
+        .await;
+        // Queue for lifecycle messages
+        let mut lifecycle_stream = self.service_state_handle.lifecycle_handle.message_stream();
 
         loop {
             tokio::select! {
-                Some(msg) = service_state.inbound_relay.recv() => {
-                    Self::handle_mempool_message(msg, &mut pool, &network_relay, &service_state);
+                // Queue for relay messages
+                Some(relay_msg) = self.service_state_handle.inbound_relay.recv() => {
+                    self.handle_mempool_message(relay_msg, network_service_relay.clone());
                 }
-                Some((key, item)) = network_items.next() => {
-                    sampling_relay.send(DaSamplingServiceMsg::TriggerSampling{blob_id: key.clone()}).await.expect("Sampling trigger message needs to be sent");
-                    pool.add_item(key, item).unwrap_or_else(|e| {
+                Some((key, item )) = network_items.next() => {
+                    self.pool.add_item(key, item).unwrap_or_else(|e| {
                         tracing::debug!("could not add item to the pool due to: {e}");
                     });
-                    tracing::info!(counter.da_mempool_pending_items = pool.pending_item_count());
+                    tracing::info!(counter.tx_mempool_pending_items = self.pool.pending_item_count());
+                    self.service_state_handle.state_updater.update(self.pool.save().into());
                 }
-                Some(msg) = lifecycle_stream.next() =>  {
-                    if lifecycle::should_stop_service::<Self>(&msg) {
+                Some(lifecycle_msg) = lifecycle_stream.next() =>  {
+                    if lifecycle::should_stop_service::<Self>(&lifecycle_msg) {
                         break;
                     }
                 }
@@ -257,58 +175,20 @@ where
     }
 }
 
-impl<
-        N,
-        P,
-        DB,
-        DN,
-        R,
-        DaStorage,
-        DaVerifierBackend,
-        DaVerifierNetwork,
-        DaVerifierStorage,
-        ApiAdapter,
-    >
-    DaMempoolService<
-        N,
-        P,
-        DB,
-        DN,
-        R,
-        DaStorage,
-        DaVerifierBackend,
-        DaVerifierNetwork,
-        DaVerifierStorage,
-        ApiAdapter,
-    >
+impl<Pool, NetworkAdapter, RecoveryBackend>
+    GenericDaMempoolService<Pool, NetworkAdapter, RecoveryBackend>
 where
-    P: MemPool + Send + 'static,
-    P::Settings: Clone + Send + Sync + 'static,
-    N::Settings: Clone + Send + Sync + 'static,
-    P::Item: Clone + Debug + Send + Sync + 'static,
-    P::Key: Debug + Send + Sync + 'static,
-    P::BlockId: Debug + Send + 'static,
-    N::Payload: DispersedBlobInfo + Into<P::Item> + Debug + Clone + Send + 'static,
-    N: NetworkAdapter<Key = P::Key> + Send + Sync + 'static,
-    DB: DaSamplingServiceBackend<R, BlobId = P::Key> + Send,
-    DB::Blob: Debug + 'static,
-    DB::BlobId: Debug + 'static,
-    DB::Settings: Clone,
-    DN: DaSamplingNetworkAdapter,
-    DaStorage: DaStorageAdapter,
-    R: SeedableRng + RngCore,
-    DaVerifierStorage: nomos_da_verifier::storage::DaStorageAdapter + Send + Sync,
-    DaVerifierBackend: VerifierBackend + Send + 'static,
-    DaVerifierBackend::Settings: Clone,
-    DaVerifierNetwork: nomos_da_verifier::network::NetworkAdapter,
-    DaVerifierNetwork::Settings: Clone,
-    ApiAdapter: nomos_da_sampling::api::ApiAdapter + Send,
+    Pool: RecoverableMempool,
+    Pool::Item: Clone + Send + 'static,
+    Pool::Settings: Clone,
+    NetworkAdapter: NetworkAdapterTrait<Payload = Pool::Item> + Send,
+    NetworkAdapter::Settings: Clone + Send + 'static,
+    RecoveryBackend: RecoveryBackendTrait,
 {
     fn handle_mempool_message(
-        message: MempoolMsg<P::BlockId, N::Payload, P::Item, P::Key>,
-        pool: &mut P,
-        network_relay: &OutboundRelay<NetworkMsg<N::Backend>>,
-        service_state: &OpaqueServiceStateHandle<Self>,
+        &mut self,
+        message: MempoolMsg<Pool::BlockId, NetworkAdapter::Payload, Pool::Item, Pool::Key>,
+        network_relay: OutboundRelay<NetworkMsg<NetworkAdapter::Backend>>,
     ) {
         match message {
             MempoolMsg::Add {
@@ -316,25 +196,42 @@ where
                 key,
                 reply_channel,
             } => {
-                Self::handle_add_to_pool(
-                    item,
-                    key,
-                    pool,
-                    network_relay,
-                    service_state,
-                    reply_channel,
-                );
+                match self.pool.add_item(key, item.clone()) {
+                    Ok(_id) => {
+                        // Broadcast the item to the network
+                        let settings = self
+                            .service_state_handle
+                            .settings_reader
+                            .get_updated_settings()
+                            .network_adapter;
+                        self.service_state_handle
+                            .state_updater
+                            .update(self.pool.save().into());
+                        // move sending to a new task so local operations can complete in the
+                        // meantime
+                        tokio::spawn(async {
+                            let adapter = NetworkAdapter::new(settings, network_relay).await;
+                            adapter.send(item).await;
+                        });
+                        if let Err(e) = reply_channel.send(Ok(())) {
+                            tracing::debug!("Failed to send reply to AddTx: {:?}", e);
+                        }
+                    }
+                    Err(e) => {
+                        tracing::debug!("could not add tx to the pool due to: {}", e);
+                    }
+                }
             }
             MempoolMsg::View {
                 ancestor_hint,
                 reply_channel,
             } => {
                 reply_channel
-                    .send(pool.view(ancestor_hint))
+                    .send(self.pool.view(ancestor_hint))
                     .unwrap_or_else(|_| tracing::debug!("could not send back pool view"));
             }
             MempoolMsg::MarkInBlock { ids, block } => {
-                pool.mark_in_block(&ids, block);
+                self.pool.mark_in_block(&ids, block);
             }
             #[cfg(test)]
             MempoolMsg::BlockItems {
@@ -342,16 +239,16 @@ where
                 reply_channel,
             } => {
                 reply_channel
-                    .send(pool.block_items(block))
+                    .send(self.pool.block_items(block))
                     .unwrap_or_else(|_| tracing::debug!("could not send back block items"));
             }
             MempoolMsg::Prune { ids } => {
-                pool.prune(&ids);
+                self.pool.prune(&ids);
             }
             MempoolMsg::Metrics { reply_channel } => {
                 let metrics = MempoolMetrics {
-                    pending_items: pool.pending_item_count(),
-                    last_item_timestamp: pool.last_item_timestamp(),
+                    pending_items: self.pool.pending_item_count(),
+                    last_item_timestamp: self.pool.last_item_timestamp(),
                 };
                 reply_channel
                     .send(metrics)
@@ -362,46 +259,9 @@ where
                 reply_channel,
             } => {
                 reply_channel
-                    .send(pool.status(&items))
+                    .send(self.pool.status(&items))
                     .unwrap_or_else(|_| tracing::debug!("could not send back mempool status"));
             }
         }
     }
-
-    fn handle_add_to_pool(
-        item: N::Payload,
-        key: P::Key,
-        pool: &mut P,
-        network_relay: &OutboundRelay<NetworkMsg<N::Backend>>,
-        service_state: &OpaqueServiceStateHandle<Self>,
-        reply_channel: oneshot::Sender<Result<(), MempoolError>>,
-    ) {
-        match pool.add_item(key, item.clone()) {
-            Ok(_id) => {
-                // Broadcast the item to the network
-                let net = network_relay.clone();
-                let settings = service_state.settings_reader.get_updated_settings().network;
-                tokio::spawn(async move {
-                    let adapter = N::new(settings, net).await;
-                    adapter.send(item).await;
-                });
-
-                if let Err(e) = reply_channel.send(Ok(())) {
-                    tracing::debug!("Failed to send reply to AddTx: {e:?}");
-                }
-            }
-            Err(e) => {
-                tracing::debug!("could not add tx to the pool due to: {e}");
-                if let Err(e) = reply_channel.send(Err(e)) {
-                    tracing::debug!("Failed to send reply to AddTx: {e:?}");
-                }
-            }
-        }
-    }
-}
-
-#[derive(Clone, Debug)]
-pub struct DaMempoolSettings<B, N> {
-    pub backend: B,
-    pub network: N,
 }

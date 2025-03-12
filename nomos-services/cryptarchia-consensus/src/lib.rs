@@ -26,7 +26,7 @@ use nomos_ledger::{leader_proof::LeaderProof, LedgerState};
 use nomos_mempool::{
     backend::{MemPool, RecoverableMempool},
     network::NetworkAdapter as MempoolAdapter,
-    DaMempoolService, MempoolMsg, TxMempoolService,
+    GenericDaMempoolService, MempoolMsg, TxMempoolService,
 };
 use nomos_network::NetworkService;
 use nomos_storage::{backends::StorageBackend, StorageMsg, StorageService};
@@ -212,7 +212,7 @@ pub struct CryptarchiaConsensus<
         Relay<nomos_blend_service::BlendService<BlendAdapter::Backend, BlendAdapter::Network>>,
     cl_mempool_relay: Relay<TxMempoolService<ClPoolAdapter, ClPool>>,
     da_mempool_relay: Relay<
-        DaMempoolService<
+        GenericDaMempoolService<
             DaPoolAdapter,
             DaPool,
             SamplingBackend,

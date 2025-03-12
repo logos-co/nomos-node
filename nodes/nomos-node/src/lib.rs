@@ -38,7 +38,7 @@ use nomos_da_verifier::{
 };
 use nomos_mempool::{backend::mockpool::MockPool, TxMempoolService};
 pub use nomos_mempool::{
-    da::service::{DaMempoolService, DaMempoolSettings},
+    da::service::{DaMempoolSettings, GenericDaMempoolService},
     network::adapters::libp2p::{
         Libp2pAdapter as MempoolNetworkAdapter, Settings as MempoolAdapterSettings,
     },
@@ -125,7 +125,7 @@ pub type TxMempool = TxMempoolService<
     MockPool<HeaderId, Tx, <Tx as Transaction>::Hash>,
 >;
 
-pub type DaMempool = DaMempoolService<
+pub type DaMempool = GenericDaMempoolService<
     MempoolNetworkAdapter<BlobInfo, <BlobInfo as DispersedBlobInfo>::BlobId>,
     MockPool<HeaderId, BlobInfo, <BlobInfo as DispersedBlobInfo>::BlobId>,
     KzgrsSamplingBackend<ChaCha20Rng>,

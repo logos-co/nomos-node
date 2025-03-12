@@ -6,7 +6,7 @@ use nomos_da_sampling::{
 };
 use nomos_da_verifier::backend::VerifierBackend;
 use nomos_mempool::{
-    backend::mockpool::MockPool, network::NetworkAdapter, DaMempoolService, MempoolMsg,
+    backend::mockpool::MockPool, network::NetworkAdapter, GenericDaMempoolService, MempoolMsg,
     TxMempoolService,
 };
 use nomos_network::backends::NetworkBackend;
@@ -86,7 +86,7 @@ where
     ApiAdapter: nomos_da_sampling::api::ApiAdapter + Send + Sync,
 {
     let relay = handle
-        .relay::<DaMempoolService<
+        .relay::<GenericDaMempoolService<
             A,
             MockPool<HeaderId, Item, Key>,
             SamplingBackend,

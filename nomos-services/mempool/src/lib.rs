@@ -7,7 +7,7 @@ pub mod verify;
 use std::fmt::{Debug, Error, Formatter};
 
 use backend::{MempoolError, Status};
-pub use da::service::{DaMempoolService, DaMempoolSettings};
+pub use da::service::{DaMempoolSettings, GenericDaMempoolService};
 use overwatch::services::relay::RelayMessage;
 use tokio::sync::oneshot::Sender;
 pub use tx::{service::TxMempoolService, settings::TxMempoolSettings};

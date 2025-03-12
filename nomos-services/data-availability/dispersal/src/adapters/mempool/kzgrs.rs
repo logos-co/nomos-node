@@ -7,7 +7,7 @@ use nomos_core::{
 };
 use nomos_da_sampling::backend::DaSamplingServiceBackend;
 use nomos_mempool::{
-    backend::MemPool, network::NetworkAdapter as MempoolAdapter, DaMempoolService, MempoolMsg,
+    backend::MemPool, network::NetworkAdapter as MempoolAdapter, GenericDaMempoolService, MempoolMsg,
 };
 use overwatch::services::{relay::OutboundRelay, ServiceData};
 use rand::{RngCore, SeedableRng};
@@ -92,7 +92,7 @@ where
     DaVerifierNetwork::Settings: Clone,
     ApiAdapter: nomos_da_sampling::api::ApiAdapter + Send + Sync,
 {
-    type MempoolService = DaMempoolService<
+    type MempoolService = GenericDaMempoolService<
         DaPoolAdapter,
         DaPool,
         SamplingBackend,
