@@ -243,9 +243,9 @@ where
                     let _ = response.send(blacklisted_peers);
                 }
             }
-        }
 
-        cx.waker().wake_by_ref();
+            cx.waker().wake_by_ref();
+        }
 
         if let Some(peer) = self.close_connections.pop_front() {
             return Poll::Ready(ToSwarm::CloseConnection {
