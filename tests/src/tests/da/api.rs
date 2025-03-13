@@ -84,7 +84,7 @@ async fn test_block_peer() {
     assert!(blocked);
 
     let blacklisted_peers = executor.blacklisted_peers().await;
-    assert_eq!(blacklisted_peers.len(), 0);
+    assert_eq!(blacklisted_peers.len(), 1);
     assert_eq!(blacklisted_peers[0], existing_peer_id.to_string());
 
     let blocked = executor.block_peer(existing_peer_id.to_string()).await;
