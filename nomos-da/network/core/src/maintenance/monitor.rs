@@ -75,9 +75,15 @@ where
         }
     }
 
-    fn try_wake(&self) {
-        if let Some(waker) = &self.waker {
-            waker.wake_by_ref();
+    // fn try_wake(&self) {
+    //     if let Some(waker) = &self.waker {
+    //         waker.wake_by_ref();
+    //     }
+    // }
+
+    fn try_wake(&mut self) {
+        if let Some(waker) = self.waker.take() {
+            waker.wake();
         }
     }
 
@@ -238,7 +244,24 @@ where
             });
         }
 
-        if let Poll::Ready(Some(cmd)) = self.peer_receiver.poll_recv(cx) {
+        // if let Poll::Ready(Some(cmd)) = self.peer_receiver.poll_recv(cx) {
+        //     match cmd {
+        //         PeerCommand::Block(peer, response) => {
+        //             let result = self.block_peer(peer);
+        //             let _ = response.send(result);
+        //         }
+        //         PeerCommand::Unblock(peer, response) => {
+        //             let result = self.unblock_peer(peer);
+        //             let _ = response.send(result);
+        //         }
+        //         PeerCommand::BlacklistedPeers(response) => {
+        //             let blacklisted_peers =
+        // self.malicous_peers.iter().copied().collect();             let _ =
+        // response.send(blacklisted_peers);         }
+        //     }
+        // }
+
+        if let Ok(cmd) = self.peer_receiver.try_recv() {
             match cmd {
                 PeerCommand::Block(peer, response) => {
                     let result = self.block_peer(peer);

@@ -11,7 +11,6 @@ use tests::{
     topology::{Topology, TopologyConfig},
 };
 
-#[ignore = "for local debugging"]
 #[tokio::test]
 async fn test_get_blob_data() {
     let topology = Topology::spawn(TopologyConfig::validator_and_executor()).await;
