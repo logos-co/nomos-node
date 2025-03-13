@@ -20,6 +20,7 @@ use tokio_stream::wrappers::{IntervalStream, UnboundedReceiverStream};
 use super::ConnectionBalancer;
 use crate::{
     behaviour::executor::{ExecutorBehaviour, ExecutorBehaviourEvent},
+    maintenance::monitor::PeerCommand,
     protocols::{
         dispersal::{
             executor::behaviour::DispersalExecutorEvent, validator::behaviour::DispersalEvent,
@@ -178,6 +179,13 @@ where
             .behaviour()
             .dispersal_executor_behaviour()
             .open_stream_sender()
+    }
+
+    pub fn peer_request_channel(&mut self) -> UnboundedSender<PeerCommand> {
+        self.swarm
+            .behaviour()
+            .monitor_behavior()
+            .peer_request_channel()
     }
 
     pub fn local_peer_id(&self) -> &PeerId {

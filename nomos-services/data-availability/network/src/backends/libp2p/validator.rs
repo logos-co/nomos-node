@@ -7,7 +7,9 @@ use futures::{
 use kzgrs_backend::common::blob::DaBlob;
 use libp2p::PeerId;
 use nomos_core::da::BlobId;
-use nomos_da_network_core::{swarm::validator::ValidatorSwarm, SubnetworkId};
+use nomos_da_network_core::{
+    maintenance::monitor::PeerCommand, swarm::validator::ValidatorSwarm, SubnetworkId,
+};
 use nomos_libp2p::ed25519;
 use nomos_tracing::info_with_id;
 use overwatch::{overwatch::handle::OverwatchHandle, services::state::NoState};
@@ -19,9 +21,11 @@ use tokio::{
 use tokio_stream::wrappers::BroadcastStream;
 use tracing::instrument;
 
+use super::common::MonitorCommand;
 use crate::backends::{
     libp2p::common::{
-        handle_sample_request, handle_validator_events_stream, DaNetworkBackendSettings,
+        handle_blacklisted_peer_request, handle_block_peer_request, handle_sample_request,
+        handle_unblock_peer_request, handle_validator_events_stream, DaNetworkBackendSettings,
         SamplingEvent, BROADCAST_CHANNEL_SIZE,
     },
     NetworkBackend,
@@ -35,6 +39,7 @@ pub enum DaNetworkMessage {
         subnetwork_id: SubnetworkId,
         blob_id: BlobId,
     },
+    PeerRequest(MonitorCommand),
 }
 
 /// Events types to subscribe to
@@ -61,6 +66,7 @@ pub struct DaNetworkValidatorBackend<Membership> {
     task: (AbortHandle, JoinHandle<Result<(), Aborted>>),
     replies_task: (AbortHandle, JoinHandle<Result<(), Aborted>>),
     sampling_request_channel: UnboundedSender<(SubnetworkId, BlobId)>,
+    peer_request_channel: UnboundedSender<PeerCommand>,
     sampling_broadcast_receiver: broadcast::Receiver<SamplingEvent>,
     verifying_broadcast_receiver: broadcast::Receiver<DaBlob>,
     _membership: PhantomData<Membership>,
@@ -103,6 +109,7 @@ where
             });
 
         let sampling_request_channel = validator_swarm.sample_request_channel();
+        let peer_request_channel = validator_swarm.peer_request_channel();
 
         let (task_abort_handle, abort_registration) = AbortHandle::new_pair();
         let task = (
@@ -132,6 +139,7 @@ where
             task,
             replies_task,
             sampling_request_channel,
+            peer_request_channel,
             sampling_broadcast_receiver,
             verifying_broadcast_receiver,
             _membership: PhantomData,
@@ -157,6 +165,23 @@ where
             } => {
                 info_with_id!(&blob_id, "RequestSample");
                 handle_sample_request(&self.sampling_request_channel, subnetwork_id, blob_id).await;
+            }
+            DaNetworkMessage::PeerRequest(MonitorCommand::BlockPeer(peer_id, response_sender)) => {
+                info_with_id!(&peer_id.to_bytes(), "BlockPeer");
+                handle_block_peer_request(&self.peer_request_channel, peer_id, response_sender)
+                    .await;
+            }
+            DaNetworkMessage::PeerRequest(MonitorCommand::UnblockPeer(
+                peer_id,
+                response_sender,
+            )) => {
+                info_with_id!(&peer_id.to_bytes(), "UnblockPeer");
+                handle_unblock_peer_request(&self.peer_request_channel, peer_id, response_sender)
+                    .await;
+            }
+            DaNetworkMessage::PeerRequest(MonitorCommand::BlacklistedPeers(response_sender)) => {
+                tracing::info!("BlacklistedPeers");
+                handle_blacklisted_peer_request(&self.peer_request_channel, response_sender).await;
             }
         }
     }

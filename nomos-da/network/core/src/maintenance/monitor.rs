@@ -14,6 +14,7 @@ use libp2p::{
     Multiaddr, PeerId,
 };
 use thiserror::Error;
+use tokio::sync::{mpsc, mpsc::UnboundedSender, oneshot};
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum PeerStatus {
@@ -34,6 +35,13 @@ pub trait ConnectionMonitor {
     fn reset_peer(&mut self, peer_id: &PeerId);
 }
 
+#[derive(Debug)]
+pub enum PeerCommand {
+    Block(PeerId, oneshot::Sender<bool>),
+    Unblock(PeerId, oneshot::Sender<bool>),
+    BlacklistedPeers(oneshot::Sender<Vec<PeerId>>),
+}
+
 /// A `NetworkBehaviour` that block connections to malicious peers or
 /// temporarily disconnects from unhealthy peers.
 #[derive(Debug)]
@@ -43,6 +51,8 @@ pub struct ConnectionMonitorBehaviour<Monitor> {
     unhealthy_peers: HashMap<PeerId, Instant>,
     close_connections: VecDeque<PeerId>,
     redial_cooldown: Duration,
+    peer_request_sender: UnboundedSender<PeerCommand>,
+    peer_receiver: mpsc::UnboundedReceiver<PeerCommand>,
     waker: Option<Waker>,
 }
 
@@ -51,12 +61,16 @@ where
     Monitor: ConnectionMonitor,
 {
     pub fn new(monitor: Monitor, redial_cooldown: Duration) -> Self {
+        let (block_peer_request_sender, block_peer_receiver) = mpsc::unbounded_channel();
+
         Self {
             monitor,
             malicous_peers: HashSet::new(),
             unhealthy_peers: HashMap::new(),
             close_connections: VecDeque::new(),
             redial_cooldown,
+            peer_request_sender: block_peer_request_sender,
+            peer_receiver: block_peer_receiver,
             waker: None,
         }
     }
@@ -120,6 +134,10 @@ where
                 PeerStatus::Healthy => {}
             }
         }
+    }
+
+    pub fn peer_request_channel(&self) -> UnboundedSender<PeerCommand> {
+        self.peer_request_sender.clone()
     }
 
     /// Enforce connection rules (deny blocked peers).
@@ -218,6 +236,23 @@ where
                 peer_id: peer,
                 connection: CloseConnection::All,
             });
+        }
+
+        if let Ok(cmd) = self.peer_receiver.try_recv() {
+            match cmd {
+                PeerCommand::Block(peer, response) => {
+                    let result = self.block_peer(peer);
+                    let _ = response.send(result);
+                }
+                PeerCommand::Unblock(peer, response) => {
+                    let result = self.unblock_peer(peer);
+                    let _ = response.send(result);
+                }
+                PeerCommand::BlacklistedPeers(response) => {
+                    let blacklisted_peers = self.malicous_peers.iter().copied().collect();
+                    let _ = response.send(blacklisted_peers);
+                }
+            }
         }
 
         self.waker = Some(cx.waker().clone());

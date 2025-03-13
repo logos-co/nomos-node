@@ -5,12 +5,14 @@ use kzgrs_backend::common::{
     blob::{DaBlob, DaLightBlob},
     ColumnIndex,
 };
+use libp2p::PeerId;
 use log::error;
 use nomos_core::da::BlobId;
 use nomos_da_network_core::{
-    protocols::{
-        sampling,
-        sampling::behaviour::{BehaviourSampleReq, BehaviourSampleRes, SamplingError},
+    maintenance::monitor::PeerCommand,
+    protocols::sampling::{
+        self,
+        behaviour::{BehaviourSampleReq, BehaviourSampleRes, SamplingError},
     },
     swarm::{
         validator::ValidatorEventsStream, DAConnectionMonitorSettings, DAConnectionPolicySettings,
@@ -22,6 +24,7 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::{
     broadcast, mpsc,
     mpsc::{error::SendError, UnboundedSender},
+    oneshot,
 };
 
 pub(crate) const BROADCAST_CHANNEL_SIZE: usize = 128;
@@ -73,6 +76,13 @@ impl SamplingEvent {
     pub fn has_blob_id(&self, target: &BlobId) -> bool {
         self.blob_id() == Some(target)
     }
+}
+
+#[derive(Debug)]
+pub enum MonitorCommand {
+    BlockPeer(PeerId, oneshot::Sender<bool>),
+    UnblockPeer(PeerId, oneshot::Sender<bool>),
+    BlacklistedPeers(oneshot::Sender<Vec<PeerId>>),
 }
 
 /// Task that handles forwarding of events to the subscriptions channels/stream
@@ -153,5 +163,40 @@ pub(crate) async fn handle_sample_request(
         sampling_request_channel.send((subnetwork_id, blob_id))
     {
         error!("Error requesting sample for subnetwork id : {subnetwork_id}, blob_id: {blob_id:?}");
+    }
+}
+
+pub(crate) async fn handle_block_peer_request(
+    monitor_request_channel: &UnboundedSender<PeerCommand>,
+    peer_id: PeerId,
+    response_sender: oneshot::Sender<bool>,
+) {
+    if let Err(SendError(cmd)) =
+        monitor_request_channel.send(PeerCommand::Block(peer_id, response_sender))
+    {
+        error!("Error peer request: {cmd:?}");
+    }
+}
+
+pub(crate) async fn handle_unblock_peer_request(
+    monitor_request_channel: &UnboundedSender<PeerCommand>,
+    peer_id: PeerId,
+    response_sender: oneshot::Sender<bool>,
+) {
+    if let Err(SendError(cmd)) =
+        monitor_request_channel.send(PeerCommand::Unblock(peer_id, response_sender))
+    {
+        error!("Error peer request: {cmd:?}");
+    }
+}
+
+pub(crate) async fn handle_blacklisted_peer_request(
+    monitor_request_channel: &UnboundedSender<PeerCommand>,
+    response_sender: oneshot::Sender<Vec<PeerId>>,
+) {
+    if let Err(SendError(cmd)) =
+        monitor_request_channel.send(PeerCommand::BlacklistedPeers(response_sender))
+    {
+        error!("Error peer request: {cmd:?}");
     }
 }

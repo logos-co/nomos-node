@@ -10,6 +10,7 @@ use libp2p::PeerId;
 use log::error;
 use nomos_core::da::BlobId;
 use nomos_da_network_core::{
+    maintenance::monitor::PeerCommand,
     protocols::dispersal::executor::behaviour::DispersalExecutorEvent,
     swarm::executor::ExecutorSwarm, SubnetworkId,
 };
@@ -25,9 +26,11 @@ use tokio::{
 use tokio_stream::wrappers::{BroadcastStream, UnboundedReceiverStream};
 use tracing::instrument;
 
+use super::common::MonitorCommand;
 use crate::backends::{
     libp2p::common::{
-        handle_sample_request, handle_validator_events_stream, DaNetworkBackendSettings,
+        handle_blacklisted_peer_request, handle_block_peer_request, handle_sample_request,
+        handle_unblock_peer_request, handle_validator_events_stream, DaNetworkBackendSettings,
         SamplingEvent, BROADCAST_CHANNEL_SIZE,
     },
     NetworkBackend,
@@ -45,6 +48,7 @@ pub enum ExecutorDaNetworkMessage {
         subnetwork_id: SubnetworkId,
         da_blob: Box<DaBlob>,
     },
+    PeerRequest(MonitorCommand),
 }
 
 /// Events types to subscribe to
@@ -87,6 +91,7 @@ where
     verifying_broadcast_receiver: broadcast::Receiver<DaBlob>,
     dispersal_broadcast_receiver: broadcast::Receiver<DispersalExecutorEvent>,
     dispersal_blobs_sender: UnboundedSender<(Membership::NetworkId, DaBlob)>,
+    peer_request_channel: UnboundedSender<PeerCommand>,
     _membership: PhantomData<Membership>,
 }
 
@@ -129,6 +134,7 @@ where
 
         let sampling_request_channel = executor_swarm.sample_request_channel();
         let dispersal_blobs_sender = executor_swarm.dispersal_blobs_channel();
+        let peer_request_channel = executor_swarm.peer_request_channel();
 
         let (task_abort_handle, abort_registration) = AbortHandle::new_pair();
         let task = (
@@ -180,6 +186,7 @@ where
             verifying_broadcast_receiver,
             dispersal_broadcast_receiver,
             dispersal_blobs_sender,
+            peer_request_channel,
             _membership: PhantomData,
         }
     }
@@ -214,6 +221,28 @@ where
                 if let Err(e) = self.dispersal_blobs_sender.send((subnetwork_id, *da_blob)) {
                     error!("Could not send internal blob to underlying dispersal behaviour: {e}");
                 }
+            }
+            ExecutorDaNetworkMessage::PeerRequest(MonitorCommand::BlockPeer(
+                peer_id,
+                response_sender,
+            )) => {
+                info_with_id!(&peer_id.to_bytes(), "BlockPeer");
+                handle_block_peer_request(&self.peer_request_channel, peer_id, response_sender)
+                    .await;
+            }
+            ExecutorDaNetworkMessage::PeerRequest(MonitorCommand::UnblockPeer(
+                peer_id,
+                response_sender,
+            )) => {
+                info_with_id!(&peer_id.to_bytes(), "UnblockPeer");
+                handle_unblock_peer_request(&self.peer_request_channel, peer_id, response_sender)
+                    .await;
+            }
+            ExecutorDaNetworkMessage::PeerRequest(MonitorCommand::BlacklistedPeers(
+                response_sender,
+            )) => {
+                tracing::info!("BlacklistedPeers");
+                handle_blacklisted_peer_request(&self.peer_request_channel, response_sender).await;
             }
         }
     }
