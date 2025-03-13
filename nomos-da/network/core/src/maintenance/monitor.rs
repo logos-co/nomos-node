@@ -91,7 +91,6 @@ where
         let inserted = self.malicous_peers.insert(peer);
         if inserted {
             self.close_connections.push_back(peer);
-            self.try_wake();
         }
         inserted
     }
@@ -106,7 +105,6 @@ where
         self.unhealthy_peers.insert(peer, until);
         // Close existing connections
         self.close_connections.push_back(peer);
-        self.try_wake();
     }
 
     /// Unblock connections to a given peer.
@@ -114,12 +112,7 @@ where
     /// Returns whether the peer was present in the set. Does nothing if the
     /// peer was not present in the set.
     pub fn unblock_peer(&mut self, peer: PeerId) -> bool {
-        let removed =
-            self.malicous_peers.remove(&peer) || self.unhealthy_peers.remove(&peer).is_some();
-        if removed {
-            self.try_wake();
-        }
-        removed
+        self.malicous_peers.remove(&peer) || self.unhealthy_peers.remove(&peer).is_some()
     }
 
     pub fn record_event(&mut self, event: Monitor::Event) {
@@ -127,9 +120,11 @@ where
             match output.peer_status {
                 PeerStatus::Malicious => {
                     self.block_peer(output.peer_id);
+                    self.try_wake();
                 }
                 PeerStatus::Unhealthy => {
                     self.temporarily_block_peer(output.peer_id);
+                    self.try_wake();
                 }
                 PeerStatus::Healthy => {}
             }
@@ -231,6 +226,8 @@ where
         &mut self,
         cx: &mut Context<'_>,
     ) -> Poll<ToSwarm<Self::ToSwarm, THandlerInEvent<Self>>> {
+        self.waker = Some(cx.waker().clone());
+
         if let Poll::Ready(Some(cmd)) = self.peer_receiver.poll_recv(cx) {
             match cmd {
                 PeerCommand::Block(peer, response) => {
@@ -248,7 +245,7 @@ where
             }
         }
 
-        self.waker = Some(cx.waker().clone());
+        cx.waker().wake_by_ref();
 
         if let Some(peer) = self.close_connections.pop_front() {
             return Poll::Ready(ToSwarm::CloseConnection {
@@ -381,9 +378,11 @@ mod tests {
 
     #[tokio::test]
     async fn test_block_unblock_peer() {
-        let mut dialer = Swarm::new_ephemeral_tokio(|_| {
+        use std::sync::{Arc, Mutex};
+
+        let dialer = Arc::new(Mutex::new(Swarm::new_ephemeral_tokio(|_| {
             ConnectionMonitorBehaviour::new(MockMonitor::default(), Duration::from_millis(100))
-        });
+        })));
         let mut listener = Swarm::new_ephemeral_tokio(|_| {
             ConnectionMonitorBehaviour::new(MockMonitor::default(), Duration::from_millis(100))
         });
@@ -391,8 +390,39 @@ mod tests {
 
         let listener_peer = *listener.local_peer_id();
 
-        let connection_behavior_dialer = dialer.behaviour_mut();
-        let sender_channel = connection_behavior_dialer.peer_request_channel();
+        let sender_channel = {
+            dialer
+                .lock()
+                .unwrap()
+                .behaviour_mut()
+                .peer_request_channel()
+        };
+
+        let (shutdown_tx, mut shudown_rx) = oneshot::channel();
+
+        let dialer_clone = Arc::clone(&dialer);
+        let poll_handle = tokio::task::spawn_blocking(move || {
+            let runtime = tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .unwrap();
+
+            runtime.block_on(async {
+                loop {
+                    tokio::time::sleep(Duration::from_millis(10)).await;
+
+                    if shudown_rx.try_recv().is_ok() {
+                        break;
+                    }
+
+                    let waker = futures::task::noop_waker();
+                    let mut cx = Context::from_waker(&waker);
+                    let _ = dialer_clone.lock().unwrap().behaviour_mut().poll(&mut cx);
+                }
+            });
+        });
+
+        tokio::time::sleep(Duration::from_millis(20)).await;
 
         let response_channel = oneshot::channel();
 
@@ -400,21 +430,55 @@ mod tests {
             .send(PeerCommand::Block(listener_peer, response_channel.0))
             .unwrap();
 
-        let mut cx = Context::from_waker(futures::task::noop_waker_ref());
-
-        // Poll the behavior directly
-        for _ in 0..5 {
-            let _ = dialer.behaviour_mut().poll(&mut cx);
-            // Optional sleep between polls
-            tokio::time::sleep(Duration::from_millis(10)).await;
-        }
-
-        // Check response
         let result = tokio::time::timeout(Duration::from_millis(100), response_channel.1)
             .await
             .expect("Test timed out")
             .expect("Response channel closed");
         assert!(result);
+
+        // blacklisted peers
+        let response_channel = oneshot::channel();
+        sender_channel
+            .send(PeerCommand::BlacklistedPeers(response_channel.0))
+            .unwrap();
+
+        let blacklisted_peers =
+            tokio::time::timeout(Duration::from_millis(100), response_channel.1)
+                .await
+                .expect("Test timed out")
+                .expect("Response channel closed");
+
+        assert_eq!(blacklisted_peers.len(), 1);
+        assert_eq!(blacklisted_peers[0], listener_peer);
+
+        // unblock
+        let response_channel = oneshot::channel();
+        sender_channel
+            .send(PeerCommand::Unblock(listener_peer, response_channel.0))
+            .unwrap();
+
+        let result = tokio::time::timeout(Duration::from_millis(100), response_channel.1)
+            .await
+            .expect("Test timed out")
+            .expect("Response channel closed");
+        assert!(result);
+
+        // blacklisted peers
+        let response_channel = oneshot::channel();
+        sender_channel
+            .send(PeerCommand::BlacklistedPeers(response_channel.0))
+            .unwrap();
+
+        let blacklisted_peers =
+            tokio::time::timeout(Duration::from_millis(100), response_channel.1)
+                .await
+                .expect("Test timed out")
+                .expect("Response channel closed");
+
+        assert!(blacklisted_peers.is_empty());
+
+        shutdown_tx.send(()).unwrap();
+        poll_handle.await.unwrap();
     }
 
     fn dial(
