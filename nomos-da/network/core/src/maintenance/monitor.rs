@@ -398,28 +398,22 @@ mod tests {
                 .peer_request_channel()
         };
 
-        let (shutdown_tx, mut shudown_rx) = oneshot::channel();
+        let (shutdown_tx, mut shutdown_rx) = oneshot::channel();
 
         let dialer_clone = Arc::clone(&dialer);
-        let poll_handle = tokio::task::spawn_blocking(move || {
-            let runtime = tokio::runtime::Builder::new_current_thread()
-                .enable_all()
-                .build()
-                .unwrap();
-
-            runtime.block_on(async {
-                loop {
-                    tokio::time::sleep(Duration::from_millis(10)).await;
-
-                    if shudown_rx.try_recv().is_ok() {
+        let poll_handle = tokio::spawn(async move {
+            loop {
+                tokio::select! {
+                    () = tokio::time::sleep(Duration::from_millis(10)) => {
+                        let waker = futures::task::noop_waker();
+                        let mut cx = Context::from_waker(&waker);
+                        let _ = dialer_clone.lock().unwrap().behaviour_mut().poll(&mut cx);
+                    }
+                    _ = &mut shutdown_rx => {
                         break;
                     }
-
-                    let waker = futures::task::noop_waker();
-                    let mut cx = Context::from_waker(&waker);
-                    let _ = dialer_clone.lock().unwrap().behaviour_mut().poll(&mut cx);
                 }
-            });
+            }
         });
 
         tokio::time::sleep(Duration::from_millis(20)).await;
