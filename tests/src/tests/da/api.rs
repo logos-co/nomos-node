@@ -65,13 +65,13 @@ async fn test_block_peer() {
     let blacklisted_peers = executor.blacklisted_peers().await;
     assert!(blacklisted_peers.is_empty());
 
-    // let membership = executor
-    //     .config()
-    //     .da_network
-    //     .backend
-    //     .validator_settings
-    //     .membership
-    //     .members();
+    let membership = executor
+        .config()
+        .da_network
+        .backend
+        .validator_settings
+        .membership
+        .members();
 
     // // take second peer ID from the membership set
     // let existing_peer_id = membership
@@ -83,8 +83,8 @@ async fn test_block_peer() {
     // let blocked = executor.block_peer(existing_peer_id.to_string()).await;
     // assert!(blocked);
 
-    // let blacklisted_peers = executor.blacklisted_peers().await;
-    // assert_eq!(blacklisted_peers.len(), 1);
+    let blacklisted_peers = executor.blacklisted_peers().await;
+    assert_eq!(blacklisted_peers.len(), 0);
     // assert_eq!(blacklisted_peers[0], existing_peer_id.to_string());
 
     // let blocked = executor.block_peer(existing_peer_id.to_string()).await;
