@@ -238,7 +238,11 @@ where
             });
         }
 
+<<<<<<< HEAD
         if let Poll::Ready(Some(cmd)) = self.peer_receiver.poll_recv(cx) {
+=======
+        if let Ok(cmd) = self.peer_receiver.try_recv() {
+>>>>>>> master
             match cmd {
                 PeerCommand::Block(peer, response) => {
                     let result = self.block_peer(peer);
