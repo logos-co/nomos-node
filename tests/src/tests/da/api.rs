@@ -108,10 +108,10 @@ async fn test_block_peer() {
 
     let non_existing_peer_id = secret_key_to_peer_id(node_key);
     let blocked = executor.block_peer(non_existing_peer_id.to_string()).await;
-    assert!(!blocked);
+    assert!(blocked);
 
     let unblocked = executor
         .unblock_peer(non_existing_peer_id.to_string())
         .await;
-    assert!(!unblocked);
+    assert!(unblocked);
 }
