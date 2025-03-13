@@ -49,7 +49,7 @@ pub fn get_available_port() -> u16 {
 #[must_use]
 pub fn adjust_timeout(d: Duration) -> Duration {
     if *IS_SLOW_TEST_ENV {
-        d.mul(6)
+        d.mul(2)
     } else {
         d
     }
