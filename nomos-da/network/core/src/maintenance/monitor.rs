@@ -248,6 +248,8 @@ where
             }
         }
 
+        self.waker = Some(cx.waker().clone());
+
         if let Some(peer) = self.close_connections.pop_front() {
             return Poll::Ready(ToSwarm::CloseConnection {
                 peer_id: peer,
@@ -255,7 +257,6 @@ where
             });
         }
 
-        self.waker = Some(cx.waker().clone());
         Poll::Pending
     }
 }
