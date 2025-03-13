@@ -73,48 +73,45 @@ async fn test_block_peer() {
         .membership
         .members();
 
-    // // take second peer ID from the membership set
-    // let existing_peer_id = membership
-    //     .iter()
-    //     .nth(1)
-    //     .expect("Expected at least 2 members in the set");
+    // take second peer ID from the membership set
+    let existing_peer_id = membership
+        .iter()
+        .nth(1)
+        .expect("Expected at least 2 members in the set");
 
-    // // try block/unblock peer id combinations
-    // let blocked = executor.block_peer(existing_peer_id.to_string()).await;
-    // assert!(blocked);
+    // try block/unblock peer id combinations
+    let blocked = executor.block_peer(existing_peer_id.to_string()).await;
+    assert!(blocked);
 
     let blacklisted_peers = executor.blacklisted_peers().await;
     assert_eq!(blacklisted_peers.len(), 0);
-    // assert_eq!(blacklisted_peers[0], existing_peer_id.to_string());
+    assert_eq!(blacklisted_peers[0], existing_peer_id.to_string());
 
-    // let blocked = executor.block_peer(existing_peer_id.to_string()).await;
-    // assert!(!blocked);
+    let blocked = executor.block_peer(existing_peer_id.to_string()).await;
+    assert!(!blocked);
 
-    // let unblocked =
-    // executor.unblock_peer(existing_peer_id.to_string()).await;
-    // assert!(unblocked);
+    let unblocked = executor.unblock_peer(existing_peer_id.to_string()).await;
+    assert!(unblocked);
 
-    // let blacklisted_peers = executor.blacklisted_peers().await;
-    // assert!(blacklisted_peers.is_empty());
+    let blacklisted_peers = executor.blacklisted_peers().await;
+    assert!(blacklisted_peers.is_empty());
 
-    // let unblocked =
-    // executor.unblock_peer(existing_peer_id.to_string()).await;
-    // assert!(!unblocked);
+    let unblocked = executor.unblock_peer(existing_peer_id.to_string()).await;
+    assert!(!unblocked);
 
-    // // try blocking/unblocking non existing peer id
-    // let mut node_key_bytes = [0u8; 32];
-    // OsRng.fill_bytes(&mut node_key_bytes);
+    // try blocking/unblocking non existing peer id
+    let mut node_key_bytes = [0u8; 32];
+    OsRng.fill_bytes(&mut node_key_bytes);
 
-    // let node_key = ed25519::SecretKey::try_from_bytes(&mut node_key_bytes)
-    //     .expect("Failed to generate secret key from bytes");
+    let node_key = ed25519::SecretKey::try_from_bytes(&mut node_key_bytes)
+        .expect("Failed to generate secret key from bytes");
 
-    // let non_existing_peer_id = secret_key_to_peer_id(node_key);
-    // let blocked =
-    // executor.block_peer(non_existing_peer_id.to_string()).await;
-    // assert!(!blocked);
+    let non_existing_peer_id = secret_key_to_peer_id(node_key);
+    let blocked = executor.block_peer(non_existing_peer_id.to_string()).await;
+    assert!(!blocked);
 
-    // let unblocked = executor
-    //     .unblock_peer(non_existing_peer_id.to_string())
-    //     .await;
-    // assert!(!unblocked);
+    let unblocked = executor
+        .unblock_peer(non_existing_peer_id.to_string())
+        .await;
+    assert!(!unblocked);
 }

@@ -231,13 +231,6 @@ where
         &mut self,
         cx: &mut Context<'_>,
     ) -> Poll<ToSwarm<Self::ToSwarm, THandlerInEvent<Self>>> {
-        if let Some(peer) = self.close_connections.pop_front() {
-            return Poll::Ready(ToSwarm::CloseConnection {
-                peer_id: peer,
-                connection: CloseConnection::All,
-            });
-        }
-
         if let Poll::Ready(Some(cmd)) = self.peer_receiver.poll_recv(cx) {
             match cmd {
                 PeerCommand::Block(peer, response) => {
@@ -253,6 +246,13 @@ where
                     let _ = response.send(blacklisted_peers);
                 }
             }
+        }
+
+        if let Some(peer) = self.close_connections.pop_front() {
+            return Poll::Ready(ToSwarm::CloseConnection {
+                peer_id: peer,
+                connection: CloseConnection::All,
+            });
         }
 
         self.waker = Some(cx.waker().clone());
