@@ -42,13 +42,6 @@ pub enum PeerCommand {
     BlacklistedPeers(oneshot::Sender<Vec<PeerId>>),
 }
 
-#[derive(Debug)]
-pub enum PeerCommand {
-    Block(PeerId, oneshot::Sender<bool>),
-    Unblock(PeerId, oneshot::Sender<bool>),
-    BlacklistedPeers(oneshot::Sender<Vec<PeerId>>),
-}
-
 /// A `NetworkBehaviour` that block connections to malicious peers or
 /// temporarily disconnects from unhealthy peers.
 #[derive(Debug)]
@@ -70,16 +63,12 @@ where
     pub fn new(monitor: Monitor, redial_cooldown: Duration) -> Self {
         let (block_peer_request_sender, block_peer_receiver) = mpsc::unbounded_channel();
 
-        let (block_peer_request_sender, block_peer_receiver) = mpsc::unbounded_channel();
-
         Self {
             monitor,
             malicous_peers: HashSet::new(),
             unhealthy_peers: HashMap::new(),
             close_connections: VecDeque::new(),
             redial_cooldown,
-            peer_request_sender: block_peer_request_sender,
-            peer_receiver: block_peer_receiver,
             peer_request_sender: block_peer_request_sender,
             peer_receiver: block_peer_receiver,
             waker: None,
@@ -145,10 +134,6 @@ where
                 PeerStatus::Healthy => {}
             }
         }
-    }
-
-    pub fn peer_request_channel(&self) -> UnboundedSender<PeerCommand> {
-        self.peer_request_sender.clone()
     }
 
     pub fn peer_request_channel(&self) -> UnboundedSender<PeerCommand> {

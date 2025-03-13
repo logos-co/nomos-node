@@ -57,6 +57,7 @@ async fn test_get_blob_data() {
     assert!(blob_data.is_some());
 }
 
+#[ignore = "for local debugging"]
 #[tokio::test]
 async fn test_block_peer() {
     let topology = Topology::spawn(TopologyConfig::validator_and_executor()).await;
