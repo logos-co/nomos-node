@@ -348,6 +348,10 @@ where
     NetworkAdapter::Settings: Clone + Send + 'static,
     RecoveryBackend: RecoveryBackendTrait,
 {
+    #[expect(
+        clippy::cognitive_complexity,
+        reason = "Mempool message handling is convenient to have in one block"
+    )]
     fn handle_mempool_message(
         &mut self,
         message: MempoolMsg<Pool::BlockId, NetworkAdapter::Payload, Pool::Item, Pool::Key>,
@@ -377,11 +381,14 @@ where
                             adapter.send(item).await;
                         });
                         if let Err(e) = reply_channel.send(Ok(())) {
-                            tracing::debug!("Failed to send reply to AddTx: {:?}", e);
+                            tracing::debug!("Failed to send reply to AddTx: {e:?}");
                         }
                     }
                     Err(e) => {
-                        tracing::debug!("could not add tx to the pool due to: {}", e);
+                        tracing::debug!("could not add tx to the pool due to: {e}");
+                        if let Err(e) = reply_channel.send(Err(e)) {
+                            tracing::debug!("Failed to send reply to AddTx: {e:?}");
+                        }
                     }
                 }
             }
