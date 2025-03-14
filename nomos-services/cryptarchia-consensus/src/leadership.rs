@@ -134,8 +134,8 @@ impl Leader {
         None
     }
 
-    pub(crate) fn notes(&self, header_id: &HeaderId) -> Option<&Vec<NoteWitness>> {
-        self.notes.get(header_id)
+    pub(crate) fn notes(&self, header_id: &HeaderId) -> Option<&[NoteWitness]> {
+        self.notes.get(header_id).map(Vec::as_slice)
     }
 }
 

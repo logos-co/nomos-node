@@ -995,7 +995,7 @@ where
     ///
     /// A vector of blocks in the range from `from` to `to`.
     /// If no blocks are found, returns an empty vector.
-    /// If any of the HeaderId are invalid, returns an error with the first
+    /// If any of the [`HeaderId`]s are invalid, returns an error with the first
     /// invalid header id.
     async fn get_blocks_in_range(
         from: HeaderId,
@@ -1042,6 +1042,10 @@ where
     ///   the consensus.
     /// * `block_subscription_sender` - The broadcast channel to send the blocks
     ///   to the services.
+    #[expect(
+        clippy::type_complexity,
+        reason = "CryptarchiaConsensusState and CryptarchiaConsensusRelays amount of generics."
+    )]
     async fn build_cryptarchia(
         mut initial_state: CryptarchiaConsensusState<
             TxS::Settings,
@@ -1120,6 +1124,10 @@ where
     /// * `block_broadcaster` - The broadcast channel to send the blocks to the
     ///   services.
     /// * `ledger_config` - The ledger configuration.
+    #[expect(
+        clippy::type_complexity,
+        reason = "CryptarchiaConsensusRelays amount of generics."
+    )]
     async fn recover_cryptarchia(
         from_header_id: HeaderId,
         from_ledger_state: LedgerState,
@@ -1155,7 +1163,7 @@ where
                 relays,
                 block_subscription_sender,
             )
-            .await
+            .await;
         }
 
         cryptarchia
@@ -1173,6 +1181,10 @@ where
         (cryptarchia, leader)
     }
 
+    #[expect(
+        clippy::type_complexity,
+        reason = "CryptarchiaConsensusRelays amount of generics."
+    )]
     async fn recover_from_genesis(
         GenesisRecoveryStrategy { tip }: GenesisRecoveryStrategy,
         genesis_id: HeaderId,
@@ -1191,6 +1203,7 @@ where
             SamplingRng,
             Storage,
             TxS,
+            DaVerifierBackend,
         >,
         block_subscription_sender: &mut broadcast::Sender<Block<ClPool::Item, DaPool::Item>>,
     ) -> (Cryptarchia, Leader) {
@@ -1209,6 +1222,10 @@ where
         (cryptarchia, leader)
     }
 
+    #[expect(
+        clippy::type_complexity,
+        reason = "CryptarchiaConsensusRelays amount of generics."
+    )]
     async fn recover_from_security(
         SecurityRecoveryStrategy {
             tip,
@@ -1230,6 +1247,7 @@ where
             SamplingRng,
             Storage,
             TxS,
+            DaVerifierBackend,
         >,
         block_subscription_sender: &mut broadcast::Sender<Block<ClPool::Item, DaPool::Item>>,
     ) -> (Cryptarchia, Leader) {

@@ -94,7 +94,7 @@ impl<TxS, BxS, NetworkAdapterSettings, BlendAdapterSettings, TimeBackendSettings
             .cloned();
         let security_leader_notes = security_block_header
             .and_then(|header_id| leader.notes(&header_id))
-            .cloned();
+            .map(Vec::from);
 
         Self::new(
             Some(cryptarchia.tip()),
