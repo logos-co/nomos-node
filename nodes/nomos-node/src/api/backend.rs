@@ -12,6 +12,7 @@ use nomos_core::{
     tx::Transaction,
 };
 use nomos_da_network_core::SubnetworkId;
+use nomos_da_network_service::backends::libp2p::validator::DaNetworkValidatorBackend;
 use nomos_da_sampling::backend::DaSamplingServiceBackend;
 use nomos_da_verifier::backend::VerifierBackend;
 use nomos_libp2p::PeerId;
@@ -29,8 +30,9 @@ use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
 
 use super::handlers::{
-    add_blob, add_blob_info, add_tx, block, cl_metrics, cl_status, cryptarchia_headers,
-    cryptarchia_info, da_get_commitments, da_get_light_blob, get_range, libp2p_info,
+    add_blob, add_blob_info, add_tx, blacklisted_peers, block, block_peer, cl_metrics, cl_status,
+    cryptarchia_headers, cryptarchia_info, da_get_commitments, da_get_light_blob, get_range,
+    libp2p_info, unblock_peer,
 };
 use crate::api::paths;
 
@@ -332,6 +334,18 @@ where
                         SIZE,
                     >,
                 ),
+            )
+            .route(
+                paths::DA_BLOCK_PEER,
+                routing::post(block_peer::<DaNetworkValidatorBackend<Membership>>),
+            )
+            .route(
+                paths::DA_UNBLOCK_PEER,
+                routing::post(unblock_peer::<DaNetworkValidatorBackend<Membership>>),
+            )
+            .route(
+                paths::DA_BLACKLISTED_PEERS,
+                routing::get(blacklisted_peers::<DaNetworkValidatorBackend<Membership>>),
             )
             .route(paths::NETWORK_INFO, routing::get(libp2p_info))
             .route(

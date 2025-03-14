@@ -5,7 +5,11 @@ use axum::{
     response::Response,
     Json,
 };
-use nomos_api::http::{cl, consensus, da, libp2p, mempool, storage};
+use nomos_api::http::{
+    cl, consensus,
+    da::{self, PeerMessagesFactory},
+    libp2p, mempool, storage,
+};
 use nomos_core::{
     da::{
         blob::{info::DispersedBlobInfo, metadata::Metadata, Blob},
@@ -16,11 +20,12 @@ use nomos_core::{
 };
 use nomos_da_messages::http::da::{DABlobCommitmentsRequest, DAGetLightBlobReq, GetRangeReq};
 use nomos_da_network_core::SubnetworkId;
+use nomos_da_network_service::backends::NetworkBackend;
 use nomos_da_sampling::backend::DaSamplingServiceBackend;
 use nomos_da_verifier::backend::VerifierBackend;
 use nomos_libp2p::PeerId;
 use nomos_mempool::network::adapters::libp2p::Libp2pAdapter as MempoolNetworkAdapter;
-use nomos_network::backends::libp2p::Libp2p as NetworkBackend;
+use nomos_network::backends::libp2p::Libp2p as Libp2pNetworkBackend;
 use nomos_storage::backends::StorageSerde;
 use overwatch::overwatch::handle::OverwatchHandle;
 use rand::{RngCore, SeedableRng};
@@ -372,6 +377,61 @@ where
 }
 
 #[utoipa::path(
+    post,
+    path = paths::DA_BLOCK_PEER,
+    responses(
+        (status = 200, description = "Block a peer", body = bool),
+        (status = 500, description = "Internal server error", body = String),
+    )
+)]
+pub async fn block_peer<Backend>(
+    State(handle): State<OverwatchHandle>,
+    Json(peer_id): Json<PeerId>,
+) -> Response
+where
+    Backend: NetworkBackend + Send + 'static,
+    Backend::Message: PeerMessagesFactory,
+{
+    make_request_and_return_response!(da::block_peer::<Backend>(&handle, peer_id))
+}
+
+#[utoipa::path(
+    post,
+    path = paths::DA_UNBLOCK_PEER,
+    responses(
+        (status = 200, description = "Unblock a peer", body = bool),
+        (status = 500, description = "Internal server error", body = String),
+    )
+)]
+
+pub async fn unblock_peer<Backend>(
+    State(handle): State<OverwatchHandle>,
+    Json(peer_id): Json<PeerId>,
+) -> Response
+where
+    Backend: NetworkBackend + Send + 'static,
+    Backend::Message: PeerMessagesFactory,
+{
+    make_request_and_return_response!(da::unblock_peer::<Backend>(&handle, peer_id))
+}
+
+#[utoipa::path(
+    get,
+    path = paths::DA_BLACKLISTED_PEERS,
+    responses(
+        (status = 200, description = "Get the blacklisted peers", body = Vec<PeerId>),
+        (status = 500, description = "Internal server error", body = String),
+    )
+)]
+pub async fn blacklisted_peers<Backend>(State(handle): State<OverwatchHandle>) -> Response
+where
+    Backend: NetworkBackend + Send + 'static,
+    Backend::Message: PeerMessagesFactory,
+{
+    make_request_and_return_response!(da::blacklisted_peers::<Backend>(&handle))
+}
+
+#[utoipa::path(
     get,
     path = paths::NETWORK_INFO,
     responses(
@@ -471,7 +531,7 @@ where
         std::cmp::Ord + Debug + Send + Sync + Serialize + for<'de> Deserialize<'de> + 'static,
 {
     make_request_and_return_response!(mempool::add_tx::<
-        NetworkBackend,
+        Libp2pNetworkBackend,
         MempoolNetworkAdapter<Tx, <Tx as Transaction>::Hash>,
         Tx,
         <Tx as Transaction>::Hash,
@@ -536,7 +596,7 @@ where
     ApiAdapter: nomos_da_sampling::api::ApiAdapter + Send + Sync,
 {
     make_request_and_return_response!(mempool::add_blob_info::<
-        NetworkBackend,
+        Libp2pNetworkBackend,
         MempoolNetworkAdapter<B, <B as DispersedBlobInfo>::BlobId>,
         B,
         <B as DispersedBlobInfo>::BlobId,

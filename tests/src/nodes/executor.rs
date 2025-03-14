@@ -41,7 +41,7 @@ use nomos_da_verifier::{
 use nomos_executor::{api::backend::AxumBackendSettings, config::Config};
 use nomos_network::{backends::libp2p::Libp2pConfig, NetworkConfig};
 use nomos_node::{
-    api::paths::{CL_METRICS, DA_GET_RANGE},
+    api::paths::{CL_METRICS, DA_BLACKLISTED_PEERS, DA_BLOCK_PEER, DA_GET_RANGE, DA_UNBLOCK_PEER},
     config::mempool::MempoolConfig,
     RocksBackendSettings,
 };
@@ -137,6 +137,43 @@ impl Executor {
             .await
             .unwrap()
             .json::<Vec<([u8; 8], Vec<DaBlob>)>>()
+            .await
+            .unwrap()
+    }
+
+    pub async fn block_peer(&self, peer_id: String) -> bool {
+        CLIENT
+            .post(format!("http://{}{}", self.addr, DA_BLOCK_PEER))
+            .header("Content-Type", "application/json")
+            .body(serde_json::to_string(&peer_id).unwrap())
+            .send()
+            .await
+            .unwrap()
+            .json::<bool>()
+            .await
+            .unwrap()
+    }
+
+    pub async fn unblock_peer(&self, peer_id: String) -> bool {
+        CLIENT
+            .post(format!("http://{}{}", self.addr, DA_UNBLOCK_PEER))
+            .header("Content-Type", "application/json")
+            .body(serde_json::to_string(&peer_id).unwrap())
+            .send()
+            .await
+            .unwrap()
+            .json::<bool>()
+            .await
+            .unwrap()
+    }
+
+    pub async fn blacklisted_peers(&self) -> Vec<String> {
+        CLIENT
+            .get(format!("http://{}{}", self.addr, DA_BLACKLISTED_PEERS))
+            .send()
+            .await
+            .unwrap()
+            .json::<Vec<String>>()
             .await
             .unwrap()
     }

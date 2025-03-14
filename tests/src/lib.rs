@@ -59,7 +59,8 @@ fn node_address_from_port(port: u16) -> Multiaddr {
     Swarm::multiaddr(std::net::Ipv4Addr::new(127, 0, 0, 1), port)
 }
 
-fn secret_key_to_peer_id(node_key: nomos_libp2p::ed25519::SecretKey) -> PeerId {
+#[must_use]
+pub fn secret_key_to_peer_id(node_key: nomos_libp2p::ed25519::SecretKey) -> PeerId {
     PeerId::from_public_key(
         &nomos_libp2p::ed25519::Keypair::from(node_key)
             .public()

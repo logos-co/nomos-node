@@ -1,9 +1,13 @@
 use common_http_client::CommonHttpClient;
 use kzgrs_backend::common::blob::{DaBlob, DaLightBlob};
 use nomos_core::da::blob::Blob;
+use nomos_libp2p::ed25519;
+use rand::{rngs::OsRng, RngCore};
 use reqwest::Url;
+use subnetworks_assignations::MembershipHandler;
 use tests::{
     common::da::{disseminate_with_metadata, wait_for_indexed_blob, APP_ID},
+    secret_key_to_peer_id,
     topology::{Topology, TopologyConfig},
 };
 
@@ -51,4 +55,63 @@ async fn test_get_blob_data() {
         .unwrap();
 
     assert!(blob_data.is_some());
+}
+
+#[tokio::test]
+async fn test_block_peer() {
+    let topology = Topology::spawn(TopologyConfig::validator_and_executor()).await;
+    let executor = &topology.executors()[0];
+
+    let blacklisted_peers = executor.blacklisted_peers().await;
+    assert!(blacklisted_peers.is_empty());
+
+    let membership = executor
+        .config()
+        .da_network
+        .backend
+        .validator_settings
+        .membership
+        .members();
+
+    // take second peer ID from the membership set
+    let existing_peer_id = membership
+        .iter()
+        .nth(1)
+        .expect("Expected at least 2 members in the set");
+
+    // try block/unblock peer id combinations
+    let blocked = executor.block_peer(existing_peer_id.to_string()).await;
+    assert!(blocked);
+
+    let blacklisted_peers = executor.blacklisted_peers().await;
+    assert_eq!(blacklisted_peers.len(), 1);
+    assert_eq!(blacklisted_peers[0], existing_peer_id.to_string());
+
+    let blocked = executor.block_peer(existing_peer_id.to_string()).await;
+    assert!(!blocked);
+
+    let unblocked = executor.unblock_peer(existing_peer_id.to_string()).await;
+    assert!(unblocked);
+
+    let blacklisted_peers = executor.blacklisted_peers().await;
+    assert!(blacklisted_peers.is_empty());
+
+    let unblocked = executor.unblock_peer(existing_peer_id.to_string()).await;
+    assert!(!unblocked);
+
+    // try blocking/unblocking non existing peer id
+    let mut node_key_bytes = [0u8; 32];
+    OsRng.fill_bytes(&mut node_key_bytes);
+
+    let node_key = ed25519::SecretKey::try_from_bytes(&mut node_key_bytes)
+        .expect("Failed to generate secret key from bytes");
+
+    let non_existing_peer_id = secret_key_to_peer_id(node_key);
+    let blocked = executor.block_peer(non_existing_peer_id.to_string()).await;
+    assert!(blocked);
+
+    let unblocked = executor
+        .unblock_peer(non_existing_peer_id.to_string())
+        .await;
+    assert!(unblocked);
 }
