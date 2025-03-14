@@ -1,7 +1,8 @@
 use std::{fmt::Debug, sync::Arc};
 
+use futures::{Stream, StreamExt};
 use nomos_core::da::blob::Blob;
-use nomos_da_messages::http::da::{DABlobCommitmentsRequest, DAGetLightBlobReq};
+use nomos_da_messages::http::da::{DABlobCommitmentsRequest, DAGetLightBlobReq, GetSharesRequest};
 use reqwest::{Client, ClientBuilder, RequestBuilder, StatusCode, Url};
 use serde::{de::DeserializeOwned, Serialize};
 
@@ -9,6 +10,7 @@ use serde::{de::DeserializeOwned, Serialize};
 const DA_GET_SHARED_COMMITMENTS: &str = "/da/get-commitments";
 
 const DA_GET_LIGHT_BLOB: &str = "/da/get-blob";
+const DA_GET_SHARES: &str = "/da/sampling/shares";
 
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
@@ -130,5 +132,48 @@ impl CommonHttpClient {
         let path = DA_GET_LIGHT_BLOB.trim_start_matches('/');
         let request_url = base_url.join(path).map_err(Error::Url)?;
         self.get(request_url, &request).await
+    }
+
+    pub async fn get_shares<B>(
+        &self,
+        base_url: Url,
+        blob_id: B::BlobId,
+        requested_shares: Vec<B::ColumnIndex>,
+        filter_shares: Vec<B::ColumnIndex>,
+        return_available: bool,
+    ) -> Result<impl Stream<Item = B::LightBlob>, Error>
+    where
+        B: Blob,
+        <B as Blob>::BlobId: serde::Serialize + Send + Sync,
+        <B as Blob>::ColumnIndex: serde::Serialize + DeserializeOwned + Send + Sync,
+        <B as Blob>::LightBlob: DeserializeOwned + Send + Sync,
+    {
+        let request: GetSharesRequest<B> = GetSharesRequest {
+            blob_id,
+            requested_shares,
+            filter_shares,
+            return_available,
+        };
+        let request_url = base_url
+            .join(DA_GET_SHARES.trim_start_matches('/'))
+            .map_err(Error::Url)?;
+        let mut request = self.client.get(request_url).json(&request);
+
+        if let Some(basic_auth) = &self.basic_auth {
+            request = request.basic_auth(&basic_auth.username, basic_auth.password.as_deref());
+        }
+
+        let response = request.send().await.map_err(Error::Request)?;
+        let status = response.status();
+
+        let shares_stream = response.bytes_stream().filter_map(|item| async move {
+            item.ok()
+                .and_then(|bytes| serde_json::from_slice::<B::LightBlob>(&bytes).ok())
+        });
+        match status {
+            StatusCode::OK => Ok(shares_stream),
+            StatusCode::INTERNAL_SERVER_ERROR => Err(Error::Server("Error".to_string())),
+            _ => Err(Error::Server(format!("Unexpected response [{status}]",))),
+        }
     }
 }

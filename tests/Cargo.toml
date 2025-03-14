@@ -47,6 +47,7 @@ time                     = "0.3"
 tokio                    = "1"
 tracing                  = "0.1"
 x25519-dalek             = { version = "2", features = ["getrandom", "static_secrets"] }
+futures-util             = "0.3.31"
 
 [[test]]
 name = "test_cryptarchia_happy_path"

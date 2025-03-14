@@ -5,7 +5,10 @@ use kzgrs_backend::common::blob::DaBlob;
 use nomos_blend_service::network::libp2p::Libp2pAdapter as BlendNetworkAdapter;
 use nomos_core::{
     da::{
-        blob::{info::DispersedBlobInfo, metadata, select::FillSize as FillSizeWithBlobs, Blob},
+        blob::{
+            info::DispersedBlobInfo, metadata, select::FillSize as FillSizeWithBlobs, Blob,
+            LightBlob,
+        },
         BlobId, DaVerifier as CoreDaVerifier,
     },
     header::HeaderId,
@@ -108,7 +111,8 @@ where
     B: Blob + Serialize + DeserializeOwned + Clone + Send + Sync + 'static,
     <B as Blob>::BlobId: AsRef<[u8]> + Send + Sync + 'static,
     <B as Blob>::ColumnIndex: AsRef<[u8]> + Send + Sync + 'static,
-    <B as Blob>::LightBlob: Serialize + DeserializeOwned + Clone + Send + Sync + 'static,
+    <B as Blob>::LightBlob:
+        LightBlob + Serialize + DeserializeOwned + Clone + Send + Sync + 'static,
     <B as Blob>::SharedCommitments: Serialize + DeserializeOwned + Clone + Send + Sync + 'static,
     M: MembershipHandler<NetworkId = SubnetworkId, Id = PeerId>
         + Clone

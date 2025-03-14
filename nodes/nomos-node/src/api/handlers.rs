@@ -1,10 +1,12 @@
 use std::{error::Error, fmt::Debug, hash::Hash};
 
 use axum::{
+    body::StreamBody,
     extract::{Query, State},
-    response::Response,
+    response::{IntoResponse, Response},
     Json,
 };
+use http::{header, StatusCode};
 use nomos_api::http::{
     cl, consensus,
     da::{self, PeerMessagesFactory},
@@ -12,13 +14,15 @@ use nomos_api::http::{
 };
 use nomos_core::{
     da::{
-        blob::{info::DispersedBlobInfo, metadata::Metadata, Blob},
+        blob::{info::DispersedBlobInfo, metadata::Metadata, Blob, LightBlob},
         BlobId, DaVerifier as CoreDaVerifier,
     },
     header::HeaderId,
     tx::Transaction,
 };
-use nomos_da_messages::http::da::{DABlobCommitmentsRequest, DAGetLightBlobReq, GetRangeReq};
+use nomos_da_messages::http::da::{
+    DABlobCommitmentsRequest, DAGetLightBlobReq, GetRangeReq, GetSharesRequest,
+};
 use nomos_da_network_core::SubnetworkId;
 use nomos_da_network_service::backends::NetworkBackend;
 use nomos_da_sampling::backend::DaSamplingServiceBackend;
@@ -259,7 +263,8 @@ where
     B: Blob + Serialize + DeserializeOwned + Clone + Send + Sync + 'static,
     <B as Blob>::BlobId: AsRef<[u8]> + Send + Sync + 'static,
     <B as Blob>::ColumnIndex: AsRef<[u8]> + Send + Sync + 'static,
-    <B as Blob>::LightBlob: Serialize + DeserializeOwned + Clone + Send + Sync + 'static,
+    <B as Blob>::LightBlob:
+        LightBlob + Serialize + DeserializeOwned + Clone + Send + Sync + 'static,
     <B as Blob>::SharedCommitments: Serialize + DeserializeOwned + Clone + Send + Sync + 'static,
     M: MembershipHandler<NetworkId = SubnetworkId, Id = PeerId>
         + Clone
@@ -505,7 +510,7 @@ where
     DaBlob: Blob,
     <DaBlob as Blob>::BlobId: AsRef<[u8]> + DeserializeOwned + Clone + Send + Sync + 'static,
     <DaBlob as Blob>::ColumnIndex: AsRef<[u8]> + DeserializeOwned + Send + Sync + 'static,
-    <DaBlob as Blob>::LightBlob: Serialize + DeserializeOwned + Send + Sync + 'static,
+    <DaBlob as Blob>::LightBlob: LightBlob + Serialize + DeserializeOwned + Send + Sync + 'static,
     StorageOp: StorageSerde + Send + Sync + 'static,
     <StorageOp as StorageSerde>::Error: Send + Sync,
 {
@@ -514,6 +519,50 @@ where
         request.blob_id,
         request.column_idx
     ))
+}
+
+#[utoipa::path(
+    get,
+    path = paths::DA_GET_SHARES,
+    responses(
+        (status = 200, description = "Request shares for a blob", body = GetSharesRequest<DaBlob>),
+        (status = 500, description = "Internal server error", body = StreamBody),
+    )
+)]
+pub async fn da_get_shares<StorageOp, DaBlob>(
+    State(handle): State<OverwatchHandle>,
+    Json(request): Json<GetSharesRequest<DaBlob>>,
+) -> Response
+where
+    DaBlob: Blob,
+    <DaBlob as Blob>::BlobId: AsRef<[u8]> + DeserializeOwned + Clone + Send + Sync + 'static,
+    <DaBlob as Blob>::ColumnIndex: serde::Serialize + DeserializeOwned + Send + Sync + Eq + Hash,
+    <DaBlob as Blob>::LightBlob: LightBlob<ColumnIndex = <DaBlob as Blob>::ColumnIndex>
+        + Serialize
+        + DeserializeOwned
+        + Send
+        + Sync
+        + 'static,
+    StorageOp: StorageSerde + Send + Sync + 'static,
+    <StorageOp as StorageSerde>::Error: Send + Sync,
+    <DaBlob as Blob>::LightBlob: LightBlob,
+    <DaBlob as Blob>::ColumnIndex: 'static,
+{
+    match storage::get_shares::<StorageOp, DaBlob>(
+        &handle,
+        request.blob_id,
+        request.requested_shares,
+        request.filter_shares,
+        request.return_available,
+    )
+    .await
+    {
+        Ok(shares) => {
+            let body = StreamBody::new(shares);
+            IntoResponse::into_response(([(header::CONTENT_TYPE, "application/x-ndjson")], body))
+        }
+        Err(e) => IntoResponse::into_response((StatusCode::INTERNAL_SERVER_ERROR, e.to_string())),
+    }
 }
 
 #[utoipa::path(

@@ -2,6 +2,11 @@ pub mod info;
 pub mod metadata;
 pub mod select;
 
+pub trait LightBlob {
+    type ColumnIndex;
+    fn column_idx(&self) -> Self::ColumnIndex;
+}
+
 pub trait Blob {
     type BlobId;
     type ColumnIndex;

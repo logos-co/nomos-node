@@ -5,6 +5,7 @@ pub const CRYPTARCHIA_HEADERS: &str = "/cryptarchia/headers";
 pub const DA_ADD_BLOB: &str = "/da/add-blob";
 pub const DA_GET_RANGE: &str = "/da/get-range";
 pub const DA_GET_SHARED_COMMITMENTS: &str = "/da/get-commitments";
+pub const DA_GET_SHARES: &str = "/da/sampling/shares";
 pub const DA_GET_LIGHT_BLOB: &str = "/da/get-blob";
 pub const DA_BLOCK_PEER: &str = "/da/block-peer";
 pub const DA_UNBLOCK_PEER: &str = "/da/unblock-peer";
