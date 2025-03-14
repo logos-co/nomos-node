@@ -328,16 +328,12 @@ where
 
 // Builder for generating messages for peers (validator and executor).
 pub trait PeerMessagesBuilder {
-    type MessageType;
-
     fn create_block_message(peer_id: PeerId, sender: oneshot::Sender<bool>) -> Self;
     fn create_unblock_message(peer_id: PeerId, sender: oneshot::Sender<bool>) -> Self;
     fn create_blacklisted_message(sender: oneshot::Sender<Vec<PeerId>>) -> Self;
 }
 
 impl PeerMessagesBuilder for DaNetworkMessage {
-    type MessageType = Self;
-
     fn create_block_message(peer_id: PeerId, sender: oneshot::Sender<bool>) -> Self {
         Self::PeerRequest(MonitorCommand::BlockPeer(peer_id, sender))
     }
@@ -352,8 +348,6 @@ impl PeerMessagesBuilder for DaNetworkMessage {
 }
 
 impl PeerMessagesBuilder for ExecutorDaNetworkMessage {
-    type MessageType = Self;
-
     fn create_block_message(peer_id: PeerId, sender: oneshot::Sender<bool>) -> Self {
         Self::PeerRequest(MonitorCommand::BlockPeer(peer_id, sender))
     }
