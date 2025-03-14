@@ -164,3 +164,137 @@ impl<TxS, BxS, NetworkAdapterSettings, BlendAdapterSettings, TimeBackendSettings
         Ok(Self::new(None, None, None, None))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::fmt::{Debug, Formatter};
+
+    use super::*;
+
+    impl PartialEq for CryptarchiaInitialisationStrategy {
+        fn eq(&self, other: &Self) -> bool {
+            match (self, other) {
+                (Self::Genesis, Self::Genesis) => true,
+                (Self::RecoveryFromGenesis(a), Self::RecoveryFromGenesis(b)) => a == b,
+                (Self::RecoveryFromSecurity(a), Self::RecoveryFromSecurity(b)) => a == b,
+                _ => false,
+            }
+        }
+    }
+
+    impl Debug for CryptarchiaInitialisationStrategy {
+        fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+            match self {
+                Self::Genesis => f.debug_tuple("Genesis").finish(),
+                Self::RecoveryFromGenesis(strategy) => f
+                    .debug_tuple("RecoveryFromGenesis")
+                    .field(strategy)
+                    .finish(),
+                Self::RecoveryFromSecurity(strategy) => f
+                    .debug_tuple("RecoveryFromSecurity")
+                    .field(strategy)
+                    .finish(),
+            }
+        }
+    }
+
+    impl PartialEq for GenesisRecoveryStrategy {
+        fn eq(&self, other: &Self) -> bool {
+            self.tip == other.tip
+        }
+    }
+
+    impl Debug for GenesisRecoveryStrategy {
+        fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+            f.debug_struct("GenesisRecoveryStrategy")
+                .field("tip", &self.tip)
+                .finish()
+        }
+    }
+
+    impl PartialEq for SecurityRecoveryStrategy {
+        fn eq(&self, other: &Self) -> bool {
+            self.tip == other.tip
+                && self.security_block_id == other.security_block_id
+                && self.security_ledger_state == other.security_ledger_state
+                && self.security_leader_notes == other.security_leader_notes
+        }
+    }
+
+    impl Debug for SecurityRecoveryStrategy {
+        fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+            f.debug_struct("SecurityRecoveryStrategy")
+                .field("tip", &self.tip)
+                .field("security_block_id", &self.security_block_id)
+                .field("security_ledger_state", &self.security_ledger_state)
+                .field("security_leader_notes", &self.security_leader_notes)
+                .finish()
+        }
+    }
+
+    #[test]
+    fn test_can_recover() {
+        let state = CryptarchiaConsensusState::<(), (), (), (), ()>::new(None, None, None, None);
+        assert!(!state.can_recover());
+
+        let header_id = HeaderId::from([0; 32]);
+        let state =
+            CryptarchiaConsensusState::<(), (), (), (), ()>::new(Some(header_id), None, None, None);
+        assert!(state.can_recover());
+    }
+
+    #[test]
+    fn test_can_recover_from_security() {
+        let header_id = HeaderId::from([0; 32]);
+        let state =
+            CryptarchiaConsensusState::<(), (), (), (), ()>::new(Some(header_id), None, None, None);
+        assert!(!state.can_recover_from_security());
+
+        let state = CryptarchiaConsensusState::<(), (), (), (), ()>::new(
+            Some(header_id),
+            Some(header_id),
+            Some(LedgerState::from_commitments(vec![], 0)),
+            Some(Vec::new()),
+        );
+        assert!(state.can_recover_from_security());
+    }
+
+    #[test]
+    fn test_recovery_strategy() {
+        let mut state =
+            CryptarchiaConsensusState::<(), (), (), (), ()>::new(None, None, None, None);
+        assert_eq!(
+            state.recovery_strategy(),
+            CryptarchiaInitialisationStrategy::Genesis
+        );
+
+        let header_id = HeaderId::from([0; 32]);
+        let mut state =
+            CryptarchiaConsensusState::<(), (), (), (), ()>::new(Some(header_id), None, None, None);
+        assert_eq!(
+            state.recovery_strategy(),
+            CryptarchiaInitialisationStrategy::RecoveryFromGenesis(GenesisRecoveryStrategy {
+                tip: header_id
+            })
+        );
+
+        let ledger_state = LedgerState::from_commitments(vec![], 0);
+        let mut state = CryptarchiaConsensusState::<(), (), (), (), ()>::new(
+            Some(header_id),
+            Some(header_id),
+            Some(ledger_state.clone()),
+            Some(Vec::new()),
+        );
+        assert_eq!(
+            state.recovery_strategy(),
+            CryptarchiaInitialisationStrategy::RecoveryFromSecurity(Box::new(
+                SecurityRecoveryStrategy {
+                    tip: header_id,
+                    security_block_id: header_id,
+                    security_ledger_state: ledger_state,
+                    security_leader_notes: Vec::new(),
+                }
+            ))
+        );
+    }
+}
