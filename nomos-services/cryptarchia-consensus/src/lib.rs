@@ -1076,7 +1076,7 @@ where
     ) -> (Cryptarchia, Leader) {
         match initial_state.recovery_strategy() {
             CryptarchiaInitialisationStrategy::Genesis => {
-                info!("Building Cryptarchia from genesis...");
+                info!("Building Cryptarchia from genesis.");
                 Self::build_from_genesis(genesis_id, genesis_state, leader_config, ledger_config)
             }
             CryptarchiaInitialisationStrategy::RecoveryFromGenesis(strategy) => {
