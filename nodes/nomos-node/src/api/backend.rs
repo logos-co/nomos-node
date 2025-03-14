@@ -5,7 +5,7 @@ use hyper::header::{CONTENT_TYPE, USER_AGENT};
 use nomos_api::Backend;
 use nomos_core::{
     da::{
-        blob::{info::DispersedBlobInfo, metadata::Metadata, Share},
+        blob::{info::DispersedBlobInfo, metadata::Metadata, LightShare, Share},
         DaVerifier as CoreDaVerifier,
     },
     header::HeaderId,
@@ -31,8 +31,8 @@ use utoipa_swagger_ui::SwaggerUi;
 
 use super::handlers::{
     add_blob_info, add_share, add_tx, blacklisted_peers, block, block_peer, cl_metrics, cl_status,
-    cryptarchia_headers, cryptarchia_info, da_get_commitments, da_get_light_share, get_range,
-    libp2p_info, unblock_peer,
+    cryptarchia_headers, cryptarchia_info, da_get_commitments, da_get_light_share, da_get_shares,
+    get_range, libp2p_info, unblock_peer,
 };
 use crate::api::paths;
 
@@ -140,8 +140,7 @@ where
     DaShare: Share + Serialize + DeserializeOwned + Clone + Send + Sync + 'static,
     <DaShare as Share>::BlobId:
         AsRef<[u8]> + Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
-    <DaShare as Share>::ShareIndex:
-        AsRef<[u8]> + Serialize + DeserializeOwned + Hash + Eq + Send + Sync + 'static,
+    <DaShare as Share>::ShareIndex: AsRef<[u8]> + DeserializeOwned + Send + Sync + 'static,
     DaShare::LightShare: Serialize + DeserializeOwned + Clone + Send + Sync + 'static,
     DaShare::SharesCommitments: Serialize + DeserializeOwned + Clone + Send + Sync + 'static,
     DaBlobInfo: DispersedBlobInfo<BlobId = [u8; 32]>
@@ -204,6 +203,17 @@ where
     SamplingBackend::Settings: Clone,
     SamplingBackend::Share: Debug + 'static,
     SamplingBackend::BlobId: Debug + 'static,
+    DaShare::LightShare: LightShare<ShareIndex = <DaShare as Share>::ShareIndex>
+        + Serialize
+        + DeserializeOwned
+        + Clone
+        + Send
+        + Sync
+        + 'static,
+    <DaShare as Share>::ShareIndex:
+        AsRef<[u8]> + Serialize + DeserializeOwned + Hash + Eq + Send + Sync + 'static,
+    DaShare::LightShare: Serialize + DeserializeOwned + Clone + Send + Sync + 'static,
+    DaShare::SharesCommitments: Serialize + DeserializeOwned + Clone + Send + Sync + 'static,
     SamplingNetworkAdapter: nomos_da_sampling::network::NetworkAdapter + Send + 'static,
     SamplingStorage: nomos_da_sampling::storage::DaStorageAdapter + Send + 'static,
     DaVerifierNetwork::Settings: Clone,
@@ -377,6 +387,10 @@ where
             .route(
                 paths::DA_GET_LIGHT_SHARE,
                 routing::get(da_get_light_share::<DaStorageSerializer, DaShare>),
+            )
+            .route(
+                paths::DA_GET_SHARES,
+                routing::get(da_get_shares::<DaStorageSerializer, DaShare>),
             )
             .with_state(handle);
 

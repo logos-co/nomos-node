@@ -1,24 +1,28 @@
 use std::{error::Error, fmt::Debug, hash::Hash};
 
 use axum::{
+    body::StreamBody,
     extract::{Query, State},
-    response::Response,
+    response::{IntoResponse, Response},
     Json,
 };
+use http::{header, StatusCode};
 use nomos_api::http::{
     cl, consensus,
     da::{self, PeerMessagesFactory},
-    libp2p, mempool, storage,
+    da_shares, libp2p, mempool, storage,
 };
 use nomos_core::{
     da::{
-        blob::{info::DispersedBlobInfo, metadata::Metadata, Share},
+        blob::{info::DispersedBlobInfo, metadata::Metadata, LightShare, Share},
         BlobId, DaVerifier as CoreDaVerifier,
     },
     header::HeaderId,
     tx::Transaction,
 };
-use nomos_da_messages::http::da::{DASharesCommitmentsRequest, DaSamplingRequest, GetRangeReq};
+use nomos_da_messages::http::da::{
+    DASharesCommitmentsRequest, DaSamplingRequest, GetRangeReq, GetSharesRequest,
+};
 use nomos_da_network_core::SubnetworkId;
 use nomos_da_network_service::backends::NetworkBackend;
 use nomos_da_sampling::backend::DaSamplingServiceBackend;
@@ -515,6 +519,50 @@ where
         request.blob_id,
         request.share_idx
     ))
+}
+
+#[utoipa::path(
+    get,
+    path = paths::DA_GET_LIGHT_SHARE,
+    responses(
+        (status = 200, description = "Request shares for a blob", body = GetSharesRequest<DaBlob>),
+        (status = 500, description = "Internal server error", body = StreamBody),
+    )
+)]
+pub async fn da_get_shares<StorageOp, DaShare>(
+    State(handle): State<OverwatchHandle>,
+    Json(request): Json<GetSharesRequest<DaShare>>,
+) -> Response
+where
+    DaShare: Share + 'static,
+    <DaShare as Share>::BlobId: AsRef<[u8]> + DeserializeOwned + Clone + Send + Sync + 'static,
+    <DaShare as Share>::ShareIndex: serde::Serialize + DeserializeOwned + Send + Sync + Eq + Hash,
+    <DaShare as Share>::LightShare: LightShare<ShareIndex = <DaShare as Share>::ShareIndex>
+        + Serialize
+        + DeserializeOwned
+        + Send
+        + Sync
+        + 'static,
+    StorageOp: StorageSerde + Send + Sync + 'static,
+    <StorageOp as StorageSerde>::Error: Send + Sync,
+    <DaShare as Share>::LightShare: LightShare<ShareIndex = <DaShare as Share>::ShareIndex>,
+    <DaShare as Share>::ShareIndex: AsRef<[u8]> + 'static,
+{
+    match da_shares::get_shares::<StorageOp, DaShare>(
+        &handle,
+        request.blob_id,
+        request.requested_shares,
+        request.filter_shares,
+        request.return_available,
+    )
+    .await
+    {
+        Ok(shares) => {
+            let body = StreamBody::new(shares);
+            IntoResponse::into_response(([(header::CONTENT_TYPE, "application/x-ndjson")], body))
+        }
+        Err(e) => IntoResponse::into_response((StatusCode::INTERNAL_SERVER_ERROR, e.to_string())),
+    }
 }
 
 #[utoipa::path(
