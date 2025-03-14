@@ -259,6 +259,7 @@ where
     fn record_event(&mut self, event: Self::Event) -> Option<ConnectionMonitorOutput> {
         if let Some(peer_id) = event.peer_id() {
             tracing::info!("MONITOR EVENT: {event:?}");
+            println!(">>>>>>>> MONITOR event {event:?}");
             let stats = self.peer_stats.entry(*peer_id).or_default();
             let now = Instant::now();
             match event {
@@ -375,7 +376,8 @@ mod tests {
         for _ in 0..4 {
             monitor.record_event(MonitorEvent::Sampling(SamplingError::Io {
                 peer_id,
-                error: std::io::Error::new(std::io::ErrorKind::Other, "Simulated I/O error"),
+                error: std::io::Error::other("Simulated I/O error"),
+                message: None,
             }));
         }
 
@@ -393,7 +395,8 @@ mod tests {
         for _ in 0..100 {
             monitor.record_event(MonitorEvent::Sampling(SamplingError::Io {
                 peer_id,
-                error: std::io::Error::new(std::io::ErrorKind::Other, "Simulated I/O error"),
+                error: std::io::Error::other("Simulated I/O error"),
+                message: None,
             }));
         }
 
@@ -411,7 +414,8 @@ mod tests {
         for _ in 0..4 {
             monitor.record_event(MonitorEvent::Sampling(SamplingError::Io {
                 peer_id,
-                error: std::io::Error::new(std::io::ErrorKind::Other, "Simulated I/O error"),
+                error: std::io::Error::other("Simulated I/O error"),
+                message: None,
             }));
         }
 
@@ -434,7 +438,8 @@ mod tests {
         for _ in 0..4 {
             monitor.record_event(MonitorEvent::Sampling(SamplingError::Io {
                 peer_id,
-                error: std::io::Error::new(std::io::ErrorKind::Other, "Simulated I/O error"),
+                error: std::io::Error::other("Simulated I/O error"),
+                message: None,
             }));
         }
 
