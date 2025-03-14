@@ -1,36 +1,54 @@
-# nomos-node
-Nomos blockchain node mvp
+# Nomos
 
+Nomos is the blockchain layer of the Logos technology stack, providing a privacy-preserving and censorship-resistant
+framework for decentralized network states.
 
-## Project structure
+This monorepo serves as a unified codebase for the Nomos ecosystem, housing all core components, services, and tools
+necessary for running and interacting with the Nomos blockchain. Key features include:
 
-- `nomos-core`: Nomos core is the collection of essential structures for the Nomos mvp and experimental nodes.
-- `nomos-services`: Nomos services is the collection of components that are used as building blocks of the Nomos node prototype and the experimental nodes.
-  - consensus
-  - log
-  - http
-  - mempool
-  - network
-- `nodes`: Nomos nodes is the collection of nodes that are used to run the Nomos mvp and experimental nodes.
-  - `nomos-node`: main implementation of the Nomos mvp node.
-  - `mockpool-node`: node with single mempool service, used to measure transaction dissemination.
+- Consensus mechanisms for secure and scalable network agreement
+- Ledger management for state persistence and validation
+- Networking layers leveraging libp2p for peer-to-peer communication
+- CLI tools and clients for seamless interaction with the blockchain
+- Testnet configurations for development and experimentation
 
+## Table of Contents
 
-## Services
+- [Requirements](#requirements)
+- [Design Goals](#design-goals)
+    - [Service Architecture](#service-architecture)
+    - [Static Dispatching](#static-dispatching)
+- [Project Structure](#project-structure)
+- [Development Workflow](#development-workflow)
+    - [Docker](#docker)
+    - [Running Tests](#running-tests)
+    - [Generating Documentation](#generating-documentation)
+- [Contributing](#contributing)
+- [License](#license)
+- [Community](#community)
 
-The Nomos node uses `Overwatch` as its main internal framework. This means that services request communication channels 
-to other services to interchange information through a specified messaging API.
+## Requirements
 
-### Service architecture
+- **Rust**
+    - We aim to maintain compatibility with the latest stable version of Rust.
+    - [Installation Guide](https://www.rust-lang.org/tools/install)
 
-Most of the services are implemented with the same idea behind. There is a front layer responsible for handling the `Overwatch` service
-and a back layer that implements the actual service logic.
+- **Risc0**
+    - Required for zero-knowledge proof functionality.
+    - [Installation Guide](https://dev.risczero.com/api/zkvm/install)
 
-This allows us to easily replace components as needed in a type level system. In any case, a node can be setup in a declarative way composing the types.
+## Design Goals
+
+### Service Architecture
+
+Nomos services follow a consistent design pattern: a front layer handles the `Overwatch` service, while a back layer
+implements the actual service logic.
+
+This modular approach allows for easy replacement of components in a declarative manner.
+
 For example:
 
-```rust
-...
+```rust ignore
 #[derive(Services)]
 struct MockPoolNode {
     logging: OpaqueServiceHandle<Logger>,
@@ -41,20 +59,61 @@ struct MockPoolNode {
 }
 ```
 
+### Static Dispatching
 
+Nomos favours static dispatching over dynamic, influenced by Overwatch.
+This means you'll encounter Generics sprinkled throughout the codebase.
+While it might occasionally feel a bit over the top, it brings some solid advantages, such as:
 
-## Docker
+- Compile-time type checking
+- Highly modular and adaptable applications
 
-To build and run a docker container with the Nomos node you need to mount both `config.yml` and `global_params_path` specified in the configuration. 
+## Project Structure
+
+```
+nomos/
+├── book/               # Documentation in Markdown format
+├── ci/                 # Non-GitHub scripts, such as Jenkins' nightly integration and fuzzy testing
+├── clients/            # General-purpose clients
+├── consensus/          # Engine and protocols for agreement and validation
+├── ledger/             # Ledger management and state transition logic
+├── nodes/              # Node implementations
+├── nomos-blend/        # Blend Network, our privacy routing protocol
+├── nomos-bundler/      # Crate packaging and bundling
+├── nomos-cli/          # Command-line interface for interacting with the Nomos blockchain
+├── nomos-core/         # Collection of essential structures
+├── nomos-da/           # Data availability layer
+├── nomos-libp2p/       # Libp2p integration
+├── nomos-services/     # Building blocks for the Node
+├── nomos-tracing/      # Tracing, logging, and metrics
+├── nomos-utils/        # Shared utility functions and helpers
+├── testnet/            # Testnet configurations, monitoring, and deployment scripts
+└── tests/              # Integration and E2E test suites
+```
+
+## Development Workflow
+
+### Docker
+
+#### Building the Image
+
+To build the Nomos Docker image, run:
 
 ```bash
 docker build -t nomos .
-
-docker run -v "/path/to/config.yml" -v "/path/to/global_params:global/params/path" nomos /etc/nomos/config.yml
-
 ```
 
-To use an example configuration located at `nodes/nomos-node/config.yaml`, first run the test that generates the random kzgrs file and then run the docker container with the appropriate config and global params:
+#### Running a Nomos Node
+
+To run a docker container with the Nomos node you need to mount both `config.yml` and `global_params_path` specified in
+the configuration.
+
+```bash
+docker run -v "/path/to/config.yml" -v "/path/to/global_params:global/params/path" nomos /etc/nomos/config.yml
+```
+
+To use an example configuration located at `nodes/nomos-node/config.yaml`, first run the test that generates the random
+kzgrs file and then run the docker container with the appropriate config and global params:
 
 ```bash
 cargo test --package kzgrs-backend write_random_kzgrs_params_to_file -- --ignored
@@ -63,10 +122,36 @@ docker run -v "$(pwd)/nodes/nomos-node/config.yaml:/etc/nomos/config.yml" -v "$(
 
 ```
 
+## Running Tests
+
+To run the test suite, use:
+
+```bash
+cargo test
+```
+
+## Generating Documentation
+
+To generate the project documentation locally, run:
+
+```bash
+cargo doc
+```
+
+## Contributing
+
+We welcome contributions! Please read our [Contributing Guidelines](CONTRIBUTING.md) for details on how to get started.
 
 ## License
 
 This project is primarily distributed under the terms defined by either the MIT license or the
 Apache License (Version 2.0), at your option.
 
-See [LICENSE-APACHE](LICENSE-APACHE2.0) and [LICENSE-MIT](LICENSE-MIT) for details.
+See [LICENSE-APACHE2.0](LICENSE-APACHE2.0) and [LICENSE-MIT](LICENSE-MIT) for details.
+
+## Community
+
+Join the Nomos community on [Discord](https://discord.gg/8Q7Q7vz) and follow us
+on [Twitter](https://twitter.com/nomos_tech).
+
+For more information, visit [nomos.tech](https://nomos.tech/?utm_source=chatgpt.com).
