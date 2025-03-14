@@ -284,7 +284,7 @@ where
 pub async fn block_peer<B>(handle: &OverwatchHandle, peer_id: PeerId) -> Result<bool, DynError>
 where
     B: NetworkBackend + 'static + Send,
-    B::Message: PeerMessagesBuilder,
+    B::Message: PeerMessagesFactory,
 {
     let relay = handle.relay::<NetworkService<B>>().connect().await?;
     let (sender, receiver) = oneshot::channel();
@@ -299,7 +299,7 @@ where
 pub async fn unblock_peer<B>(handle: &OverwatchHandle, peer_id: PeerId) -> Result<bool, DynError>
 where
     B: NetworkBackend + 'static + Send,
-    B::Message: PeerMessagesBuilder,
+    B::Message: PeerMessagesFactory,
 {
     let relay = handle.relay::<NetworkService<B>>().connect().await?;
     let (sender, receiver) = oneshot::channel();
@@ -314,7 +314,7 @@ where
 pub async fn blacklisted_peers<B>(handle: &OverwatchHandle) -> Result<Vec<PeerId>, DynError>
 where
     B: NetworkBackend + 'static + Send,
-    B::Message: PeerMessagesBuilder,
+    B::Message: PeerMessagesFactory,
 {
     let relay = handle.relay::<NetworkService<B>>().connect().await?;
     let (sender, receiver) = oneshot::channel();
@@ -327,13 +327,13 @@ where
 }
 
 // Builder for generating messages for peers (validator and executor).
-pub trait PeerMessagesBuilder {
+pub trait PeerMessagesFactory {
     fn create_block_message(peer_id: PeerId, sender: oneshot::Sender<bool>) -> Self;
     fn create_unblock_message(peer_id: PeerId, sender: oneshot::Sender<bool>) -> Self;
     fn create_blacklisted_message(sender: oneshot::Sender<Vec<PeerId>>) -> Self;
 }
 
-impl PeerMessagesBuilder for DaNetworkMessage {
+impl PeerMessagesFactory for DaNetworkMessage {
     fn create_block_message(peer_id: PeerId, sender: oneshot::Sender<bool>) -> Self {
         Self::PeerRequest(MonitorCommand::BlockPeer(peer_id, sender))
     }
@@ -347,7 +347,7 @@ impl PeerMessagesBuilder for DaNetworkMessage {
     }
 }
 
-impl PeerMessagesBuilder for ExecutorDaNetworkMessage {
+impl PeerMessagesFactory for ExecutorDaNetworkMessage {
     fn create_block_message(peer_id: PeerId, sender: oneshot::Sender<bool>) -> Self {
         Self::PeerRequest(MonitorCommand::BlockPeer(peer_id, sender))
     }

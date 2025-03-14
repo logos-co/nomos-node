@@ -7,7 +7,7 @@ use axum::{
 };
 use nomos_api::http::{
     cl, consensus,
-    da::{self, PeerMessagesBuilder},
+    da::{self, PeerMessagesFactory},
     libp2p, mempool, storage,
 };
 use nomos_core::{
@@ -390,7 +390,7 @@ pub async fn block_peer<Backend>(
 ) -> Response
 where
     Backend: NetworkBackend + Send + 'static,
-    Backend::Message: PeerMessagesBuilder,
+    Backend::Message: PeerMessagesFactory,
 {
     make_request_and_return_response!(da::block_peer::<Backend>(&handle, peer_id))
 }
@@ -410,7 +410,7 @@ pub async fn unblock_peer<Backend>(
 ) -> Response
 where
     Backend: NetworkBackend + Send + 'static,
-    Backend::Message: PeerMessagesBuilder,
+    Backend::Message: PeerMessagesFactory,
 {
     make_request_and_return_response!(da::unblock_peer::<Backend>(&handle, peer_id))
 }
@@ -426,7 +426,7 @@ where
 pub async fn blacklisted_peers<Backend>(State(handle): State<OverwatchHandle>) -> Response
 where
     Backend: NetworkBackend + Send + 'static,
-    Backend::Message: PeerMessagesBuilder,
+    Backend::Message: PeerMessagesFactory,
 {
     make_request_and_return_response!(da::blacklisted_peers::<Backend>(&handle))
 }
