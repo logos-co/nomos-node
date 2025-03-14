@@ -326,7 +326,7 @@ where
     Ok(receiver.await?)
 }
 
-// Builder for generating messages for peers (validator and executor).
+// Factory for generating messages for peers (validator and executor).
 pub trait PeerMessagesFactory {
     fn create_block_message(peer_id: PeerId, sender: oneshot::Sender<bool>) -> Self;
     fn create_unblock_message(peer_id: PeerId, sender: oneshot::Sender<bool>) -> Self;
