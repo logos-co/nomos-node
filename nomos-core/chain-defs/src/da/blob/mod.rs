@@ -2,19 +2,19 @@ pub mod info;
 pub mod metadata;
 pub mod select;
 
-pub trait Blob {
+pub trait Share {
     type BlobId;
-    type ColumnIndex;
-    type LightBlob;
-    type SharedCommitments;
+    type ShareIndex;
+    type LightShare;
+    type SharesCommitments;
 
-    fn id(&self) -> Self::BlobId;
-    fn column_idx(&self) -> Self::ColumnIndex;
-    fn into_blob_and_shared_commitments(self) -> (Self::LightBlob, Self::SharedCommitments);
+    fn blob_id(&self) -> Self::BlobId;
+    fn share_idx(&self) -> Self::ShareIndex;
+    fn into_share_and_commitments(self) -> (Self::LightShare, Self::SharesCommitments);
 
-    fn from_blob_and_shared_commitments(
-        light_blob: Self::LightBlob,
-        shared_commitments: Self::SharedCommitments,
+    fn from_share_and_commitments(
+        light_blob: Self::LightShare,
+        shared_commitments: Self::SharesCommitments,
     ) -> Self;
 }
 

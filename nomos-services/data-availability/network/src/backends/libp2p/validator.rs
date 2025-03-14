@@ -4,7 +4,7 @@ use futures::{
     future::{AbortHandle, Abortable, Aborted},
     Stream, StreamExt,
 };
-use kzgrs_backend::common::blob::DaBlob;
+use kzgrs_backend::common::share::DaShare;
 use libp2p::PeerId;
 use nomos_core::da::BlobId;
 use nomos_da_network_core::{
@@ -55,7 +55,7 @@ pub enum DaNetworkEventKind {
 #[derive(Debug)]
 pub enum DaNetworkEvent {
     Sampling(SamplingEvent),
-    Verifying(Box<DaBlob>),
+    Verifying(Box<DaShare>),
 }
 
 /// DA network backend for validators
@@ -68,7 +68,7 @@ pub struct DaNetworkValidatorBackend<Membership> {
     sampling_request_channel: UnboundedSender<(SubnetworkId, BlobId)>,
     peer_request_channel: UnboundedSender<PeerCommand>,
     sampling_broadcast_receiver: broadcast::Receiver<SamplingEvent>,
-    verifying_broadcast_receiver: broadcast::Receiver<DaBlob>,
+    verifying_broadcast_receiver: broadcast::Receiver<DaShare>,
     _membership: PhantomData<Membership>,
 }
 
@@ -199,7 +199,7 @@ where
             DaNetworkEventKind::Verifying => Box::pin(
                 BroadcastStream::new(self.verifying_broadcast_receiver.resubscribe())
                     .filter_map(|event| async { event.ok() })
-                    .map(|blob| Self::NetworkEvent::Verifying(Box::new(blob))),
+                    .map(|share| Self::NetworkEvent::Verifying(Box::new(share))),
             ),
         }
     }

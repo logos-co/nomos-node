@@ -1,8 +1,8 @@
-use kzgrs_backend::common::ColumnIndex;
+use kzgrs_backend::common::ShareIndex;
 use nomos_core::da::BlobId;
 use serde::{Deserialize, Serialize};
 
-use crate::common::LightBlob;
+use crate::common::LightShare;
 
 #[repr(C)]
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
@@ -14,7 +14,7 @@ pub enum SampleErrorType {
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct SampleError {
     pub blob_id: BlobId,
-    pub column_idx: ColumnIndex,
+    pub column_idx: ShareIndex,
     pub error_type: SampleErrorType,
     pub error_description: String,
 }
@@ -22,7 +22,7 @@ pub struct SampleError {
 impl SampleError {
     pub fn new(
         blob_id: BlobId,
-        column_idx: ColumnIndex,
+        column_idx: ShareIndex,
         error_type: SampleErrorType,
         error_description: impl Into<String>,
     ) -> Self {
@@ -39,16 +39,13 @@ impl SampleError {
 #[derive(Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct SampleRequest {
     pub blob_id: BlobId,
-    pub column_idx: ColumnIndex,
+    pub share_idx: ShareIndex,
 }
 
 impl SampleRequest {
     #[must_use]
-    pub const fn new(blob_id: BlobId, column_idx: ColumnIndex) -> Self {
-        Self {
-            blob_id,
-            column_idx,
-        }
+    pub const fn new(blob_id: BlobId, share_idx: ShareIndex) -> Self {
+        Self { blob_id, share_idx }
     }
 }
 
@@ -56,6 +53,6 @@ impl SampleRequest {
 #[repr(C)]
 #[derive(Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub enum SampleResponse {
-    Blob(LightBlob),
+    Share(LightShare),
     Error(SampleError),
 }

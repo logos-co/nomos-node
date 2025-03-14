@@ -2,17 +2,17 @@ use std::{marker::PhantomData, ops::Range, path::PathBuf};
 
 use bytes::Bytes;
 use futures::{stream::FuturesUnordered, try_join, Stream};
-use kzgrs_backend::common::blob::{DaBlob, DaBlobSharedCommitments, DaLightBlob};
+use kzgrs_backend::common::share::{DaLightShare, DaShare, DaSharesCommitments};
 use nomos_core::da::{
     blob::{
         info::DispersedBlobInfo,
         metadata::{Metadata, Next},
-        Blob,
+        Share,
     },
     BlobId,
 };
 use nomos_da_storage::rocksdb::{
-    key_bytes, DA_BLOB_PREFIX, DA_SHARED_COMMITMENTS_PREFIX, DA_VID_KEY_PREFIX,
+    key_bytes, DA_SHARED_COMMITMENTS_PREFIX, DA_SHARE_PREFIX, DA_VID_KEY_PREFIX,
 };
 use nomos_storage::{
     backends::{rocksdb::RocksBackend, StorageSerde},
@@ -44,7 +44,7 @@ where
     Meta::AppId: AsRef<[u8]> + Clone + Send + Sync + 'static,
 {
     type Backend = RocksBackend<S>;
-    type Blob = DaBlob;
+    type Share = DaShare;
     type Info = Meta;
     type Settings = RocksAdapterSettings;
 
@@ -59,11 +59,11 @@ where
 
     async fn add_index(&self, info: &Self::Info) -> Result<(), DynError> {
         // Check if Info in a block is something that the node've seen before.
-        let blob_key = key_bytes(DA_BLOB_PREFIX, info.blob_id().as_ref());
+        let share_key = key_bytes(DA_SHARE_PREFIX, info.blob_id().as_ref());
         let (reply_tx, reply_rx) = tokio::sync::oneshot::channel();
         self.storage_relay
             .send(StorageMsg::LoadPrefix {
-                prefix: blob_key,
+                prefix: share_key,
                 reply_channel: reply_tx,
             })
             .await
@@ -97,7 +97,7 @@ where
         &self,
         app_id: <Self::Info as Metadata>::AppId,
         index_range: Range<<Self::Info as Metadata>::Index>,
-    ) -> Box<dyn Stream<Item = (<Self::Info as Metadata>::Index, Vec<Self::Blob>)> + Unpin + Send>
+    ) -> Box<dyn Stream<Item = (<Self::Info as Metadata>::Index, Vec<Self::Share>)> + Unpin + Send>
     {
         let futures = FuturesUnordered::new();
 
@@ -132,19 +132,19 @@ where
                     return (idx, Vec::new());
                 };
 
-                let Ok((blobs, shared_commitments)) = try_join!(
+                let Ok((shares, shared_commitments)) = try_join!(
                     async {
-                        let blobs_prefix_key = key_bytes(DA_BLOB_PREFIX, id.as_ref());
-                        let (blob_reply_tx, blob_reply_rx) = tokio::sync::oneshot::channel();
+                        let shares_prefix_key = key_bytes(DA_SHARE_PREFIX, id.as_ref());
+                        let (share_reply_tx, share_reply_rx) = tokio::sync::oneshot::channel();
                         storage_relay
                             .send(StorageMsg::LoadPrefix {
-                                prefix: blobs_prefix_key,
-                                reply_channel: blob_reply_tx,
+                                prefix: shares_prefix_key,
+                                reply_channel: share_reply_tx,
                             })
                             .await
                             .expect("Failed to send load request to storage relay");
 
-                        blob_reply_rx.await.map_err(|e| Box::new(e) as DynError)
+                        share_reply_rx.await.map_err(|e| Box::new(e) as DynError)
                     },
                     async {
                         let shared_commitments_key =
@@ -171,24 +171,24 @@ where
                     return (idx, Vec::new());
                 };
 
-                let deserialized_blobs = blobs
+                let deserialized_shares = shares
                     .into_iter()
-                    .filter_map(|bytes| S::deserialize::<DaLightBlob>(bytes).ok());
+                    .filter_map(|bytes| S::deserialize::<DaLightShare>(bytes).ok());
 
                 let deserialized_shared_commitments =
-                    S::deserialize::<DaBlobSharedCommitments>(shared_commitments)
+                    S::deserialize::<DaSharesCommitments>(shared_commitments)
                         .expect("Failed to deserialize shared commitments");
 
-                let da_blobs: Vec<_> = deserialized_blobs
-                    .map(|blob| {
-                        DaBlob::from_blob_and_shared_commitments(
-                            blob,
+                let da_shares: Vec<_> = deserialized_shares
+                    .map(|share| {
+                        DaShare::from_share_and_commitments(
+                            share,
                             deserialized_shared_commitments.clone(),
                         )
                     })
                     .collect();
 
-                (idx, da_blobs)
+                (idx, da_shares)
             });
 
             current_index = current_index.next();

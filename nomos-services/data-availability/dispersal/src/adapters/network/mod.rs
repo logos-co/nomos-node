@@ -2,7 +2,7 @@ pub mod libp2p;
 use std::{pin::Pin, time::Duration};
 
 use futures::Stream;
-use kzgrs_backend::common::blob::DaBlob;
+use kzgrs_backend::common::share::DaShare;
 use nomos_core::da::BlobId;
 use nomos_da_network_core::SubnetworkId;
 use overwatch::{
@@ -19,7 +19,7 @@ pub trait DispersalNetworkAdapter {
     async fn disperse(
         &self,
         subnetwork_id: Self::SubnetworkId,
-        da_blob: DaBlob,
+        da_share: DaShare,
     ) -> Result<(), DynError>;
 
     async fn dispersal_events_stream(

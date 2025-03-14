@@ -1,6 +1,6 @@
 use std::marker::PhantomData;
 
-use kzgrs_backend::common::blob::DaBlob;
+use kzgrs_backend::common::share::DaShare;
 use nomos_da_network_core::SubnetworkId;
 
 pub mod adapters;
@@ -21,5 +21,5 @@ pub trait DaNetworkAdapter {
         network_relay: PhantomData<()>,
     ) -> Self;
 
-    async fn sample(&self, blob_id: &[u8], subnetwork_id: SubnetworkId) -> Option<DaBlob>;
+    async fn sample(&self, blob_id: &[u8], subnetwork_id: SubnetworkId) -> Option<DaShare>;
 }

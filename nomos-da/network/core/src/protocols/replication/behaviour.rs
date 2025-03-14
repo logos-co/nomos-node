@@ -105,9 +105,9 @@ impl From<ReplicationError> for ReplicationEvent {
 
 impl ReplicationEvent {
     #[must_use]
-    pub fn blob_size(&self) -> Option<usize> {
+    pub fn share_size(&self) -> Option<usize> {
         match self {
-            Self::IncomingMessage { message, .. } => Some(message.blob.data.column_len()),
+            Self::IncomingMessage { message, .. } => Some(message.share.data.column_len()),
             Self::ReplicationError { .. } => None,
         }
     }
@@ -275,7 +275,7 @@ where
     }
 
     fn replicate_message(&mut self, waker: &Waker, message: &DaMessage) {
-        let message_id = (message.blob.blob_id.to_vec(), message.subnetwork_id);
+        let message_id = (message.share.blob_id.to_vec(), message.subnetwork_id);
         if self.seen_message_cache.contains(&message_id) {
             return;
         }

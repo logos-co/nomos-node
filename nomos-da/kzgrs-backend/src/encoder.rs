@@ -14,7 +14,7 @@ use kzgrs::{
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 
 use crate::{
-    common::{blob::DaBlob, hash_commitment, Chunk, ChunksMatrix, Row},
+    common::{hash_commitment, share::DaShare, Chunk, ChunksMatrix, Row},
     global::GLOBAL_PARAMETERS,
 };
 
@@ -60,14 +60,14 @@ pub struct EncodedData {
 }
 
 impl EncodedData {
-    /// Returns a `DaBlob` for the given index.
+    /// Returns a `DaShare` for the given index.
     /// If the index is out of bounds, returns `None`.
     #[must_use]
-    pub fn to_da_blob(&self, index: usize) -> Option<DaBlob> {
+    pub fn to_da_share(&self, index: usize) -> Option<DaShare> {
         let column = self.extended_data.columns().nth(index)?;
-        Some(DaBlob {
+        Some(DaShare {
             column,
-            column_idx: index.try_into().unwrap(),
+            share_idx: index.try_into().unwrap(),
             column_commitment: self.column_commitments[index],
             aggregated_column_commitment: self.aggregated_column_commitment,
             aggregated_column_proof: self.aggregated_column_proofs[index],
@@ -89,7 +89,7 @@ impl EncodedData {
 }
 
 impl<'a> IntoIterator for &'a EncodedData {
-    type Item = DaBlob;
+    type Item = DaShare;
     type IntoIter = EncodedDataIterator<'a>;
     fn into_iter(self) -> Self::IntoIter {
         self.iter()
@@ -102,12 +102,12 @@ pub struct OwnedEncodedDataIterator {
 }
 
 impl Iterator for OwnedEncodedDataIterator {
-    type Item = DaBlob;
+    type Item = DaShare;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let next_da_blob = self.encoded_data.to_da_blob(self.next_index)?;
+        let next_da_share = self.encoded_data.to_da_share(self.next_index)?;
         self.next_index += 1;
-        Some(next_da_blob)
+        Some(next_da_share)
     }
 }
 
@@ -127,12 +127,12 @@ impl<'a> EncodedDataIterator<'a> {
 }
 
 impl Iterator for EncodedDataIterator<'_> {
-    type Item = DaBlob;
+    type Item = DaShare;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let next_da_blob = self.encoded_data.to_da_blob(self.next_index)?;
+        let next_da_share = self.encoded_data.to_da_share(self.next_index)?;
         self.next_index += 1;
-        Some(next_da_blob)
+        Some(next_da_share)
     }
 }
 
@@ -588,10 +588,10 @@ pub mod test {
         ];
         let encoded_data = encoder.encode(&data).unwrap();
 
-        let blobs = encoded_data.iter();
-        assert_eq!(blobs.count(), 16);
+        let shares = encoded_data.iter();
+        assert_eq!(shares.count(), 16);
 
-        let blobs = encoded_data.iter();
-        assert_eq!(blobs.count(), 16);
+        let shares = encoded_data.iter();
+        assert_eq!(shares.count(), 16);
     }
 }

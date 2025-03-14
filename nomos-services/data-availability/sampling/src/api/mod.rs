@@ -8,7 +8,7 @@ pub mod http;
 #[async_trait]
 pub trait ApiAdapter {
     type Settings;
-    type Blob;
+    type Share;
     type BlobId;
     type Commitments;
     fn new(settings: Self::Settings) -> Self;

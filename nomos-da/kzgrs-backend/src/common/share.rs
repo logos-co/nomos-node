@@ -3,16 +3,16 @@ use nomos_core::da::blob;
 use serde::{Deserialize, Serialize};
 use sha3::{Digest, Sha3_256};
 
-use super::{build_blob_id, ColumnIndex};
+use super::{build_blob_id, ShareIndex};
 use crate::common::{
     deserialize_canonical, deserialize_vec_canonical, serialize_canonical, serialize_vec_canonical,
     Column, Commitment,
 };
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
-pub struct DaBlob {
+pub struct DaShare {
     pub column: Column,
-    pub column_idx: ColumnIndex,
+    pub share_idx: ShareIndex,
     #[serde(
         serialize_with = "serialize_canonical",
         deserialize_with = "deserialize_canonical"
@@ -40,9 +40,9 @@ pub struct DaBlob {
     pub rows_proofs: Vec<Proof>,
 }
 
-impl DaBlob {
+impl DaShare {
     #[must_use]
-    pub fn id(&self) -> Vec<u8> {
+    pub fn blob_id(&self) -> Vec<u8> {
         build_blob_id(&self.aggregated_column_commitment, &self.rows_commitments).into()
     }
 
@@ -59,55 +59,55 @@ impl DaBlob {
     }
 }
 
-impl blob::Blob for DaBlob {
+impl blob::Share for DaShare {
     type BlobId = [u8; 32];
-    type ColumnIndex = [u8; 2];
-    type LightBlob = DaLightBlob;
-    type SharedCommitments = DaBlobSharedCommitments;
+    type ShareIndex = [u8; 2];
+    type LightShare = DaLightShare;
+    type SharesCommitments = DaSharesCommitments;
 
-    fn id(&self) -> Self::BlobId {
+    fn blob_id(&self) -> Self::BlobId {
         build_blob_id(&self.aggregated_column_commitment, &self.rows_commitments)
     }
 
-    fn column_idx(&self) -> Self::ColumnIndex {
-        self.column_idx.to_be_bytes()
+    fn share_idx(&self) -> Self::ShareIndex {
+        self.share_idx.to_be_bytes()
     }
 
-    fn into_blob_and_shared_commitments(self) -> (Self::LightBlob, Self::SharedCommitments) {
+    fn into_share_and_commitments(self) -> (Self::LightShare, Self::SharesCommitments) {
         (
-            DaLightBlob {
-                column_idx: self.column_idx,
+            DaLightShare {
+                share_idx: self.share_idx,
                 column: self.column,
                 column_commitment: self.column_commitment,
                 aggregated_column_proof: self.aggregated_column_proof,
                 rows_proofs: self.rows_proofs,
             },
-            DaBlobSharedCommitments {
+            DaSharesCommitments {
                 aggregated_column_commitment: self.aggregated_column_commitment,
                 rows_commitments: self.rows_commitments,
             },
         )
     }
 
-    fn from_blob_and_shared_commitments(
-        light_blob: Self::LightBlob,
-        shared_commitments: Self::SharedCommitments,
+    fn from_share_and_commitments(
+        light_share: Self::LightShare,
+        shares_commitments: Self::SharesCommitments,
     ) -> Self {
         Self {
-            column: light_blob.column,
-            column_idx: light_blob.column_idx,
-            column_commitment: light_blob.column_commitment,
-            aggregated_column_commitment: shared_commitments.aggregated_column_commitment,
-            aggregated_column_proof: light_blob.aggregated_column_proof,
-            rows_commitments: shared_commitments.rows_commitments,
-            rows_proofs: light_blob.rows_proofs,
+            column: light_share.column,
+            share_idx: light_share.share_idx,
+            column_commitment: light_share.column_commitment,
+            aggregated_column_commitment: shares_commitments.aggregated_column_commitment,
+            aggregated_column_proof: light_share.aggregated_column_proof,
+            rows_commitments: shares_commitments.rows_commitments,
+            rows_proofs: light_share.rows_proofs,
         }
     }
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
-pub struct DaLightBlob {
-    pub column_idx: ColumnIndex,
+pub struct DaLightShare {
+    pub share_idx: ShareIndex,
     pub column: Column,
     #[serde(
         serialize_with = "serialize_canonical",
@@ -127,7 +127,7 @@ pub struct DaLightBlob {
 }
 
 #[derive(Debug, Clone, Default, Eq, PartialEq, Serialize, Deserialize)]
-pub struct DaBlobSharedCommitments {
+pub struct DaSharesCommitments {
     #[serde(
         serialize_with = "serialize_canonical",
         deserialize_with = "deserialize_canonical"

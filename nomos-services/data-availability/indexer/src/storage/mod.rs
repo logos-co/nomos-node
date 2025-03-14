@@ -15,7 +15,7 @@ pub trait DaStorageAdapter {
     type Backend: StorageBackend + Send + Sync + 'static;
     type Settings: Clone;
 
-    type Blob;
+    type Share;
     type Info: DispersedBlobInfo;
 
     async fn new(
@@ -27,5 +27,5 @@ pub trait DaStorageAdapter {
         &self,
         app_id: <Self::Info as Metadata>::AppId,
         range: Range<<Self::Info as Metadata>::Index>,
-    ) -> Box<dyn Stream<Item = (<Self::Info as Metadata>::Index, Vec<Self::Blob>)> + Unpin + Send>;
+    ) -> Box<dyn Stream<Item = (<Self::Info as Metadata>::Index, Vec<Self::Share>)> + Unpin + Send>;
 }

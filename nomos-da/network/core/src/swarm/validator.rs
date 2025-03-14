@@ -1,7 +1,7 @@
 use std::{io, time::Duration};
 
 use futures::{stream, StreamExt};
-use kzgrs_backend::common::blob::DaBlob;
+use kzgrs_backend::common::share::DaShare;
 use libp2p::{
     core::transport::ListenerId,
     identity::Keypair,
@@ -46,7 +46,7 @@ const EVENT_REPLICATION: &str = "replication";
 
 pub struct ValidatorEventsStream {
     pub sampling_events_receiver: UnboundedReceiverStream<SamplingEvent>,
-    pub validation_events_receiver: UnboundedReceiverStream<DaBlob>,
+    pub validation_events_receiver: UnboundedReceiverStream<DaShare>,
 }
 
 pub struct ValidatorSwarm<
@@ -60,7 +60,7 @@ pub struct ValidatorSwarm<
         >,
     >,
     sampling_events_sender: UnboundedSender<SamplingEvent>,
-    validation_events_sender: UnboundedSender<DaBlob>,
+    validation_events_sender: UnboundedSender<DaShare>,
 }
 
 impl<Membership> ValidatorSwarm<Membership>
@@ -241,7 +241,7 @@ where
                 tracing::info!(
                     counter.behaviour_events_received = 1,
                     event = EVENT_VALIDATOR_DISPERSAL,
-                    blob_size = event.blob_size()
+                    share_size = event.share_size()
                 );
                 self.handle_dispersal_event(event).await;
             }
@@ -249,7 +249,7 @@ where
                 tracing::info!(
                     counter.behaviour_events_received = 1,
                     event = EVENT_REPLICATION,
-                    blob_size = event.blob_size()
+                    share_size = event.share_size()
                 );
                 self.handle_replication_event(event).await;
             }

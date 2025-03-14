@@ -83,7 +83,7 @@ pub type ConsensusRelay<
 >;
 
 pub struct DataIndexerService<
-    Blob,
+    Share,
     DaStorage,
     Consensus,
     NetAdapter,
@@ -105,7 +105,7 @@ pub struct DataIndexerService<
     TimeBackend,
     ApiAdapter,
 > where
-    Blob: 'static,
+    Share: 'static,
     NetAdapter: NetworkAdapter,
     NetAdapter::Settings: Send,
     BlendAdapter: cryptarchia_consensus::blend::BlendAdapter,
@@ -128,12 +128,12 @@ pub struct DataIndexerService<
     TxS::Settings: Send,
     BS: BlobSelect<BlobId = DaPool::Item>,
     BS::Settings: Send,
-    DaStorage: DaStorageAdapter<Info = DaPool::Item, Blob = Blob>,
+    DaStorage: DaStorageAdapter<Info = DaPool::Item, Share = Share>,
     ConsensusStorage: StorageBackend + Send + Sync + 'static,
     SamplingRng: SeedableRng + RngCore,
     SamplingBackend: DaSamplingServiceBackend<SamplingRng, BlobId = DaPool::Key> + Send,
     SamplingBackend::Settings: Clone,
-    SamplingBackend::Blob: Debug + 'static,
+    SamplingBackend::Share: Debug + 'static,
     SamplingBackend::BlobId: Debug + 'static,
     SamplingNetworkAdapter: nomos_da_sampling::network::NetworkAdapter,
     SamplingStorage: nomos_da_sampling::storage::DaStorageAdapter,
@@ -199,7 +199,7 @@ impl<Blob: 'static, Meta: Metadata + 'static> Debug for DaMsg<Blob, Meta> {
 impl<Blob: 'static, Meta: Metadata + 'static> RelayMessage for DaMsg<Blob, Meta> {}
 
 impl<
-        Blob,
+        Share,
         DaStorage,
         Consensus,
         NetAdapter,
@@ -222,7 +222,7 @@ impl<
         ApiAdapter,
     > ServiceData
     for DataIndexerService<
-        Blob,
+        Share,
         DaStorage,
         Consensus,
         NetAdapter,
@@ -245,7 +245,7 @@ impl<
         ApiAdapter,
     >
 where
-    Blob: 'static,
+    Share: 'static,
     NetAdapter: NetworkAdapter,
     NetAdapter::Settings: Send,
     BlendAdapter: cryptarchia_consensus::blend::BlendAdapter,
@@ -268,12 +268,12 @@ where
     TxS::Settings: Send,
     BS: BlobSelect<BlobId = DaPool::Item>,
     BS::Settings: Send,
-    DaStorage: DaStorageAdapter<Info = DaPool::Item, Blob = Blob>,
+    DaStorage: DaStorageAdapter<Info = DaPool::Item, Share = Share>,
     ConsensusStorage: StorageBackend + Send + Sync + 'static,
     SamplingRng: SeedableRng + RngCore,
     SamplingBackend: DaSamplingServiceBackend<SamplingRng, BlobId = DaPool::Key> + Send,
     SamplingBackend::Settings: Clone,
-    SamplingBackend::Blob: Debug + 'static,
+    SamplingBackend::Share: Debug + 'static,
     SamplingBackend::BlobId: Debug + 'static,
     SamplingNetworkAdapter: nomos_da_sampling::network::NetworkAdapter,
     SamplingStorage: nomos_da_sampling::storage::DaStorageAdapter,
@@ -290,11 +290,11 @@ where
     type Settings = IndexerSettings<DaStorage::Settings>;
     type State = NoState<Self::Settings>;
     type StateOperator = NoOperator<Self::State, Self::Settings>;
-    type Message = DaMsg<Blob, DaPool::Item>;
+    type Message = DaMsg<Share, DaPool::Item>;
 }
 
 impl<
-        Blob,
+        Share,
         DaStorage,
         Consensus,
         NetAdapter,
@@ -317,7 +317,7 @@ impl<
         ApiAdapter,
     >
     DataIndexerService<
-        Blob,
+        Share,
         DaStorage,
         Consensus,
         NetAdapter,
@@ -340,7 +340,7 @@ impl<
         ApiAdapter,
     >
 where
-    Blob: Send + Sync + 'static,
+    Share: Send + Sync + 'static,
     NetAdapter: NetworkAdapter,
     NetAdapter::Settings: Send,
     BlendAdapter: cryptarchia_consensus::blend::BlendAdapter,
@@ -365,12 +365,12 @@ where
     TxS::Settings: Send,
     BS: BlobSelect<BlobId = DaPool::Item>,
     BS::Settings: Send,
-    DaStorage: DaStorageAdapter<Info = DaPool::Item, Blob = Blob> + Sync,
+    DaStorage: DaStorageAdapter<Info = DaPool::Item, Share = Share> + Sync,
     ConsensusStorage: StorageBackend + Send + Sync + 'static,
     SamplingRng: SeedableRng + RngCore,
     SamplingBackend: DaSamplingServiceBackend<SamplingRng, BlobId = DaPool::Key> + Send,
     SamplingBackend::Settings: Clone,
-    SamplingBackend::Blob: Debug + 'static,
+    SamplingBackend::Share: Debug + 'static,
     SamplingBackend::BlobId: Debug + 'static,
     SamplingNetworkAdapter: nomos_da_sampling::network::NetworkAdapter,
     SamplingStorage: nomos_da_sampling::storage::DaStorageAdapter,
@@ -398,7 +398,7 @@ where
     #[instrument(skip_all)]
     async fn handle_da_msg(
         storage_adapter: &DaStorage,
-        msg: DaMsg<Blob, DaPool::Item>,
+        msg: DaMsg<Share, DaPool::Item>,
     ) -> Result<(), DynError> {
         match msg {
             DaMsg::AddIndex { info } => {
@@ -423,7 +423,7 @@ where
 
 #[async_trait::async_trait]
 impl<
-        Blob,
+        Share,
         DaStorage,
         Consensus,
         NetAdapter,
@@ -446,7 +446,7 @@ impl<
         ApiAdapter,
     > ServiceCore
     for DataIndexerService<
-        Blob,
+        Share,
         DaStorage,
         Consensus,
         NetAdapter,
@@ -469,7 +469,7 @@ impl<
         ApiAdapter,
     >
 where
-    Blob: Debug + Send + Sync,
+    Share: Debug + Send + Sync,
     NetAdapter: NetworkAdapter,
     NetAdapter::Settings: Send,
     BlendAdapter: cryptarchia_consensus::blend::BlendAdapter,
@@ -514,14 +514,14 @@ where
     TxS::Settings: Send,
     BS: BlobSelect<BlobId = DaPool::Item>,
     BS::Settings: Send,
-    DaStorage: DaStorageAdapter<Info = DaPool::Item, Blob = Blob> + Send + Sync + 'static,
+    DaStorage: DaStorageAdapter<Info = DaPool::Item, Share = Share> + Send + Sync + 'static,
     DaStorage::Settings: Clone + Send + Sync + 'static,
     ConsensusStorage: StorageBackend + Send + Sync + 'static,
     Consensus: ConsensusAdapter<Tx = ClPool::Item, Cert = DaPool::Item> + Send + Sync,
     SamplingRng: SeedableRng + RngCore,
     SamplingBackend: DaSamplingServiceBackend<SamplingRng, BlobId = DaPool::Key> + Send,
     SamplingBackend::Settings: Clone,
-    SamplingBackend::Blob: Debug + 'static,
+    SamplingBackend::Share: Debug + 'static,
     SamplingBackend::BlobId: Debug + 'static,
     SamplingNetworkAdapter: nomos_da_sampling::network::NetworkAdapter,
     SamplingStorage: nomos_da_sampling::storage::DaStorageAdapter,
