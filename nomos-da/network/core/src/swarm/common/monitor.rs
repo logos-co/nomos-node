@@ -287,7 +287,7 @@ where
                     stats.last_sampling_failure = Some(now);
                 }
                 MonitorEvent::Noop => {}
-            };
+            }
 
             Some(ConnectionMonitorOutput {
                 peer_id: *peer_id,
