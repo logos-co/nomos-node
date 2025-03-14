@@ -126,6 +126,14 @@ pub struct DaLightBlob {
     pub rows_proofs: Vec<Proof>,
 }
 
+impl blob::LightBlob for DaLightBlob {
+    type ColumnIndex = [u8; 2];
+
+    fn column_idx(&self) -> Self::ColumnIndex {
+        self.column_idx.to_be_bytes()
+    }
+}
+
 #[derive(Debug, Clone, Default, Eq, PartialEq, Serialize, Deserialize)]
 pub struct DaBlobSharedCommitments {
     #[serde(

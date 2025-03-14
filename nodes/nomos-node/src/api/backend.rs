@@ -5,7 +5,7 @@ use hyper::header::{CONTENT_TYPE, USER_AGENT};
 use nomos_api::Backend;
 use nomos_core::{
     da::{
-        blob::{info::DispersedBlobInfo, metadata::Metadata, Blob},
+        blob::{info::DispersedBlobInfo, metadata::Metadata, Blob, LightBlob},
         DaVerifier as CoreDaVerifier,
     },
     header::HeaderId,
@@ -31,8 +31,8 @@ use utoipa_swagger_ui::SwaggerUi;
 
 use super::handlers::{
     add_blob, add_blob_info, add_tx, blacklisted_peers, block, block_peer, cl_metrics, cl_status,
-    cryptarchia_headers, cryptarchia_info, da_get_commitments, da_get_light_blob, get_range,
-    libp2p_info, unblock_peer,
+    cryptarchia_headers, cryptarchia_info, da_get_commitments, da_get_light_blob, da_get_shares,
+    get_range, libp2p_info, unblock_peer,
 };
 use crate::api::paths;
 
@@ -140,8 +140,15 @@ where
     DaBlob: Blob + Serialize + DeserializeOwned + Clone + Send + Sync + 'static,
     <DaBlob as Blob>::BlobId:
         AsRef<[u8]> + Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
-    <DaBlob as Blob>::ColumnIndex: AsRef<[u8]> + DeserializeOwned + Send + Sync + 'static,
-    DaBlob::LightBlob: Serialize + DeserializeOwned + Clone + Send + Sync + 'static,
+    <DaBlob as Blob>::ColumnIndex:
+        AsRef<[u8]> + Serialize + DeserializeOwned + Hash + Eq + Send + Sync + 'static,
+    DaBlob::LightBlob: LightBlob<ColumnIndex = <DaBlob as Blob>::ColumnIndex>
+        + Serialize
+        + DeserializeOwned
+        + Clone
+        + Send
+        + Sync
+        + 'static,
     DaBlob::SharedCommitments: Serialize + DeserializeOwned + Clone + Send + Sync + 'static,
     DaBlobInfo: DispersedBlobInfo<BlobId = [u8; 32]>
         + Clone
@@ -376,6 +383,10 @@ where
             .route(
                 paths::DA_GET_LIGHT_BLOB,
                 routing::get(da_get_light_blob::<DaStorageSerializer, DaBlob>),
+            )
+            .route(
+                paths::DA_GET_SHARES,
+                routing::get(da_get_shares::<DaStorageSerializer, DaBlob>),
             )
             .with_state(handle);
 

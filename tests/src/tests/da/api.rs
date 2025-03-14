@@ -1,6 +1,7 @@
 use common_http_client::CommonHttpClient;
+use futures_util::stream::StreamExt;
 use kzgrs_backend::common::blob::{DaBlob, DaLightBlob};
-use nomos_core::da::blob::Blob;
+use nomos_core::da::blob::{Blob, LightBlob};
 use nomos_libp2p::ed25519;
 use rand::{rngs::OsRng, RngCore};
 use reqwest::Url;
@@ -114,4 +115,83 @@ async fn test_block_peer() {
         .unblock_peer(non_existing_peer_id.to_string())
         .await;
     assert!(unblocked);
+}
+
+#[tokio::test]
+async fn test_get_shares() {
+    let topology = Topology::spawn(TopologyConfig::validator_and_executor()).await;
+    let executor = &topology.executors()[0];
+    let num_subnets = executor.config().da_network.backend.num_subnets as usize;
+
+    let data = [1u8; 31];
+    let app_id = hex::decode(APP_ID).unwrap();
+    let app_id: [u8; 32] = app_id.try_into().unwrap();
+    let metadata = kzgrs_backend::dispersal::Metadata::new(app_id, 0u64.into());
+
+    disseminate_with_metadata(executor, &data, metadata).await;
+    let from = 0u64.to_be_bytes();
+    let to = 1u64.to_be_bytes();
+    wait_for_indexed_blob(executor, app_id, from, to, num_subnets).await;
+
+    let executor_blobs = executor.get_indexer_range(app_id, from..to).await;
+    let blob = executor_blobs
+        .iter()
+        .flat_map(|(_, blobs)| blobs)
+        .next()
+        .unwrap();
+    let blob_id = blob.id().try_into().unwrap();
+
+    let exec_url = Url::parse(&format!(
+        "http://{}",
+        executor.config().http.backend_settings.address
+    ))
+    .unwrap();
+    let client = CommonHttpClient::new(None);
+
+    // Test case 1: Request all shares
+    let shares_stream = client
+        .get_shares::<DaBlob>(exec_url.clone(), blob_id, vec![], vec![], true)
+        .await
+        .unwrap();
+    let shares = shares_stream.collect::<Vec<_>>().await;
+    assert_eq!(shares.len(), num_subnets);
+    assert!(shares.iter().any(|share| share.column_idx() == [0, 0]));
+    assert!(shares.iter().any(|share| share.column_idx() == [0, 1]));
+
+    // Test case 2: Request only the first share
+    let shares_stream = client
+        .get_shares::<DaBlob>(exec_url.clone(), blob_id, vec![[0, 0]], vec![], false)
+        .await
+        .unwrap();
+    let shares = shares_stream.collect::<Vec<_>>().await;
+    assert_eq!(shares.len(), 1);
+    assert_eq!(shares[0].column_idx(), [0, 0]);
+
+    // Test case 3: Request only the first share but return all available shares
+    let shares_stream = client
+        .get_shares::<DaBlob>(exec_url.clone(), blob_id, vec![[0, 0]], vec![], true)
+        .await
+        .unwrap();
+    let shares = shares_stream.collect::<Vec<_>>().await;
+    assert_eq!(shares.len(), num_subnets);
+    assert!(shares.iter().any(|share| share.column_idx() == [0, 0]));
+    assert!(shares.iter().any(|share| share.column_idx() == [0, 1]));
+
+    // Test case 4: Request all shares and filter out the second share
+    let shares_stream = client
+        .get_shares::<DaBlob>(exec_url.clone(), blob_id, vec![], vec![[0, 1]], true)
+        .await
+        .unwrap();
+    let shares = shares_stream.collect::<Vec<_>>().await;
+    assert_eq!(shares.len(), 1);
+    assert_eq!(shares[0].column_idx(), [0, 0]);
+
+    // Test case 5: Request unavailable shares
+    let shares_stream = client
+        .get_shares::<DaBlob>(exec_url.clone(), blob_id, vec![[0, 2]], vec![], false)
+        .await
+        .unwrap();
+
+    let shares = shares_stream.collect::<Vec<_>>().await;
+    assert!(shares.is_empty());
 }

@@ -25,3 +25,14 @@ pub struct DAGetLightBlobReq<B: Blob> {
     pub blob_id: B::BlobId,
     pub column_idx: B::ColumnIndex,
 }
+
+#[derive(Serialize, Deserialize)]
+pub struct GetSharesRequest<B: Blob>
+where
+    <B as Blob>::ColumnIndex: Serialize + DeserializeOwned,
+{
+    pub blob_id: B::BlobId,
+    pub requested_shares: Vec<B::ColumnIndex>,
+    pub filter_shares: Vec<B::ColumnIndex>,
+    pub return_available: bool,
+}

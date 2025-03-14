@@ -1,5 +1,6 @@
 pub use common_http_client::BasicAuthCredentials;
 use common_http_client::{CommonHttpClient, Error};
+use futures::Stream;
 use nomos_core::da::blob::Blob;
 use nomos_executor::api::{handlers::DispersalRequest, paths};
 use reqwest::Url;
@@ -66,6 +67,31 @@ impl ExecutorHttpClient {
     {
         self.client
             .get_blob::<B, C>(base_url, blob_id, column_idx)
+            .await
+    }
+
+    pub async fn get_shares<B>(
+        &self,
+        base_url: Url,
+        blob_id: B::BlobId,
+        requested_shares: Vec<B::ColumnIndex>,
+        filter_shares: Vec<B::ColumnIndex>,
+        return_available: bool,
+    ) -> Result<impl Stream<Item = B::LightBlob>, Error>
+    where
+        B: Blob,
+        <B as Blob>::BlobId: serde::Serialize + Send + Sync,
+        <B as Blob>::ColumnIndex: serde::Serialize + DeserializeOwned + Send + Sync,
+        <B as Blob>::LightBlob: DeserializeOwned + Send + Sync,
+    {
+        self.client
+            .get_shares::<B>(
+                base_url,
+                blob_id,
+                requested_shares,
+                filter_shares,
+                return_available,
+            )
             .await
     }
 }

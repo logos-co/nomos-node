@@ -1,12 +1,25 @@
-use nomos_core::{block::Block, da::blob::Blob, header::HeaderId};
+use std::{hash::Hash, sync::Arc};
+
+use nomos_core::{
+    block::Block,
+    da::blob::{Blob, LightBlob},
+    header::HeaderId,
+};
 use nomos_da_storage::rocksdb::{
     create_blob_idx, key_bytes, DA_BLOB_PREFIX, DA_SHARED_COMMITMENTS_PREFIX,
+};
+use nomos_libp2p::libp2p::{
+    bytes::Bytes,
+    futures::{stream, Stream, StreamExt},
 };
 use nomos_storage::{
     backends::{rocksdb::RocksBackend, StorageSerde},
     StorageMsg, StorageService,
 };
 use serde::{de::DeserializeOwned, Serialize};
+use tokio::sync::oneshot;
+
+use crate::http::DynError;
 
 pub async fn block_req<S, Tx>(
     handle: &overwatch::overwatch::handle::OverwatchHandle,
@@ -71,7 +84,7 @@ where
     DaBlob: Blob,
     <DaBlob as Blob>::BlobId: AsRef<[u8]> + DeserializeOwned + Send + Sync + 'static,
     <DaBlob as Blob>::ColumnIndex: AsRef<[u8]> + DeserializeOwned + Send + Sync + 'static,
-    <DaBlob as Blob>::LightBlob: Serialize + DeserializeOwned,
+    <DaBlob as Blob>::LightBlob: LightBlob + Serialize + DeserializeOwned,
     <StorageOp as StorageSerde>::Error: Send + Sync,
 {
     let relay = handle
@@ -95,4 +108,68 @@ where
         .map(|data| StorageOp::deserialize(data))
         .transpose()
         .map_err(super::DynError::from)
+}
+
+pub async fn get_shares<StorageOp, DaBlob>(
+    handle: &overwatch::overwatch::handle::OverwatchHandle,
+    blob_id: DaBlob::BlobId,
+    requested_shares: Vec<DaBlob::ColumnIndex>,
+    filter_shares: Vec<DaBlob::ColumnIndex>,
+    return_available: bool,
+) -> Result<impl Stream<Item = Result<Bytes, DynError>> + Send + Sync + 'static, DynError>
+where
+    StorageOp: StorageSerde + Send + Sync + 'static,
+    DaBlob: Blob,
+    DaBlob::BlobId: AsRef<[u8]> + DeserializeOwned + Send + Sync + 'static,
+    DaBlob::ColumnIndex: DeserializeOwned + Hash + Eq + Send + Sync + 'static,
+    DaBlob::LightBlob: LightBlob<ColumnIndex = <DaBlob as Blob>::ColumnIndex>
+        + Serialize
+        + DeserializeOwned
+        + Send
+        + Sync
+        + 'static,
+    StorageOp::Error: Send + Sync,
+{
+    let storage_relay = handle
+        .relay::<StorageService<RocksBackend<StorageOp>>>()
+        .connect()
+        .await?;
+
+    let shares_prefix = key_bytes(DA_BLOB_PREFIX, blob_id.as_ref());
+
+    let (blob_reply_tx, blob_reply_rx) = oneshot::channel();
+    storage_relay
+        .send(StorageMsg::LoadPrefix {
+            prefix: shares_prefix,
+            reply_channel: blob_reply_tx,
+        })
+        .await
+        .map_err(|(e, _)| e)?;
+
+    let blobs = blob_reply_rx.await?;
+
+    let requested_shares = Arc::new(requested_shares);
+    let filter_shares = Arc::new(filter_shares);
+
+    // Wrapping into stream from here because currently storage backend returns
+    // collection
+    Ok(stream::iter(blobs)
+        .filter_map(|bytes| async move { StorageOp::deserialize::<DaBlob::LightBlob>(bytes).ok() })
+        .filter_map(move |blob| {
+            let requested = requested_shares.clone();
+            let filtered = filter_shares.clone();
+            async move {
+                if requested.contains(&blob.column_idx())
+                    || (return_available && !filtered.contains(&blob.column_idx()))
+                {
+                    let Ok(mut json) = serde_json::to_vec(&blob) else {
+                        return None;
+                    };
+                    json.push(b'\n');
+                    Some(Ok(Bytes::from(json)))
+                } else {
+                    None
+                }
+            }
+        }))
 }
