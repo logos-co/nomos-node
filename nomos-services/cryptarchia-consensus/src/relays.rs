@@ -119,16 +119,12 @@ where
     DaPool::BlockId: Debug,
     DaPool::Item: Debug + DeserializeOwned + Eq + Hash + Clone + Send + Sync + 'static,
     DaPool::Key: Debug + 'static,
-    //
     DaPool::RecoveryState: Serialize + for<'de> Deserialize<'de>,
-    //
     DaPool::Settings: Clone,
     DaPoolAdapter: MempoolAdapter<Key = DaPool::Key>,
     DaPoolAdapter::Payload: DispersedBlobInfo + Into<DaPool::Item> + Debug,
-    //
     DaVerifierBackend: nomos_da_verifier::backend::VerifierBackend + Send + Sync + 'static,
     DaVerifierBackend::Settings: Clone,
-    //
     NetworkAdapter: network::NetworkAdapter,
     Storage: StorageBackend + Send + Sync + 'static,
     SamplingRng: SeedableRng + RngCore,
