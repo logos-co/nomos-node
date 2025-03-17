@@ -80,8 +80,8 @@ where
             api_port: settings.api_port,
             protocol: settings
                 .is_secure
-                .then(|| "https".to_string())
-                .unwrap_or_else(|| "http".to_string()),
+                .then(|| "https".to_owned())
+                .unwrap_or_else(|| "http".to_owned()),
         }
     }
 

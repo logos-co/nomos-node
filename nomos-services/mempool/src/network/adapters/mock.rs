@@ -48,7 +48,7 @@ impl NetworkAdapter for MockAdapter {
 
         if let Err((e, _)) = network_relay
             .send(NetworkMsg::Process(MockBackendMessage::RelaySubscribe {
-                topic: MOCK_PUB_SUB_TOPIC.to_string(),
+                topic: MOCK_PUB_SUB_TOPIC.to_owned(),
             }))
             .await
         {

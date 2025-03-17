@@ -66,8 +66,8 @@ pub type DAY = BoundTag<'d'>;
 fn fill_duration_measure<T: TimeTag>() -> Result<String, impl Display> {
     match T::inner() {
         v @ ('d' | 'h' | 'm' | 's') => Ok(v.to_string()),
-        'l' => Ok("ms".to_string()),
-        'n' => Ok("ns".to_string()),
+        'l' => Ok("ms".to_owned()),
+        'n' => Ok("ns".to_owned()),
         other => Err(format!("'{other}' measure not supported")),
     }
 }

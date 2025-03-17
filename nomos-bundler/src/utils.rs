@@ -63,7 +63,7 @@ pub fn get_target_directory_for_current_profile(target_triple: &str) -> Result<P
         return Ok(profile_directory);
     }
 
-    Err("Could not find target directory for profile.".to_string())
+    Err("Could not find target directory for profile.".to_owned())
 }
 
 #[must_use]

@@ -30,14 +30,14 @@ async fn pull_to_file<Config: Serialize + DeserializeOwned>(
 
 #[tokio::main]
 async fn main() {
-    let config_file_path = env::var("CFG_FILE_PATH").unwrap_or_else(|_| "config.yaml".to_string());
+    let config_file_path = env::var("CFG_FILE_PATH").unwrap_or_else(|_| "config.yaml".to_owned());
     let server_addr =
-        env::var("CFG_SERVER_ADDR").unwrap_or_else(|_| "http://127.0.0.1:4400".to_string());
-    let ip = parse_ip(&env::var("CFG_HOST_IP").unwrap_or_else(|_| "127.0.0.1".to_string()));
+        env::var("CFG_SERVER_ADDR").unwrap_or_else(|_| "http://127.0.0.1:4400".to_owned());
+    let ip = parse_ip(&env::var("CFG_HOST_IP").unwrap_or_else(|_| "127.0.0.1".to_owned()));
     let identifier =
-        env::var("CFG_HOST_IDENTIFIER").unwrap_or_else(|_| "unidentified-node".to_string());
+        env::var("CFG_HOST_IDENTIFIER").unwrap_or_else(|_| "unidentified-node".to_owned());
 
-    let host_kind = env::var("CFG_HOST_KIND").unwrap_or_else(|_| "validator".to_string());
+    let host_kind = env::var("CFG_HOST_KIND").unwrap_or_else(|_| "validator".to_owned());
 
     let node_config_endpoint = match host_kind.as_str() {
         "executor" => format!("{server_addr}/executor"),

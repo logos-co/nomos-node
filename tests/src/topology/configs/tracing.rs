@@ -32,7 +32,7 @@ impl GeneralTracingConfig {
                     // provided tracing level. Libp2p and risc0 related crates are very log
                     // intensive in debug mode.
                     filters: std::iter::once(&("nomos", "debug"))
-                        .map(|(k, v)| ((*k).to_string(), (*v).to_string()))
+                        .map(|(k, v)| ((*k).to_owned(), (*v).to_owned()))
                         .collect(),
                 }),
                 metrics: MetricsLayer::Otlp(OtlpMetricsConfig {

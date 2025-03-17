@@ -55,7 +55,7 @@ fn build_package(version: String) {
         .package_settings(tauri_bundler::PackageSettings {
             product_name: String::from(CRATE_NAME),
             version,
-            description: "Nomos Node".to_string(),
+            description: "Nomos Node".to_owned(),
             homepage: None,
             authors: None,
             default_run: None,
@@ -78,7 +78,7 @@ fn build_package(version: String) {
             resources: None,
             resources_map: None,
             copyright: None,
-            license: Some("MIT or Apache-2.0".to_string()),
+            license: Some("MIT or Apache-2.0".to_owned()),
             license_file: None,
             category: None,
             file_associations: None,

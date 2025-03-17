@@ -61,13 +61,13 @@ fn test_mockmempool() {
 
         let predefined_messages = vec![
             MockMessage {
-                payload: "This is foo".to_string(),
+                payload: "This is foo".to_owned(),
                 content_topic: MOCK_TX_CONTENT_TOPIC,
                 version: 0,
                 timestamp: 0,
             },
             MockMessage {
-                payload: "This is bar".to_string(),
+                payload: "This is bar".to_owned(),
                 content_topic: MOCK_TX_CONTENT_TOPIC,
                 version: 0,
                 timestamp: 0,
