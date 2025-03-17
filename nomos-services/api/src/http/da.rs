@@ -47,6 +47,8 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use subnetworks_assignations::MembershipHandler;
 use tokio::sync::oneshot;
 
+use crate::wait_with_timeout;
+
 pub type DaIndexer<
     Tx,
     C,
@@ -132,7 +134,7 @@ where
         .await
         .map_err(|(e, _)| e)?;
 
-    Ok(receiver.await?)
+    wait_with_timeout(receiver, "Timeout while waiting for add share".to_owned()).await
 }
 
 pub async fn get_range<
@@ -239,7 +241,7 @@ where
         .await
         .map_err(|(e, _)| e)?;
 
-    Ok(receiver.await?)
+    wait_with_timeout(receiver, "Timeout while waiting for get range".to_owned()).await
 }
 
 pub async fn disperse_data<Backend, NetworkAdapter, MempoolAdapter, Membership, Metadata>(
@@ -279,7 +281,11 @@ where
         .await
         .map_err(|(e, _)| e)?;
 
-    receiver.await?
+    wait_with_timeout(
+        receiver,
+        "Timeout while waiting for disperse data".to_owned(),
+    )
+    .await?
 }
 
 pub async fn block_peer<B>(handle: &OverwatchHandle, peer_id: PeerId) -> Result<bool, DynError>
@@ -294,7 +300,8 @@ where
         .send(DaNetworkMsg::Process(message))
         .await
         .map_err(|(e, _)| e)?;
-    Ok(receiver.await?)
+
+    wait_with_timeout(receiver, "Timeout while waiting for block peer".to_owned()).await
 }
 
 pub async fn unblock_peer<B>(handle: &OverwatchHandle, peer_id: PeerId) -> Result<bool, DynError>
@@ -309,7 +316,12 @@ where
         .send(DaNetworkMsg::Process(message))
         .await
         .map_err(|(e, _)| e)?;
-    Ok(receiver.await?)
+
+    wait_with_timeout(
+        receiver,
+        "Timeout while waiting for unblock peer".to_owned(),
+    )
+    .await
 }
 
 pub async fn blacklisted_peers<B>(handle: &OverwatchHandle) -> Result<Vec<PeerId>, DynError>
@@ -324,7 +336,12 @@ where
         .send(DaNetworkMsg::Process(message))
         .await
         .map_err(|(e, _)| e)?;
-    Ok(receiver.await?)
+
+    wait_with_timeout(
+        receiver,
+        "Timeout while waiting for blacklisted peers".to_owned(),
+    )
+    .await
 }
 
 // Factory for generating messages for peers (validator and executor).
