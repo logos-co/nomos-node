@@ -1,3 +1,5 @@
+use std::{future::Future, time::Duration};
+
 use overwatch::{
     overwatch::handle::OverwatchHandle,
     services::{
@@ -9,6 +11,8 @@ use overwatch::{
 };
 
 pub mod http;
+
+pub(crate) const HTTP_REQUEST_TIMEOUT: Duration = Duration::from_secs(10);
 
 /// A simple abstraction so that we can easily
 /// change the underlying http server
@@ -69,4 +73,21 @@ where
         endpoint.serve(self.handle).await?;
         Ok(())
     }
+}
+
+pub(crate) async fn wait_with_timeout<T, F, E>(
+    future: F,
+    timeout_duration: Duration,
+    timeout_error: impl Into<Box<dyn std::error::Error + Send + Sync>>,
+) -> Result<T, DynError>
+where
+    F: Future<Output = Result<T, E>>,
+    E: Into<Box<dyn std::error::Error + Send + Sync>>,
+{
+    tokio::time::timeout(timeout_duration, future)
+        .await
+        .map_or_else(
+            |_| Err(timeout_error.into()),
+            |result| result.map_err(std::convert::Into::into),
+        )
 }

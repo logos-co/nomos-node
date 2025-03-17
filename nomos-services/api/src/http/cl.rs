@@ -8,6 +8,8 @@ use nomos_mempool::{
 use serde::{Deserialize, Serialize};
 use tokio::sync::oneshot;
 
+use crate::{wait_with_timeout, HTTP_REQUEST_TIMEOUT};
+
 type ClMempoolService<T> = TxMempoolService<
     MempoolNetworkAdapter<T, <T as Transaction>::Hash>,
     MockPool<HeaderId, T, <T as Transaction>::Hash>,
@@ -38,7 +40,12 @@ where
         .await
         .map_err(|(e, _)| e)?;
 
-    Ok(receiver.await?)
+    wait_with_timeout(
+        receiver,
+        HTTP_REQUEST_TIMEOUT,
+        "Timeout while waiting for cl_mempool_metrics".to_string(),
+    )
+    .await
 }
 
 pub async fn cl_mempool_status<T>(
@@ -68,5 +75,10 @@ where
         .await
         .map_err(|(e, _)| e)?;
 
-    Ok(receiver.await?)
+    wait_with_timeout(
+        receiver,
+        HTTP_REQUEST_TIMEOUT,
+        "Timeout while waiting for cl_mempool_status".to_string(),
+    )
+    .await
 }

@@ -10,11 +10,12 @@ use nomos_mempool::{
     TxMempoolService,
 };
 use nomos_network::backends::NetworkBackend;
+use overwatch::DynError;
 use rand::{RngCore, SeedableRng};
 use serde::{Deserialize, Serialize};
 use tokio::sync::oneshot;
 
-use super::DynError;
+use crate::{wait_with_timeout, HTTP_REQUEST_TIMEOUT};
 
 pub async fn add_tx<N, A, Item, Key>(
     handle: &overwatch::overwatch::handle::OverwatchHandle,
@@ -43,7 +44,13 @@ where
         .await
         .map_err(|(e, _)| e)?;
 
-    receiver.await?.map_err(DynError::from)
+    wait_with_timeout(
+        receiver,
+        HTTP_REQUEST_TIMEOUT,
+        "Timeout while waiting for add_tx".to_string(),
+    )
+    .await?
+    .map_err(DynError::from)
 }
 
 pub async fn add_blob_info<
@@ -111,5 +118,11 @@ where
         .await
         .map_err(|(e, _)| e)?;
 
-    receiver.await?.map_err(DynError::from)
+    wait_with_timeout(
+        receiver,
+        HTTP_REQUEST_TIMEOUT,
+        "Timeout while waiting for add_blob_info".to_string(),
+    )
+    .await?
+    .map_err(DynError::from)
 }

@@ -8,6 +8,8 @@ use nomos_storage::{
 };
 use serde::{de::DeserializeOwned, Serialize};
 
+use crate::{wait_with_timeout, HTTP_REQUEST_TIMEOUT};
+
 pub async fn block_req<S, Tx>(
     handle: &overwatch::overwatch::handle::OverwatchHandle,
     id: HeaderId,
@@ -23,7 +25,12 @@ where
     let (msg, receiver) = StorageMsg::new_load_message(id);
     relay.send(msg).await.map_err(|(e, _)| e)?;
 
-    Ok(receiver.recv().await?)
+    wait_with_timeout(
+        receiver.recv(),
+        HTTP_REQUEST_TIMEOUT,
+        "Timeout while waiting for block".to_string(),
+    )
+    .await
 }
 
 pub async fn get_shared_commitments<StorageOp, DaShare>(
@@ -54,7 +61,13 @@ where
         .await
         .map_err(|(e, _)| e)?;
 
-    let result = reply_rcv.await?;
+    let result = wait_with_timeout(
+        reply_rcv,
+        HTTP_REQUEST_TIMEOUT,
+        "Timeout while waiting for shared commitments".to_string(),
+    )
+    .await?;
+
     result
         .map(|data| StorageOp::deserialize(data))
         .transpose()
@@ -90,7 +103,13 @@ where
         .await
         .map_err(|(e, _)| e)?;
 
-    let result = reply_rcv.await?;
+    let result = wait_with_timeout(
+        reply_rcv,
+        HTTP_REQUEST_TIMEOUT,
+        "Timeout while waiting for light share".to_string(),
+    )
+    .await?;
+
     result
         .map(|data| StorageOp::deserialize(data))
         .transpose()
