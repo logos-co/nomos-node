@@ -387,7 +387,7 @@ where
             }
         };
 
-        // Safety: blob_id should always be a 32bytes hash
+        // `blob_id` should always be a 32bytes hash
         Ok((peer_id, SampleStreamResponse::Writer(response), stream))
     }
 
@@ -694,7 +694,7 @@ impl<Membership: MembershipHandler<Id = PeerId, NetworkId = SubnetworkId> + 'sta
                     ));
                 }
                 Err((error, maybe_stream)) => {
-                    Self::handle_stream_error(to_sample, to_close, error, maybe_stream);
+                    return Self::handle_stream_error(to_sample, to_close, error, maybe_stream);
                 }
             }
         }
