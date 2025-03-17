@@ -1,11 +1,11 @@
 use core::ops::Range;
 use std::{error::Error, fmt::Debug, hash::Hash};
 
-use kzgrs_backend::common::blob::DaBlob;
+use kzgrs_backend::common::share::DaShare;
 use nomos_blend_service::network::libp2p::Libp2pAdapter as BlendNetworkAdapter;
 use nomos_core::{
     da::{
-        blob::{info::DispersedBlobInfo, metadata, select::FillSize as FillSizeWithBlobs, Blob},
+        blob::{info::DispersedBlobInfo, metadata, select::FillSize as FillSizeWithBlobs, Share},
         BlobId, DaVerifier as CoreDaVerifier,
     },
     header::HeaderId,
@@ -64,7 +64,7 @@ pub type DaIndexer<
     const SIZE: usize,
 > = DataIndexerService<
     // Indexer specific.
-    DaBlob,
+    DaShare,
     IndexerStorageAdapter<SS, V>,
     CryptarchiaConsensusAdapter<Tx, V>,
     // Cryptarchia specific, should be the same as in `Cryptarchia` type above.
@@ -99,33 +99,33 @@ pub type DaDispersal<Backend, NetworkAdapter, MempoolAdapter, Membership, Metada
 
 pub type DaNetwork<Backend> = NetworkService<Backend>;
 
-pub async fn add_blob<A, B, M, VB, SS>(
+pub async fn add_share<A, S, M, VB, SS>(
     handle: &OverwatchHandle,
-    blob: B,
+    share: S,
 ) -> Result<Option<()>, DynError>
 where
     A: Serialize + DeserializeOwned + Clone + Send + Sync + 'static,
-    B: Blob + Serialize + DeserializeOwned + Clone + Send + Sync + 'static,
-    <B as Blob>::BlobId: AsRef<[u8]> + Send + Sync + 'static,
-    <B as Blob>::ColumnIndex: AsRef<[u8]> + Send + Sync + 'static,
-    <B as Blob>::LightBlob: Serialize + DeserializeOwned + Clone + Send + Sync + 'static,
-    <B as Blob>::SharedCommitments: Serialize + DeserializeOwned + Clone + Send + Sync + 'static,
+    S: Share + Serialize + DeserializeOwned + Clone + Send + Sync + 'static,
+    <S as Share>::BlobId: AsRef<[u8]> + Send + Sync + 'static,
+    <S as Share>::ShareIndex: AsRef<[u8]> + Send + Sync + 'static,
+    <S as Share>::LightShare: Serialize + DeserializeOwned + Clone + Send + Sync + 'static,
+    <S as Share>::SharesCommitments: Serialize + DeserializeOwned + Clone + Send + Sync + 'static,
     M: MembershipHandler<NetworkId = SubnetworkId, Id = PeerId>
         + Clone
         + Debug
         + Send
         + Sync
         + 'static,
-    VB: VerifierBackend + CoreDaVerifier<DaBlob = B>,
+    VB: VerifierBackend + CoreDaVerifier<DaShare = S>,
     <VB as VerifierBackend>::Settings: Clone,
     <VB as CoreDaVerifier>::Error: Error,
     SS: StorageSerde + Send + Sync + 'static,
 {
-    let relay = handle.relay::<DaVerifier<B, M, VB, SS>>().connect().await?;
+    let relay = handle.relay::<DaVerifier<S, M, VB, SS>>().connect().await?;
     let (sender, receiver) = oneshot::channel();
     relay
-        .send(DaVerifierMsg::AddBlob {
-            blob,
+        .send(DaVerifierMsg::AddShare {
+            share,
             reply_channel: sender,
         })
         .await
@@ -153,7 +153,7 @@ pub async fn get_range<
     handle: &OverwatchHandle,
     app_id: <V as metadata::Metadata>::AppId,
     range: Range<<V as metadata::Metadata>::Index>,
-) -> Result<Vec<(<V as metadata::Metadata>::Index, Vec<DaBlob>)>, DynError>
+) -> Result<Vec<(<V as metadata::Metadata>::Index, Vec<DaShare>)>, DynError>
 where
     Tx: Transaction
         + Eq
@@ -196,7 +196,7 @@ where
     SamplingRng: SeedableRng + RngCore,
     SamplingBackend: DaSamplingServiceBackend<SamplingRng, BlobId = BlobId> + Send,
     SamplingBackend::Settings: Clone,
-    SamplingBackend::Blob: Debug + 'static,
+    SamplingBackend::Share: Debug + 'static,
     SamplingBackend::BlobId: Debug + 'static,
     SamplingNetworkAdapter: nomos_da_sampling::network::NetworkAdapter,
     SamplingStorage: nomos_da_sampling::storage::DaStorageAdapter,

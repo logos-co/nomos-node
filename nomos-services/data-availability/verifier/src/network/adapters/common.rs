@@ -26,7 +26,7 @@ macro_rules! adapter_for {
         {
             type Backend = $DaNetworkBackend<M>;
             type Settings = ();
-            type Blob = DaBlob;
+            type Share = DaShare;
 
             async fn new(
                 _settings: Self::Settings,
@@ -40,7 +40,7 @@ macro_rules! adapter_for {
                 }
             }
 
-            async fn blob_stream(&self) -> Box<dyn Stream<Item = Self::Blob> + Unpin + Send> {
+            async fn share_stream(&self) -> Box<dyn Stream<Item = Self::Share> + Unpin + Send> {
                 let (sender, receiver) = tokio::sync::oneshot::channel();
                 self.network_relay
                     .send(nomos_da_network_service::DaNetworkMsg::Subscribe {

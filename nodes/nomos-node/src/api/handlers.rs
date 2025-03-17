@@ -12,13 +12,13 @@ use nomos_api::http::{
 };
 use nomos_core::{
     da::{
-        blob::{info::DispersedBlobInfo, metadata::Metadata, Blob},
+        blob::{info::DispersedBlobInfo, metadata::Metadata, Share},
         BlobId, DaVerifier as CoreDaVerifier,
     },
     header::HeaderId,
     tx::Transaction,
 };
-use nomos_da_messages::http::da::{DABlobCommitmentsRequest, DAGetLightBlobReq, GetRangeReq};
+use nomos_da_messages::http::da::{DASharesCommitmentsRequest, DaSamplingRequest, GetRangeReq};
 use nomos_da_network_core::SubnetworkId;
 use nomos_da_network_service::backends::NetworkBackend;
 use nomos_da_sampling::backend::DaSamplingServiceBackend;
@@ -141,7 +141,7 @@ where
     SamplingRng: SeedableRng + RngCore,
     SamplingBackend: DaSamplingServiceBackend<SamplingRng, BlobId = BlobId> + Send,
     SamplingBackend::Settings: Clone,
-    SamplingBackend::Blob: Debug + 'static,
+    SamplingBackend::Share: Debug + 'static,
     SamplingBackend::BlobId: Debug + 'static,
     SamplingNetworkAdapter: nomos_da_sampling::network::NetworkAdapter,
     SamplingStorage: nomos_da_sampling::storage::DaStorageAdapter,
@@ -212,7 +212,7 @@ where
     SamplingRng: SeedableRng + RngCore,
     SamplingBackend: DaSamplingServiceBackend<SamplingRng, BlobId = BlobId> + Send,
     SamplingBackend::Settings: Clone,
-    SamplingBackend::Blob: Debug + 'static,
+    SamplingBackend::Share: Debug + 'static,
     SamplingBackend::BlobId: Debug + 'static,
     SamplingNetworkAdapter: nomos_da_sampling::network::NetworkAdapter,
     SamplingStorage: nomos_da_sampling::storage::DaStorageAdapter,
@@ -244,42 +244,42 @@ where
 
 #[utoipa::path(
     post,
-    path = paths::DA_ADD_BLOB,
+    path = paths::DA_ADD_SHARE,
     responses(
-        (status = 200, description = "Blob to be published received"),
+        (status = 200, description = "Share to be published received"),
         (status = 500, description = "Internal server error", body = String),
     )
 )]
-pub async fn add_blob<A, B, M, VB, SS>(
+pub async fn add_share<A, S, M, VB, SS>(
     State(handle): State<OverwatchHandle>,
-    Json(blob): Json<B>,
+    Json(share): Json<S>,
 ) -> Response
 where
     A: Serialize + DeserializeOwned + Clone + Send + Sync + 'static,
-    B: Blob + Serialize + DeserializeOwned + Clone + Send + Sync + 'static,
-    <B as Blob>::BlobId: AsRef<[u8]> + Send + Sync + 'static,
-    <B as Blob>::ColumnIndex: AsRef<[u8]> + Send + Sync + 'static,
-    <B as Blob>::LightBlob: Serialize + DeserializeOwned + Clone + Send + Sync + 'static,
-    <B as Blob>::SharedCommitments: Serialize + DeserializeOwned + Clone + Send + Sync + 'static,
+    S: Share + Serialize + DeserializeOwned + Clone + Send + Sync + 'static,
+    <S as Share>::BlobId: AsRef<[u8]> + Send + Sync + 'static,
+    <S as Share>::ShareIndex: AsRef<[u8]> + Send + Sync + 'static,
+    <S as Share>::LightShare: Serialize + DeserializeOwned + Clone + Send + Sync + 'static,
+    <S as Share>::SharesCommitments: Serialize + DeserializeOwned + Clone + Send + Sync + 'static,
     M: MembershipHandler<NetworkId = SubnetworkId, Id = PeerId>
         + Clone
         + Debug
         + Send
         + Sync
         + 'static,
-    VB: VerifierBackend + CoreDaVerifier<DaBlob = B>,
+    VB: VerifierBackend + CoreDaVerifier<DaShare = S>,
     <VB as VerifierBackend>::Settings: Clone,
     <VB as CoreDaVerifier>::Error: Error,
     SS: StorageSerde + Send + Sync + 'static,
 {
-    make_request_and_return_response!(da::add_blob::<A, B, M, VB, SS>(&handle, blob))
+    make_request_and_return_response!(da::add_share::<A, S, M, VB, SS>(&handle, share))
 }
 
 #[utoipa::path(
     post,
     path = paths::DA_GET_RANGE,
     responses(
-        (status = 200, description = "Range of blobs", body = Vec<([u8;8], Vec<DaBlob>)>),
+        (status = 200, description = "Range of blobs", body = Vec<([u8;8], Vec<DaShare>)>),
         (status = 500, description = "Internal server error", body = String),
     )
 )]
@@ -345,7 +345,7 @@ where
     SamplingBackend:
         DaSamplingServiceBackend<SamplingRng, BlobId = <V as DispersedBlobInfo>::BlobId> + Send,
     SamplingBackend::Settings: Clone,
-    SamplingBackend::Blob: Debug + 'static,
+    SamplingBackend::Share: Debug + 'static,
     SamplingBackend::BlobId: Debug + 'static,
     SamplingNetworkAdapter: nomos_da_sampling::network::NetworkAdapter,
     SamplingStorage: nomos_da_sampling::storage::DaStorageAdapter,
@@ -464,26 +464,26 @@ where
 
 #[utoipa::path(
     get,
-    path = paths::DA_GET_SHARED_COMMITMENTS,
+    path = paths::DA_GET_SHARES_COMMITMENTS,
     responses(
-        (status = 200, description = "Request the commitments for an specific `BlobId`", body = DABlobCommitmentsRequest<DaBlob>),
+        (status = 200, description = "Request the commitments for an specific `BlobId`", body = DASharesCommitmentsRequest<DaShare>),
         (status = 500, description = "Internal server error", body = String),
     )
 )]
-pub async fn da_get_commitments<StorageOp, DaBlob>(
+pub async fn da_get_commitments<StorageOp, DaShare>(
     State(handle): State<OverwatchHandle>,
-    Json(req): Json<DABlobCommitmentsRequest<DaBlob>>,
+    Json(req): Json<DASharesCommitmentsRequest<DaShare>>,
 ) -> Response
 where
-    DaBlob: Blob,
-    <DaBlob as Blob>::BlobId:
+    DaShare: Share,
+    <DaShare as Share>::BlobId:
         AsRef<[u8]> + Serialize + DeserializeOwned + Clone + Send + Sync + 'static,
-    <DaBlob as Blob>::SharedCommitments:
+    <DaShare as Share>::SharesCommitments:
         serde::Serialize + DeserializeOwned + Send + Sync + 'static,
     StorageOp: StorageSerde + Send + Sync + 'static,
     <StorageOp as StorageSerde>::Error: Send + Sync,
 {
-    make_request_and_return_response!(storage::get_shared_commitments::<StorageOp, DaBlob>(
+    make_request_and_return_response!(storage::get_shared_commitments::<StorageOp, DaShare>(
         &handle,
         req.blob_id
     ))
@@ -491,28 +491,28 @@ where
 
 #[utoipa::path(
     get,
-    path = paths::DA_GET_LIGHT_BLOB,
+    path = paths::DA_GET_LIGHT_SHARE,
     responses(
-        (status = 200, description = "Get blob by blob id", body = GetLightBlobReq<DaBlob>),
+        (status = 200, description = "Get blob by blob id", body = DaSamplingRequest<DaShare>),
         (status = 500, description = "Internal server error", body = String),
     )
 )]
-pub async fn da_get_light_blob<StorageOp, DaBlob>(
+pub async fn da_get_light_share<StorageOp, DaShare>(
     State(handle): State<OverwatchHandle>,
-    Json(request): Json<DAGetLightBlobReq<DaBlob>>,
+    Json(request): Json<DaSamplingRequest<DaShare>>,
 ) -> Response
 where
-    DaBlob: Blob,
-    <DaBlob as Blob>::BlobId: AsRef<[u8]> + DeserializeOwned + Clone + Send + Sync + 'static,
-    <DaBlob as Blob>::ColumnIndex: AsRef<[u8]> + DeserializeOwned + Send + Sync + 'static,
-    <DaBlob as Blob>::LightBlob: Serialize + DeserializeOwned + Send + Sync + 'static,
+    DaShare: Share,
+    <DaShare as Share>::BlobId: AsRef<[u8]> + DeserializeOwned + Clone + Send + Sync + 'static,
+    <DaShare as Share>::ShareIndex: AsRef<[u8]> + DeserializeOwned + Send + Sync + 'static,
+    <DaShare as Share>::LightShare: Serialize + DeserializeOwned + Send + Sync + 'static,
     StorageOp: StorageSerde + Send + Sync + 'static,
     <StorageOp as StorageSerde>::Error: Send + Sync,
 {
-    make_request_and_return_response!(storage::get_light_blob::<StorageOp, DaBlob>(
+    make_request_and_return_response!(storage::get_light_share::<StorageOp, DaShare>(
         &handle,
         request.blob_id,
-        request.column_idx
+        request.share_idx
     ))
 }
 
@@ -583,7 +583,7 @@ where
         + Send
         + 'static,
     SamplingBackend::Settings: Clone,
-    SamplingBackend::Blob: Debug + 'static,
+    SamplingBackend::Share: Debug + 'static,
     SamplingBackend::BlobId: Debug + 'static,
     SamplingAdapter: nomos_da_sampling::network::NetworkAdapter + Send + 'static,
     SamplingRng: SeedableRng + RngCore + Send + 'static,

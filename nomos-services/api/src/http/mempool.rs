@@ -73,7 +73,7 @@ where
     Key: Clone + Debug + Ord + Hash + Send + Serialize + for<'de> Deserialize<'de> + 'static,
     SamplingBackend: DaSamplingServiceBackend<SamplingRng, BlobId = Key> + Send,
     SamplingBackend::BlobId: Debug,
-    SamplingBackend::Blob: Debug + 'static,
+    SamplingBackend::Share: Debug + 'static,
     SamplingBackend::Settings: Clone,
     SamplingAdapter: DaSamplingNetworkAdapter + Send,
     SamplingRng: SeedableRng + RngCore + Send,

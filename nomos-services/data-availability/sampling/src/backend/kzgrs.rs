@@ -7,8 +7,8 @@ use std::{
 
 use hex;
 use kzgrs_backend::common::{
-    blob::{DaBlob, DaBlobSharedCommitments},
-    ColumnIndex,
+    share::{DaShare, DaSharesCommitments},
+    ShareIndex,
 };
 use nomos_core::da::BlobId;
 use nomos_da_network_core::SubnetworkId;
@@ -24,7 +24,7 @@ use crate::{backend::SamplingState, DaSamplingServiceBackend};
 pub struct SamplingContext {
     subnets: HashSet<SubnetworkId>,
     started: Instant,
-    commitment: Option<Arc<DaBlobSharedCommitments>>,
+    commitment: Option<Arc<DaSharesCommitments>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -54,8 +54,8 @@ impl<R: Rng> KzgrsSamplingBackend<R> {
 impl<R: Rng + Sync + Send> DaSamplingServiceBackend<R> for KzgrsSamplingBackend<R> {
     type Settings = KzgrsSamplingBackendSettings;
     type BlobId = BlobId;
-    type Blob = DaBlob;
-    type SharedCommitments = DaBlobSharedCommitments;
+    type Share = DaShare;
+    type SharesCommitments = DaSharesCommitments;
 
     fn new(settings: Self::Settings, rng: R) -> Self {
         let bt: BTreeSet<BlobId> = BTreeSet::new();
@@ -84,7 +84,7 @@ impl<R: Rng + Sync + Send> DaSamplingServiceBackend<R> for KzgrsSamplingBackend<
         }
     }
 
-    async fn handle_sampling_success(&mut self, blob_id: Self::BlobId, column_idx: ColumnIndex) {
+    async fn handle_sampling_success(&mut self, blob_id: Self::BlobId, column_idx: ShareIndex) {
         if let Some(ctx) = self.pending_sampling_blobs.get_mut(&blob_id) {
             tracing::info!(
                 "subnet {} for blob id {} has been successfully sampled",
@@ -138,13 +138,13 @@ impl<R: Rng + Sync + Send> DaSamplingServiceBackend<R> for KzgrsSamplingBackend<
         self.prune_by_time();
     }
 
-    fn get_commitments(&self, blob_id: &Self::BlobId) -> Option<Arc<Self::SharedCommitments>> {
+    fn get_commitments(&self, blob_id: &Self::BlobId) -> Option<Arc<Self::SharesCommitments>> {
         self.pending_sampling_blobs
             .get(blob_id)
             .and_then(|ctx| ctx.commitment.clone())
     }
 
-    fn add_commitments(&mut self, blob_id: &Self::BlobId, commitments: Self::SharedCommitments) {
+    fn add_commitments(&mut self, blob_id: &Self::BlobId, commitments: Self::SharesCommitments) {
         if let Some(ctx) = self.pending_sampling_blobs.get_mut(blob_id) {
             ctx.commitment = Some(Arc::new(commitments));
         }
@@ -159,7 +159,7 @@ mod test {
     };
 
     use kzgrs::{Commitment, Proof};
-    use kzgrs_backend::common::{blob::DaBlob, Column};
+    use kzgrs_backend::common::{share::DaShare, Column};
     use nomos_core::da::BlobId;
     use rand::{prelude::*, rngs::StdRng};
 
@@ -224,8 +224,8 @@ mod test {
         // create some blobs and blob_ids
         let b1: BlobId = sampler.rng.gen();
         let b2: BlobId = sampler.rng.gen();
-        let blob = DaBlob {
-            column_idx: 42,
+        let share = DaShare {
+            share_idx: 42,
             column: Column(vec![]),
             column_commitment: Commitment::default(),
             aggregated_column_commitment: Commitment::default(),
@@ -233,8 +233,8 @@ mod test {
             rows_commitments: vec![],
             rows_proofs: vec![],
         };
-        let blob2 = blob.clone();
-        let mut blob3 = blob2.clone();
+        let share2 = share.clone();
+        let mut share3 = share2.clone();
 
         // at start everything should be empty
         assert!(sampler.pending_sampling_blobs.is_empty());
@@ -277,7 +277,7 @@ mod test {
         // handle ficticious sampling success for b1
         // should still just have one pending blob, no validated blobs yet,
         // and one subnet added to blob
-        sampler.handle_sampling_success(b1, blob.column_idx).await;
+        sampler.handle_sampling_success(b1, share.share_idx).await;
         assert!(sampler.validated_blobs.is_empty());
         assert!(sampler.pending_sampling_blobs.len() == 1);
         println!(
@@ -305,8 +305,8 @@ mod test {
         // should not change, still just one sampling blob,
         // no validated blobs and one subnet
         for _ in 1..subnet_num {
-            let b = blob2.clone();
-            sampler.handle_sampling_success(b1, b.column_idx).await;
+            let b = share2.clone();
+            sampler.handle_sampling_success(b1, b.share_idx).await;
         }
         assert!(sampler.validated_blobs.is_empty());
         assert!(sampler.pending_sampling_blobs.len() == 1);
@@ -325,9 +325,9 @@ mod test {
         // but subnets len is now subnet size minus one
         // we already added subnet 42
         for i in 1..(subnet_num - 1) {
-            let mut b = blob2.clone();
-            b.column_idx = i as u16;
-            sampler.handle_sampling_success(b1, b.column_idx).await;
+            let mut b = share2.clone();
+            b.share_idx = i as u16;
+            sampler.handle_sampling_success(b1, b.share_idx).await;
         }
         assert!(sampler.validated_blobs.is_empty());
         assert!(sampler.pending_sampling_blobs.len() == 1);
@@ -345,8 +345,8 @@ mod test {
         // we should have all subnets set,
         // and the validated blobs should now have that blob
         // pending blobs should now be empty
-        blob3.column_idx = (subnet_num - 1) as u16;
-        sampler.handle_sampling_success(b1, blob3.column_idx).await;
+        share3.share_idx = (subnet_num - 1) as u16;
+        sampler.handle_sampling_success(b1, share3.share_idx).await;
         assert!(sampler.pending_sampling_blobs.is_empty());
         assert!(sampler.validated_blobs.len() == 1);
         assert!(sampler.validated_blobs.contains(&b1));

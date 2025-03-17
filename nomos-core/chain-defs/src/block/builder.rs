@@ -12,6 +12,7 @@ use crate::{
     tx::{Transaction, TxSelect},
     wire,
 };
+
 /// Wrapper over a block building `new` method than holds intermediary state and
 /// can be passed around.
 ///

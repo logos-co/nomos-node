@@ -5,7 +5,7 @@ pub mod validator;
 pub mod test {
     use futures::StreamExt;
     use kzgrs::{Commitment, Proof};
-    use kzgrs_backend::common::{blob::DaBlob, Column};
+    use kzgrs_backend::common::{share::DaShare, Column};
     use libp2p::{
         swarm::{dial_opts::DialOpts, SwarmEvent},
         PeerId, Swarm,
@@ -72,7 +72,7 @@ pub mod test {
             res
         };
         let join_validator = tokio::spawn(validator_task);
-        let executor_disperse_blob_sender = executor.behaviour().blobs_sender();
+        let executor_disperse_share_sender = executor.behaviour().shares_sender();
         let (sender, mut receiver) = tokio::sync::oneshot::channel();
         let executor_poll = async move {
             loop {
@@ -89,11 +89,11 @@ pub mod test {
         let executor_task = tokio::spawn(executor_poll);
         for i in 0..10 {
             info!("Sending blob: {i}");
-            executor_disperse_blob_sender
+            executor_disperse_share_sender
                 .send((
                     0,
-                    DaBlob {
-                        column_idx: 0,
+                    DaShare {
+                        share_idx: 0,
                         column: Column(vec![]),
                         column_commitment: Commitment::default(),
                         aggregated_column_commitment: Commitment::default(),

@@ -5,7 +5,7 @@ use hyper::header::{CONTENT_TYPE, USER_AGENT};
 use nomos_api::Backend;
 use nomos_core::{
     da::{
-        blob::{info::DispersedBlobInfo, metadata, Blob},
+        blob::{info::DispersedBlobInfo, metadata, Share},
         DaVerifier as CoreDaVerifier,
     },
     header::HeaderId,
@@ -19,8 +19,8 @@ use nomos_da_verifier::backend::VerifierBackend;
 use nomos_libp2p::PeerId;
 use nomos_mempool::{tx::service::openapi::Status, MempoolMetrics};
 use nomos_node::api::handlers::{
-    add_blob, add_blob_info, add_tx, blacklisted_peers, block, block_peer, cl_metrics, cl_status,
-    cryptarchia_headers, cryptarchia_info, da_get_commitments, da_get_light_blob, get_range,
+    add_blob_info, add_share, add_tx, blacklisted_peers, block, block_peer, cl_metrics, cl_status,
+    cryptarchia_headers, cryptarchia_info, da_get_commitments, da_get_light_share, get_range,
     libp2p_info, unblock_peer,
 };
 use nomos_storage::backends::StorageSerde;
@@ -49,7 +49,7 @@ pub struct AxumBackendSettings {
 
 pub struct AxumBackend<
     DaAttestation,
-    DaBlob,
+    DaShare,
     DaBlobInfo,
     Memebership,
     DaVerifiedBlobInfo,
@@ -75,7 +75,7 @@ pub struct AxumBackend<
     #[expect(clippy::type_complexity)]
     _phantom: core::marker::PhantomData<(
         DaAttestation,
-        DaBlob,
+        DaShare,
         DaBlobInfo,
         Memebership,
         DaVerifiedBlobInfo,
@@ -113,7 +113,7 @@ struct ApiDoc;
 #[async_trait::async_trait]
 impl<
         DaAttestation,
-        DaBlob,
+        DaShare,
         DaBlobInfo,
         Membership,
         DaVerifiedBlobInfo,
@@ -136,7 +136,7 @@ impl<
     > Backend
     for AxumBackend<
         DaAttestation,
-        DaBlob,
+        DaShare,
         DaBlobInfo,
         Membership,
         DaVerifiedBlobInfo,
@@ -159,12 +159,12 @@ impl<
     >
 where
     DaAttestation: Serialize + DeserializeOwned + Clone + Send + Sync + 'static,
-    DaBlob: Blob + Serialize + DeserializeOwned + Clone + Send + Sync + 'static,
-    <DaBlob as Blob>::BlobId:
+    DaShare: Share + Serialize + DeserializeOwned + Clone + Send + Sync + 'static,
+    <DaShare as Share>::BlobId:
         AsRef<[u8]> + Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
-    <DaBlob as Blob>::ColumnIndex: AsRef<[u8]> + DeserializeOwned + Send + Sync + 'static,
-    <DaBlob as Blob>::LightBlob: Serialize + DeserializeOwned + Clone + Send + Sync + 'static,
-    <DaBlob as Blob>::SharedCommitments:
+    <DaShare as Share>::ShareIndex: AsRef<[u8]> + DeserializeOwned + Send + Sync + 'static,
+    <DaShare as Share>::LightShare: Serialize + DeserializeOwned + Clone + Send + Sync + 'static,
+    <DaShare as Share>::SharesCommitments:
         Serialize + DeserializeOwned + Clone + Send + Sync + 'static,
     DaBlobInfo: DispersedBlobInfo<BlobId = [u8; 32]>
         + Clone
@@ -198,7 +198,7 @@ where
         AsRef<[u8]> + Clone + Serialize + DeserializeOwned + Send + Sync,
     <DaVerifiedBlobInfo as metadata::Metadata>::Index:
         AsRef<[u8]> + Clone + Serialize + DeserializeOwned + PartialOrd + Send + Sync,
-    DaVerifierBackend: VerifierBackend + CoreDaVerifier<DaBlob = DaBlob> + Send + Sync + 'static,
+    DaVerifierBackend: VerifierBackend + CoreDaVerifier<DaShare = DaShare> + Send + Sync + 'static,
     <DaVerifierBackend as VerifierBackend>::Settings: Clone,
     <DaVerifierBackend as CoreDaVerifier>::Error: Error,
     DaVerifierNetwork: nomos_da_verifier::network::NetworkAdapter + Send + Sync + 'static,
@@ -240,7 +240,7 @@ where
         > + Send
         + 'static,
     SamplingBackend::Settings: Clone,
-    SamplingBackend::Blob: Debug + 'static,
+    SamplingBackend::Share: Debug + 'static,
     SamplingBackend::BlobId: Debug + 'static,
     SamplingNetworkAdapter: nomos_da_sampling::network::NetworkAdapter + Send + 'static,
     SamplingStorage: nomos_da_sampling::storage::DaStorageAdapter + Send + 'static,
@@ -326,11 +326,11 @@ where
                 ),
             )
             .route(
-                paths::DA_ADD_BLOB,
+                paths::DA_ADD_SHARE,
                 routing::post(
-                    add_blob::<
+                    add_share::<
                         DaAttestation,
-                        DaBlob,
+                        DaShare,
                         Membership,
                         DaVerifierBackend,
                         DaStorageSerializer,
@@ -405,12 +405,12 @@ where
                 ),
             )
             .route(
-                paths::DA_GET_SHARED_COMMITMENTS,
-                routing::get(da_get_commitments::<DaStorageSerializer, DaBlob>),
+                paths::DA_GET_SHARES_COMMITMENTS,
+                routing::get(da_get_commitments::<DaStorageSerializer, DaShare>),
             )
             .route(
-                paths::DA_GET_LIGHT_BLOB,
-                routing::get(da_get_light_blob::<DaStorageSerializer, DaBlob>),
+                paths::DA_GET_LIGHT_SHARE,
+                routing::get(da_get_light_share::<DaStorageSerializer, DaShare>),
             )
             .with_state(handle);
 

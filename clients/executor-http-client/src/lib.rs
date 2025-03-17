@@ -1,6 +1,6 @@
 pub use common_http_client::BasicAuthCredentials;
 use common_http_client::{CommonHttpClient, Error};
-use nomos_core::da::blob::Blob;
+use nomos_core::da::blob::Share;
 use nomos_executor::api::{handlers::DispersalRequest, paths};
 use reqwest::Url;
 use serde::{de::DeserializeOwned, Serialize};
@@ -38,34 +38,34 @@ impl ExecutorHttpClient {
     }
 
     /// Get the commitments for a specific `BlobId`
-    pub async fn get_commitments<B>(
+    pub async fn get_commitments<S>(
         &self,
         base_url: Url,
-        blob_id: B::BlobId,
-    ) -> Result<Option<B::SharedCommitments>, Error>
+        blob_id: S::BlobId,
+    ) -> Result<Option<S::SharesCommitments>, Error>
     where
-        B: Blob + Send,
-        <B as Blob>::BlobId: Serialize + Send + Sync,
-        <B as Blob>::SharedCommitments: DeserializeOwned + Send + Sync,
+        S: Share + Send,
+        <S as Share>::BlobId: Serialize + Send + Sync,
+        <S as Share>::SharesCommitments: DeserializeOwned + Send + Sync,
     {
-        self.client.get_commitments::<B>(base_url, blob_id).await
+        self.client.get_commitments::<S>(base_url, blob_id).await
     }
 
-    /// Get blob by blob id and column index
-    pub async fn get_blob<B, C>(
+    /// Get share by blob id and share index
+    pub async fn get_share<S, C>(
         &self,
         base_url: Url,
-        blob_id: B::BlobId,
-        column_idx: B::ColumnIndex,
+        blob_id: S::BlobId,
+        share_idx: S::ShareIndex,
     ) -> Result<Option<C>, Error>
     where
         C: DeserializeOwned + Send + Sync,
-        B: Blob + DeserializeOwned + Send + Sync,
-        <B as Blob>::BlobId: serde::Serialize + Send + Sync,
-        <B as Blob>::ColumnIndex: serde::Serialize + Send + Sync,
+        S: Share + DeserializeOwned + Send + Sync,
+        <S as Share>::BlobId: serde::Serialize + Send + Sync,
+        <S as Share>::ShareIndex: serde::Serialize + Send + Sync,
     {
         self.client
-            .get_blob::<B, C>(base_url, blob_id, column_idx)
+            .get_share::<S, C>(base_url, blob_id, share_idx)
             .await
     }
 }

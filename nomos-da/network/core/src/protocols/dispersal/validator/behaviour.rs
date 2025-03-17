@@ -62,9 +62,9 @@ pub enum DispersalEvent {
 
 impl DispersalEvent {
     #[must_use]
-    pub fn blob_size(&self) -> Option<usize> {
+    pub fn share_size(&self) -> Option<usize> {
         match self {
-            Self::IncomingMessage { message } => Some(message.blob.data.column_len()),
+            Self::IncomingMessage { message } => Some(message.share.data.column_len()),
             Self::DispersalError { .. } => None,
         }
     }
@@ -111,7 +111,7 @@ impl<Membership: MembershipHandler> DispersalValidatorBehaviour<Membership> {
             .await
             .map_err(|error| DispersalError::Io { peer_id, error })?;
 
-        let blob_id = message.blob.blob_id;
+        let blob_id = message.share.blob_id;
         let response = dispersal::DispersalResponse::BlobId(blob_id);
 
         pack_to_writer(&response, &mut stream)

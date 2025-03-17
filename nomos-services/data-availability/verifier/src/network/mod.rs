@@ -8,13 +8,12 @@ use overwatch::services::{relay::OutboundRelay, ServiceData};
 pub trait NetworkAdapter {
     type Backend: NetworkBackend + Send + 'static;
     type Settings;
-
-    type Blob;
+    type Share;
 
     async fn new(
         settings: Self::Settings,
         network_relay: OutboundRelay<<NetworkService<Self::Backend> as ServiceData>::Message>,
     ) -> Self;
 
-    async fn blob_stream(&self) -> Box<dyn Stream<Item = Self::Blob> + Unpin + Send>;
+    async fn share_stream(&self) -> Box<dyn Stream<Item = Self::Share> + Unpin + Send>;
 }

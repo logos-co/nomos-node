@@ -5,7 +5,7 @@ use futures::{
     stream::{AbortHandle, Abortable},
     Stream, StreamExt,
 };
-use kzgrs_backend::common::blob::DaBlob;
+use kzgrs_backend::common::share::DaShare;
 use libp2p::PeerId;
 use log::error;
 use nomos_core::da::BlobId;
@@ -46,7 +46,7 @@ pub enum ExecutorDaNetworkMessage {
     },
     RequestDispersal {
         subnetwork_id: SubnetworkId,
-        da_blob: Box<DaBlob>,
+        da_share: Box<DaShare>,
     },
     PeerRequest(MonitorCommand),
 }
@@ -65,7 +65,7 @@ pub enum DaNetworkEventKind {
 #[derive(Debug)]
 pub enum DaNetworkEvent {
     Sampling(SamplingEvent),
-    Verifying(Box<DaBlob>),
+    Verifying(Box<DaShare>),
     Dispersal(DispersalExecutorEvent),
 }
 
@@ -88,9 +88,9 @@ where
     executor_replies_task: (AbortHandle, JoinHandle<Result<(), Aborted>>),
     sampling_request_channel: UnboundedSender<(SubnetworkId, BlobId)>,
     sampling_broadcast_receiver: broadcast::Receiver<SamplingEvent>,
-    verifying_broadcast_receiver: broadcast::Receiver<DaBlob>,
+    verifying_broadcast_receiver: broadcast::Receiver<DaShare>,
     dispersal_broadcast_receiver: broadcast::Receiver<DispersalExecutorEvent>,
-    dispersal_blobs_sender: UnboundedSender<(Membership::NetworkId, DaBlob)>,
+    dispersal_shares_sender: UnboundedSender<(Membership::NetworkId, DaShare)>,
     peer_request_channel: UnboundedSender<PeerCommand>,
     _membership: PhantomData<Membership>,
 }
@@ -133,7 +133,7 @@ where
             });
 
         let sampling_request_channel = executor_swarm.sample_request_channel();
-        let dispersal_blobs_sender = executor_swarm.dispersal_blobs_channel();
+        let dispersal_shares_sender = executor_swarm.dispersal_shares_channel();
         let peer_request_channel = executor_swarm.peer_request_channel();
 
         let (task_abort_handle, abort_registration) = AbortHandle::new_pair();
@@ -185,7 +185,7 @@ where
             sampling_broadcast_receiver,
             verifying_broadcast_receiver,
             dispersal_broadcast_receiver,
-            dispersal_blobs_sender,
+            dispersal_shares_sender,
             peer_request_channel,
             _membership: PhantomData,
         }
@@ -215,10 +215,13 @@ where
             }
             ExecutorDaNetworkMessage::RequestDispersal {
                 subnetwork_id,
-                da_blob,
+                da_share,
             } => {
-                info_with_id!(&da_blob.id(), "RequestDispersal");
-                if let Err(e) = self.dispersal_blobs_sender.send((subnetwork_id, *da_blob)) {
+                info_with_id!(&da_share.blob_id(), "RequestDispersal");
+                if let Err(e) = self
+                    .dispersal_shares_sender
+                    .send((subnetwork_id, *da_share))
+                {
                     error!("Could not send internal blob to underlying dispersal behaviour: {e}");
                 }
             }
@@ -260,7 +263,7 @@ where
             DaNetworkEventKind::Verifying => Box::pin(
                 BroadcastStream::new(self.verifying_broadcast_receiver.resubscribe())
                     .filter_map(|event| async { event.ok() })
-                    .map(|blob| Self::NetworkEvent::Verifying(Box::new(blob))),
+                    .map(|share| Self::NetworkEvent::Verifying(Box::new(share))),
             ),
             DaNetworkEventKind::Dispersal => Box::pin(
                 BroadcastStream::new(self.dispersal_broadcast_receiver.resubscribe())

@@ -1,6 +1,6 @@
 use std::ops::Range;
 
-use nomos_core::da::blob::{metadata::Metadata, Blob};
+use nomos_core::da::blob::{metadata::Metadata, Share};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 // Shared types for http requests. Probably better part of upcoming `nomos-lib`
@@ -16,12 +16,12 @@ where
 }
 
 #[derive(Serialize, Deserialize)]
-pub struct DABlobCommitmentsRequest<B: Blob> {
-    pub blob_id: B::BlobId,
+pub struct DASharesCommitmentsRequest<S: Share> {
+    pub blob_id: S::BlobId,
 }
 
 #[derive(Serialize, Deserialize)]
-pub struct DAGetLightBlobReq<B: Blob> {
-    pub blob_id: B::BlobId,
-    pub column_idx: B::ColumnIndex,
+pub struct DaSamplingRequest<S: Share> {
+    pub blob_id: S::BlobId,
+    pub share_idx: S::ShareIndex,
 }

@@ -13,7 +13,7 @@ use futures::{
     stream::{BoxStream, FuturesUnordered},
     AsyncWriteExt, FutureExt, StreamExt,
 };
-use kzgrs_backend::common::{blob::DaLightBlob, ColumnIndex};
+use kzgrs_backend::common::{share::DaLightShare, ShareIndex};
 use libp2p::{
     core::{transport::PortUse, Endpoint},
     swarm::{
@@ -172,22 +172,16 @@ impl Clone for SamplingError {
 #[derive(Debug, Clone)]
 pub struct BehaviourSampleReq {
     pub blob_id: BlobId,
-    pub column_idx: ColumnIndex,
+    pub share_idx: ShareIndex,
 }
 
 impl TryFrom<sampling::SampleRequest> for BehaviourSampleReq {
     type Error = Vec<u8>;
 
     fn try_from(req: sampling::SampleRequest) -> Result<Self, Self::Error> {
-        let sampling::SampleRequest {
-            blob_id,
-            column_idx,
-        } = req;
+        let sampling::SampleRequest { blob_id, share_idx } = req;
 
-        Ok(Self {
-            blob_id,
-            column_idx,
-        })
+        Ok(Self { blob_id, share_idx })
     }
 }
 
@@ -196,7 +190,7 @@ pub enum BehaviourSampleRes {
     SamplingSuccess {
         blob_id: BlobId,
         subnetwork_id: SubnetworkId,
-        blob: Box<DaLightBlob>,
+        share: Box<DaLightShare>,
     },
     SampleNotFound {
         blob_id: BlobId,
@@ -207,8 +201,8 @@ pub enum BehaviourSampleRes {
 impl From<BehaviourSampleRes> for sampling::SampleResponse {
     fn from(res: BehaviourSampleRes) -> Self {
         match res {
-            BehaviourSampleRes::SamplingSuccess { blob, blob_id, .. } => {
-                Self::Blob(common::LightBlob::new(blob_id, *blob))
+            BehaviourSampleRes::SamplingSuccess { share, blob_id, .. } => {
+                Self::Share(common::LightShare::new(blob_id, *share))
             }
             BehaviourSampleRes::SampleNotFound {
                 blob_id,
@@ -229,7 +223,7 @@ pub enum SamplingEvent {
     SamplingSuccess {
         blob_id: BlobId,
         subnetwork_id: SubnetworkId,
-        light_blob: Box<DaLightBlob>,
+        light_share: Box<DaLightShare>,
     },
     IncomingSample {
         request_receiver: Receiver<BehaviourSampleReq>,
@@ -576,11 +570,11 @@ impl<Membership: MembershipHandler<Id = PeerId, NetworkId = SubnetworkId> + 'sta
                     },
                 }))
             }
-            sampling::SampleResponse::Blob(blob) => {
+            sampling::SampleResponse::Share(share) => {
                 Poll::Ready(ToSwarm::GenerateEvent(SamplingEvent::SamplingSuccess {
                     blob_id,
                     subnetwork_id,
-                    light_blob: Box::new(blob.data),
+                    light_share: Box::new(share.data),
                 }))
             }
         }

@@ -109,10 +109,10 @@ impl AsRef<[u8]> for Index {
 
 #[cfg(test)]
 mod tests {
-    use nomos_core::da::{blob::Blob, DaEncoder as _};
+    use nomos_core::da::{blob::Share, DaEncoder as _};
 
     use crate::{
-        common::blob::DaBlob,
+        common::share::DaShare,
         encoder::{
             test::{rand_data, ENCODER},
             EncodedData,
@@ -126,9 +126,9 @@ mod tests {
         let domain_size = encoded_data.extended_data.0[0].len();
         for (i, column) in encoded_data.extended_data.columns().enumerate() {
             let verifier = &verifiers[i];
-            let da_blob = DaBlob {
+            let da_share = DaShare {
                 column,
-                column_idx: i
+                share_idx: i
                     .try_into()
                     .expect("Column index shouldn't overflow the target type"),
                 column_commitment: encoded_data.column_commitments[i],
@@ -141,8 +141,8 @@ mod tests {
                     .map(|proofs| proofs.get(i).copied().unwrap())
                     .collect(),
             };
-            let (light_blob, commitments) = da_blob.into_blob_and_shared_commitments();
-            attestations.push(verifier.verify(&commitments, &light_blob, domain_size));
+            let (light_share, commitments) = da_share.into_share_and_commitments();
+            attestations.push(verifier.verify(&commitments, &light_share, domain_size));
         }
         attestations
     }

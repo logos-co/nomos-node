@@ -1,7 +1,7 @@
 use nomos_core::da::BlobId;
 use serde::{Deserialize, Serialize};
 
-use crate::{common::Blob, SubnetworkId};
+use crate::{common::Share, SubnetworkId};
 
 #[repr(C)]
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -35,15 +35,15 @@ impl DispersalError {
 #[repr(C)]
 #[derive(Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct DispersalRequest {
-    pub blob: Blob,
+    pub share: Share,
     pub subnetwork_id: SubnetworkId,
 }
 
 impl DispersalRequest {
     #[must_use]
-    pub const fn new(blob: Blob, subnetwork_id: SubnetworkId) -> Self {
+    pub const fn new(share: Share, subnetwork_id: SubnetworkId) -> Self {
         Self {
-            blob,
+            share,
             subnetwork_id,
         }
     }

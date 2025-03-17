@@ -6,7 +6,7 @@ use api::backend::AxumBackend;
 use bytes::Bytes;
 use color_eyre::eyre::Result;
 pub use config::{Config, CryptarchiaArgs, HttpArgs, LogArgs, NetworkArgs};
-use kzgrs_backend::common::blob::DaBlob;
+use kzgrs_backend::common::share::DaShare;
 pub use kzgrs_backend::dispersal::BlobInfo;
 use nomos_api::ApiService;
 pub use nomos_blend_service::{
@@ -68,19 +68,19 @@ pub type NomosDaMembership = FillFromNodeList;
 pub type NomosApiService = ApiService<
     AxumBackend<
         (),
-        DaBlob,
+        DaShare,
         BlobInfo,
         NomosDaMembership,
         BlobInfo,
         KzgrsDaVerifier,
         VerifierNetworkAdapter<NomosDaMembership>,
-        VerifierStorageAdapter<DaBlob, Wire>,
+        VerifierStorageAdapter<DaShare, Wire>,
         Tx,
         Wire,
         KzgrsSamplingBackend<ChaCha20Rng>,
         nomos_da_sampling::network::adapters::validator::Libp2pAdapter<NomosDaMembership>,
         ChaCha20Rng,
-        SamplingStorageAdapter<DaBlob, Wire>,
+        SamplingStorageAdapter<DaShare, Wire>,
         SystemTimeBackend,
         HttApiAdapter<NomosDaMembership>,
         MB16,
@@ -109,10 +109,10 @@ pub type Cryptarchia<SamplingAdapter> = cryptarchia_consensus::CryptarchiaConsen
     KzgrsSamplingBackend<ChaCha20Rng>,
     SamplingAdapter,
     ChaCha20Rng,
-    SamplingStorageAdapter<DaBlob, Wire>,
+    SamplingStorageAdapter<DaShare, Wire>,
     KzgrsDaVerifier,
     VerifierNetworkAdapter<NomosDaMembership>,
-    VerifierStorageAdapter<DaBlob, Wire>,
+    VerifierStorageAdapter<DaShare, Wire>,
     SystemTimeBackend,
     HttApiAdapter<NomosDaMembership>,
 >;
@@ -131,16 +131,16 @@ pub type DaMempool = DaMempoolService<
     KzgrsSamplingBackend<ChaCha20Rng>,
     nomos_da_sampling::network::adapters::validator::Libp2pAdapter<NomosDaMembership>,
     ChaCha20Rng,
-    SamplingStorageAdapter<DaBlob, Wire>,
+    SamplingStorageAdapter<DaShare, Wire>,
     KzgrsDaVerifier,
     VerifierNetworkAdapter<NomosDaMembership>,
-    VerifierStorageAdapter<DaBlob, Wire>,
+    VerifierStorageAdapter<DaShare, Wire>,
     HttApiAdapter<NomosDaMembership>,
 >;
 
 pub type DaIndexer<SamplingAdapter> = DataIndexerService<
     // Indexer specific.
-    DaBlob,
+    DaShare,
     IndexerStorageAdapter<Wire, BlobInfo>,
     CryptarchiaConsensusAdapter<Tx, BlobInfo>,
     // Cryptarchia specific, should be the same as in `Cryptarchia` type above.
@@ -160,10 +160,10 @@ pub type DaIndexer<SamplingAdapter> = DataIndexerService<
     KzgrsSamplingBackend<ChaCha20Rng>,
     SamplingAdapter,
     ChaCha20Rng,
-    SamplingStorageAdapter<DaBlob, Wire>,
+    SamplingStorageAdapter<DaShare, Wire>,
     KzgrsDaVerifier,
     VerifierNetworkAdapter<NomosDaMembership>,
-    VerifierStorageAdapter<DaBlob, Wire>,
+    VerifierStorageAdapter<DaShare, Wire>,
     SystemTimeBackend,
     HttApiAdapter<NomosDaMembership>,
 >;
@@ -175,17 +175,17 @@ pub type DaSampling<SamplingAdapter> = DaSamplingService<
     KzgrsSamplingBackend<ChaCha20Rng>,
     SamplingAdapter,
     ChaCha20Rng,
-    SamplingStorageAdapter<DaBlob, Wire>,
+    SamplingStorageAdapter<DaShare, Wire>,
     KzgrsDaVerifier,
     VerifierNetworkAdapter<NomosDaMembership>,
-    VerifierStorageAdapter<DaBlob, Wire>,
+    VerifierStorageAdapter<DaShare, Wire>,
     HttApiAdapter<NomosDaMembership>,
 >;
 
 pub type NodeDaSampling = DaSampling<SamplingLibp2pAdapter<NomosDaMembership>>;
 
 pub type DaVerifier<VerifierAdapter> =
-    DaVerifierService<KzgrsDaVerifier, VerifierAdapter, VerifierStorageAdapter<DaBlob, Wire>>;
+    DaVerifierService<KzgrsDaVerifier, VerifierAdapter, VerifierStorageAdapter<DaShare, Wire>>;
 
 pub type NodeDaVerifier = DaVerifier<VerifierNetworkAdapter<FillFromNodeList>>;
 

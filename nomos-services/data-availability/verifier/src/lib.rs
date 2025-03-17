@@ -10,7 +10,7 @@ use std::{
 
 use backend::VerifierBackend;
 use network::NetworkAdapter;
-use nomos_core::da::blob::Blob;
+use nomos_core::da::blob::Share;
 use nomos_da_network_service::NetworkService;
 use nomos_storage::StorageService;
 use nomos_tracing::info_with_id;
@@ -30,14 +30,14 @@ use tokio_stream::StreamExt;
 use tracing::{error, instrument};
 
 const DA_VERIFIER_TAG: ServiceId = "DA-Verifier";
-pub enum DaVerifierMsg<Commitments, LightBlob, Blob, Answer> {
-    AddBlob {
-        blob: Blob,
+pub enum DaVerifierMsg<Commitments, LightShare, Share, Answer> {
+    AddShare {
+        share: Share,
         reply_channel: Sender<Option<Answer>>,
     },
-    VerifyBlob {
+    VerifyShare {
         commitments: Arc<Commitments>,
-        light_blob: Box<LightBlob>,
+        light_share: Box<LightShare>,
         reply_channel: Sender<Result<(), DynError>>,
     },
 }
@@ -45,11 +45,11 @@ pub enum DaVerifierMsg<Commitments, LightBlob, Blob, Answer> {
 impl<C: 'static, L: 'static, B: 'static, A: 'static> Debug for DaVerifierMsg<C, L, B, A> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::AddBlob { .. } => {
-                write!(f, "DaVerifierMsg::AddBlob")
+            Self::AddShare { .. } => {
+                write!(f, "DaVerifierMsg::AddShare")
             }
-            Self::VerifyBlob { .. } => {
-                write!(f, "DaVerifierMsg::VerifyBlob")
+            Self::VerifyShare { .. } => {
+                write!(f, "DaVerifierMsg::VerifyShare")
             }
         }
     }
@@ -61,7 +61,7 @@ pub struct DaVerifierService<Backend, N, S>
 where
     Backend: VerifierBackend,
     Backend::Settings: Clone,
-    Backend::DaBlob: 'static,
+    Backend::DaShare: 'static,
     N: NetworkAdapter,
     N::Settings: Clone,
     S: DaStorageAdapter,
@@ -75,33 +75,33 @@ where
 impl<Backend, N, S> DaVerifierService<Backend, N, S>
 where
     Backend: VerifierBackend + Send + Sync + 'static,
-    Backend::DaBlob: Debug + Send,
+    Backend::DaShare: Debug + Send,
     Backend::Error: Error + Send + Sync,
     Backend::Settings: Clone,
-    <Backend::DaBlob as Blob>::BlobId: AsRef<[u8]>,
-    N: NetworkAdapter<Blob = Backend::DaBlob> + Send + 'static,
+    <Backend::DaShare as Share>::BlobId: AsRef<[u8]>,
+    N: NetworkAdapter<Share = Backend::DaShare> + Send + 'static,
     N::Settings: Clone,
-    S: DaStorageAdapter<Blob = Backend::DaBlob> + Send + Sync + 'static,
+    S: DaStorageAdapter<Share = Backend::DaShare> + Send + Sync + 'static,
 {
     #[instrument(skip_all)]
-    async fn handle_new_blob(
+    async fn handle_new_share(
         verifier: &Backend,
         storage_adapter: &S,
-        blob: Backend::DaBlob,
+        share: Backend::DaShare,
     ) -> Result<(), DynError> {
         if storage_adapter
-            .get_blob(blob.id(), blob.column_idx())
+            .get_share(share.blob_id(), share.share_idx())
             .await?
             .is_some()
         {
-            info_with_id!(blob.id().as_ref(), "VerifierBlobExists");
+            info_with_id!(share.blob_id().as_ref(), "VerifierShareExists");
         } else {
-            info_with_id!(blob.id().as_ref(), "VerifierAddBlob");
-            let (blob_id, column_idx) = (blob.id(), blob.column_idx());
-            let (light_blob, commitments) = blob.into_blob_and_shared_commitments();
-            verifier.verify(&commitments, &light_blob)?;
+            info_with_id!(share.blob_id().as_ref(), "VerifierAddShare");
+            let (blob_id, share_idx) = (share.blob_id(), share.share_idx());
+            let (light_share, commitments) = share.into_share_and_commitments();
+            verifier.verify(&commitments, &light_share)?;
             storage_adapter
-                .add_blob(blob_id, column_idx, commitments, light_blob)
+                .add_share(blob_id, share_idx, commitments, light_share)
                 .await?;
         }
         Ok(())
@@ -122,9 +122,9 @@ where
     type State = NoState<Self::Settings>;
     type StateOperator = NoOperator<Self::State, Self::Settings>;
     type Message = DaVerifierMsg<
-        <Backend::DaBlob as Blob>::SharedCommitments,
-        <Backend::DaBlob as Blob>::LightBlob,
-        Backend::DaBlob,
+        <Backend::DaShare as Share>::SharesCommitments,
+        <Backend::DaShare as Share>::LightShare,
+        Backend::DaShare,
         (),
     >;
 }
@@ -134,14 +134,14 @@ impl<Backend, N, S> ServiceCore for DaVerifierService<Backend, N, S>
 where
     Backend: VerifierBackend + Send + Sync + 'static,
     Backend::Settings: Clone + Send + Sync + 'static,
-    Backend::DaBlob: Debug + Send + Sync + 'static,
+    Backend::DaShare: Debug + Send + Sync + 'static,
     Backend::Error: Error + Send + Sync + 'static,
-    <Backend::DaBlob as Blob>::BlobId: AsRef<[u8]> + Debug + Send + Sync + 'static,
-    <Backend::DaBlob as Blob>::LightBlob: Debug + Send + Sync + 'static,
-    <Backend::DaBlob as Blob>::SharedCommitments: Debug + Send + Sync + 'static,
-    N: NetworkAdapter<Blob = Backend::DaBlob> + Send + Sync + 'static,
+    <Backend::DaShare as Share>::BlobId: AsRef<[u8]> + Debug + Send + Sync + 'static,
+    <Backend::DaShare as Share>::LightShare: Debug + Send + Sync + 'static,
+    <Backend::DaShare as Share>::SharesCommitments: Debug + Send + Sync + 'static,
+    N: NetworkAdapter<Share = Backend::DaShare> + Send + Sync + 'static,
     N::Settings: Clone + Send + Sync + 'static,
-    S: DaStorageAdapter<Blob = Backend::DaBlob> + Send + Sync + 'static,
+    S: DaStorageAdapter<Share = Backend::DaShare> + Send + Sync + 'static,
     S::Settings: Clone + Send + Sync + 'static,
 {
     fn init(
@@ -181,7 +181,7 @@ where
 
         let network_relay = network_relay.connect().await?;
         let network_adapter = N::new(network_adapter_settings, network_relay).await;
-        let mut blob_stream = network_adapter.blob_stream().await;
+        let mut share_stream = network_adapter.share_stream().await;
 
         let storage_relay = storage_relay.connect().await?;
         let storage_adapter = S::new(storage_relay).await;
@@ -193,17 +193,17 @@ where
         )]
         loop {
             tokio::select! {
-                Some(blob) = blob_stream.next() => {
-                    let blob_id = blob.id();
-                    if let Err(err) =  Self::handle_new_blob(&verifier,&storage_adapter, blob).await {
+                Some(share) = share_stream.next() => {
+                    let blob_id = share.blob_id();
+                    if let Err(err) =  Self::handle_new_share(&verifier,&storage_adapter, share).await {
                         error!("Error handling blob {blob_id:?} due to {err:?}");
                     }
                 }
                 Some(msg) = service_state.inbound_relay.recv() => {
                     match msg {
-                        DaVerifierMsg::AddBlob { blob, reply_channel } => {
-                            let blob_id = blob.id();
-                            match Self::handle_new_blob(&verifier, &storage_adapter, blob).await {
+                        DaVerifierMsg::AddShare { share, reply_channel } => {
+                            let blob_id = share.blob_id();
+                            match Self::handle_new_share(&verifier, &storage_adapter, share).await {
                                 Ok(attestation) => {
                                     if let Err(err) = reply_channel.send(Some(attestation)) {
                                         error!("Error replying attestation {err:?}");
@@ -217,8 +217,8 @@ where
                                 },
                             };
                         },
-                        DaVerifierMsg::VerifyBlob {commitments,  light_blob, reply_channel } => {
-                            match verifier.verify(&commitments, &light_blob) {
+                        DaVerifierMsg::VerifyShare {commitments,  light_share, reply_channel } => {
+                            match verifier.verify(&commitments, &light_share) {
                                 Ok(()) => {
                                     if let Err(err) = reply_channel.send(Ok(())) {
                                         error!("Error replying verification {err:?}");
