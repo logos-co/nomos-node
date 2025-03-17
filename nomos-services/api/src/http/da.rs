@@ -47,7 +47,7 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use subnetworks_assignations::MembershipHandler;
 use tokio::sync::oneshot;
 
-use crate::{wait_with_timeout, HTTP_REQUEST_TIMEOUT};
+use crate::wait_with_timeout;
 
 pub type DaIndexer<
     Tx,
@@ -133,12 +133,7 @@ where
         .await
         .map_err(|(e, _)| e)?;
 
-    wait_with_timeout(
-        receiver,
-        HTTP_REQUEST_TIMEOUT,
-        "Timeout while waiting for add share".to_owned(),
-    )
-    .await
+    wait_with_timeout(receiver, "Timeout while waiting for add share".to_owned()).await
 }
 
 pub async fn get_range<
@@ -245,12 +240,7 @@ where
         .await
         .map_err(|(e, _)| e)?;
 
-    wait_with_timeout(
-        receiver,
-        HTTP_REQUEST_TIMEOUT,
-        "Timeout while waiting for get range".to_owned(),
-    )
-    .await
+    wait_with_timeout(receiver, "Timeout while waiting for get range".to_owned()).await
 }
 
 pub async fn disperse_data<Backend, NetworkAdapter, MempoolAdapter, Membership, Metadata>(
@@ -292,7 +282,6 @@ where
 
     wait_with_timeout(
         receiver,
-        HTTP_REQUEST_TIMEOUT,
         "Timeout while waiting for disperse data".to_owned(),
     )
     .await?
@@ -311,12 +300,7 @@ where
         .await
         .map_err(|(e, _)| e)?;
 
-    wait_with_timeout(
-        receiver,
-        HTTP_REQUEST_TIMEOUT,
-        "Timeout while waiting for block peer".to_owned(),
-    )
-    .await
+    wait_with_timeout(receiver, "Timeout while waiting for block peer".to_owned()).await
 }
 
 pub async fn unblock_peer<B>(handle: &OverwatchHandle, peer_id: PeerId) -> Result<bool, DynError>
@@ -334,7 +318,6 @@ where
 
     wait_with_timeout(
         receiver,
-        HTTP_REQUEST_TIMEOUT,
         "Timeout while waiting for unblock peer".to_owned(),
     )
     .await
@@ -355,7 +338,6 @@ where
 
     wait_with_timeout(
         receiver,
-        HTTP_REQUEST_TIMEOUT,
         "Timeout while waiting for blacklisted peers".to_owned(),
     )
     .await

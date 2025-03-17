@@ -4,7 +4,7 @@ use nomos_network::{
 };
 use tokio::sync::oneshot;
 
-use crate::{wait_with_timeout, HTTP_REQUEST_TIMEOUT};
+use crate::wait_with_timeout;
 
 pub async fn libp2p_info(
     handle: &overwatch::overwatch::handle::OverwatchHandle,
@@ -19,7 +19,6 @@ pub async fn libp2p_info(
 
     wait_with_timeout(
         receiver,
-        HTTP_REQUEST_TIMEOUT,
         "Timeout while waiting for cl_mempool_metrics".to_owned(),
     )
     .await

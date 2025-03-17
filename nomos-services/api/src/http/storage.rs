@@ -8,7 +8,7 @@ use nomos_storage::{
 };
 use serde::{de::DeserializeOwned, Serialize};
 
-use crate::{wait_with_timeout, HTTP_REQUEST_TIMEOUT};
+use crate::wait_with_timeout;
 
 pub async fn block_req<S, Tx>(
     handle: &overwatch::overwatch::handle::OverwatchHandle,
@@ -27,7 +27,6 @@ where
 
     wait_with_timeout(
         receiver.recv(),
-        HTTP_REQUEST_TIMEOUT,
         "Timeout while waiting for block".to_owned(),
     )
     .await
@@ -63,7 +62,6 @@ where
 
     let result = wait_with_timeout(
         reply_rcv,
-        HTTP_REQUEST_TIMEOUT,
         "Timeout while waiting for shared commitments".to_owned(),
     )
     .await?;
@@ -105,7 +103,6 @@ where
 
     let result = wait_with_timeout(
         reply_rcv,
-        HTTP_REQUEST_TIMEOUT,
         "Timeout while waiting for light share".to_owned(),
     )
     .await?;

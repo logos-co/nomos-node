@@ -8,7 +8,7 @@ use nomos_mempool::{
 use serde::{Deserialize, Serialize};
 use tokio::sync::oneshot;
 
-use crate::{wait_with_timeout, HTTP_REQUEST_TIMEOUT};
+use crate::wait_with_timeout;
 
 type ClMempoolService<T> = TxMempoolService<
     MempoolNetworkAdapter<T, <T as Transaction>::Hash>,
@@ -42,7 +42,6 @@ where
 
     wait_with_timeout(
         receiver,
-        HTTP_REQUEST_TIMEOUT,
         "Timeout while waiting for cl_mempool_metrics".to_owned(),
     )
     .await
@@ -77,7 +76,6 @@ where
 
     wait_with_timeout(
         receiver,
-        HTTP_REQUEST_TIMEOUT,
         "Timeout while waiting for cl_mempool_status".to_owned(),
     )
     .await

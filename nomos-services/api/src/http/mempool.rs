@@ -15,7 +15,7 @@ use rand::{RngCore, SeedableRng};
 use serde::{Deserialize, Serialize};
 use tokio::sync::oneshot;
 
-use crate::{wait_with_timeout, HTTP_REQUEST_TIMEOUT};
+use crate::wait_with_timeout;
 
 pub async fn add_tx<N, A, Item, Key>(
     handle: &overwatch::overwatch::handle::OverwatchHandle,
@@ -44,13 +44,9 @@ where
         .await
         .map_err(|(e, _)| e)?;
 
-    wait_with_timeout(
-        receiver,
-        HTTP_REQUEST_TIMEOUT,
-        "Timeout while waiting for add_tx".to_owned(),
-    )
-    .await?
-    .map_err(DynError::from)
+    wait_with_timeout(receiver, "Timeout while waiting for add_tx".to_owned())
+        .await?
+        .map_err(DynError::from)
 }
 
 pub async fn add_blob_info<
@@ -120,7 +116,6 @@ where
 
     wait_with_timeout(
         receiver,
-        HTTP_REQUEST_TIMEOUT,
         "Timeout while waiting for add_blob_info".to_owned(),
     )
     .await?
