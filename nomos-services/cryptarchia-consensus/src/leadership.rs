@@ -7,7 +7,7 @@ use cl::{
 };
 use cryptarchia_engine::Slot;
 use nomos_core::{header::HeaderId, proofs::leader_proof::Risc0LeaderProof};
-use nomos_ledger::{Config, EpochState, NoteTree};
+use nomos_ledger::{EpochState, NoteTree};
 use nomos_proof_statements::leadership::{LeaderPrivate, LeaderPublic};
 use serde::{Deserialize, Serialize};
 
@@ -27,15 +27,24 @@ pub struct LeaderConfig {
 
 impl Leader {
     pub fn new(
-        genesis: HeaderId,
-        LeaderConfig { notes, nf_sk }: LeaderConfig,
-        config: Config,
+        header_id: HeaderId,
+        header_notes: Vec<NoteWitness>,
+        nf_sk: NullifierSecret,
+        config: nomos_ledger::Config,
     ) -> Self {
         Self {
-            notes: HashMap::from([(genesis, notes)]),
+            notes: HashMap::from([(header_id, header_notes)]),
             nf_sk,
             config,
         }
+    }
+
+    pub fn from_genesis(
+        genesis: HeaderId,
+        LeaderConfig { notes, nf_sk }: LeaderConfig,
+        config: nomos_ledger::Config,
+    ) -> Self {
+        Self::new(genesis, notes, nf_sk, config)
     }
 
     // Signal that the chain extended with a new header, possibly evolving a leader
@@ -123,6 +132,10 @@ impl Leader {
         }
 
         None
+    }
+
+    pub(crate) fn notes(&self, header_id: &HeaderId) -> Option<&[NoteWitness]> {
+        self.notes.get(header_id).map(Vec::as_slice)
     }
 }
 
