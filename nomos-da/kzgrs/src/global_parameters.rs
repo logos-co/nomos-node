@@ -13,7 +13,7 @@ pub fn global_parameters_from_randomness<R: Rng>(rng: &mut R) -> GlobalParameter
 }
 
 pub fn global_parameters_from_file(file_path: &str) -> Result<GlobalParameters, Box<dyn Error>> {
-    let serialized_data = std::fs::read(file_path).unwrap();
+    let serialized_data = std::fs::read(file_path)?;
 
     let params =
         UniversalParams::<Bls12_381>::deserialize_uncompressed_unchecked(&*serialized_data)?;
