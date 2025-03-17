@@ -136,7 +136,7 @@ where
     wait_with_timeout(
         receiver,
         HTTP_REQUEST_TIMEOUT,
-        "Timeout while waiting for add share".to_string(),
+        "Timeout while waiting for add share".to_owned(),
     )
     .await
 }
@@ -248,7 +248,7 @@ where
     wait_with_timeout(
         receiver,
         HTTP_REQUEST_TIMEOUT,
-        "Timeout while waiting for get range".to_string(),
+        "Timeout while waiting for get range".to_owned(),
     )
     .await
 }
@@ -293,7 +293,7 @@ where
     wait_with_timeout(
         receiver,
         HTTP_REQUEST_TIMEOUT,
-        "Timeout while waiting for disperse data".to_string(),
+        "Timeout while waiting for disperse data".to_owned(),
     )
     .await?
 }
@@ -335,7 +335,7 @@ where
     wait_with_timeout(
         receiver,
         HTTP_REQUEST_TIMEOUT,
-        "Timeout while waiting for unblock peer".to_string(),
+        "Timeout while waiting for unblock peer".to_owned(),
     )
     .await
 }
@@ -356,7 +356,7 @@ where
     wait_with_timeout(
         receiver,
         HTTP_REQUEST_TIMEOUT,
-        "Timeout while waiting for blacklisted peers".to_string(),
+        "Timeout while waiting for blacklisted peers".to_owned(),
     )
     .await
 }

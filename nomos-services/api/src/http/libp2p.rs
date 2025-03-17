@@ -20,7 +20,7 @@ pub async fn libp2p_info(
     wait_with_timeout(
         receiver,
         HTTP_REQUEST_TIMEOUT,
-        "Timeout while waiting for cl_mempool_metrics".to_string(),
+        "Timeout while waiting for cl_mempool_metrics".to_owned(),
     )
     .await
 }

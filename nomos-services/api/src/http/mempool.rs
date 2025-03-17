@@ -121,7 +121,7 @@ where
     wait_with_timeout(
         receiver,
         HTTP_REQUEST_TIMEOUT,
-        "Timeout while waiting for add_blob_info".to_string(),
+        "Timeout while waiting for add_blob_info".to_owned(),
     )
     .await?
     .map_err(DynError::from)
