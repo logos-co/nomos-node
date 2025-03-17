@@ -4,6 +4,7 @@ use bytes::{Bytes, BytesMut};
 pub const DA_VID_KEY_PREFIX: &str = "da/vid/";
 
 // "DA/VERIFIED/" PREFIX
+pub const DA_BLOB_SHARES_INDEX_PREFIX: &str = concat!("da/verified/", "si");
 pub const DA_SHARED_COMMITMENTS_PREFIX: &str = concat!("da/verified/", "sc");
 pub const DA_SHARE_PREFIX: &str = concat!("da/verified/", "bl");
 

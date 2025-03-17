@@ -162,10 +162,11 @@ where
     DaShare: Share + Serialize + DeserializeOwned + Clone + Send + Sync + 'static,
     <DaShare as Share>::BlobId:
         AsRef<[u8]> + Clone + Serialize + DeserializeOwned + Send + Sync + 'static,
-    <DaShare as Share>::ShareIndex: AsRef<[u8]> + DeserializeOwned + Send + Sync + 'static,
-    <DaShare as Share>::LightShare: Serialize + DeserializeOwned + Clone + Send + Sync + 'static,
+    <DaShare as Share>::ShareIndex:
+        AsRef<[u8]> + Serialize + DeserializeOwned + Hash + Eq + Send + Sync + 'static,
     <DaShare as Share>::SharesCommitments:
         Serialize + DeserializeOwned + Clone + Send + Sync + 'static,
+    <DaShare as Share>::LightShare: Serialize + DeserializeOwned + Clone + Send + Sync + 'static,
     DaBlobInfo: DispersedBlobInfo<BlobId = [u8; 32]>
         + Clone
         + Debug

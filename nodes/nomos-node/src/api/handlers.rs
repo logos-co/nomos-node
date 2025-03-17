@@ -258,7 +258,8 @@ where
     A: Serialize + DeserializeOwned + Clone + Send + Sync + 'static,
     S: Share + Serialize + DeserializeOwned + Clone + Send + Sync + 'static,
     <S as Share>::BlobId: AsRef<[u8]> + Send + Sync + 'static,
-    <S as Share>::ShareIndex: AsRef<[u8]> + Send + Sync + 'static,
+    <S as Share>::ShareIndex:
+        AsRef<[u8]> + Serialize + DeserializeOwned + Hash + Eq + Send + Sync + 'static,
     <S as Share>::LightShare: Serialize + DeserializeOwned + Clone + Send + Sync + 'static,
     <S as Share>::SharesCommitments: Serialize + DeserializeOwned + Clone + Send + Sync + 'static,
     M: MembershipHandler<NetworkId = SubnetworkId, Id = PeerId>
