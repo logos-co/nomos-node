@@ -314,7 +314,7 @@ where
     wait_with_timeout(
         receiver,
         HTTP_REQUEST_TIMEOUT,
-        "Timeout while waiting for block peer".to_string(),
+        "Timeout while waiting for block peer".to_owned(),
     )
     .await
 }

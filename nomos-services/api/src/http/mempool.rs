@@ -47,7 +47,7 @@ where
     wait_with_timeout(
         receiver,
         HTTP_REQUEST_TIMEOUT,
-        "Timeout while waiting for add_tx".to_string(),
+        "Timeout while waiting for add_tx".to_owned(),
     )
     .await?
     .map_err(DynError::from)
