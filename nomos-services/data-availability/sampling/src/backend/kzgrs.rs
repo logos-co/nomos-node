@@ -110,8 +110,15 @@ impl<R: Rng + Sync + Send> DaSamplingServiceBackend<R> for KzgrsSamplingBackend<
         // If it fails a single time we consider it failed.
         // We may want to abstract the sampling policies somewhere else at some point if
         // we need to get fancier than this
-        self.pending_sampling_blobs.remove(&blob_id);
-        self.validated_blobs.remove(&blob_id);
+        //
+        // Sampling service subscribes to the DaNetwork to send and receive messages,
+        // other services could be sending sampling requests for their use (like
+        // dispersal service).
+        //
+        // Only act on errors for the blobs that requested through this service.
+        if self.pending_sampling_blobs.remove(&blob_id).is_some() {
+            self.validated_blobs.remove(&blob_id);
+        }
     }
 
     async fn init_sampling(&mut self, blob_id: Self::BlobId) -> SamplingState {

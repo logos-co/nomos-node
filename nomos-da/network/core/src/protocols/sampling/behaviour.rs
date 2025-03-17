@@ -1,5 +1,5 @@
 use std::{
-    collections::{HashMap, VecDeque},
+    collections::VecDeque,
     task::{Context, Poll},
 };
 
@@ -271,8 +271,6 @@ pub struct SamplingBehaviour<Membership: MembershipHandler> {
     incoming_tasks: FuturesUnordered<IncomingStreamHandlerFuture>,
     /// Subnetworks membership information
     membership: Membership,
-    /// Pending blobs that need to be dispersed by `PeerId`
-    to_sample: HashMap<PeerId, VecDeque<(Membership::NetworkId, BlobId)>>,
     /// Sample streams that has no tasks and should be closed.
     to_close: VecDeque<SampleStream>,
     /// Hook of pending samples channel
@@ -297,7 +295,6 @@ where
         let outgoing_tasks = FuturesUnordered::new();
         let incoming_tasks = FuturesUnordered::new();
 
-        let to_sample = HashMap::new();
         let to_close = VecDeque::new();
 
         let (samples_request_sender, receiver) = mpsc::unbounded_channel();
@@ -310,7 +307,6 @@ where
             outgoing_tasks,
             incoming_tasks,
             membership,
-            to_sample,
             to_close,
             samples_request_sender,
             samples_request_stream,
@@ -381,39 +377,6 @@ where
 
         // `blob_id` should always be a 32bytes hash
         Ok((blob_id, subnetwork_id, response, stream))
-    }
-
-    /// Get a pending outgoing request if its available
-    fn next_request(
-        peer_id: &PeerId,
-        to_sample: &mut HashMap<PeerId, VecDeque<(SubnetworkId, BlobId)>>,
-    ) -> Option<(SubnetworkId, BlobId)> {
-        to_sample
-            .get_mut(peer_id)
-            .and_then(std::collections::VecDeque::pop_front)
-    }
-
-    /// Handle outgoing stream
-    /// Schedule a new task if its available or drop the stream if not
-    fn handle_outgoing_stream(
-        outgoing_tasks: &FuturesUnordered<OutgoingStreamHandlerFuture>,
-        to_sample: &mut HashMap<PeerId, VecDeque<(SubnetworkId, BlobId)>>,
-        to_close: &mut VecDeque<SampleStream>,
-        stream: SampleStream,
-        cx: &Context<'_>,
-    ) {
-        let peer = stream.peer_id;
-
-        // If there is a pending task schedule next one
-        if let Some((subnetwork_id, blob_id)) = Self::next_request(&peer, to_sample) {
-            let sample_request = sampling::SampleRequest::new(blob_id, subnetwork_id);
-            outgoing_tasks
-                .push(Self::stream_sample(stream, sample_request, subnetwork_id, blob_id).boxed());
-            cx.waker().wake_by_ref();
-        } else {
-            // if not pop stream from connected ones
-            to_close.push_back(stream);
-        }
     }
 
     /// Handler for incoming streams
@@ -642,6 +605,10 @@ impl<M: MembershipHandler<Id = PeerId, NetworkId = SubnetworkId> + 'static> Netw
             .on_connection_handler_event(peer_id, connection_id, event);
     }
 
+    #[expect(
+        clippy::too_many_lines,
+        reason = "Poll method contains all the branches in small enough sections"
+    )]
     fn poll(
         &mut self,
         cx: &mut Context<'_>,
@@ -650,7 +617,6 @@ impl<M: MembershipHandler<Id = PeerId, NetworkId = SubnetworkId> + 'static> Netw
             peer_id,
             outgoing_tasks,
             incoming_tasks,
-            to_sample,
             to_close,
             samples_request_stream,
             incoming_streams,
@@ -673,11 +639,13 @@ impl<M: MembershipHandler<Id = PeerId, NetworkId = SubnetworkId> + 'static> Netw
         }
         // poll outgoing tasks
         if let Poll::Ready(Some(future_result)) = outgoing_tasks.poll_next_unpin(cx) {
+            cx.waker().wake_by_ref();
             match future_result {
                 Ok((blob_id, subnetwork_id, sample_response, stream)) => {
                     let peer_id = stream.peer_id;
+                    // Any subsequent requests to this peer will be performed on a new stream.
+                    to_close.push_back(stream);
                     // handle the free stream then return the success
-                    Self::handle_outgoing_stream(outgoing_tasks, to_sample, to_close, stream, cx);
                     return Self::handle_sample_response(
                         blob_id,
                         subnetwork_id,
@@ -685,10 +653,23 @@ impl<M: MembershipHandler<Id = PeerId, NetworkId = SubnetworkId> + 'static> Netw
                         peer_id,
                     );
                 }
+                Err((SamplingError::Io { error, .. }, stream))
+                    if error.kind() == std::io::ErrorKind::UnexpectedEof
+                        || error.kind() == std::io::ErrorKind::ConnectionReset =>
+                {
+                    // Eof is actually expected and is proper signal about remote closing the
+                    // stream. Do not propagate and continue execution of this poll method.
+                    //
+                    // TODO: Investigate `ConnectionReset` error, as it appears it is related not
+                    // to connection, but stream and happens to write stream, when other peer
+                    // receives UnexpectedEof.
+                    if let Some(stream) = stream {
+                        to_close.push_back(stream);
+                    }
+                }
                 Err((error, stream)) => {
                     if let Some(stream) = stream {
                         to_close.push_back(stream);
-                        cx.waker().wake_by_ref();
                     }
                     return Poll::Ready(ToSwarm::GenerateEvent(SamplingEvent::SamplingError {
                         error,
@@ -708,29 +689,32 @@ impl<M: MembershipHandler<Id = PeerId, NetworkId = SubnetworkId> + 'static> Netw
         }
         // poll incoming tasks
         if let Poll::Ready(Some(res)) = incoming_tasks.poll_next_unpin(cx) {
+            cx.waker().wake_by_ref();
             match res {
                 Ok(sample_stream) => {
-                    let (request_receiver, response_sender) =
-                        Self::schedule_incoming_stream_task(incoming_tasks, sample_stream, cx);
-                    return Poll::Ready(ToSwarm::GenerateEvent(SamplingEvent::IncomingSample {
-                        request_receiver,
-                        response_sender,
-                    }));
+                    to_close.push_back(sample_stream);
                 }
-                //  Ignore `UnexpectedEof` errors and continue polling, stream is closed by the
-                //  sender after the message is sent.
                 Err((SamplingError::Io { error, .. }, stream))
-                    if error.kind() == std::io::ErrorKind::UnexpectedEof =>
+                    if error.kind() == std::io::ErrorKind::UnexpectedEof
+                        || error.kind() == std::io::ErrorKind::ConnectionReset =>
                 {
+                    // Eof is actually expected and is proper signal about remote closing the
+                    // stream. Do not propagate and continue execution of this poll method.
                     to_close.push_back(stream);
-                    cx.waker().wake_by_ref();
-                    return Poll::Pending;
                 }
-                Err((error, _)) => {
+                Err((error, stream)) => {
+                    to_close.push_back(stream);
                     return Poll::Ready(ToSwarm::GenerateEvent(SamplingEvent::SamplingError {
                         error,
-                    }))
+                    }));
                 }
+            }
+        }
+        // Discard stream, if still pending pushback to close later.
+        if let Some(mut stream) = to_close.pop_front() {
+            if stream.stream.close().poll_unpin(cx).is_pending() {
+                to_close.push_back(stream);
+                cx.waker().wake_by_ref();
             }
         }
         // Deal with connection as the underlying behaviour would do
@@ -745,13 +729,6 @@ impl<M: MembershipHandler<Id = PeerId, NetworkId = SubnetworkId> + 'static> Netw
                     .extend_addresses_through_behaviour()
                     .build();
                 return Poll::Ready(ToSwarm::Dial { opts });
-            }
-        }
-        // Discard stream, if still pending pushback to close later.
-        if let Some(mut stream) = to_close.pop_front() {
-            if stream.stream.close().poll_unpin(cx).is_pending() {
-                to_close.push_back(stream);
-                cx.waker().wake_by_ref();
             }
         }
 
