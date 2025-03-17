@@ -105,7 +105,7 @@ where
                 bl_blobs: blobs,
             })
         } else {
-            Err("incomplete block".to_string())
+            Err("incomplete block".to_owned())
         }
     }
 }

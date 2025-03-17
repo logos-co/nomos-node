@@ -128,7 +128,7 @@ mod tests {
     #[tokio::test]
     async fn preload_backend() {
         // Initialize a backend with a pre-generated key in the setting
-        let key_id = "blend/1".to_string();
+        let key_id = "blend/1".to_owned();
         let key = ed25519_dalek::SigningKey::generate(&mut OsRng);
         let mut backend = PreloadKMSBackend::new(PreloadKMSBackendSettings {
             keys: HashMap::from_iter(vec![(
@@ -171,7 +171,7 @@ mod tests {
             keys: HashMap::new(),
         });
 
-        let key_id = "blend/not_registered".to_string();
+        let key_id = "blend/not_registered".to_owned();
         assert!(backend
             .register(key_id.clone(), SupportedKeyTypes::Ed25519)
             .is_err());

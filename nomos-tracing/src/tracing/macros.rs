@@ -21,7 +21,7 @@ pub mod prelude {
     pub fn set_remote_context(trace_id: TraceId, span_id: SpanId) -> HashMap<String, String> {
         let mut carrier = HashMap::new();
         carrier.insert(
-            "traceparent".to_string(),
+            "traceparent".to_owned(),
             format!("00-{trace_id}-{span_id}-01"),
         );
 

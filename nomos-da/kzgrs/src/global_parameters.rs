@@ -1,9 +1,9 @@
-use std::{error::Error, fs::File};
+use std::error::Error;
 
 use ark_bls12_381::{fr::Fr, Bls12_381};
 use ark_poly::polynomial::univariate::DensePolynomial;
 use ark_poly_commit::kzg10::{UniversalParams, KZG10};
-use ark_serialize::{CanonicalDeserialize, Read};
+use ark_serialize::CanonicalDeserialize;
 use rand::Rng;
 
 use super::GlobalParameters;
@@ -13,9 +13,7 @@ pub fn global_parameters_from_randomness<R: Rng>(rng: &mut R) -> GlobalParameter
 }
 
 pub fn global_parameters_from_file(file_path: &str) -> Result<GlobalParameters, Box<dyn Error>> {
-    let mut file = File::open(file_path)?;
-    let mut serialized_data = Vec::new();
-    file.read_to_end(&mut serialized_data)?;
+    let serialized_data = std::fs::read(file_path).unwrap();
 
     let params =
         UniversalParams::<Bls12_381>::deserialize_uncompressed_unchecked(&*serialized_data)?;

@@ -210,7 +210,7 @@ impl<Backend: StorageBackend + Send + Sync + 'static> StorageService<Backend> {
         reply_channel
             .send(result)
             .map_err(|_| StorageServiceError::ReplyError {
-                operation: "Load".to_string(),
+                operation: "Load".to_owned(),
                 key,
             })
     }
@@ -228,7 +228,7 @@ impl<Backend: StorageBackend + Send + Sync + 'static> StorageService<Backend> {
         reply_channel
             .send(result)
             .map_err(|_| StorageServiceError::ReplyError {
-                operation: "LoadPrefix".to_string(),
+                operation: "LoadPrefix".to_owned(),
                 key: prefix,
             })
     }
@@ -246,7 +246,7 @@ impl<Backend: StorageBackend + Send + Sync + 'static> StorageService<Backend> {
         reply_channel
             .send(result)
             .map_err(|_| StorageServiceError::ReplyError {
-                operation: "Remove".to_string(),
+                operation: "Remove".to_owned(),
                 key,
             })
     }
@@ -278,7 +278,7 @@ impl<Backend: StorageBackend + Send + Sync + 'static> StorageService<Backend> {
         reply_channel
             .send(result)
             .map_err(|_| StorageServiceError::ReplyError {
-                operation: "Execute".to_string(),
+                operation: "Execute".to_owned(),
                 key: Bytes::new(),
             })
     }
