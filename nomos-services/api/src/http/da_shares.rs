@@ -46,13 +46,10 @@ where
     let blob_shares =
         load_blob_shares_index::<StorageOp, DaShare>(&storage_relay, &blob_id).await?;
 
-    let filtered_shares: Vec<_> = blob_shares
-        .into_iter()
-        .filter(|idx| {
-            // If requested_shares contains the index, then ignore the filter_shares
-            requested_shares.contains(idx) || (return_available && !filter_shares.contains(idx))
-        })
-        .collect();
+    let filtered_shares = blob_shares.into_iter().filter(move |idx| {
+        // If requested_shares contains the index, then ignore the filter_shares
+        requested_shares.contains(idx) || (return_available && !filter_shares.contains(idx))
+    });
 
     let blob_id = Arc::new(blob_id);
     let stream = stream::iter(filtered_shares).then(move |share_idx| {
