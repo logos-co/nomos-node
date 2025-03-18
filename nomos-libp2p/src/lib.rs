@@ -23,7 +23,7 @@ pub use libp2p::{
 use libp2p::{
     gossipsub::{Message, MessageId, TopicHash},
     identify,
-    kad::{self, NoKnownPeers, QueryId},
+    kad::{self, QueryId},
     swarm::ConnectionId,
     StreamProtocol,
 };
@@ -61,12 +61,8 @@ impl Behaviour {
                 .build()?,
         )?;
 
-        // Initialize a memory store for Kademlia
         let store = kad::store::MemoryStore::new(peer_id);
-
         let kad_config = kad::Config::new(StreamProtocol::new("nomos/kad/1.0.0"));
-
-        // Create a Kademlia behavior with the provided config
         let kademlia = kad::Behaviour::with_config(peer_id, store, kad_config);
 
         let identify = identify::Behaviour::new(identify::Config::new(
