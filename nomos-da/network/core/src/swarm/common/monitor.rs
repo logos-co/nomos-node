@@ -287,7 +287,7 @@ where
                     stats.last_sampling_failure = Some(now);
                 }
                 MonitorEvent::Noop => {}
-            };
+            }
 
             Some(ConnectionMonitorOutput {
                 peer_id: *peer_id,
@@ -375,7 +375,8 @@ mod tests {
         for _ in 0..4 {
             monitor.record_event(MonitorEvent::Sampling(SamplingError::Io {
                 peer_id,
-                error: std::io::Error::new(std::io::ErrorKind::Other, "Simulated I/O error"),
+                error: std::io::Error::other("Simulated I/O error"),
+                message: None,
             }));
         }
 
@@ -393,7 +394,8 @@ mod tests {
         for _ in 0..100 {
             monitor.record_event(MonitorEvent::Sampling(SamplingError::Io {
                 peer_id,
-                error: std::io::Error::new(std::io::ErrorKind::Other, "Simulated I/O error"),
+                error: std::io::Error::other("Simulated I/O error"),
+                message: None,
             }));
         }
 
@@ -411,7 +413,8 @@ mod tests {
         for _ in 0..4 {
             monitor.record_event(MonitorEvent::Sampling(SamplingError::Io {
                 peer_id,
-                error: std::io::Error::new(std::io::ErrorKind::Other, "Simulated I/O error"),
+                error: std::io::Error::other("Simulated I/O error"),
+                message: None,
             }));
         }
 
@@ -434,7 +437,8 @@ mod tests {
         for _ in 0..4 {
             monitor.record_event(MonitorEvent::Sampling(SamplingError::Io {
                 peer_id,
-                error: std::io::Error::new(std::io::ErrorKind::Other, "Simulated I/O error"),
+                error: std::io::Error::other("Simulated I/O error"),
+                message: None,
             }));
         }
 

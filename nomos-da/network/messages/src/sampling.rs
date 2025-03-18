@@ -36,7 +36,7 @@ impl SampleError {
 }
 
 #[repr(C)]
-#[derive(Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct SampleRequest {
     pub blob_id: BlobId,
     pub share_idx: ShareIndex,
