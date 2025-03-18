@@ -171,6 +171,10 @@ impl PendingOutbound {
         self.last_scheduled = next;
         next
     }
+
+    fn is_empty(&self) -> bool {
+        self.messages.is_empty()
+    }
 }
 
 /// Nomos DA broadcast network behaviour.
@@ -274,22 +278,22 @@ where
         peers
     }
 
-    fn replicate_message(&mut self, waker: &Waker, message: &DaMessage) {
-        let message_id = (message.share.blob_id.to_vec(), message.subnetwork_id);
-        if self.seen_message_cache.contains(&message_id) {
-            return;
-        }
-        self.seen_message_cache.insert(message_id);
-        self.send_message_impl(Some(waker), message);
-    }
-
     /// Initiate sending a replication message **from outside the behaviour**
     pub fn send_message(&mut self, message: &DaMessage) {
         let waker = self.waker.take();
         self.send_message_impl(waker.as_ref(), message);
     }
 
+    /// Send a replication message to all connected peers that are members of
+    /// the same subnetwork. If the message has already been seen, it is not
+    /// sent again.
     fn send_message_impl(&mut self, waker: Option<&Waker>, message: &DaMessage) {
+        let message_id = (message.share.blob_id.to_vec(), message.subnetwork_id);
+        if self.seen_message_cache.contains(&message_id) {
+            return;
+        }
+        self.seen_message_cache.insert(message_id);
+
         // Push a message in the queue for every single peer connected that is a member
         // of the selected subnetwork_id
         let peers = self.no_loopback_member_peers_of(message.subnetwork_id);
@@ -368,7 +372,7 @@ where
             Poll::Ready(Some(Ok((peer_id, message, read_half)))) => {
                 // Replicate the message to all connected peers from the same subnet if we
                 // haven't seen it yet
-                self.replicate_message(cx.waker(), &message);
+                self.send_message_impl(Some(cx.waker()), &message);
                 // Schedule waiting for any next incoming message on the same stream's read half
                 self.incoming_tasks
                     .push(Self::try_read_message(peer_id, read_half).boxed());
@@ -469,6 +473,13 @@ where
                 }
             }
 
+            cx.waker().wake_by_ref();
+        }
+
+        // We must ensure that we ge awaken if there are still pending messages in the
+        // queue. In some scenarios it may happen that there's no other event that
+        // triggers the wake-up.
+        if !self.pending_outbound.is_empty() {
             cx.waker().wake_by_ref();
         }
 
