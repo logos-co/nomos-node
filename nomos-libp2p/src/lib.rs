@@ -22,7 +22,10 @@ pub use libp2p::{
 };
 use libp2p::{
     gossipsub::{Message, MessageId, TopicHash},
+    identify,
+    kad::{self, NoKnownPeers, QueryId},
     swarm::ConnectionId,
+    StreamProtocol,
 };
 pub use multiaddr::{multiaddr, Multiaddr, Protocol};
 
@@ -39,10 +42,16 @@ pub struct Swarm {
 #[derive(NetworkBehaviour)]
 pub struct Behaviour {
     gossipsub: gossipsub::Behaviour,
+    kademlia: kad::Behaviour<kad::store::MemoryStore>, // todo: support persistent store
+    identify: identify::Behaviour,
 }
 
 impl Behaviour {
-    fn new(peer_id: PeerId, gossipsub_config: gossipsub::Config) -> Result<Self, Box<dyn Error>> {
+    fn new(
+        peer_id: PeerId,
+        gossipsub_config: gossipsub::Config,
+        publick_key: identity::PublicKey,
+    ) -> Result<Self, Box<dyn Error>> {
         let gossipsub = gossipsub::Behaviour::new(
             gossipsub::MessageAuthenticity::Author(peer_id),
             gossipsub::ConfigBuilder::from(gossipsub_config)
@@ -51,7 +60,29 @@ impl Behaviour {
                 .max_transmit_size(DATA_LIMIT)
                 .build()?,
         )?;
-        Ok(Self { gossipsub })
+
+        // Initialize a memory store for Kademlia
+        let store = kad::store::MemoryStore::new(peer_id);
+
+        let kad_config = kad::Config::new(StreamProtocol::new("nomos/kad/1.0.0"));
+
+        // Create a Kademlia behavior with the provided config
+        let kademlia = kad::Behaviour::with_config(peer_id, store, kad_config);
+
+        let identify = identify::Behaviour::new(identify::Config::new(
+            "/nomos/id/1.0.0".into(), // Identify protocol name
+            publick_key,
+        ));
+
+        Ok(Self {
+            gossipsub,
+            kademlia,
+            identify,
+        })
+    }
+
+    pub fn kademlia_add_address(&mut self, peer_id: PeerId, addr: Multiaddr) {
+        self.kademlia.add_address(&peer_id, addr);
     }
 }
 
@@ -59,6 +90,9 @@ impl Behaviour {
 pub enum SwarmError {
     #[error("duplicate dialing")]
     DuplicateDialing,
+
+    #[error("no known peers")]
+    NoKnownPeers,
 }
 
 /// How long to keep a connection alive once it is idling.
@@ -79,13 +113,23 @@ impl Swarm {
             .with_tokio()
             .with_quic()
             .with_dns()?
-            .with_behaviour(|_| Behaviour::new(peer_id, config.gossipsub_config.clone()).unwrap())?
+            .with_behaviour(|keypair| {
+                Behaviour::new(peer_id, config.gossipsub_config.clone(), keypair.public()).unwrap()
+            })?
             .with_swarm_config(|c| c.with_idle_connection_timeout(IDLE_CONN_TIMEOUT))
             .build();
 
         swarm.listen_on(Self::multiaddr(config.host, config.port))?;
 
         Ok(Self { swarm })
+    }
+
+    pub fn bootstrap_kademlia(&mut self) -> Result<QueryId, SwarmError> {
+        self.swarm
+            .behaviour_mut()
+            .kademlia
+            .bootstrap()
+            .map_err(|_| SwarmError::NoKnownPeers)
     }
 
     /// Initiates a connection attempt to a peer
@@ -133,6 +177,10 @@ impl Swarm {
     /// Returns a reference to the underlying [`libp2p::Swarm`]
     pub const fn swarm(&self) -> &libp2p::Swarm<Behaviour> {
         &self.swarm
+    }
+
+    pub const fn swarm_mut(&mut self) -> &mut libp2p::Swarm<Behaviour> {
+        &mut self.swarm
     }
 
     pub fn is_subscribed(&mut self, topic: &str) -> bool {

@@ -1,7 +1,9 @@
 use std::{collections::HashMap, time::Duration};
 
 use nomos_libp2p::{
-    gossipsub, libp2p::swarm::ConnectionId, BehaviourEvent, Multiaddr, PeerId, Swarm, SwarmEvent,
+    gossipsub,
+    libp2p::{identify, swarm::ConnectionId},
+    BehaviourEvent, Multiaddr, PeerId, Swarm, SwarmEvent,
 };
 use tokio::sync::{broadcast, mpsc, oneshot};
 use tokio_stream::StreamExt;
@@ -56,14 +58,27 @@ impl SwarmHandler {
     }
 
     pub async fn run(&mut self, initial_peers: Vec<Multiaddr>) {
-        for initial_peer in initial_peers {
+        for initial_peer in &initial_peers {
             let (tx, _) = oneshot::channel();
             let dial = Dial {
-                addr: initial_peer,
+                addr: initial_peer.clone(),
                 retry_count: 0,
                 result_sender: tx,
             };
             Self::schedule_connect(dial, self.commands_tx.clone()).await;
+        }
+
+        // Bootstrap Kademlia to discover more peers
+        if initial_peers.is_empty() {
+            tracing::info!("No initial peers configured, skipping Kademlia bootstrap");
+        } else {
+            tracing::info!("Bootstrapping Kademlia DHT...");
+            match self.swarm.bootstrap_kademlia() {
+                Ok(query_id) => {
+                    tracing::debug!("Kademlia bootstrap started. Query id: {:?}", query_id);
+                }
+                Err(e) => tracing::warn!("Failed to bootstrap Kademlia DHT: {}", e),
+            }
         }
 
         loop {
@@ -92,6 +107,31 @@ impl SwarmHandler {
                 tracing::debug!("Got message with id: {id} from peer: {peer_id}");
                 log_error!(self.events_tx.send(Event::Message(message)));
             }
+            // identify events (used for peer discovery)
+            SwarmEvent::Behaviour(BehaviourEvent::Identify(identify::Event::Received {
+                peer_id,
+                info,
+                ..
+            })) => {
+                tracing::debug!(
+                    "Identified peer {} with addresses {:?}",
+                    peer_id,
+                    info.listen_addrs
+                );
+
+                let behaviour = self.swarm.swarm_mut().behaviour_mut();
+
+                // we need to add the peer to the kademlia routing table
+                // in order to enable peer discovery
+                for addr in info.listen_addrs {
+                    behaviour.kademlia_add_address(peer_id, addr);
+                }
+            }
+
+            SwarmEvent::Behaviour(BehaviourEvent::Kademlia(event)) => {
+                tracing::debug!("Kademlia event: {:?}", event);
+            }
+
             SwarmEvent::ConnectionEstablished {
                 peer_id,
                 connection_id,
@@ -167,6 +207,17 @@ impl SwarmHandler {
             } => {
                 self.broadcast_and_retry(topic, message, retry_count);
             }
+
+            // this is just an illustration what kind of commands we could expose to other services
+            Command::AddPeer {
+                peer_id,
+                addr,
+                reply,
+            } => todo!(),
+            Command::FindPeer { peer_id, reply } => todo!(),
+            Command::PutValue { key, value, reply } => todo!(),
+            Command::GetValue { key, reply } => todo!(),
+            Command::Bootstrap { reply } => todo!(),
         }
     }
 
