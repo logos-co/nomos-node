@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use libp2p::{gossipsub, identity::ed25519, kad};
+use libp2p::{gossipsub, identity::ed25519};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

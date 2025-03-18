@@ -209,15 +209,11 @@ impl SwarmHandler {
             }
 
             // this is just an illustration what kind of commands we could expose to other services
-            Command::AddPeer {
-                peer_id,
-                addr,
-                reply,
-            } => todo!(),
-            Command::FindPeer { peer_id, reply } => todo!(),
-            Command::PutValue { key, value, reply } => todo!(),
-            Command::GetValue { key, reply } => todo!(),
-            Command::Bootstrap { reply } => todo!(),
+            Command::AddPeer { .. } => todo!(),
+            Command::FindPeer { .. } => todo!(),
+            Command::PutValue { .. } => todo!(),
+            Command::GetValue { .. } => todo!(),
+            Command::Bootstrap { .. } => todo!(),
         }
     }
 
