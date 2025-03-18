@@ -105,6 +105,7 @@ fn test_todo() {
             NomosApiServiceSettings {
                 http: ApiServiceSettings {
                     backend_settings: addr,
+                    request_timeout: None,
                 },
             },
             None,

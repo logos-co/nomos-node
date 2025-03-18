@@ -282,6 +282,7 @@ pub fn create_executor_config(config: GeneralConfig) -> Config {
                 address: config.api_config.address,
                 cors_origins: vec![],
             },
+            request_timeout: None,
         },
         da_sampling: DaSamplingServiceSettings {
             sampling_settings: KzgrsSamplingBackendSettings {
