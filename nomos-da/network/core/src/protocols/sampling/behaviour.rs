@@ -541,7 +541,7 @@ impl<Membership: MembershipHandler<Id = PeerId, NetworkId = SubnetworkId> + 'sta
         let control = control.clone();
         let sample_request = sampling::SampleRequest::new(blob_id, subnetwork_id);
         let with_dial_task: SamplingStreamFuture = async move {
-            // If we don't have an existing connection to the peer, this will immediatly
+            // If we don't have an existing connection to the peer, this will immediately
             // return `ConnectionReset` io error. To handle that, we need to queue
             // `sample_request` for a peer and try again when the connection is
             // established.
