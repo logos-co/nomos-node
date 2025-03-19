@@ -8,5 +8,5 @@ version = "0.1.0"
 common-http-client = { workspace = true }
 nomos-core         = { workspace = true }
 nomos-executor     = { workspace = true }
-reqwest            = "0.12"
+reqwest            = { workspace = true }
 serde              = "1.0"

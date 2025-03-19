@@ -95,6 +95,7 @@ tests                    = { path = "./tests" }
 libp2p           = "0.55"
 overwatch        = { git = "https://github.com/logos-co/Overwatch", rev = "1373cbd" }
 overwatch-derive = { git = "https://github.com/logos-co/Overwatch", rev = "1373cbd" }
+reqwest          = "0.12"
 risc0-zkvm       = "1.2.0"
 
 [workspace.package]
