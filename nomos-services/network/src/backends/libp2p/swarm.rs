@@ -2,8 +2,12 @@ use std::{collections::HashMap, time::Duration};
 
 use nomos_libp2p::{
     gossipsub,
-    libp2p::{identify, swarm::ConnectionId},
-    BehaviourEvent, Multiaddr, PeerId, Protocol, Swarm, SwarmEvent,
+    libp2p::{
+        identify,
+        kad::{self, PeerInfo, QueryId},
+        swarm::ConnectionId,
+    },
+    BehaviourEvent, Multiaddr, PeerId, Protocol, Swarm, SwarmEvent, KAD_PROTOCOL_NAME,
 };
 use tokio::sync::{broadcast, mpsc, oneshot};
 use tokio_stream::StreamExt;
@@ -20,6 +24,8 @@ pub struct SwarmHandler {
     pub commands_tx: mpsc::Sender<Command>,
     pub commands_rx: mpsc::Receiver<Command>,
     pub events_tx: broadcast::Sender<Event>,
+
+    pending_queries: HashMap<QueryId, oneshot::Sender<Vec<PeerInfo>>>,
 }
 
 macro_rules! log_error {
@@ -54,18 +60,20 @@ impl SwarmHandler {
             commands_tx,
             commands_rx,
             events_tx,
+            pending_queries: HashMap::new(),
         }
     }
 
     pub async fn run(&mut self, initial_peers: Vec<Multiaddr>) {
-        for initial_peer in &initial_peers {
-            let (tx, _) = oneshot::channel();
-            let dial = Dial {
-                addr: initial_peer.clone(),
-                retry_count: 0,
-                result_sender: tx,
-            };
-            Self::schedule_connect(dial, self.commands_tx.clone()).await;
+        let local_peer_id = *self.swarm.swarm().local_peer_id();
+        let local_addr = self.swarm.swarm().listeners().next().cloned();
+
+        // add local address to kademlia
+        if let Some(addr) = local_addr {
+            self.swarm
+                .swarm_mut()
+                .behaviour_mut()
+                .kademlia_add_address(local_peer_id, addr);
         }
 
         for peer_addr in &initial_peers {
@@ -82,6 +90,18 @@ impl SwarmHandler {
             } else {
                 tracing::warn!("Multiaddr doesn't contain peer ID: {}", peer_addr);
             }
+
+            self.swarm.swarm_mut().behaviour_mut().bootstrap_kademlia();
+        }
+
+        for initial_peer in &initial_peers {
+            let (tx, _) = oneshot::channel();
+            let dial = Dial {
+                addr: initial_peer.clone(),
+                retry_count: 0,
+                result_sender: tx,
+            };
+            Self::schedule_connect(dial, self.commands_tx.clone()).await;
         }
 
         loop {
@@ -98,6 +118,7 @@ impl SwarmHandler {
 
     #[expect(
         clippy::cognitive_complexity,
+        clippy::too_many_lines,
         reason = "TODO: Address this at some point."
     )]
     fn handle_event(&mut self, event: SwarmEvent<BehaviourEvent>) {
@@ -124,11 +145,65 @@ impl SwarmHandler {
 
                 let behaviour = self.swarm.swarm_mut().behaviour_mut();
 
-                // we need to add the peer to the kademlia routing table
-                // in order to enable peer discovery
-                for addr in info.listen_addrs {
-                    behaviour.kademlia_add_address(peer_id, addr);
+                if info.protocols.iter().any(|p| *p == KAD_PROTOCOL_NAME) {
+                    // we need to add the peer to the kademlia routing table
+                    // in order to enable peer discovery
+                    for addr in &info.listen_addrs {
+                        behaviour.kademlia_add_address(peer_id, addr.clone());
+                    }
                 }
+            }
+
+            SwarmEvent::Behaviour(BehaviourEvent::Kademlia(
+                kad::Event::OutboundQueryProgressed {
+                    id,
+                    result: kad::QueryResult::GetClosestPeers(Ok(result)),
+                    ..
+                },
+            )) => {
+                if let Some(sender) = self.pending_queries.remove(&id) {
+                    let _ = sender.send(result.peers);
+                }
+            }
+
+            SwarmEvent::Behaviour(BehaviourEvent::Kademlia(
+                kad::Event::OutboundQueryProgressed {
+                    id,
+                    result: kad::QueryResult::GetClosestPeers(Err(err)),
+                    ..
+                },
+            )) => {
+                tracing::warn!("Failed to find closest peers: {:?}", err);
+
+                if let Some(sender) = self.pending_queries.remove(&id) {
+                    let _ = sender.send(Vec::new());
+                }
+            }
+            SwarmEvent::Behaviour(BehaviourEvent::Kademlia(
+                kad::Event::OutboundQueryProgressed {
+                    id,
+                    result: kad::QueryResult::Bootstrap(result),
+                    ..
+                },
+            )) => match result {
+                Ok(_) => {
+                    tracing::debug!("Bootstrap successful. Query ID: {:?}", id);
+                }
+                Err(e) => {
+                    tracing::warn!("Bootstrap failed: {:?}, Query ID: {:?}", e, id);
+                }
+            },
+
+            SwarmEvent::Behaviour(BehaviourEvent::Kademlia(kad::Event::RoutingUpdated {
+                peer,
+                addresses,
+                old_peer,
+                is_new_peer,
+                bucket_range,
+            })) => {
+                tracing::debug!(
+                    "Routing table updated: peer: {peer}, addresses: {addresses:?}, old_peer: {old_peer:?}, is_new_peer: {is_new_peer}, bucket_range: {bucket_range:?}"
+                );
             }
 
             SwarmEvent::Behaviour(BehaviourEvent::Kademlia(event)) => {
@@ -212,11 +287,21 @@ impl SwarmHandler {
             }
 
             // this is just an illustration what kind of commands we could expose to other services
-            Command::AddPeer { .. } => todo!(),
-            Command::FindPeer { .. } => todo!(),
-            Command::PutValue { .. } => todo!(),
-            Command::GetValue { .. } => todo!(),
-            Command::Bootstrap { .. } => todo!(),
+            // it is not optimized and is just a proof of concept
+            Command::GetClosestPeers { peer_id, reply } => {
+                tracing::info!("Getting closest peers to: {peer_id}");
+                let query_id = self.swarm.get_closest_peers(peer_id);
+                tracing::info!("Query id: {query_id:?}");
+                self.pending_queries.insert(query_id, reply);
+            }
+            Command::DumpRoutingTable { reply } => {
+                let result = self
+                    .swarm
+                    .swarm_mut()
+                    .behaviour_mut()
+                    .kademlia_routing_table_dump();
+                let _ = reply.send(result);
+            }
         }
     }
 
@@ -316,5 +401,184 @@ impl SwarmHandler {
 
     const fn exp_backoff(retry: usize) -> Duration {
         std::time::Duration::from_secs(BACKOFF.pow(retry as u32))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::{
+        net::{Ipv4Addr, TcpListener},
+        sync::Once,
+    };
+
+    use rand::{thread_rng, Rng};
+    use tracing_subscriber::EnvFilter;
+
+    use super::*;
+
+    static INIT: Once = Once::new();
+
+    fn init_tracing() {
+        let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
+
+        INIT.call_once(|| {
+            tracing_subscriber::fmt().with_env_filter(filter).init();
+        });
+    }
+
+    fn get_next_available_port(start_port: u16) -> Option<u16> {
+        (start_port..10000).find(|&port| TcpListener::bind(("127.0.0.1", port)).is_ok())
+        // Return None if no ports are available
+    }
+
+    fn create_swarm_config() -> nomos_libp2p::SwarmConfig {
+        let random_port = thread_rng().gen_range(8000, 9000);
+        let port = get_next_available_port(random_port).expect("No available ports found");
+
+        nomos_libp2p::SwarmConfig {
+            host: Ipv4Addr::new(127, 0, 0, 1),
+            port,
+            node_key: nomos_libp2p::ed25519::SecretKey::generate(),
+            gossipsub_config: gossipsub::Config::default(),
+        }
+    }
+
+    fn create_libp2p_config(initial_peers: Vec<Multiaddr>) -> Libp2pConfig {
+        Libp2pConfig {
+            inner: create_swarm_config(),
+            initial_peers,
+        }
+    }
+
+    const NODE_COUNT: usize = 10;
+
+    #[tokio::test]
+    async fn test_kademlia_bootstrap() {
+        init_tracing();
+
+        let mut handler_tasks = Vec::with_capacity(NODE_COUNT);
+        let mut txs = Vec::new();
+
+        // Create first node (bootstrap node)
+        let (tx1, rx1) = mpsc::channel(10);
+        txs.push(tx1.clone());
+
+        let (events_tx1, _) = broadcast::channel(10);
+        let config = create_libp2p_config(vec![]);
+        let mut bootstrap_node = SwarmHandler::new(&config, tx1.clone(), rx1, events_tx1.clone());
+
+        let bootstrap_node_peer_id = *bootstrap_node.swarm.swarm().local_peer_id();
+
+        let task1 = tokio::spawn(async move {
+            bootstrap_node.run(vec![]).await;
+        });
+        handler_tasks.push(task1);
+
+        // Wait for bootstrap node to start
+        tokio::time::sleep(Duration::from_secs(5)).await;
+
+        let (info_tx, info_rx) = oneshot::channel();
+        tx1.send(Command::Info { reply: info_tx })
+            .await
+            .expect("Failed to send info command");
+        let bootstrap_info = info_rx.await.expect("Failed to get bootstrap node info");
+
+        assert!(
+            !bootstrap_info.listen_addresses.is_empty(),
+            "Bootstrap node has no listening addresses"
+        );
+
+        tracing::info!(
+            "Bootstrap node listening on: {:?}",
+            bootstrap_info.listen_addresses
+        );
+
+        // Use the first listening address as the bootstrap address
+        let bootstrap_addr = bootstrap_info.listen_addresses[0]
+            .clone()
+            .with(Protocol::P2p(bootstrap_node_peer_id));
+
+        tracing::info!("Using bootstrap address: {}", bootstrap_addr);
+
+        let bootstrap_addr = bootstrap_addr.clone();
+
+        // Start additional nodes
+        for i in 1..NODE_COUNT {
+            let (tx, rx) = mpsc::channel(10);
+            txs.push(tx.clone());
+            let (events_tx, _) = broadcast::channel(10);
+
+            // Each node connects to the bootstrap node
+            let config = create_libp2p_config(vec![bootstrap_addr.clone()]);
+            let mut handler = SwarmHandler::new(&config, tx.clone(), rx, events_tx);
+
+            let peer_id = *handler.swarm.swarm().local_peer_id();
+            tracing::info!("Starting node {} with peer ID: {}", i, peer_id);
+
+            let bootstrap_addr = bootstrap_addr.clone();
+            let task = tokio::spawn(async move {
+                handler.run(vec![bootstrap_addr.clone()]).await;
+            });
+
+            handler_tasks.push(task);
+
+            // Add small delay between node startups to avoid overloading
+            tokio::time::sleep(Duration::from_millis(500)).await;
+        }
+
+        tracing::info!("Waiting for DHT to populate...");
+        tokio::time::sleep(Duration::from_secs(20)).await;
+
+        // Check routing tables of all nodes
+        for tx in &txs {
+            let (dump_tx, dump_rx) = oneshot::channel();
+            tx.send(Command::DumpRoutingTable { reply: dump_tx })
+                .await
+                .expect("Failed to send dump command");
+
+            let routing_table = dump_rx.await.expect("Failed to receive routing table dump");
+
+            // we expect full conectivity as number of nodes is less then K (kademlia bucket
+            // size)
+            assert!(
+                routing_table.len() >= NODE_COUNT - 1,
+                "Expected at least {} entries in routing table, got {}",
+                NODE_COUNT - 1,
+                routing_table.len()
+            );
+        }
+
+        // Verify bootstrap node connections
+        let (info_tx, info_rx) = oneshot::channel();
+        tx1.send(Command::Info { reply: info_tx })
+            .await
+            .expect("Failed to send info command");
+        let bootstrap_info = info_rx.await.expect("Failed to get bootstrap node info");
+
+        assert!(
+            bootstrap_info.n_peers > 0,
+            "Bootstrap node has 0 peers after test"
+        );
+
+        let (closest_tx, closest_rx) = oneshot::channel();
+        tx1.send(Command::GetClosestPeers {
+            peer_id: bootstrap_node_peer_id,
+            reply: closest_tx,
+        })
+        .await
+        .expect("Failed to send get closest peers command");
+
+        let closest_peers = closest_rx.await.expect("Failed to get closest peers");
+
+        assert!(
+            closest_peers.len() >= NODE_COUNT - 1,
+            "Expected at least {} closest peers, got {}",
+            NODE_COUNT - 1,
+            closest_peers.len()
+        );
+
+        for task in handler_tasks {
+            task.abort();
+        }
     }
 }

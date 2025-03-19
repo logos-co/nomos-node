@@ -29,6 +29,8 @@ use libp2p::{
 };
 pub use multiaddr::{multiaddr, Multiaddr, Protocol};
 
+pub const KAD_PROTOCOL_NAME: &str = "/nomos/kad/1.0.0";
+
 // TODO: Risc0 proofs are HUGE (220 Kb) and it's the only reason we need to have
 // this limit so large. Remove this once we transition to smaller proofs.
 const DATA_LIMIT: usize = 1 << 18; // Do not serialize/deserialize more than 256 KiB
@@ -62,11 +64,12 @@ impl Behaviour {
         )?;
 
         let store = kad::store::MemoryStore::new(peer_id);
-        let kad_config = kad::Config::new(StreamProtocol::new("/nomos/kad/1.0.0"));
+        let mut kad_config = kad::Config::new(StreamProtocol::new(KAD_PROTOCOL_NAME));
+        kad_config.set_periodic_bootstrap_interval(Some(Duration::from_secs(10))); // this interval is only for proof of concept and should be configurable
         let kademlia = kad::Behaviour::with_config(peer_id, store, kad_config);
 
         let identify = identify::Behaviour::new(identify::Config::new(
-            "/nomos/id/1.0.0".into(), // Identify protocol name
+            "/nomos/ide/1.0.0".into(), // Identify protocol name
             publick_key,
         ));
 
@@ -79,6 +82,27 @@ impl Behaviour {
 
     pub fn kademlia_add_address(&mut self, peer_id: PeerId, addr: Multiaddr) {
         self.kademlia.add_address(&peer_id, addr);
+    }
+
+    pub fn kademlia_routing_table_dump(&mut self) -> Vec<PeerId> {
+        self.kademlia
+            .kbuckets()
+            .flat_map(|bucket| {
+                let peers = bucket
+                    .iter()
+                    .map(|entry| *entry.node.key.preimage())
+                    .collect::<Vec<_>>();
+
+                peers
+            })
+            .collect()
+    }
+
+    pub fn bootstrap_kademlia(&mut self) {
+        let res = self.kademlia.bootstrap();
+        if let Err(e) = res {
+            tracing::error!("failed to bootstrap kademlia: {e}");
+        }
     }
 }
 
@@ -115,7 +139,13 @@ impl Swarm {
             .with_swarm_config(|c| c.with_idle_connection_timeout(IDLE_CONN_TIMEOUT))
             .build();
 
-        swarm.listen_on(Self::multiaddr(config.host, config.port))?;
+        let listen_addr = Self::multiaddr(config.host, config.port);
+        swarm.listen_on(listen_addr.clone())?;
+
+        // Add our own listening address as external to enable server mode for Kademlia
+        let external_addr = listen_addr.with(Protocol::P2p(peer_id));
+        swarm.add_external_address(external_addr.clone());
+        tracing::info!("Added external address: {}", external_addr);
 
         Ok(Self { swarm })
     }
@@ -180,6 +210,13 @@ impl Swarm {
             .gossipsub
             .topics()
             .any(|h| h == &topic_hash)
+    }
+
+    pub fn get_closest_peers(&mut self, peer_id: libp2p::PeerId) -> QueryId {
+        self.swarm
+            .behaviour_mut()
+            .kademlia
+            .get_closest_peers(peer_id)
     }
 
     #[must_use]
