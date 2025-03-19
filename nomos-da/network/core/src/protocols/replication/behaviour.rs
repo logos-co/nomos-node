@@ -1,6 +1,7 @@
 use std::{
     collections::{hash_map::Entry, HashMap, HashSet, VecDeque},
     task::{Context, Poll, Waker},
+    time::Duration,
 };
 
 use cached::{Cached, TimedSizedCache};
@@ -178,6 +179,12 @@ impl PendingOutbound {
     }
 }
 
+#[derive(Debug)]
+pub struct ReplicationConfig {
+    pub seen_message_cache_size: usize,
+    pub seen_message_ttl: Duration,
+}
+
 /// Nomos DA broadcast network behaviour.
 ///
 /// This item handles the logic of the nomos da subnetworks broadcasting.
@@ -229,7 +236,7 @@ pub struct ReplicationBehaviour<Membership> {
 }
 
 impl<Membership> ReplicationBehaviour<Membership> {
-    pub fn new(peer_id: PeerId, membership: Membership) -> Self {
+    pub fn new(config: ReplicationConfig, peer_id: PeerId, membership: Membership) -> Self {
         let stream_behaviour = libp2p_stream::Behaviour::new();
         let mut control = stream_behaviour.new_control();
         let incoming_streams = control
@@ -242,13 +249,8 @@ impl<Membership> ReplicationBehaviour<Membership> {
         let outbound_read_stream_rx = UnboundedReceiverStream::new(new_read_stream_rx).boxed();
 
         let seen_message_cache = TimedSizedCache::with_size_and_lifespan_and_refresh(
-            // TODO config, reasonable defaults
-            // Some pretty random defaults for now
-            // Key size is 34 bytes (blob_id + subnetwork_id)
-            // size: num subnets x 100 blobs x 34 bytes
-            2048 * 100,
-            // ttl: 30 blocks
-            30 * 60,
+            config.seen_message_cache_size,
+            config.seen_message_ttl.as_secs(),
             // Looking up key resets its elapsed ttl
             true,
         );

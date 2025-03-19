@@ -25,7 +25,7 @@ use crate::{
         dispersal::{
             executor::behaviour::DispersalExecutorEvent, validator::behaviour::DispersalEvent,
         },
-        replication::behaviour::ReplicationEvent,
+        replication::behaviour::{ReplicationConfig, ReplicationEvent},
         sampling::behaviour::SamplingEvent,
     },
     swarm::{
@@ -39,6 +39,7 @@ use crate::{
         },
         validator::ValidatorEventsStream,
         ConnectionMonitor, DAConnectionMonitorSettings, DAConnectionPolicySettings,
+        DAReplicationSettings,
     },
     SubnetworkId,
 };
@@ -80,6 +81,7 @@ where
         monitor_settings: DAConnectionMonitorSettings,
         balancer_interval: Duration,
         redial_cooldown: Duration,
+        replication_settings: DAReplicationSettings,
     ) -> (Self, ExecutorEventsStream) {
         let (sampling_events_sender, sampling_events_receiver) = unbounded_channel();
         let (validation_events_sender, validation_events_receiver) = unbounded_channel();
@@ -108,7 +110,17 @@ where
 
         (
             Self {
-                swarm: Self::build_swarm(key, membership, balancer, monitor, redial_cooldown),
+                swarm: Self::build_swarm(
+                    key,
+                    membership,
+                    balancer,
+                    monitor,
+                    redial_cooldown,
+                    ReplicationConfig {
+                        seen_message_cache_size: replication_settings.seen_message_cache_size,
+                        seen_message_ttl: replication_settings.seen_message_ttl,
+                    },
+                ),
                 sampling_events_sender,
                 validation_events_sender,
                 dispersal_events_sender,
@@ -128,6 +140,7 @@ where
         balancer: ConnectionBalancer<Membership>,
         monitor: ConnectionMonitor<Membership>,
         redial_cooldown: Duration,
+        replication_config: ReplicationConfig,
     ) -> Swarm<
         ExecutorBehaviour<
             ConnectionBalancer<Membership>,
@@ -139,7 +152,14 @@ where
             .with_tokio()
             .with_quic()
             .with_behaviour(|key| {
-                ExecutorBehaviour::new(key, membership, balancer, monitor, redial_cooldown)
+                ExecutorBehaviour::new(
+                    key,
+                    membership,
+                    balancer,
+                    monitor,
+                    redial_cooldown,
+                    replication_config,
+                )
             })
             .expect("Validator behaviour should build")
             .with_swarm_config(|cfg| {

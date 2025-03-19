@@ -12,7 +12,9 @@ mod test {
     use tracing_subscriber::{fmt::TestWriter, EnvFilter};
 
     use crate::{
-        protocols::replication::behaviour::{DaMessage, ReplicationBehaviour, ReplicationEvent},
+        protocols::replication::behaviour::{
+            DaMessage, ReplicationBehaviour, ReplicationConfig, ReplicationEvent,
+        },
         test_utils::AllNeighbours,
     };
 
@@ -26,7 +28,14 @@ mod test {
             .with_other_transport(|keypair| quic::tokio::Transport::new(quic::Config::new(keypair)))
             .unwrap()
             .with_behaviour(|key| {
-                ReplicationBehaviour::new(PeerId::from_public_key(&key.public()), all_neighbours)
+                ReplicationBehaviour::new(
+                    ReplicationConfig {
+                        seen_message_cache_size: 100,
+                        seen_message_ttl: Duration::from_secs(60),
+                    },
+                    PeerId::from_public_key(&key.public()),
+                    all_neighbours,
+                )
             })
             .unwrap()
             .with_swarm_config(|cfg| cfg.with_idle_connection_timeout(Duration::from_secs(10)))
