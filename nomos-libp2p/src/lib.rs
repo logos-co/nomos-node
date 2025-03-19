@@ -62,7 +62,7 @@ impl Behaviour {
         )?;
 
         let store = kad::store::MemoryStore::new(peer_id);
-        let kad_config = kad::Config::new(StreamProtocol::new("nomos/kad/1.0.0"));
+        let kad_config = kad::Config::new(StreamProtocol::new("/nomos/kad/1.0.0"));
         let kademlia = kad::Behaviour::with_config(peer_id, store, kad_config);
 
         let identify = identify::Behaviour::new(identify::Config::new(

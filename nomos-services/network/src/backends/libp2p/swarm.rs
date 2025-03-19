@@ -3,7 +3,7 @@ use std::{collections::HashMap, time::Duration};
 use nomos_libp2p::{
     gossipsub,
     libp2p::{identify, swarm::ConnectionId},
-    BehaviourEvent, Multiaddr, PeerId, Swarm, SwarmEvent,
+    BehaviourEvent, Multiaddr, PeerId, Protocol, Swarm, SwarmEvent,
 };
 use tokio::sync::{broadcast, mpsc, oneshot};
 use tokio_stream::StreamExt;
@@ -68,16 +68,19 @@ impl SwarmHandler {
             Self::schedule_connect(dial, self.commands_tx.clone()).await;
         }
 
-        // Bootstrap Kademlia to discover more peers
-        if initial_peers.is_empty() {
-            tracing::info!("No initial peers configured, skipping Kademlia bootstrap");
-        } else {
-            tracing::info!("Bootstrapping Kademlia DHT...");
-            match self.swarm.bootstrap_kademlia() {
-                Ok(query_id) => {
-                    tracing::debug!("Kademlia bootstrap started. Query id: {:?}", query_id);
+        for peer_addr in &initial_peers {
+            if let Some(Protocol::P2p(peer_id_bytes)) = peer_addr.iter().last() {
+                if let Ok(peer_id) = PeerId::from_multihash(peer_id_bytes.into()) {
+                    self.swarm
+                        .swarm_mut()
+                        .behaviour_mut()
+                        .kademlia_add_address(peer_id, peer_addr.clone());
+                    tracing::debug!("Added peer to Kademlia: {} at {}", peer_id, peer_addr);
+                } else {
+                    tracing::warn!("Failed to parse peer ID from multiaddr: {}", peer_addr);
                 }
-                Err(e) => tracing::warn!("Failed to bootstrap Kademlia DHT: {}", e),
+            } else {
+                tracing::warn!("Multiaddr doesn't contain peer ID: {}", peer_addr);
             }
         }
 
