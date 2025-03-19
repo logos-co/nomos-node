@@ -120,14 +120,6 @@ impl Swarm {
         Ok(Self { swarm })
     }
 
-    pub fn bootstrap_kademlia(&mut self) -> Result<QueryId, SwarmError> {
-        self.swarm
-            .behaviour_mut()
-            .kademlia
-            .bootstrap()
-            .map_err(|_| SwarmError::NoKnownPeers)
-    }
-
     /// Initiates a connection attempt to a peer
     pub fn connect(&mut self, peer_addr: &Multiaddr) -> Result<ConnectionId, DialError> {
         let opt = DialOpts::from(peer_addr.clone());

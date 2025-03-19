@@ -84,8 +84,6 @@ impl SwarmHandler {
             }
         }
 
-        log_error!(self.swarm.bootstrap_kademlia());
-
         loop {
             tokio::select! {
                 Some(event) = self.swarm.next() => {
