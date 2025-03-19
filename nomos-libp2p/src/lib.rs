@@ -29,6 +29,10 @@ use libp2p::{
 };
 pub use multiaddr::{multiaddr, Multiaddr, Protocol};
 
+// The protocol name for the Kademlia protocol
+// This makes all node use the same protocol name
+// todo: figure out if we need to handle multiple networks that should not be
+// connected (states)
 pub const KAD_PROTOCOL_NAME: &str = "/nomos/kad/1.0.0";
 
 // TODO: Risc0 proofs are HUGE (220 Kb) and it's the only reason we need to have
@@ -44,7 +48,7 @@ pub struct Swarm {
 #[derive(NetworkBehaviour)]
 pub struct Behaviour {
     gossipsub: gossipsub::Behaviour,
-    kademlia: kad::Behaviour<kad::store::MemoryStore>, // todo: support persistent store
+    kademlia: kad::Behaviour<kad::store::MemoryStore>, // todo: support persistent store if needed
     identify: identify::Behaviour,
 }
 
@@ -63,6 +67,7 @@ impl Behaviour {
                 .build()?,
         )?;
 
+        // make config parameters configurable
         let store = kad::store::MemoryStore::new(peer_id);
         let mut kad_config = kad::Config::new(StreamProtocol::new(KAD_PROTOCOL_NAME));
         kad_config.set_periodic_bootstrap_interval(Some(Duration::from_secs(10))); // this interval is only for proof of concept and should be configurable
@@ -143,6 +148,8 @@ impl Swarm {
         swarm.listen_on(listen_addr.clone())?;
 
         // Add our own listening address as external to enable server mode for Kademlia
+        // todo: figure out if we need to also support client mode and make it
+        // configurable
         let external_addr = listen_addr.with(Protocol::P2p(peer_id));
         swarm.add_external_address(external_addr.clone());
         tracing::info!("Added external address: {}", external_addr);
