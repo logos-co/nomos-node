@@ -179,7 +179,7 @@ impl PendingOutbound {
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Copy, Debug)]
 pub struct ReplicationConfig {
     pub seen_message_cache_size: usize,
     pub seen_message_ttl: Duration,
@@ -225,6 +225,7 @@ pub struct ReplicationBehaviour<Membership> {
     /// - oldest entries when full (Least-Recently-Used),
     /// - after a certain TTL has passed since the entry was last accessed,
     ///   regardless of cache utilization.
+    ///
     /// The cache allocates memory once up front and any expired and unused
     /// entries will eventually be overwritten and erasing them via
     /// [`TimeSizedCache::flush`] does not save space.
