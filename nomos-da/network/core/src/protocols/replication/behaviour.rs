@@ -3,6 +3,7 @@ use std::{
     task::{Context, Poll, Waker},
 };
 
+use cached::{Cached, TimedSizedCache};
 use either::Either;
 use futures::{
     future::BoxFuture,
@@ -10,7 +11,7 @@ use futures::{
     stream::{BoxStream, FuturesUnordered},
     AsyncReadExt, AsyncWriteExt, FutureExt, StreamExt,
 };
-use indexmap::{IndexMap, IndexSet};
+use indexmap::IndexMap;
 use libp2p::{
     core::{transport::PortUse, Endpoint},
     swarm::{
@@ -213,8 +214,14 @@ pub struct ReplicationBehaviour<Membership> {
     outbound_streams: HashMap<PeerId, WriteHalfState>,
     /// Holds tasks for writing messages to the streams' write halves
     outbound_tasks: FuturesUnordered<OutboundTask>,
-    /// Seen messages cache holds a record of seen messages
-    seen_message_cache: IndexSet<(Vec<u8>, SubnetworkId)>,
+    /// The cache for seen messages, evicts entries in two ways:
+    /// - oldest entries when full (Least-Recently-Used),
+    /// - after a certain TTL has passed since the entry was last accessed,
+    ///   regardless of cache utilization.
+    /// The cache allocates memory once up front and any expired and unused
+    /// entries will eventually be overwritten and erasing them via
+    /// [`TimeSizedCache::flush`] does not save space.
+    seen_message_cache: TimedSizedCache<(Vec<u8>, SubnetworkId), ()>,
     /// This waker is only used when we are the initiator of
     /// [`Self::send_message`], ie. the method is called from outside the
     /// behaviour. In all other cases we wake via reference in [`Self::poll`].
@@ -234,6 +241,18 @@ impl<Membership> ReplicationBehaviour<Membership> {
         let (outbound_read_stream_tx, new_read_stream_rx) = mpsc::unbounded_channel();
         let outbound_read_stream_rx = UnboundedReceiverStream::new(new_read_stream_rx).boxed();
 
+        let seen_message_cache = TimedSizedCache::with_size_and_lifespan_and_refresh(
+            // TODO config, reasonable defaults
+            // Some pretty random defaults for now
+            // Key size is 34 bytes (blob_id + subnetwork_id)
+            // size: num subnets x 100 blobs x 34 bytes
+            2048 * 100,
+            // ttl: 30 blocks
+            30 * 60,
+            // Looking up key resets its elapsed ttl
+            true,
+        );
+
         Self {
             local_peer_id: peer_id,
             stream_behaviour,
@@ -245,7 +264,7 @@ impl<Membership> ReplicationBehaviour<Membership> {
             pending_outbound: PendingOutbound::default(),
             outbound_streams: HashMap::default(),
             outbound_tasks,
-            seen_message_cache: IndexSet::default(),
+            seen_message_cache,
             waker: None,
             outbound_read_half_tx: outbound_read_stream_tx,
             outbound_read_half_rx: outbound_read_stream_rx,
@@ -289,10 +308,10 @@ where
     /// sent again.
     fn send_message_impl(&mut self, waker: Option<&Waker>, message: &DaMessage) {
         let message_id = (message.share.blob_id.to_vec(), message.subnetwork_id);
-        if self.seen_message_cache.contains(&message_id) {
+        if self.seen_message_cache.cache_get(&message_id).is_some() {
             return;
         }
-        self.seen_message_cache.insert(message_id);
+        self.seen_message_cache.cache_set(message_id, ());
 
         // Push a message in the queue for every single peer connected that is a member
         // of the selected subnetwork_id
