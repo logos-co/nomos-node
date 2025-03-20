@@ -426,15 +426,7 @@ mod tests {
         });
     }
 
-    fn get_next_available_port(start_port: u16) -> Option<u16> {
-        (start_port..10000).find(|&port| TcpListener::bind(("127.0.0.1", port)).is_ok())
-        // Return None if no ports are available
-    }
-
-    fn create_swarm_config() -> nomos_libp2p::SwarmConfig {
-        let random_port = thread_rng().gen_range(8000, 9000);
-        let port = get_next_available_port(random_port).expect("No available ports found");
-
+    fn create_swarm_config(port: u16) -> nomos_libp2p::SwarmConfig {
         nomos_libp2p::SwarmConfig {
             host: Ipv4Addr::new(127, 0, 0, 1),
             port,
@@ -443,9 +435,9 @@ mod tests {
         }
     }
 
-    fn create_libp2p_config(initial_peers: Vec<Multiaddr>) -> Libp2pConfig {
+    fn create_libp2p_config(initial_peers: Vec<Multiaddr>, port: u16) -> Libp2pConfig {
         Libp2pConfig {
-            inner: create_swarm_config(),
+            inner: create_swarm_config(port),
             initial_peers,
         }
     }
@@ -464,7 +456,7 @@ mod tests {
         txs.push(tx1.clone());
 
         let (events_tx1, _) = broadcast::channel(10);
-        let config = create_libp2p_config(vec![]);
+        let config = create_libp2p_config(vec![], 8000);
         let mut bootstrap_node = SwarmHandler::new(&config, tx1.clone(), rx1, events_tx1.clone());
 
         let bootstrap_node_peer_id = *bootstrap_node.swarm.swarm().local_peer_id();
@@ -509,7 +501,7 @@ mod tests {
             let (events_tx, _) = broadcast::channel(10);
 
             // Each node connects to the bootstrap node
-            let config = create_libp2p_config(vec![bootstrap_addr.clone()]);
+            let config = create_libp2p_config(vec![bootstrap_addr.clone()], 8000 + i as u16);
             let mut handler = SwarmHandler::new(&config, tx.clone(), rx, events_tx);
 
             let peer_id = *handler.swarm.swarm().local_peer_id();
