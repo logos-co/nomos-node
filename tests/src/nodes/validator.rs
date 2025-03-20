@@ -212,11 +212,7 @@ impl Validator {
             .filter_map(|entry| {
                 let entry = entry.unwrap();
                 let path = entry.path();
-                if path.is_file() && path.to_str().unwrap().contains(LOGS_PREFIX) {
-                    Some(path)
-                } else {
-                    None
-                }
+                (path.is_file() && path.to_str().unwrap().contains(LOGS_PREFIX)).then_some(path)
             })
             .map(|f| std::fs::read_to_string(f).unwrap())
             .collect::<String>()

@@ -78,12 +78,10 @@ impl NetworkAdapter for MockAdapter {
                 match event {
                     Ok(NetworkEvent::RawMessage(message)) => {
                         tracing::info!("Received message: {:?}", message.payload());
-                        if message.content_topic().eq(&MOCK_TX_CONTENT_TOPIC) {
+                        message.content_topic().eq(&MOCK_TX_CONTENT_TOPIC).then(|| {
                             let tx = MockTransaction::new(message);
-                            Some((tx.id(), tx))
-                        } else {
-                            None
-                        }
+                            (tx.id(), tx)
+                        })
                     }
                     Err(_e) => None,
                 }
