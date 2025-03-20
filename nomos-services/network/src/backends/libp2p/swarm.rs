@@ -538,8 +538,8 @@ mod tests {
 
             let routing_table = dump_rx.await.expect("Failed to receive routing table dump");
 
-            // we expect full conectivity as number of nodes is less then K (kademlia bucket
-            // size)
+            // we expect all nodes in routing table as number of nodes is less then K
+            // (kademlia bucket size)
             assert!(
                 routing_table.len() >= NODE_COUNT - 1,
                 "Expected at least {} entries in routing table, got {}",
