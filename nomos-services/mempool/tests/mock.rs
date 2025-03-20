@@ -18,7 +18,7 @@ use nomos_network::{
     NetworkConfig, NetworkMsg, NetworkService,
 };
 use nomos_tracing_service::{Tracing, TracingSettings};
-use overwatch::{overwatch::OverwatchRunner, OpaqueServiceHandle};
+use overwatch::overwatch::OverwatchRunner;
 use overwatch_derive::*;
 use rand::distributions::{Alphanumeric, DistString};
 use services_utils::{
@@ -30,17 +30,18 @@ type MockRecoveryBackend = JsonFileBackend<
     TxMempoolState<MockPool<HeaderId, MockTransaction<MockMessage>, MockTxId>, (), ()>,
     TxMempoolSettings<(), ()>,
 >;
-type MockMempoolService = GenericTxMempoolService<
+type MockMempoolService<RuntimeServiceId> = GenericTxMempoolService<
     MockPool<HeaderId, MockTransaction<MockMessage>, MockTxId>,
-    MockAdapter,
+    MockAdapter<RuntimeServiceId>,
     MockRecoveryBackend,
+    RuntimeServiceId,
 >;
 
-#[derive(Services)]
+#[derive_services]
 struct MockPoolNode {
-    logging: OpaqueServiceHandle<Tracing>,
-    network: OpaqueServiceHandle<NetworkService<Mock>>,
-    mockpool: OpaqueServiceHandle<MockMempoolService>,
+    logging: Tracing<RuntimeServiceId>,
+    network: NetworkService<Mock, RuntimeServiceId>,
+    mockpool: MockMempoolService<RuntimeServiceId>,
 }
 
 fn run_with_recovery_teardown(recovery_path: &Path, run: impl Fn()) {
@@ -99,12 +100,16 @@ fn test_mockmempool() {
         .map_err(|e| eprintln!("Error encountered: {e}"))
         .unwrap();
 
-        let network = app.handle().relay::<NetworkService<Mock>>();
-        let mempool = app.handle().relay::<MockMempoolService>();
-
+        let overwatch_handle = app.handle().clone();
         app.spawn(async move {
-            let network_outbound = network.connect().await.unwrap();
-            let mempool_outbound = mempool.connect().await.unwrap();
+            let network_outbound = overwatch_handle
+                .relay::<NetworkService<Mock, RuntimeServiceId>>()
+                .await
+                .unwrap();
+            let mempool_outbound = overwatch_handle
+                .relay::<MockMempoolService<RuntimeServiceId>>()
+                .await
+                .unwrap();
 
             // subscribe to the mock content topic
             network_outbound
