@@ -6,6 +6,7 @@ pub const DA_ADD_SHARE: &str = "/da/add-share";
 pub const DA_GET_RANGE: &str = "/da/get-range";
 pub const DA_GET_SHARES_COMMITMENTS: &str = "/da/get-commitments";
 pub const DA_GET_LIGHT_SHARE: &str = "/da/get-share";
+pub const DA_GET_SHARES: &str = "/da/sampling/shares";
 pub const DA_BLOCK_PEER: &str = "/da/block-peer";
 pub const DA_UNBLOCK_PEER: &str = "/da/unblock-peer";
 pub const DA_BLACKLISTED_PEERS: &str = "/da/blacklisted-peers";
