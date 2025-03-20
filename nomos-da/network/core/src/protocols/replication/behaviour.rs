@@ -180,11 +180,9 @@ impl PendingOutbound {
     }
 }
 
-#[cfg_attr(feature = "time", serde_with::serde_as)]
 #[derive(Clone, Copy, Debug, Deserialize, Serialize)]
 pub struct ReplicationConfig {
     pub seen_message_cache_size: usize,
-    #[cfg_attr(feature = "time", serde_as(as = "MinimalBoundedDuration<1, MINUTE>"))]
     pub seen_message_ttl: Duration,
 }
 

@@ -16,10 +16,8 @@ libp2p-stream            = "0.3.0-alpha"
 log                      = "0.4"
 nomos-core               = { workspace = true }
 nomos-da-messages        = { workspace = true }
-nomos-utils              = { workspace = true, features = ["time"], optional = true }
 rand                     = "0.8"
 serde                    = "1.0"
-serde_with               = { version = "3.12", optional = true }
 subnetworks-assignations = { workspace = true }
 thiserror                = "1.0"
 tokio                    = { version = "1" }
@@ -36,9 +34,3 @@ libp2p-swarm-test  = { version = "0.5.0", features = ["tokio"] }
 rstest             = "0.25"
 tokio              = { version = "1", features = ["macros", "rt-multi-thread", "time"] }
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-
-[features]
-time = ["dep:nomos-utils", "dep:serde_with"]
-
-[package.metadata.cargo-machete]
-ignored = ["nomos-utils"]
