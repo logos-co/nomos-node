@@ -3,7 +3,7 @@ use std::{fs, net::Ipv4Addr, num::NonZero, path::PathBuf, sync::Arc, time::Durat
 use axum::{extract::State, http::StatusCode, response::IntoResponse, routing::post, Json, Router};
 use nomos_da_dispersal::backend::kzgrs::MempoolPublishStrategy;
 use nomos_da_network_core::swarm::{
-    DAConnectionMonitorSettings, DAConnectionPolicySettings, DAReplicationSettings,
+    DAConnectionMonitorSettings, DAConnectionPolicySettings, ReplicationConfig,
 };
 use nomos_tracing_service::TracingSettings;
 use serde::{Deserialize, Serialize};
@@ -88,7 +88,7 @@ impl CfgSyncConfig {
             },
             balancer_interval: Duration::from_secs(self.balancer_interval_secs),
             redial_cooldown: Duration::ZERO,
-            replication_settings: DAReplicationSettings {
+            replication_settings: ReplicationConfig {
                 seen_message_cache_size: 2048 * 100,
                 seen_message_ttl: Duration::from_secs(30 * 60),
             },

@@ -39,7 +39,6 @@ use crate::{
         },
         validator::ValidatorEventsStream,
         ConnectionMonitor, DAConnectionMonitorSettings, DAConnectionPolicySettings,
-        DAReplicationSettings,
     },
     SubnetworkId,
 };
@@ -81,7 +80,7 @@ where
         monitor_settings: DAConnectionMonitorSettings,
         balancer_interval: Duration,
         redial_cooldown: Duration,
-        replication_settings: DAReplicationSettings,
+        replication_config: ReplicationConfig,
     ) -> (Self, ExecutorEventsStream) {
         let (sampling_events_sender, sampling_events_receiver) = unbounded_channel();
         let (validation_events_sender, validation_events_receiver) = unbounded_channel();
@@ -116,10 +115,7 @@ where
                     balancer,
                     monitor,
                     redial_cooldown,
-                    ReplicationConfig {
-                        seen_message_cache_size: replication_settings.seen_message_cache_size,
-                        seen_message_ttl: replication_settings.seen_message_ttl,
-                    },
+                    replication_config,
                 ),
                 sampling_events_sender,
                 validation_events_sender,

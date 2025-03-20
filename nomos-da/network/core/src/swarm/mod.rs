@@ -3,7 +3,7 @@ pub mod executor;
 pub mod validator;
 
 pub use common::{
-    monitor::DAConnectionMonitorSettings, policy::DAConnectionPolicySettings, DAReplicationSettings,
+    monitor::DAConnectionMonitorSettings, policy::DAConnectionPolicySettings, ReplicationConfig,
 };
 
 pub(crate) type ConnectionMonitor<Membership> =

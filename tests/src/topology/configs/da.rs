@@ -8,7 +8,7 @@ use std::{
 
 use nomos_da_dispersal::backend::kzgrs::MempoolPublishStrategy;
 use nomos_da_network_core::swarm::{
-    DAConnectionMonitorSettings, DAConnectionPolicySettings, DAReplicationSettings,
+    DAConnectionMonitorSettings, DAConnectionPolicySettings, ReplicationConfig,
 };
 use nomos_libp2p::{ed25519, Multiaddr, PeerId};
 use nomos_node::NomosDaMembership;
@@ -42,7 +42,7 @@ pub struct DaParams {
     pub monitor_settings: DAConnectionMonitorSettings,
     pub balancer_interval: Duration,
     pub redial_cooldown: Duration,
-    pub replication_settings: DAReplicationSettings,
+    pub replication_settings: ReplicationConfig,
 }
 
 impl Default for DaParams {
@@ -74,7 +74,7 @@ impl Default for DaParams {
             },
             balancer_interval: Duration::from_secs(5),
             redial_cooldown: Duration::ZERO,
-            replication_settings: DAReplicationSettings {
+            replication_settings: ReplicationConfig {
                 seen_message_cache_size: 1000,
                 seen_message_ttl: Duration::from_secs(3600),
             },
@@ -101,7 +101,7 @@ pub struct GeneralDaConfig {
     pub monitor_settings: DAConnectionMonitorSettings,
     pub balancer_interval: Duration,
     pub redial_cooldown: Duration,
-    pub replication_settings: DAReplicationSettings,
+    pub replication_settings: ReplicationConfig,
 }
 
 #[must_use]

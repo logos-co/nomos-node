@@ -24,6 +24,7 @@ use libp2p::{
 use libp2p_stream::{Control, IncomingStreams, OpenStreamError};
 use log::{error, trace};
 use nomos_da_messages::packing::{pack_to_writer, unpack_from_reader};
+use serde::{Deserialize, Serialize};
 use subnetworks_assignations::MembershipHandler;
 use thiserror::Error;
 use tokio::sync::mpsc;
@@ -179,7 +180,7 @@ impl PendingOutbound {
     }
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Deserialize, Serialize)]
 pub struct ReplicationConfig {
     pub seen_message_cache_size: usize,
     pub seen_message_ttl: Duration,
@@ -228,7 +229,7 @@ pub struct ReplicationBehaviour<Membership> {
     ///
     /// The cache allocates memory once up front and any expired and unused
     /// entries will eventually be overwritten and erasing them via
-    /// [`TimeSizedCache::flush`] does not save space.
+    /// [`TimeSizedCache::flush`] does not save space, so we don't do it.
     seen_message_cache: TimedSizedCache<(Vec<u8>, SubnetworkId), ()>,
     /// This waker is only used when we are the initiator of
     /// [`Self::send_message`], ie. the method is called from outside the
