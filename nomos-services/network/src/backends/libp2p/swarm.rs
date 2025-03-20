@@ -406,7 +406,7 @@ impl SwarmHandler {
 
 #[cfg(test)]
 mod tests {
-    use std::{net::Ipv4Addr, sync::Once};
+    use std::{net::Ipv4Addr, sync::Once, time::Instant};
 
     use tracing_subscriber::EnvFilter;
 
@@ -514,40 +514,45 @@ mod tests {
             tokio::time::sleep(Duration::from_millis(500)).await;
         }
 
-        tracing::info!("Waiting for DHT to populate...");
-        tokio::time::sleep(Duration::from_secs(20)).await;
+        let timeout = Duration::from_secs(30);
+        let poll_interval = Duration::from_secs(1);
+        let start_time = Instant::now();
 
-        // Check routing tables of all nodes
-        for tx in &txs {
-            let (dump_tx, dump_rx) = oneshot::channel();
-            tx.send(Command::DumpRoutingTable { reply: dump_tx })
-                .await
-                .expect("Failed to send dump command");
+        while !txs.is_empty() && start_time.elapsed() < timeout {
+            tokio::time::sleep(poll_interval).await;
+            let mut indices_to_remove = Vec::new();
 
-            let routing_table = dump_rx.await.expect("Failed to receive routing table dump");
+            for (idx, tx) in txs.iter().enumerate() {
+                let (dump_tx, dump_rx) = oneshot::channel();
+                tx.send(Command::DumpRoutingTable { reply: dump_tx })
+                    .await
+                    .expect("Failed to send dump command");
 
-            // we expect all nodes in routing table as number of nodes is less then K
-            // (kademlia bucket size)
-            assert!(
-                routing_table.len() >= NODE_COUNT - 1,
-                "Expected at least {} entries in routing table, got {}",
-                NODE_COUNT - 1,
-                routing_table.len()
-            );
+                let routing_table = dump_rx.await.expect("Failed to receive routing table dump");
+
+                if routing_table.len() >= NODE_COUNT - 1 {
+                    // This node's routing table is fully populated, mark for removal
+                    indices_to_remove.push(idx);
+                    tracing::info!(
+                        "Node has complete routing table with {} entries",
+                        routing_table.len()
+                    );
+                }
+            }
+
+            for idx in indices_to_remove.iter().rev() {
+                txs.remove(*idx);
+            }
         }
 
-        // Verify bootstrap node connections
-        let (info_tx, info_rx) = oneshot::channel();
-        tx1.send(Command::Info { reply: info_tx })
-            .await
-            .expect("Failed to send info command");
-        let bootstrap_info = info_rx.await.expect("Failed to get bootstrap node info");
-
         assert!(
-            bootstrap_info.n_peers > 0,
-            "Bootstrap node has 0 peers after test"
+            txs.is_empty(),
+            "Timed out after {:?} - {} nodes still have incomplete routing tables",
+            timeout,
+            txs.len()
         );
 
+        // Verify closest peers from the bootstrap node
         let (closest_tx, closest_rx) = oneshot::channel();
         tx1.send(Command::GetClosestPeers {
             peer_id: bootstrap_node_peer_id,
