@@ -41,6 +41,7 @@ pub struct CfgSyncConfig {
     pub monitor_failure_time_window_secs: u64,
     pub balancer_interval_secs: u64,
     pub mempool_publish_strategy: MempoolPublishStrategy,
+    pub replication_settings: ReplicationConfig,
 
     // Tracing params
     pub tracing_settings: TracingSettings,
@@ -88,10 +89,7 @@ impl CfgSyncConfig {
             },
             balancer_interval: Duration::from_secs(self.balancer_interval_secs),
             redial_cooldown: Duration::ZERO,
-            replication_settings: ReplicationConfig {
-                seen_message_cache_size: 2048 * 100,
-                seen_message_ttl: Duration::from_secs(30 * 60),
-            },
+            replication_settings: self.replication_settings,
         }
     }
 

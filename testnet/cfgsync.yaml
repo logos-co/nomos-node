@@ -28,6 +28,10 @@ mempool_publish_strategy: !SampleSubnetworks
     secs: 0
     nanos: 100000000
 
+replication_settings:
+  seen_message_cache_size: 204800
+  seen_message_ttl: "15m"
+
 # Tracing
 tracing_settings:
   logger: !Loki
