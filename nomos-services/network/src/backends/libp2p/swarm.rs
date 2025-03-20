@@ -406,12 +406,8 @@ impl SwarmHandler {
 
 #[cfg(test)]
 mod tests {
-    use std::{
-        net::{Ipv4Addr, TcpListener},
-        sync::Once,
-    };
+    use std::{net::Ipv4Addr, sync::Once};
 
-    use rand::{thread_rng, Rng};
     use tracing_subscriber::EnvFilter;
 
     use super::*;
