@@ -20,7 +20,7 @@ use overwatch::{
     services::{
         life_cycle::LifecycleMessage,
         state::{NoOperator, NoState},
-        ServiceCore, ServiceData, ServiceId, ToService,
+        AsServiceId, ServiceCore, ServiceData,
     },
     OpaqueServiceStateHandle,
 };
@@ -157,7 +157,7 @@ impl<RuntimeServiceId> ServiceData for Tracing<RuntimeServiceId> {
 #[async_trait::async_trait]
 impl<RuntimeServiceId> ServiceCore<RuntimeServiceId> for Tracing<RuntimeServiceId>
 where
-    RuntimeServiceId: ToService<Self> + Send + Display,
+    RuntimeServiceId: AsServiceId<Self> + Send + Display,
 {
     fn init(
         service_state: OpaqueServiceStateHandle<Self, RuntimeServiceId>,
@@ -266,7 +266,7 @@ where
                         if sender.send(()).is_err() {
                             error!(
                                 "Error sending successful shutdown signal from service {}",
-                                <Self as ServiceId<RuntimeServiceId>>::SERVICE_ID
+                                <RuntimeServiceId as AsServiceId<Self>>::SERVICE_ID
                             );
                         }
                         break;

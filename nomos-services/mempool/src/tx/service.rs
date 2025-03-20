@@ -13,7 +13,7 @@ use futures::StreamExt;
 use nomos_network::{NetworkMsg, NetworkService};
 use overwatch::{
     services::{
-        handle::ServiceStateHandle, relay::OutboundRelay, ServiceCore, ServiceData, ToService,
+        handle::ServiceStateHandle, relay::OutboundRelay, AsServiceId, ServiceCore, ServiceData,
     },
     OpaqueServiceStateHandle,
 };
@@ -113,8 +113,8 @@ where
         NetworkAdapterTrait<RuntimeServiceId, Payload = Pool::Item, Key = Pool::Key> + Send,
     NetworkAdapter::Settings: Clone + Send + Sync + 'static,
     RecoveryBackend: RecoveryBackendTrait + Send,
-    RuntimeServiceId: ToService<NetworkService<NetworkAdapter::Backend, RuntimeServiceId>>
-        + ToService<Self>
+    RuntimeServiceId: AsServiceId<NetworkService<NetworkAdapter::Backend, RuntimeServiceId>>
+        + AsServiceId<Self>
         + Debug
         + Sync
         + Send

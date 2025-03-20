@@ -16,7 +16,7 @@ use nomos_da_sampling::{
 };
 use nomos_network::{NetworkMsg, NetworkService};
 use overwatch::{
-    services::{relay::OutboundRelay, ServiceCore, ServiceData, ToService},
+    services::{relay::OutboundRelay, AsServiceId, ServiceCore, ServiceData},
     OpaqueServiceStateHandle,
 };
 use rand::Rng;
@@ -250,8 +250,8 @@ where
         + Sync
         + Send
         + Display
-        + ToService<NetworkService<NetworkAdapter::Backend, RuntimeServiceId>>
-        + ToService<
+        + AsServiceId<NetworkService<NetworkAdapter::Backend, RuntimeServiceId>>
+        + AsServiceId<
             DaSamplingService<
                 DaSamplingBackend,
                 DaSamplingNetwork,
@@ -263,7 +263,7 @@ where
                 DaApiAdapter,
                 RuntimeServiceId,
             >,
-        > + ToService<Self>
+        > + AsServiceId<Self>
         + 'static,
 {
     fn init(

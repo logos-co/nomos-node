@@ -12,7 +12,7 @@ use futures::StreamExt;
 use overwatch::{
     services::{
         state::{NoOperator, NoState},
-        ServiceCore, ServiceData, ToService,
+        ServiceCore, ServiceData, AsServiceId,
     },
     OpaqueServiceStateHandle,
 };
@@ -287,7 +287,7 @@ impl<Backend: StorageBackend + Send + Sync + 'static, RuntimeServiceId>
 impl<Backend: StorageBackend + Send + Sync + 'static, RuntimeServiceId>
     ServiceCore<RuntimeServiceId> for StorageService<Backend, RuntimeServiceId>
 where
-    RuntimeServiceId: Display + ToService<Self> + Send,
+    RuntimeServiceId: Display + AsServiceId<Self> + Send,
 {
     fn init(
         service_state: OpaqueServiceStateHandle<Self, RuntimeServiceId>,

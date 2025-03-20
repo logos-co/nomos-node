@@ -7,7 +7,7 @@ use futures::StreamExt;
 use overwatch::{
     services::{
         state::{NoOperator, ServiceState},
-        ServiceCore, ServiceData, ToService,
+        ServiceCore, ServiceData, AsServiceId,
     },
     OpaqueServiceStateHandle,
 };
@@ -73,7 +73,7 @@ impl<B, RuntimeServiceId> ServiceCore<RuntimeServiceId> for NetworkService<B, Ru
 where
     B: NetworkBackend<RuntimeServiceId> + Send + 'static,
     B::State: Send + Sync,
-    RuntimeServiceId: Clone + Display + ToService<Self> + Send,
+    RuntimeServiceId: Clone + Display + AsServiceId<Self> + Send,
 {
     fn init(
         service_state: OpaqueServiceStateHandle<Self, RuntimeServiceId>,

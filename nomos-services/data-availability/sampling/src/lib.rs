@@ -25,7 +25,7 @@ use overwatch::{
     services::{
         relay::OutboundRelay,
         state::{NoOperator, NoState},
-        ServiceCore, ServiceData, ToService,
+        ServiceCore, ServiceData, AsServiceId,
     },
     DynError, OpaqueServiceStateHandle,
 };
@@ -414,11 +414,11 @@ where
     RuntimeServiceId: Debug
         + Sync
         + Display
-        + ToService<
+        + AsServiceId<
             DaVerifierService<VerifierBackend, VerifierNetwork, VerifierStorage, RuntimeServiceId>,
-        > + ToService<NetworkService<SamplingNetwork::Backend, RuntimeServiceId>>
-        + ToService<StorageService<SamplingStorage::Backend, RuntimeServiceId>>
-        + ToService<Self>
+        > + AsServiceId<NetworkService<SamplingNetwork::Backend, RuntimeServiceId>>
+        + AsServiceId<StorageService<SamplingStorage::Backend, RuntimeServiceId>>
+        + AsServiceId<Self>
         + Send
         + 'static,
 {

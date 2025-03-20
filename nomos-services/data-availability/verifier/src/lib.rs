@@ -17,7 +17,7 @@ use nomos_tracing::info_with_id;
 use overwatch::{
     services::{
         state::{NoOperator, NoState},
-        ServiceCore, ServiceData, ToService,
+        ServiceCore, ServiceData, AsServiceId,
     },
     DynError, OpaqueServiceStateHandle,
 };
@@ -141,11 +141,11 @@ where
     RuntimeServiceId: Debug
         + Sync
         + Display
-        + ToService<Self>
+        + AsServiceId<Self>
         + Send
         + 'static
-        + ToService<NetworkService<N::Backend, RuntimeServiceId>>
-        + ToService<StorageService<S::Backend, RuntimeServiceId>>,
+        + AsServiceId<NetworkService<N::Backend, RuntimeServiceId>>
+        + AsServiceId<StorageService<S::Backend, RuntimeServiceId>>,
 {
     fn init(
         service_state: OpaqueServiceStateHandle<Self, RuntimeServiceId>,
