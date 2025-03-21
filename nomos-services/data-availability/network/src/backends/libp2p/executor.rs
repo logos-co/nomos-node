@@ -111,7 +111,10 @@ where
     type EventKind = DaNetworkEventKind;
     type NetworkEvent = DaNetworkEvent;
 
-    fn new(config: Self::Settings, overwatch_handle: OverwatchHandle) -> Self {
+    fn new<RuntimeServiceId>(
+        config: Self::Settings,
+        overwatch_handle: OverwatchHandle<RuntimeServiceId>,
+    ) -> Self {
         let keypair = libp2p::identity::Keypair::from(ed25519::Keypair::from(
             config.validator_settings.node_key.clone(),
         ));

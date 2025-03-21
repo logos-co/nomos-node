@@ -16,7 +16,10 @@ pub trait NetworkBackend {
     type EventKind: Debug + Send + Sync + 'static;
     type NetworkEvent: Debug + Send + Sync + 'static;
 
-    fn new(config: Self::Settings, overwatch_handle: OverwatchHandle) -> Self;
+    fn new<RuntimeServiceId>(
+        config: Self::Settings,
+        overwatch_handle: OverwatchHandle<RuntimeServiceId>,
+    ) -> Self;
     fn shutdown(&mut self);
     async fn process(&self, msg: Self::Message);
     async fn subscribe(
