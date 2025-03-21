@@ -28,7 +28,7 @@ where
 }
 
 #[async_trait::async_trait]
-impl<B, S> DaStorageAdapter for RocksAdapter<B, S>
+impl<B, S, RuntimeServiceId> DaStorageAdapter<RuntimeServiceId> for RocksAdapter<B, S>
 where
     B: Share + Clone + Send + Sync + 'static,
     B::BlobId: AsRef<[u8]> + Send + Sync + 'static,
@@ -42,7 +42,9 @@ where
     type Settings = RocksAdapterSettings;
 
     async fn new(
-        storage_relay: OutboundRelay<<StorageService<Self::Backend> as ServiceData>::Message>,
+        storage_relay: OutboundRelay<
+            <StorageService<Self::Backend, RuntimeServiceId> as ServiceData>::Message,
+        >,
     ) -> Self {
         Self {
             storage_relay,
