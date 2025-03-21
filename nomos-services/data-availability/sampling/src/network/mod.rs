@@ -15,12 +15,14 @@ use overwatch::{
 };
 
 #[async_trait::async_trait]
-pub trait NetworkAdapter {
+pub trait NetworkAdapter<RuntimeServiceId> {
     type Backend: NetworkBackend + Send + 'static;
     type Settings: Clone;
 
     async fn new(
-        network_relay: OutboundRelay<<NetworkService<Self::Backend> as ServiceData>::Message>,
+        network_relay: OutboundRelay<
+            <NetworkService<Self::Backend, RuntimeServiceId> as ServiceData>::Message,
+        >,
     ) -> Self;
 
     async fn start_sampling(

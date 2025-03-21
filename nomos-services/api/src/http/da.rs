@@ -1,5 +1,9 @@
 use core::ops::Range;
-use std::{error::Error, fmt::Debug, hash::Hash};
+use std::{
+    error::Error,
+    fmt::{Debug, Display},
+    hash::Hash,
+};
 
 use kzgrs_backend::common::share::DaShare;
 use nomos_blend_service::network::libp2p::Libp2pAdapter as BlendNetworkAdapter;
@@ -41,7 +45,7 @@ use nomos_mempool::{
     backend::mockpool::MockPool, network::adapters::libp2p::Libp2pAdapter as MempoolNetworkAdapter,
 };
 use nomos_storage::backends::{rocksdb::RocksBackend, StorageSerde};
-use overwatch::{overwatch::handle::OverwatchHandle, DynError};
+use overwatch::{overwatch::handle::OverwatchHandle, services::AsServiceId, DynError};
 use rand::{RngCore, SeedableRng};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use subnetworks_assignations::MembershipHandler;
@@ -63,6 +67,7 @@ pub type DaIndexer<
     DaVerifierStorage,
     TimeBackend,
     ApiAdapter,
+    RuntimeServiceId,
     const SIZE: usize,
 > = DataIndexerService<
     // Indexer specific.
@@ -70,12 +75,17 @@ pub type DaIndexer<
     IndexerStorageAdapter<SS, V>,
     CryptarchiaConsensusAdapter<Tx, V>,
     // Cryptarchia specific, should be the same as in `Cryptarchia` type above.
-    cryptarchia_consensus::network::adapters::libp2p::LibP2pAdapter<Tx, V>,
-    cryptarchia_consensus::blend::adapters::libp2p::LibP2pAdapter<BlendNetworkAdapter, Tx, V>,
+    cryptarchia_consensus::network::adapters::libp2p::LibP2pAdapter<Tx, V, RuntimeServiceId>,
+    cryptarchia_consensus::blend::adapters::libp2p::LibP2pAdapter<
+        BlendNetworkAdapter<RuntimeServiceId>,
+        Tx,
+        V,
+        RuntimeServiceId,
+    >,
     MockPool<HeaderId, Tx, <Tx as Transaction>::Hash>,
-    MempoolNetworkAdapter<Tx, <Tx as Transaction>::Hash>,
+    MempoolNetworkAdapter<Tx, <Tx as Transaction>::Hash, RuntimeServiceId>,
     MockPool<HeaderId, V, [u8; 32]>,
-    MempoolNetworkAdapter<C, <C as DispersedBlobInfo>::BlobId>,
+    MempoolNetworkAdapter<C, <C as DispersedBlobInfo>::BlobId, RuntimeServiceId>,
     FillSizeWithTx<SIZE, Tx>,
     FillSizeWithBlobs<SIZE, V>,
     RocksBackend<SS>,
@@ -88,21 +98,37 @@ pub type DaIndexer<
     DaVerifierStorage,
     TimeBackend,
     ApiAdapter,
+    RuntimeServiceId,
 >;
 
-pub type DaVerifier<Blob, Membership, VerifierBackend, StorageSerializer> = DaVerifierService<
-    VerifierBackend,
-    Libp2pAdapter<Membership>,
-    VerifierStorageAdapter<Blob, StorageSerializer>,
+pub type DaVerifier<Blob, Membership, VerifierBackend, StorageSerializer, RuntimeServiceId> =
+    DaVerifierService<
+        VerifierBackend,
+        Libp2pAdapter<Membership, RuntimeServiceId>,
+        VerifierStorageAdapter<Blob, StorageSerializer>,
+        RuntimeServiceId,
+    >;
+
+pub type DaDispersal<
+    Backend,
+    NetworkAdapter,
+    MempoolAdapter,
+    Membership,
+    Metadata,
+    RuntimeServiceId,
+> = DispersalService<
+    Backend,
+    NetworkAdapter,
+    MempoolAdapter,
+    Membership,
+    Metadata,
+    RuntimeServiceId,
 >;
 
-pub type DaDispersal<Backend, NetworkAdapter, MempoolAdapter, Membership, Metadata> =
-    DispersalService<Backend, NetworkAdapter, MempoolAdapter, Membership, Metadata>;
+pub type DaNetwork<Backend, RuntimeServiceId> = NetworkService<Backend, RuntimeServiceId>;
 
-pub type DaNetwork<Backend> = NetworkService<Backend>;
-
-pub async fn add_share<A, S, M, VB, SS>(
-    handle: &OverwatchHandle,
+pub async fn add_share<A, S, M, VB, SS, RuntimeServiceId>(
+    handle: &OverwatchHandle<RuntimeServiceId>,
     share: S,
 ) -> Result<Option<()>, DynError>
 where
@@ -123,8 +149,12 @@ where
     <VB as VerifierBackend>::Settings: Clone,
     <VB as CoreDaVerifier>::Error: Error,
     SS: StorageSerde + Send + Sync + 'static,
+    RuntimeServiceId:
+        Debug + Sync + Display + AsServiceId<DaVerifier<S, M, VB, SS, RuntimeServiceId>>,
 {
-    let relay = handle.relay::<DaVerifier<S, M, VB, SS>>().connect().await?;
+    let relay = handle
+        .relay::<DaVerifier<S, M, VB, SS, RuntimeServiceId>>()
+        .await?;
     let (sender, receiver) = oneshot::channel();
     relay
         .send(DaVerifierMsg::AddShare {
@@ -151,9 +181,10 @@ pub async fn get_range<
     DaVerifierStorage,
     TimeBackend,
     ApiAdapter,
+    RuntimeServiceId,
     const SIZE: usize,
 >(
-    handle: &OverwatchHandle,
+    handle: &OverwatchHandle<RuntimeServiceId>,
     app_id: <V as metadata::Metadata>::AppId,
     range: Range<<V as metadata::Metadata>::Index>,
 ) -> Result<Vec<(<V as metadata::Metadata>::Index, Vec<DaShare>)>, DynError>
@@ -201,16 +232,39 @@ where
     SamplingBackend::Settings: Clone,
     SamplingBackend::Share: Debug + 'static,
     SamplingBackend::BlobId: Debug + 'static,
-    SamplingNetworkAdapter: nomos_da_sampling::network::NetworkAdapter,
-    SamplingStorage: nomos_da_sampling::storage::DaStorageAdapter,
-    DaVerifierStorage: nomos_da_verifier::storage::DaStorageAdapter,
+    SamplingNetworkAdapter: nomos_da_sampling::network::NetworkAdapter<RuntimeServiceId>,
+    SamplingStorage: nomos_da_sampling::storage::DaStorageAdapter<RuntimeServiceId>,
+    DaVerifierStorage: nomos_da_verifier::storage::DaStorageAdapter<RuntimeServiceId>,
     DaVerifierBackend: nomos_da_verifier::backend::VerifierBackend + Send + 'static,
     DaVerifierBackend::Settings: Clone,
-    DaVerifierNetwork: nomos_da_verifier::network::NetworkAdapter,
+    DaVerifierNetwork: nomos_da_verifier::network::NetworkAdapter<RuntimeServiceId>,
     DaVerifierNetwork::Settings: Clone,
     TimeBackend: nomos_time::backends::TimeBackend,
     TimeBackend::Settings: Clone + Send + Sync,
     ApiAdapter: nomos_da_sampling::api::ApiAdapter + Send + Sync,
+    RuntimeServiceId: Debug
+        + Sync
+        + Display
+        + 'static
+        + AsServiceId<
+            DaIndexer<
+                Tx,
+                C,
+                V,
+                SS,
+                SamplingBackend,
+                SamplingNetworkAdapter,
+                SamplingRng,
+                SamplingStorage,
+                DaVerifierBackend,
+                DaVerifierNetwork,
+                DaVerifierStorage,
+                TimeBackend,
+                ApiAdapter,
+                RuntimeServiceId,
+                SIZE,
+            >,
+        >,
 {
     let relay = handle
         .relay::<DaIndexer<
@@ -227,9 +281,9 @@ where
             DaVerifierStorage,
             TimeBackend,
             ApiAdapter,
+            RuntimeServiceId,
             SIZE,
         >>()
-        .connect()
         .await?;
     let (sender, receiver) = oneshot::channel();
     relay
@@ -244,8 +298,15 @@ where
     wait_with_timeout(receiver, "Timeout while waiting for get range".to_owned()).await
 }
 
-pub async fn disperse_data<Backend, NetworkAdapter, MempoolAdapter, Membership, Metadata>(
-    handle: &OverwatchHandle,
+pub async fn disperse_data<
+    Backend,
+    NetworkAdapter,
+    MempoolAdapter,
+    Membership,
+    Metadata,
+    RuntimeServiceId,
+>(
+    handle: &OverwatchHandle<RuntimeServiceId>,
     data: Vec<u8>,
     metadata: Metadata,
 ) -> Result<(), DynError>
@@ -266,11 +327,31 @@ where
     NetworkAdapter: DispersalNetworkAdapter<SubnetworkId = Membership::NetworkId> + Send,
     MempoolAdapter: DaMempoolAdapter,
     Metadata: metadata::Metadata + Debug + Send + 'static,
+    RuntimeServiceId: Debug
+        + Sync
+        + Display
+        + AsServiceId<
+            DaDispersal<
+                Backend,
+                NetworkAdapter,
+                MempoolAdapter,
+                Membership,
+                Metadata,
+                RuntimeServiceId,
+            >,
+        >,
 {
-    let relay = handle
-        .relay::<DaDispersal<Backend, NetworkAdapter, MempoolAdapter, Membership, Metadata>>()
-        .connect()
-        .await?;
+    let relay =
+        handle
+            .relay::<DaDispersal<
+                Backend,
+                NetworkAdapter,
+                MempoolAdapter,
+                Membership,
+                Metadata,
+                RuntimeServiceId,
+            >>()
+            .await?;
     let (sender, receiver) = oneshot::channel();
     relay
         .send(DaDispersalMsg::Disperse {
@@ -288,12 +369,18 @@ where
     .await?
 }
 
-pub async fn block_peer<B>(handle: &OverwatchHandle, peer_id: PeerId) -> Result<bool, DynError>
+pub async fn block_peer<B, RuntimeServiceId>(
+    handle: &OverwatchHandle<RuntimeServiceId>,
+    peer_id: PeerId,
+) -> Result<bool, DynError>
 where
     B: NetworkBackend + 'static + Send,
     B::Message: PeerMessagesFactory,
+    RuntimeServiceId: Debug + Sync + Display + AsServiceId<NetworkService<B, RuntimeServiceId>>,
 {
-    let relay = handle.relay::<NetworkService<B>>().connect().await?;
+    let relay = handle
+        .relay::<NetworkService<B, RuntimeServiceId>>()
+        .await?;
     let (sender, receiver) = oneshot::channel();
     let message = B::Message::create_block_message(peer_id, sender);
     relay
@@ -304,12 +391,18 @@ where
     wait_with_timeout(receiver, "Timeout while waiting for block peer".to_owned()).await
 }
 
-pub async fn unblock_peer<B>(handle: &OverwatchHandle, peer_id: PeerId) -> Result<bool, DynError>
+pub async fn unblock_peer<B, RuntimeServiceId>(
+    handle: &OverwatchHandle<RuntimeServiceId>,
+    peer_id: PeerId,
+) -> Result<bool, DynError>
 where
     B: NetworkBackend + 'static + Send,
     B::Message: PeerMessagesFactory,
+    RuntimeServiceId: Debug + Sync + Display + AsServiceId<NetworkService<B, RuntimeServiceId>>,
 {
-    let relay = handle.relay::<NetworkService<B>>().connect().await?;
+    let relay = handle
+        .relay::<NetworkService<B, RuntimeServiceId>>()
+        .await?;
     let (sender, receiver) = oneshot::channel();
     let message = B::Message::create_unblock_message(peer_id, sender);
     relay
@@ -324,12 +417,17 @@ where
     .await
 }
 
-pub async fn blacklisted_peers<B>(handle: &OverwatchHandle) -> Result<Vec<PeerId>, DynError>
+pub async fn blacklisted_peers<B, RuntimeServiceId>(
+    handle: &OverwatchHandle<RuntimeServiceId>,
+) -> Result<Vec<PeerId>, DynError>
 where
     B: NetworkBackend + 'static + Send,
     B::Message: PeerMessagesFactory,
+    RuntimeServiceId: Debug + Sync + Display + AsServiceId<NetworkService<B, RuntimeServiceId>>,
 {
-    let relay = handle.relay::<NetworkService<B>>().connect().await?;
+    let relay = handle
+        .relay::<NetworkService<B, RuntimeServiceId>>()
+        .await?;
     let (sender, receiver) = oneshot::channel();
     let message = B::Message::create_blacklisted_message(sender);
     relay

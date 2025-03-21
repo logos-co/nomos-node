@@ -114,8 +114,9 @@ impl<
         SamplingStorage,
         TimeBackend,
         ApiAdapter,
+        RuntimeServiceId,
         const SIZE: usize,
-    > Backend
+    > Backend<RuntimeServiceId>
     for AxumBackend<
         DaAttestation,
         DaShare,
@@ -178,8 +179,10 @@ where
     DaVerifierBackend: VerifierBackend + CoreDaVerifier<DaShare = DaShare> + Send + Sync + 'static,
     <DaVerifierBackend as VerifierBackend>::Settings: Clone,
     <DaVerifierBackend as CoreDaVerifier>::Error: Error,
-    DaVerifierNetwork: nomos_da_verifier::network::NetworkAdapter + Send + Sync + 'static,
-    DaVerifierStorage: nomos_da_verifier::storage::DaStorageAdapter + Send + Sync + 'static,
+    DaVerifierNetwork:
+        nomos_da_verifier::network::NetworkAdapter<RuntimeServiceId> + Send + Sync + 'static,
+    DaVerifierStorage:
+        nomos_da_verifier::storage::DaStorageAdapter<RuntimeServiceId> + Send + Sync + 'static,
     Tx: Transaction
         + Clone
         + Debug
@@ -214,12 +217,15 @@ where
         AsRef<[u8]> + Serialize + DeserializeOwned + Hash + Eq + Send + Sync + 'static,
     DaShare::LightShare: Serialize + DeserializeOwned + Clone + Send + Sync + 'static,
     DaShare::SharesCommitments: Serialize + DeserializeOwned + Clone + Send + Sync + 'static,
-    SamplingNetworkAdapter: nomos_da_sampling::network::NetworkAdapter + Send + 'static,
-    SamplingStorage: nomos_da_sampling::storage::DaStorageAdapter + Send + 'static,
+    SamplingNetworkAdapter:
+        nomos_da_sampling::network::NetworkAdapter<RuntimeServiceId> + Send + 'static,
+    SamplingStorage:
+        nomos_da_sampling::storage::DaStorageAdapter<RuntimeServiceId> + Send + 'static,
     DaVerifierNetwork::Settings: Clone,
     TimeBackend: nomos_time::backends::TimeBackend + Send + 'static,
     TimeBackend::Settings: Clone + Send + Sync,
     ApiAdapter: nomos_da_sampling::api::ApiAdapter + Send + Sync + 'static,
+    RuntimeServiceId: Clone,
 {
     type Error = hyper::Error;
     type Settings = AxumBackendSettings;
@@ -250,7 +256,7 @@ where
     }
 
     #[expect(clippy::too_many_lines, reason = "TODO: Address this at some point.")]
-    async fn serve(self, handle: OverwatchHandle) -> Result<(), Self::Error> {
+    async fn serve(self, handle: OverwatchHandle<RuntimeServiceId>) -> Result<(), Self::Error> {
         let mut builder = CorsLayer::new();
         if self.settings.cors_origins.is_empty() {
             builder = builder.allow_origin(Any);

@@ -39,7 +39,10 @@ impl NetworkBackend for Libp2p {
     type EventKind = EventKind;
     type NetworkEvent = Event;
 
-    fn new(config: Self::Settings, overwatch_handle: OverwatchHandle) -> Self {
+    fn new<RuntimeServiceId>(
+        config: Self::Settings,
+        overwatch_handle: OverwatchHandle<RuntimeServiceId>,
+    ) -> Self {
         let (commands_tx, commands_rx) = tokio::sync::mpsc::channel(BUFFER_SIZE);
         let (events_tx, _) = tokio::sync::broadcast::channel(BUFFER_SIZE);
 

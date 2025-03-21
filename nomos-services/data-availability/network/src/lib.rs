@@ -1,7 +1,7 @@
 pub mod backends;
 
 use std::{
-    fmt::{self, Debug},
+    fmt::{self, Debug, Display},
     pin::Pin,
 };
 
@@ -10,17 +10,14 @@ use backends::NetworkBackend;
 use futures::{Stream, StreamExt};
 use overwatch::{
     services::{
-        relay::RelayMessage,
         state::{NoOperator, ServiceState},
-        ServiceCore, ServiceData, ServiceId,
+        AsServiceId, ServiceCore, ServiceData,
     },
     OpaqueServiceStateHandle,
 };
 use serde::{Deserialize, Serialize};
 use services_utils::overwatch::lifecycle;
 use tokio::sync::oneshot;
-
-const DA_NETWORK_TAG: ServiceId = "DA-Network";
 
 pub enum DaNetworkMsg<B: NetworkBackend> {
     Process(B::Message),
@@ -41,8 +38,6 @@ impl<B: NetworkBackend> Debug for DaNetworkMsg<B> {
     }
 }
 
-impl<T: NetworkBackend + 'static> RelayMessage for DaNetworkMsg<T> {}
-
 #[derive(Serialize, Deserialize)]
 pub struct NetworkConfig<B: NetworkBackend> {
     pub backend: B::Settings,
@@ -54,17 +49,18 @@ impl<B: NetworkBackend> Debug for NetworkConfig<B> {
     }
 }
 
-pub struct NetworkService<B: NetworkBackend + Send + 'static> {
+pub struct NetworkService<B: NetworkBackend + Send + 'static, RuntimeServiceId> {
     backend: B,
-    service_state: OpaqueServiceStateHandle<Self>,
+    service_state: OpaqueServiceStateHandle<Self, RuntimeServiceId>,
 }
 
 pub struct NetworkState<B: NetworkBackend> {
     backend: B::State,
 }
 
-impl<B: NetworkBackend + 'static + Send> ServiceData for NetworkService<B> {
-    const SERVICE_ID: ServiceId = DA_NETWORK_TAG;
+impl<B: NetworkBackend + 'static + Send, RuntimeServiceId> ServiceData
+    for NetworkService<B, RuntimeServiceId>
+{
     type Settings = NetworkConfig<B>;
     type State = NetworkState<B>;
     type StateOperator = NoOperator<Self::State, Self::Settings>;
@@ -72,13 +68,14 @@ impl<B: NetworkBackend + 'static + Send> ServiceData for NetworkService<B> {
 }
 
 #[async_trait]
-impl<B> ServiceCore for NetworkService<B>
+impl<B, RuntimeServiceId> ServiceCore<RuntimeServiceId> for NetworkService<B, RuntimeServiceId>
 where
     B: NetworkBackend + Send + 'static,
     B::State: Send + Sync,
+    RuntimeServiceId: AsServiceId<Self> + Clone + Display + Send,
 {
     fn init(
-        service_state: OpaqueServiceStateHandle<Self>,
+        service_state: OpaqueServiceStateHandle<Self, RuntimeServiceId>,
         _init_state: Self::State,
     ) -> Result<Self, overwatch::DynError> {
         Ok(Self {
@@ -93,7 +90,7 @@ where
     async fn run(mut self) -> Result<(), overwatch::DynError> {
         let Self {
             service_state:
-                OpaqueServiceStateHandle::<Self> {
+                OpaqueServiceStateHandle::<Self, RuntimeServiceId> {
                     mut inbound_relay,
                     lifecycle_handle,
                     ..
@@ -112,7 +109,7 @@ where
                     Self::handle_network_service_message(msg, &mut backend).await;
                 }
                 Some(msg) = lifecycle_stream.next() => {
-                    if lifecycle::should_stop_service::<Self>(&msg) {
+                    if lifecycle::should_stop_service::<Self, RuntimeServiceId>(&msg) {
                         // TODO: Maybe add a call to backend to handle this. Maybe trying to save unprocessed messages?
                         backend.shutdown();
                         break;
@@ -125,7 +122,7 @@ where
     }
 }
 
-impl<B> NetworkService<B>
+impl<B, RuntimeServiceId> NetworkService<B, RuntimeServiceId>
 where
     B: NetworkBackend + Send + 'static,
     B::State: Send + Sync,
