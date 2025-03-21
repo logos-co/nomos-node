@@ -1,8 +1,10 @@
 use std::{
     collections::{hash_map::Entry, HashMap, HashSet, VecDeque},
     task::{Context, Poll, Waker},
+    time::Duration,
 };
 
+use cached::{Cached, TimedSizedCache};
 use either::Either;
 use futures::{
     future::BoxFuture,
@@ -10,7 +12,7 @@ use futures::{
     stream::{BoxStream, FuturesUnordered},
     AsyncReadExt, AsyncWriteExt, FutureExt, StreamExt,
 };
-use indexmap::{IndexMap, IndexSet};
+use indexmap::IndexMap;
 use libp2p::{
     core::{transport::PortUse, Endpoint},
     swarm::{
@@ -22,6 +24,7 @@ use libp2p::{
 use libp2p_stream::{Control, IncomingStreams, OpenStreamError};
 use log::{error, trace};
 use nomos_da_messages::packing::{pack_to_writer, unpack_from_reader};
+use serde::{Deserialize, Serialize};
 use subnetworks_assignations::MembershipHandler;
 use thiserror::Error;
 use tokio::sync::mpsc;
@@ -177,6 +180,12 @@ impl PendingOutbound {
     }
 }
 
+#[derive(Clone, Copy, Debug, Deserialize, Serialize)]
+pub struct ReplicationConfig {
+    pub seen_message_cache_size: usize,
+    pub seen_message_ttl: Duration,
+}
+
 /// Nomos DA broadcast network behaviour.
 ///
 /// This item handles the logic of the nomos da subnetworks broadcasting.
@@ -213,8 +222,15 @@ pub struct ReplicationBehaviour<Membership> {
     outbound_streams: HashMap<PeerId, WriteHalfState>,
     /// Holds tasks for writing messages to the streams' write halves
     outbound_tasks: FuturesUnordered<OutboundTask>,
-    /// Seen messages cache holds a record of seen messages
-    seen_message_cache: IndexSet<(Vec<u8>, SubnetworkId)>,
+    /// The cache for seen messages, evicts entries in two ways:
+    /// - oldest entries when full (Least-Recently-Used),
+    /// - after a certain TTL has passed since the entry was last accessed,
+    ///   regardless of cache utilization.
+    ///
+    /// The cache allocates memory once up front and any expired and unused
+    /// entries will eventually be overwritten and erasing them via
+    /// [`TimeSizedCache::flush`] does not save space, so we don't do it.
+    seen_message_cache: TimedSizedCache<(Vec<u8>, SubnetworkId), ()>,
     /// This waker is only used when we are the initiator of
     /// [`Self::send_message`], ie. the method is called from outside the
     /// behaviour. In all other cases we wake via reference in [`Self::poll`].
@@ -222,7 +238,7 @@ pub struct ReplicationBehaviour<Membership> {
 }
 
 impl<Membership> ReplicationBehaviour<Membership> {
-    pub fn new(peer_id: PeerId, membership: Membership) -> Self {
+    pub fn new(config: ReplicationConfig, peer_id: PeerId, membership: Membership) -> Self {
         let stream_behaviour = libp2p_stream::Behaviour::new();
         let mut control = stream_behaviour.new_control();
         let incoming_streams = control
@@ -233,6 +249,13 @@ impl<Membership> ReplicationBehaviour<Membership> {
 
         let (outbound_read_stream_tx, new_read_stream_rx) = mpsc::unbounded_channel();
         let outbound_read_stream_rx = UnboundedReceiverStream::new(new_read_stream_rx).boxed();
+
+        let seen_message_cache = TimedSizedCache::with_size_and_lifespan_and_refresh(
+            config.seen_message_cache_size,
+            config.seen_message_ttl.as_secs(),
+            // Looking up key resets its elapsed ttl
+            true,
+        );
 
         Self {
             local_peer_id: peer_id,
@@ -245,7 +268,7 @@ impl<Membership> ReplicationBehaviour<Membership> {
             pending_outbound: PendingOutbound::default(),
             outbound_streams: HashMap::default(),
             outbound_tasks,
-            seen_message_cache: IndexSet::default(),
+            seen_message_cache,
             waker: None,
             outbound_read_half_tx: outbound_read_stream_tx,
             outbound_read_half_rx: outbound_read_stream_rx,
@@ -289,10 +312,10 @@ where
     /// sent again.
     fn send_message_impl(&mut self, waker: Option<&Waker>, message: &DaMessage) {
         let message_id = (message.share.blob_id.to_vec(), message.subnetwork_id);
-        if self.seen_message_cache.contains(&message_id) {
+        if self.seen_message_cache.cache_get(&message_id).is_some() {
             return;
         }
-        self.seen_message_cache.insert(message_id);
+        self.seen_message_cache.cache_set(message_id, ());
 
         // Push a message in the queue for every single peer connected that is a member
         // of the selected subnetwork_id
