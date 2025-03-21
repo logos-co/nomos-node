@@ -1,14 +1,13 @@
 pub mod backends;
-use std::fmt::{self, Debug};
+use std::fmt::{self, Debug, Display};
 
 use async_trait::async_trait;
 use backends::NetworkBackend;
 use futures::StreamExt;
 use overwatch::{
     services::{
-        relay::RelayMessage,
         state::{NoOperator, ServiceState},
-        ServiceCore, ServiceData, ServiceId,
+        AsServiceId, ServiceCore, ServiceData,
     },
     OpaqueServiceStateHandle,
 };
@@ -36,8 +35,6 @@ impl<B: NetworkBackend> Debug for NetworkMsg<B> {
     }
 }
 
-impl<T: NetworkBackend + 'static> RelayMessage for NetworkMsg<T> {}
-
 #[derive(Serialize, Deserialize)]
 pub struct NetworkConfig<B: NetworkBackend> {
     pub backend: B::Settings,
@@ -49,17 +46,18 @@ impl<B: NetworkBackend> Debug for NetworkConfig<B> {
     }
 }
 
-pub struct NetworkService<B: NetworkBackend + 'static> {
+pub struct NetworkService<B: NetworkBackend + 'static, RuntimeServiceId> {
     backend: B,
-    service_state: OpaqueServiceStateHandle<Self>,
+    service_state: OpaqueServiceStateHandle<Self, RuntimeServiceId>,
 }
 
 pub struct NetworkState<B: NetworkBackend> {
     backend: B::State,
 }
 
-impl<B: NetworkBackend + 'static> ServiceData for NetworkService<B> {
-    const SERVICE_ID: ServiceId = "Network";
+impl<B: NetworkBackend + 'static, RuntimeServiceId> ServiceData
+    for NetworkService<B, RuntimeServiceId>
+{
     type Settings = NetworkConfig<B>;
     type State = NetworkState<B>;
     type StateOperator = NoOperator<Self::State, Self::Settings>;
@@ -67,13 +65,14 @@ impl<B: NetworkBackend + 'static> ServiceData for NetworkService<B> {
 }
 
 #[async_trait]
-impl<B> ServiceCore for NetworkService<B>
+impl<B, RuntimeServiceId> ServiceCore<RuntimeServiceId> for NetworkService<B, RuntimeServiceId>
 where
     B: NetworkBackend + Send + 'static,
     B::State: Send + Sync,
+    RuntimeServiceId: AsServiceId<Self> + Clone + Display + Send,
 {
     fn init(
-        service_state: OpaqueServiceStateHandle<Self>,
+        service_state: OpaqueServiceStateHandle<Self, RuntimeServiceId>,
         _init_state: Self::State,
     ) -> Result<Self, overwatch::DynError> {
         Ok(Self {
@@ -88,7 +87,7 @@ where
     async fn run(mut self) -> Result<(), overwatch::DynError> {
         let Self {
             service_state:
-                OpaqueServiceStateHandle::<Self> {
+                OpaqueServiceStateHandle::<Self, RuntimeServiceId> {
                     mut inbound_relay,
                     lifecycle_handle,
                     ..
@@ -106,7 +105,7 @@ where
                     Self::handle_network_service_message(msg, &mut backend).await;
                 }
                 Some(msg) = lifecycle_stream.next() => {
-                    if lifecycle::should_stop_service::<Self>(&msg) {
+                    if lifecycle::should_stop_service::<Self, RuntimeServiceId>(&msg) {
                         // TODO: Maybe add a call to backend to handle this. Maybe trying to save unprocessed messages?
                         break;
                     }
@@ -117,7 +116,7 @@ where
     }
 }
 
-impl<B> NetworkService<B>
+impl<B, RuntimeServiceId> NetworkService<B, RuntimeServiceId>
 where
     B: NetworkBackend + Send + 'static,
     B::State: Send + Sync,
