@@ -1,4 +1,4 @@
-use nomos_libp2p::{Multiaddr, PeerId};
+use nomos_libp2p::{libp2p::kad::PeerInfo, Multiaddr, PeerId};
 use serde::{Deserialize, Serialize};
 use tokio::sync::oneshot;
 
@@ -20,6 +20,16 @@ pub enum Command {
         topic: Topic,
         message: Box<[u8]>,
         retry_count: usize,
+    },
+
+    // Kademlia commands
+    GetClosestPeers {
+        peer_id: PeerId,
+        reply: oneshot::Sender<Vec<PeerInfo>>,
+    },
+
+    DumpRoutingTable {
+        reply: oneshot::Sender<Vec<PeerId>>,
     },
 }
 
