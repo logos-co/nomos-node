@@ -8,12 +8,13 @@ mod test {
     use libp2p::{identity::Keypair, quic, swarm::SwarmEvent, Multiaddr, PeerId, Swarm};
     use libp2p_swarm_test::SwarmExt;
     use log::info;
+    use nomos_da_messages::replication::ReplicationRequest;
     use tokio::sync::mpsc;
     use tracing_subscriber::{fmt::TestWriter, EnvFilter};
 
     use crate::{
         protocols::replication::behaviour::{
-            DaMessage, ReplicationBehaviour, ReplicationConfig, ReplicationEvent,
+            ReplicationBehaviour, ReplicationConfig, ReplicationEvent,
         },
         test_utils::AllNeighbours,
     };
@@ -49,7 +50,7 @@ mod test {
         neighbours
     }
 
-    fn get_message(i: usize) -> DaMessage {
+    fn get_message(i: usize) -> ReplicationRequest {
         MESSAGES[i].clone()
     }
 
@@ -66,7 +67,7 @@ mod test {
         let mut expected_messages = expected
             .into_iter()
             .map(|i| Box::new(get_message(i)))
-            .collect::<VecDeque<Box<DaMessage>>>();
+            .collect::<VecDeque<Box<ReplicationRequest>>>();
 
         while let Some(expected_message) = expected_messages.front() {
             loop {
@@ -84,7 +85,7 @@ mod test {
         }
     }
 
-    static MESSAGES: LazyLock<Vec<DaMessage>> = LazyLock::new(|| {
+    static MESSAGES: LazyLock<Vec<ReplicationRequest>> = LazyLock::new(|| {
         // The fixture contains 20 messages seeded from values 0..20 for subnet 0
         // Ad-hoc generation of those takes about 12 seconds on a Ryzen3700x
         bincode::deserialize(include_bytes!("./fixtures/messages.bincode")).unwrap()

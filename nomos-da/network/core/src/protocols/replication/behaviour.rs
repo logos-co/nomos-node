@@ -23,7 +23,10 @@ use libp2p::{
 };
 use libp2p_stream::{Control, IncomingStreams, OpenStreamError};
 use log::{error, trace};
-use nomos_da_messages::packing::{pack_to_writer, unpack_from_reader};
+use nomos_da_messages::{
+    packing::{pack_to_writer, unpack_from_reader},
+    replication::{ReplicationRequest, ReplicationResponseId},
+};
 use serde::{Deserialize, Serialize};
 use subnetworks_assignations::MembershipHandler;
 use thiserror::Error;
@@ -31,8 +34,6 @@ use tokio::sync::mpsc;
 use tokio_stream::wrappers::UnboundedReceiverStream;
 
 use crate::{protocol::REPLICATION_PROTOCOL, SubnetworkId};
-
-pub type DaMessage = nomos_da_messages::replication::ReplicationRequest;
 
 #[derive(Debug, Error)]
 pub enum ReplicationError {
@@ -93,7 +94,7 @@ impl Clone for ReplicationError {
 pub enum ReplicationEvent {
     IncomingMessage {
         peer_id: PeerId,
-        message: Box<DaMessage>,
+        message: Box<ReplicationRequest>,
     },
     ReplicationError {
         error: ReplicationError,
@@ -117,7 +118,7 @@ impl ReplicationEvent {
 }
 
 type IncomingTask =
-    BoxFuture<'static, Result<(PeerId, DaMessage, ReadHalf<Stream>), ReplicationError>>;
+    BoxFuture<'static, Result<(PeerId, ReplicationRequest, ReadHalf<Stream>), ReplicationError>>;
 type OutboundTask = BoxFuture<'static, Result<(PeerId, WriteHalf<Stream>), ReplicationError>>;
 
 enum WriteHalfState {
@@ -138,7 +139,7 @@ impl WriteHalfState {
 #[derive(Default)]
 struct PendingOutbound {
     /// Pending outbound message queues for each peer
-    messages: IndexMap<PeerId, VecDeque<DaMessage>>,
+    messages: IndexMap<PeerId, VecDeque<ReplicationRequest>>,
     /// The last peer whose pending message was scheduled for sending
     last_scheduled: Option<PeerId>,
 }
@@ -148,12 +149,15 @@ struct PeerNotFound;
 impl PendingOutbound {
     /// Appends a message to the peer's pending queue. Lazily creates the queue
     /// for the peer upon the first call.
-    fn enqueue_message(&mut self, peer_id: PeerId, message: DaMessage) {
+    fn enqueue_message(&mut self, peer_id: PeerId, message: ReplicationRequest) {
         self.messages.entry(peer_id).or_default().push_back(message);
     }
 
     /// Dequeues the next message from the peer's pending queue.
-    fn dequeue_message(&mut self, peer_id: &PeerId) -> Result<Option<DaMessage>, PeerNotFound> {
+    fn dequeue_message(
+        &mut self,
+        peer_id: &PeerId,
+    ) -> Result<Option<ReplicationRequest>, PeerNotFound> {
         let messages = self.messages.get_mut(peer_id).ok_or(PeerNotFound)?;
         Ok(messages.pop_front())
     }
@@ -230,7 +234,7 @@ pub struct ReplicationBehaviour<Membership> {
     /// The cache allocates memory once up front and any expired and unused
     /// entries will eventually be overwritten and erasing them via
     /// [`TimeSizedCache::flush`] does not save space, so we don't do it.
-    seen_message_cache: TimedSizedCache<(Vec<u8>, SubnetworkId), ()>,
+    seen_message_cache: TimedSizedCache<ReplicationResponseId, ()>,
     /// This waker is only used when we are the initiator of
     /// [`Self::send_message`], ie. the method is called from outside the
     /// behaviour. In all other cases we wake via reference in [`Self::poll`].
@@ -302,7 +306,7 @@ where
     }
 
     /// Initiate sending a replication message **from outside the behaviour**
-    pub fn send_message(&mut self, message: &DaMessage) {
+    pub fn send_message(&mut self, message: &ReplicationRequest) {
         let waker = self.waker.take();
         self.send_message_impl(waker.as_ref(), message);
     }
@@ -310,8 +314,8 @@ where
     /// Send a replication message to all connected peers that are members of
     /// the same subnetwork. If the message has already been seen, it is not
     /// sent again.
-    fn send_message_impl(&mut self, waker: Option<&Waker>, message: &DaMessage) {
-        let message_id = (message.share.blob_id.to_vec(), message.subnetwork_id);
+    fn send_message_impl(&mut self, waker: Option<&Waker>, message: &ReplicationRequest) {
+        let message_id = message.id();
         if self.seen_message_cache.cache_get(&message_id).is_some() {
             return;
         }
@@ -341,7 +345,7 @@ where
     async fn try_read_message(
         peer_id: PeerId,
         mut read_half: ReadHalf<Stream>,
-    ) -> Result<(PeerId, DaMessage, ReadHalf<Stream>), ReplicationError> {
+    ) -> Result<(PeerId, ReplicationRequest, ReadHalf<Stream>), ReplicationError> {
         let message = unpack_from_reader(&mut read_half)
             .await
             .map_err(|error| ReplicationError::Io { peer_id, error })?;
@@ -371,7 +375,7 @@ where
     /// Attempt to write a message to the given stream's write half
     async fn try_write_message(
         peer_id: PeerId,
-        message: DaMessage,
+        message: ReplicationRequest,
         mut write_half: WriteHalf<Stream>,
     ) -> Result<(PeerId, WriteHalf<Stream>), ReplicationError> {
         pack_to_writer(&message, &mut write_half)
