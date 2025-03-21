@@ -4,7 +4,10 @@ pub mod openapi {
     pub use crate::backend::Status;
 }
 
-use std::{fmt::Debug, marker::PhantomData};
+use std::{
+    fmt::{Debug, Display},
+    marker::PhantomData,
+};
 
 use futures::StreamExt;
 use nomos_da_sampling::{
@@ -13,7 +16,7 @@ use nomos_da_sampling::{
 };
 use nomos_network::{NetworkMsg, NetworkService};
 use overwatch::{
-    services::{relay::OutboundRelay, ServiceCore, ServiceData, ServiceId},
+    services::{relay::OutboundRelay, AsServiceId, ServiceCore, ServiceData},
     OpaqueServiceStateHandle,
 };
 use rand::Rng;
@@ -42,6 +45,7 @@ pub type DaMempoolService<
     DaVerifierNetwork,
     DaVerifierStorage,
     DaApiAdapter,
+    RuntimeServiceId,
 > = GenericDaMempoolService<
     Pool,
     NetworkAdapter,
@@ -49,11 +53,11 @@ pub type DaMempoolService<
         DaMempoolState<
             <Pool as RecoverableMempool>::RecoveryState,
             <Pool as MemPool>::Settings,
-            <NetworkAdapter as NetworkAdapterTrait>::Settings,
+            <NetworkAdapter as NetworkAdapterTrait<RuntimeServiceId>>::Settings,
         >,
         DaMempoolSettings<
             <Pool as MemPool>::Settings,
-            <NetworkAdapter as NetworkAdapterTrait>::Settings,
+            <NetworkAdapter as NetworkAdapterTrait<RuntimeServiceId>>::Settings,
         >,
     >,
     DaSamplingBackend,
@@ -64,6 +68,7 @@ pub type DaMempoolService<
     DaVerifierNetwork,
     DaVerifierStorage,
     DaApiAdapter,
+    RuntimeServiceId,
 >;
 
 /// A generic DA mempool service which wraps around a mempool, a network
@@ -80,13 +85,14 @@ pub struct GenericDaMempoolService<
     DaVerifierNetwork,
     DaVerifierStorage,
     DaApiAdapter,
+    RuntimeServiceId,
 > where
     Pool: RecoverableMempool,
-    NetworkAdapter: NetworkAdapterTrait,
+    NetworkAdapter: NetworkAdapterTrait<RuntimeServiceId>,
     RecoveryBackend: RecoveryBackendTrait,
 {
     pool: Pool,
-    service_state_handle: OpaqueServiceStateHandle<Self>,
+    service_state_handle: OpaqueServiceStateHandle<Self, RuntimeServiceId>,
     #[expect(
         clippy::type_complexity,
         reason = "There is nothing we can do about this, at the moment."
@@ -116,6 +122,7 @@ impl<
         DaVerifierNetwork,
         DaVerifierStorage,
         DaApiAdapter,
+        RuntimeServiceId,
     >
     GenericDaMempoolService<
         Pool,
@@ -129,15 +136,19 @@ impl<
         DaVerifierNetwork,
         DaVerifierStorage,
         DaApiAdapter,
+        RuntimeServiceId,
     >
 where
     Pool: RecoverableMempool,
     Pool::Settings: Clone,
-    NetworkAdapter: NetworkAdapterTrait,
+    NetworkAdapter: NetworkAdapterTrait<RuntimeServiceId>,
     NetworkAdapter::Settings: Clone,
     RecoveryBackend: RecoveryBackendTrait,
 {
-    pub const fn new(pool: Pool, service_state_handle: OpaqueServiceStateHandle<Self>) -> Self {
+    pub const fn new(
+        pool: Pool,
+        service_state_handle: OpaqueServiceStateHandle<Self, RuntimeServiceId>,
+    ) -> Self {
         Self {
             pool,
             service_state_handle,
@@ -158,6 +169,7 @@ impl<
         DaVerifierNetwork,
         DaVerifierStorage,
         DaApiAdapter,
+        RuntimeServiceId,
     > ServiceData
     for GenericDaMempoolService<
         Pool,
@@ -171,13 +183,13 @@ impl<
         DaVerifierNetwork,
         DaVerifierStorage,
         DaApiAdapter,
+        RuntimeServiceId,
     >
 where
     Pool: RecoverableMempool,
-    NetworkAdapter: NetworkAdapterTrait,
+    NetworkAdapter: NetworkAdapterTrait<RuntimeServiceId>,
     RecoveryBackend: RecoveryBackendTrait,
 {
-    const SERVICE_ID: ServiceId = "mempool-da";
     type Settings = DaMempoolSettings<Pool::Settings, NetworkAdapter::Settings>;
     type State = DaMempoolState<Pool::RecoveryState, Pool::Settings, NetworkAdapter::Settings>;
     type StateOperator = RecoveryOperator<RecoveryBackend>;
@@ -197,7 +209,8 @@ impl<
         DaVerifierNetwork,
         DaVerifierStorage,
         DaApiAdapter,
-    > ServiceCore
+        RuntimeServiceId,
+    > ServiceCore<RuntimeServiceId>
     for GenericDaMempoolService<
         Pool,
         NetworkAdapter,
@@ -210,6 +223,7 @@ impl<
         DaVerifierNetwork,
         DaVerifierStorage,
         DaApiAdapter,
+        RuntimeServiceId,
     >
 where
     Pool: RecoverableMempool + Send,
@@ -218,22 +232,42 @@ where
     Pool::Item: Clone + Send + 'static,
     Pool::BlockId: Send,
     Pool::Settings: Clone + Sync + Send,
-    NetworkAdapter: NetworkAdapterTrait<Payload = Pool::Item, Key = Pool::Key> + Send,
+    NetworkAdapter:
+        NetworkAdapterTrait<RuntimeServiceId, Payload = Pool::Item, Key = Pool::Key> + Send,
     NetworkAdapter::Key: Clone,
     NetworkAdapter::Settings: Clone + Send + Sync + 'static,
     RecoveryBackend: RecoveryBackendTrait + Send,
     DaSamplingBackend: DaSamplingServiceBackend<DaSamplingRng, BlobId = NetworkAdapter::Key> + Send,
     DaSamplingBackend::BlobId: Send + 'static,
-    DaSamplingNetwork: nomos_da_sampling::network::NetworkAdapter + Send,
+    DaSamplingNetwork: nomos_da_sampling::network::NetworkAdapter<RuntimeServiceId> + Send,
     DaSamplingRng: Rng + Send,
-    DaSamplingStorage: DaStorageAdapter + Send,
+    DaSamplingStorage: DaStorageAdapter<RuntimeServiceId> + Send,
     DaVerifierBackend: Send,
     DaVerifierNetwork: Send,
     DaVerifierStorage: Send,
     DaApiAdapter: ApiAdapter + Send,
+    RuntimeServiceId: Debug
+        + Sync
+        + Display
+        + Send
+        + AsServiceId<Self>
+        + AsServiceId<NetworkService<NetworkAdapter::Backend, RuntimeServiceId>>
+        + AsServiceId<
+            DaSamplingService<
+                DaSamplingBackend,
+                DaSamplingNetwork,
+                DaSamplingRng,
+                DaSamplingStorage,
+                DaVerifierBackend,
+                DaVerifierNetwork,
+                DaVerifierStorage,
+                DaApiAdapter,
+                RuntimeServiceId,
+            >,
+        >,
 {
     fn init(
-        service_state: OpaqueServiceStateHandle<Self>,
+        service_state: OpaqueServiceStateHandle<Self, RuntimeServiceId>,
         init_state: Self::State,
     ) -> Result<Self, overwatch::DynError> {
         tracing::trace!(
@@ -253,8 +287,7 @@ where
         let network_service_relay = self
             .service_state_handle
             .overwatch_handle
-            .relay::<NetworkService<_>>()
-            .connect()
+            .relay::<NetworkService<NetworkAdapter::Backend, RuntimeServiceId>>()
             .await
             .expect("Relay connection with NetworkService should succeed");
 
@@ -270,8 +303,8 @@ where
                 DaVerifierNetwork,
                 DaVerifierStorage,
                 DaApiAdapter,
+                RuntimeServiceId,
             >>()
-            .connect()
             .await
             .expect("Relay connection with SamplingService should succeed");
 
@@ -304,7 +337,7 @@ where
                     self.service_state_handle.state_updater.update(self.pool.save().into());
                 }
                 Some(lifecycle_msg) = lifecycle_stream.next() =>  {
-                    if lifecycle::should_stop_service::<Self>(&lifecycle_msg) {
+                    if lifecycle::should_stop_service::<Self, RuntimeServiceId>(&lifecycle_msg) {
                         break;
                     }
                 }
@@ -326,6 +359,7 @@ impl<
         DaVerifierNetwork,
         DaVerifierStorage,
         DaApiAdapter,
+        RuntimeServiceId,
     >
     GenericDaMempoolService<
         Pool,
@@ -339,12 +373,13 @@ impl<
         DaVerifierNetwork,
         DaVerifierStorage,
         DaApiAdapter,
+        RuntimeServiceId,
     >
 where
     Pool: RecoverableMempool,
     Pool::Item: Clone + Send + 'static,
     Pool::Settings: Clone,
-    NetworkAdapter: NetworkAdapterTrait<Payload = Pool::Item> + Send,
+    NetworkAdapter: NetworkAdapterTrait<RuntimeServiceId, Payload = Pool::Item> + Send,
     NetworkAdapter::Settings: Clone + Send + 'static,
     RecoveryBackend: RecoveryBackendTrait,
 {
