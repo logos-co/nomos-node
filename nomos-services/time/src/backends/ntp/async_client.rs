@@ -17,10 +17,12 @@ pub enum Error {
     Timeout(Elapsed),
 }
 
+#[cfg_attr(feature = "time", serde_with::serde_as)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Copy, Clone)]
 pub struct NTPClientSettings {
     /// NTP server requests timeout duration
+    #[cfg_attr(feature = "time", serde_as(as = "MinimalBoundedDuration<1, NANO>"))]
     timeout: Duration,
     /// NTP server socket address
     address: SocketAddr,

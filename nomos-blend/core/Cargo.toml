@@ -10,8 +10,10 @@ fixed               = { version = "1", features = ["serde-str"] }
 futures             = "0.3"
 multiaddr           = "0.18"
 nomos-blend-message = { workspace = true }
+nomos-utils         = { workspace = true, features = ["time"], optional = true }
 rand                = "0.8"
 serde               = { version = "1.0", features = ["derive"] }
+serde_with          = { workspace = true, optional = true }
 tokio               = { version = "1", features = ["macros", "sync", "time"] }
 tokio-stream        = "0.1"
 tracing             = "0.1"
@@ -19,3 +21,10 @@ tracing             = "0.1"
 [dev-dependencies]
 rand_chacha = "0.3"
 tokio       = { version = "1", features = ["rt-multi-thread", "time"] }
+
+[features]
+time = ["dep:nomos-utils", "dep:serde_with"]
+
+[package.metadata.cargo-machete]
+# False positives.
+ignored = ["nomos-utils"]

@@ -15,10 +15,19 @@ nomos-da-sampling        = { workspace = true }
 nomos-da-verifier        = { workspace = true }
 nomos-mempool            = { workspace = true, features = ["libp2p"] }
 nomos-tracing            = { workspace = true }
+nomos-utils              = { workspace = true, features = ["time"], optional = true }
 overwatch                = { workspace = true }
 rand                     = "0.8"
 serde                    = { version = "1.0", features = ["derive"] }
+serde_with               = { workspace = true, optional = true }
 subnetworks-assignations = { workspace = true }
 tokio                    = "1"
 tokio-stream             = "0.1.15"
 tracing                  = "0.1"
+
+[features]
+time = ["dep:nomos-utils", "dep:serde_with"]
+
+[package.metadata.cargo-machete]
+# False positives.
+ignored = ["nomos-utils"]
