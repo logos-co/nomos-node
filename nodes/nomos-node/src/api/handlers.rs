@@ -1,4 +1,8 @@
-use std::{error::Error, fmt::Debug, hash::Hash};
+use std::{
+    error::Error,
+    fmt::{Debug, Display},
+    hash::Hash,
+};
 
 use axum::{
     body::StreamBody,
@@ -62,7 +66,9 @@ macro_rules! make_request_and_return_response {
         (status = 500, description = "Internal server error", body = String),
     )
 )]
-pub async fn cl_metrics<T>(State(handle): State<OverwatchHandle>) -> Response
+pub async fn cl_metrics<T, RuntimeServiceId>(
+    State(handle): State<OverwatchHandle<RuntimeServiceId>>,
+) -> Response
 where
     T: Transaction
         + Clone
@@ -76,7 +82,7 @@ where
     <T as nomos_core::tx::Transaction>::Hash:
         std::cmp::Ord + Debug + Send + Sync + Serialize + for<'de> Deserialize<'de> + 'static,
 {
-    make_request_and_return_response!(cl::cl_mempool_metrics::<T>(&handle))
+    make_request_and_return_response!(cl::cl_mempool_metrics::<T, RuntimeServiceId>(&handle))
 }
 
 #[utoipa::path(
@@ -87,8 +93,8 @@ where
         (status = 500, description = "Internal server error", body = String),
     )
 )]
-pub async fn cl_status<T>(
-    State(handle): State<OverwatchHandle>,
+pub async fn cl_status<T, RuntimeServiceId>(
+    State(handle): State<OverwatchHandle<RuntimeServiceId>>,
     Json(items): Json<Vec<<T as Transaction>::Hash>>,
 ) -> Response
 where
@@ -96,7 +102,7 @@ where
     <T as nomos_core::tx::Transaction>::Hash:
         Serialize + DeserializeOwned + std::cmp::Ord + Debug + Send + Sync + 'static,
 {
-    make_request_and_return_response!(cl::cl_mempool_status::<T>(&handle, items))
+    make_request_and_return_response!(cl::cl_mempool_status::<T, RuntimeServiceId>(&handle, items))
 }
 #[derive(Deserialize)]
 pub struct CryptarchiaInfoQuery {
@@ -124,9 +130,10 @@ pub async fn cryptarchia_info<
     DaVerifierStorage,
     TimeBackend,
     ApiAdapter,
+    RuntimeServiceId,
     const SIZE: usize,
 >(
-    State(handle): State<OverwatchHandle>,
+    State(handle): State<OverwatchHandle<RuntimeServiceId>>,
 ) -> Response
 where
     Tx: Transaction
@@ -147,12 +154,12 @@ where
     SamplingBackend::Settings: Clone,
     SamplingBackend::Share: Debug + 'static,
     SamplingBackend::BlobId: Debug + 'static,
-    SamplingNetworkAdapter: nomos_da_sampling::network::NetworkAdapter,
-    SamplingStorage: nomos_da_sampling::storage::DaStorageAdapter,
-    DaVerifierStorage: nomos_da_verifier::storage::DaStorageAdapter,
+    SamplingNetworkAdapter: nomos_da_sampling::network::NetworkAdapter<RuntimeServiceId>,
+    SamplingStorage: nomos_da_sampling::storage::DaStorageAdapter<RuntimeServiceId>,
+    DaVerifierStorage: nomos_da_verifier::storage::DaStorageAdapter<RuntimeServiceId>,
     DaVerifierBackend: nomos_da_verifier::backend::VerifierBackend + Send + 'static,
     DaVerifierBackend::Settings: Clone,
-    DaVerifierNetwork: nomos_da_verifier::network::NetworkAdapter,
+    DaVerifierNetwork: nomos_da_verifier::network::NetworkAdapter<RuntimeServiceId>,
     DaVerifierNetwork::Settings: Clone,
     TimeBackend: nomos_time::backends::TimeBackend,
     TimeBackend::Settings: Clone + Send + Sync,
@@ -170,6 +177,7 @@ where
         DaVerifierStorage,
         TimeBackend,
         ApiAdapter,
+        RuntimeServiceId,
         SIZE,
     >(&handle))
 }
@@ -194,9 +202,10 @@ pub async fn cryptarchia_headers<
     DaVerifierStorage,
     TimeBackend,
     ApiAdapter,
+    RuntimeServiceId,
     const SIZE: usize,
 >(
-    State(store): State<OverwatchHandle>,
+    State(store): State<OverwatchHandle<RuntimeServiceId>>,
     Query(query): Query<CryptarchiaInfoQuery>,
 ) -> Response
 where
@@ -218,12 +227,12 @@ where
     SamplingBackend::Settings: Clone,
     SamplingBackend::Share: Debug + 'static,
     SamplingBackend::BlobId: Debug + 'static,
-    SamplingNetworkAdapter: nomos_da_sampling::network::NetworkAdapter,
-    SamplingStorage: nomos_da_sampling::storage::DaStorageAdapter,
-    DaVerifierStorage: nomos_da_verifier::storage::DaStorageAdapter,
+    SamplingNetworkAdapter: nomos_da_sampling::network::NetworkAdapter<RuntimeServiceId>,
+    SamplingStorage: nomos_da_sampling::storage::DaStorageAdapter<RuntimeServiceId>,
+    DaVerifierStorage: nomos_da_verifier::storage::DaStorageAdapter<RuntimeServiceId>,
     DaVerifierBackend: nomos_da_verifier::backend::VerifierBackend + Send + 'static,
     DaVerifierBackend::Settings: Clone,
-    DaVerifierNetwork: nomos_da_verifier::network::NetworkAdapter,
+    DaVerifierNetwork: nomos_da_verifier::network::NetworkAdapter<RuntimeServiceId>,
     DaVerifierNetwork::Settings: Clone,
     TimeBackend: nomos_time::backends::TimeBackend,
     TimeBackend::Settings: Clone + Send + Sync,
@@ -242,6 +251,7 @@ where
         DaVerifierStorage,
         TimeBackend,
         ApiAdapter,
+        RuntimeServiceId,
         SIZE,
     >(&store, from, to))
 }
@@ -254,8 +264,8 @@ where
         (status = 500, description = "Internal server error", body = String),
     )
 )]
-pub async fn add_share<A, S, M, VB, SS>(
-    State(handle): State<OverwatchHandle>,
+pub async fn add_share<A, S, M, VB, SS, RuntimeServiceId>(
+    State(handle): State<OverwatchHandle<RuntimeServiceId>>,
     Json(share): Json<S>,
 ) -> Response
 where
@@ -277,7 +287,9 @@ where
     <VB as CoreDaVerifier>::Error: Error,
     SS: StorageSerde + Send + Sync + 'static,
 {
-    make_request_and_return_response!(da::add_share::<A, S, M, VB, SS>(&handle, share))
+    make_request_and_return_response!(da::add_share::<A, S, M, VB, SS, RuntimeServiceId>(
+        &handle, share
+    ))
 }
 
 #[utoipa::path(
@@ -302,9 +314,10 @@ pub async fn get_range<
     DaVerifierStorage,
     TimeBackend,
     ApiAdapter,
+    RuntimeServiceId,
     const SIZE: usize,
 >(
-    State(handle): State<OverwatchHandle>,
+    State(handle): State<OverwatchHandle<RuntimeServiceId>>,
     Json(GetRangeReq { app_id, range }): Json<GetRangeReq<V>>,
 ) -> Response
 where
@@ -352,12 +365,12 @@ where
     SamplingBackend::Settings: Clone,
     SamplingBackend::Share: Debug + 'static,
     SamplingBackend::BlobId: Debug + 'static,
-    SamplingNetworkAdapter: nomos_da_sampling::network::NetworkAdapter,
-    SamplingStorage: nomos_da_sampling::storage::DaStorageAdapter,
-    DaVerifierStorage: nomos_da_verifier::storage::DaStorageAdapter,
+    SamplingNetworkAdapter: nomos_da_sampling::network::NetworkAdapter<RuntimeServiceId>,
+    SamplingStorage: nomos_da_sampling::storage::DaStorageAdapter<RuntimeServiceId>,
+    DaVerifierStorage: nomos_da_verifier::storage::DaStorageAdapter<RuntimeServiceId>,
     DaVerifierBackend: nomos_da_verifier::backend::VerifierBackend + Send + 'static,
     DaVerifierBackend::Settings: Clone,
-    DaVerifierNetwork: nomos_da_verifier::network::NetworkAdapter,
+    DaVerifierNetwork: nomos_da_verifier::network::NetworkAdapter<RuntimeServiceId>,
     DaVerifierNetwork::Settings: Clone,
     TimeBackend: nomos_time::backends::TimeBackend,
     TimeBackend::Settings: Clone + Send + Sync,
@@ -377,6 +390,7 @@ where
         DaVerifierStorage,
         TimeBackend,
         ApiAdapter,
+        RuntimeServiceId
         SIZE,
     >(&handle, app_id, range))
 }
@@ -389,8 +403,8 @@ where
         (status = 500, description = "Internal server error", body = String),
     )
 )]
-pub async fn block_peer<Backend>(
-    State(handle): State<OverwatchHandle>,
+pub async fn block_peer<Backend, RuntimeServiceId>(
+    State(handle): State<OverwatchHandle<RuntimeServiceId>>,
     Json(peer_id): Json<PeerId>,
 ) -> Response
 where
@@ -409,8 +423,8 @@ where
     )
 )]
 
-pub async fn unblock_peer<Backend>(
-    State(handle): State<OverwatchHandle>,
+pub async fn unblock_peer<Backend, RuntimeServiceId>(
+    State(handle): State<OverwatchHandle<RuntimeServiceId>>,
     Json(peer_id): Json<PeerId>,
 ) -> Response
 where
@@ -428,7 +442,9 @@ where
         (status = 500, description = "Internal server error", body = String),
     )
 )]
-pub async fn blacklisted_peers<Backend>(State(handle): State<OverwatchHandle>) -> Response
+pub async fn blacklisted_peers<Backend, RuntimeServiceId>(
+    State(handle): State<OverwatchHandle<RuntimeServiceId>>,
+) -> Response
 where
     Backend: NetworkBackend + Send + 'static,
     Backend::Message: PeerMessagesFactory,
@@ -444,7 +460,12 @@ where
         (status = 500, description = "Internal server error", body = String),
     )
 )]
-pub async fn libp2p_info(State(handle): State<OverwatchHandle>) -> Response {
+pub async fn libp2p_info<RuntimeServiceId>(
+    State(handle): State<OverwatchHandle<RuntimeServiceId>>,
+) -> Response
+where
+    RuntimeServiceId: Debug,
+{
     make_request_and_return_response!(libp2p::libp2p_info(&handle))
 }
 
@@ -456,15 +477,16 @@ pub async fn libp2p_info(State(handle): State<OverwatchHandle>) -> Response {
         (status = 500, description = "Internal server error", body = String),
     )
 )]
-pub async fn block<S, Tx>(
-    State(handle): State<OverwatchHandle>,
+pub async fn block<S, Tx, RuntimeServiceId>(
+    State(handle): State<OverwatchHandle<RuntimeServiceId>>,
     Json(id): Json<HeaderId>,
 ) -> Response
 where
     Tx: serde::Serialize + serde::de::DeserializeOwned + Clone + Eq + core::hash::Hash,
     S: StorageSerde + Send + Sync + 'static,
+    RuntimeServiceId: Debug + Display,
 {
-    make_request_and_return_response!(storage::block_req::<S, Tx>(&handle, id))
+    make_request_and_return_response!(storage::block_req::<S, Tx, RuntimeServiceId>(&handle, id))
 }
 
 #[utoipa::path(
@@ -475,8 +497,8 @@ where
         (status = 500, description = "Internal server error", body = String),
     )
 )]
-pub async fn da_get_commitments<StorageOp, DaShare>(
-    State(handle): State<OverwatchHandle>,
+pub async fn da_get_commitments<StorageOp, DaShare, RuntimeServiceId>(
+    State(handle): State<OverwatchHandle<RuntimeServiceId>>,
     Json(req): Json<DASharesCommitmentsRequest<DaShare>>,
 ) -> Response
 where
@@ -502,8 +524,8 @@ where
         (status = 500, description = "Internal server error", body = String),
     )
 )]
-pub async fn da_get_light_share<StorageOp, DaShare>(
-    State(handle): State<OverwatchHandle>,
+pub async fn da_get_light_share<StorageOp, DaShare, RuntimeServiceId>(
+    State(handle): State<OverwatchHandle<RuntimeServiceId>>,
     Json(request): Json<DaSamplingRequest<DaShare>>,
 ) -> Response
 where
@@ -529,8 +551,8 @@ where
         (status = 500, description = "Internal server error", body = StreamBody),
     )
 )]
-pub async fn da_get_shares<StorageOp, DaShare>(
-    State(handle): State<OverwatchHandle>,
+pub async fn da_get_shares<StorageOp, DaShare, RuntimeServiceId>(
+    State(handle): State<OverwatchHandle<RuntimeServiceId>>,
     Json(request): Json<GetSharesRequest<DaShare>>,
 ) -> Response
 where
@@ -573,7 +595,10 @@ where
         (status = 500, description = "Internal server error", body = String),
     )
 )]
-pub async fn add_tx<Tx>(State(handle): State<OverwatchHandle>, Json(tx): Json<Tx>) -> Response
+pub async fn add_tx<Tx, RuntimeServiceId>(
+    State(handle): State<OverwatchHandle<RuntimeServiceId>>,
+    Json(tx): Json<Tx>,
+) -> Response
 where
     Tx: Transaction + Clone + Debug + Hash + Serialize + DeserializeOwned + Send + Sync + 'static,
     <Tx as Transaction>::Hash:
@@ -605,8 +630,9 @@ pub async fn add_blob_info<
     DaVerifierNetwork,
     DaVerifierStorage,
     ApiAdapter,
+    RuntimeServiceId,
 >(
-    State(handle): State<OverwatchHandle>,
+    State(handle): State<OverwatchHandle<RuntimeServiceId>>,
     Json(blob_info): Json<B>,
 ) -> Response
 where
@@ -634,13 +660,13 @@ where
     SamplingBackend::Settings: Clone,
     SamplingBackend::Share: Debug + 'static,
     SamplingBackend::BlobId: Debug + 'static,
-    SamplingAdapter: nomos_da_sampling::network::NetworkAdapter + Send + 'static,
+    SamplingAdapter: nomos_da_sampling::network::NetworkAdapter<RuntimeServiceId> + Send + 'static,
     SamplingRng: SeedableRng + RngCore + Send + 'static,
-    SamplingStorage: nomos_da_sampling::storage::DaStorageAdapter,
-    DaVerifierStorage: nomos_da_verifier::storage::DaStorageAdapter,
+    SamplingStorage: nomos_da_sampling::storage::DaStorageAdapter<RuntimeServiceId>,
+    DaVerifierStorage: nomos_da_verifier::storage::DaStorageAdapter<RuntimeServiceId>,
     DaVerifierBackend: nomos_da_verifier::backend::VerifierBackend + Send + 'static,
     DaVerifierBackend::Settings: Clone,
-    DaVerifierNetwork: nomos_da_verifier::network::NetworkAdapter,
+    DaVerifierNetwork: nomos_da_verifier::network::NetworkAdapter<RuntimeServiceId>,
     DaVerifierNetwork::Settings: Clone,
     ApiAdapter: nomos_da_sampling::api::ApiAdapter + Send + Sync,
 {
@@ -657,5 +683,6 @@ where
         DaVerifierNetwork,
         DaVerifierStorage,
         ApiAdapter,
+        RuntimeServiceId,
     >(&handle, blob_info, DispersedBlobInfo::blob_id))
 }
