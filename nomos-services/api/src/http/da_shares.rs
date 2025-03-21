@@ -1,4 +1,10 @@
-use std::{collections::HashSet, hash::Hash, io::ErrorKind, sync::Arc};
+use std::{
+    collections::HashSet,
+    fmt::{Debug, Display},
+    hash::Hash,
+    io::ErrorKind,
+    sync::Arc,
+};
 
 use bytes::Bytes;
 use futures::{stream, Stream, StreamExt};
@@ -10,13 +16,16 @@ use nomos_storage::{
     backends::{rocksdb::RocksBackend, StorageSerde},
     StorageMsg, StorageService,
 };
-use overwatch::{overwatch::handle::OverwatchHandle, services::relay::OutboundRelay};
+use overwatch::{
+    overwatch::handle::OverwatchHandle,
+    services::{relay::OutboundRelay, AsServiceId},
+};
 use serde::{de::DeserializeOwned, Serialize};
 use tokio::sync::oneshot;
 
 #[expect(clippy::implicit_hasher, reason = "Don't need custom hasher")]
-pub async fn get_shares<StorageOp, DaShare>(
-    handle: &OverwatchHandle,
+pub async fn get_shares<StorageOp, DaShare, RuntimeServiceId>(
+    handle: &OverwatchHandle<RuntimeServiceId>,
     blob_id: DaShare::BlobId,
     requested_shares: HashSet<DaShare::ShareIndex>,
     filter_shares: HashSet<DaShare::ShareIndex>,
@@ -37,10 +46,13 @@ where
         + Sync
         + 'static,
     StorageOp::Error: std::error::Error + Send + Sync + 'static,
+    RuntimeServiceId: Debug
+        + Sync
+        + Display
+        + AsServiceId<StorageService<RocksBackend<StorageOp>, RuntimeServiceId>>,
 {
     let storage_relay = handle
-        .relay::<StorageService<RocksBackend<StorageOp>>>()
-        .connect()
+        .relay::<StorageService<RocksBackend<StorageOp>, RuntimeServiceId>>()
         .await?;
 
     let blob_shares =
