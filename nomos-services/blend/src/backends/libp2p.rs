@@ -45,9 +45,9 @@ impl BlendBackend for Libp2pBlendBackend {
     type Settings = Libp2pBlendBackendSettings;
     type NodeId = PeerId;
 
-    fn new<R>(
+    fn new<R, RuntimeServiceId>(
         config: Self::Settings,
-        overwatch_handle: OverwatchHandle,
+        overwatch_handle: OverwatchHandle<RuntimeServiceId>,
         membership: Membership<Self::NodeId, SphinxMessage>,
         rng: R,
     ) -> Self

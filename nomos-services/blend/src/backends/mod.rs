@@ -15,9 +15,9 @@ pub trait BlendBackend {
     type Settings: Clone + Debug + Send + Sync + 'static;
     type NodeId: Clone + Debug + Send + Sync + 'static;
 
-    fn new<R>(
+    fn new<R, RuntimeServiceId>(
         config: Self::Settings,
-        overwatch_handle: OverwatchHandle,
+        overwatch_handle: OverwatchHandle<RuntimeServiceId>,
         membership: Membership<Self::NodeId, SphinxMessage>,
         rng: R,
     ) -> Self
