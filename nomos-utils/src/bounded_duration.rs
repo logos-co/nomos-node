@@ -144,7 +144,7 @@ impl<'de, const MIN_DURATION: usize, TAG: TimeTag> Deserialize<'de>
         let parsed_duration =
             humantime::parse_duration(format!("{MIN_DURATION}{reformat_measure}").as_str())
                 .map_err(D::Error::custom)?;
-        let min_duration: Duration = Duration::new(
+        let min_duration = Duration::new(
             parsed_duration
                 .as_secs()
                 .try_into()
