@@ -25,7 +25,6 @@ impl ReplicationRequest {
     }
 }
 
-#[repr(C)]
 #[derive(Debug, Clone, Copy, Eq, Hash, PartialEq)]
 pub struct ReplicationResponseId([u8; 34]);
 
